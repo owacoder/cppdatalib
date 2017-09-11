@@ -525,7 +525,7 @@ namespace cppdatalib
                         stream << std::string(indent_width * (start_indent + 1), ' ');
                         pretty_print(stream, *it, indent_width, start_indent + 1);
                     }
-                    return stream << '\n' << std::string(indent_width * start_indent, ' ') << "]";
+                    return stream << '\n' << std::string(indent_width * start_indent, ' ') << ']';
                 }
                 case core::object:
                 {
@@ -540,7 +540,7 @@ namespace cppdatalib
                         stream << std::string(indent_width * (start_indent + 1), ' ');
                         pretty_print(write_string(stream, it->first) << ": ", it->second, indent_width, start_indent + 1);
                     }
-                    return stream << '\n' << std::string(indent_width * start_indent, ' ') << "}";
+                    return stream << '\n' << std::string(indent_width * start_indent, ' ') << '}';
                 }
             }
 
@@ -722,6 +722,78 @@ namespace cppdatalib
 
     namespace plain_text_property_list
     {
+        inline std::istream &read_string(std::istream &stream, std::string &str)
+        {
+            static const std::string hex = "0123456789ABCDEF";
+            static const std::string octal = "01234567";
+            int c;
+
+            c = stream.get();
+            if (c != '"') throw core::error("expected string");
+
+            str.clear();
+            while (c = stream.get(), c != '"')
+            {
+                if (c == EOF) throw core::error("unexpected end of string");
+
+                if (c == '\\')
+                {
+                    c = stream.get();
+                    if (c == EOF) throw core::error("unexpected end of string");
+
+                    switch (c)
+                    {
+                        case 'b': str.push_back('\b'); break;
+                        case 'n': str.push_back('\n'); break;
+                        case 'r': str.push_back('\r'); break;
+                        case 't': str.push_back('\t'); break;
+                        case 'U':
+                        {
+                            uint32_t code = 0;
+                            for (int i = 0; i < 4; ++i)
+                            {
+                                c = stream.get();
+                                if (c == EOF) throw core::error("unexpected end of string");
+                                size_t pos = hex.find(toupper(c));
+                                if (pos == std::string::npos) throw core::error("invalid character escape sequence");
+                                code = (code << 4) | pos;
+                            }
+
+                            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+                            str += utf8.to_bytes(code);
+
+                            break;
+                        }
+                        default:
+                        {
+                            if (isdigit(c))
+                            {
+                                uint32_t code = 0;
+                                for (int i = 0; i < 3; ++i)
+                                {
+                                    c = stream.get();
+                                    if (c == EOF) throw core::error("unexpected end of string");
+                                    if (!isdigit(c) || c == '8' || c == '9') throw core::error("invalid character escape sequence");
+                                    code = (code << 3) | (c - '0');
+                                }
+
+                                std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+                                str += utf8.to_bytes(code);
+                            }
+                            else
+                                str.push_back(c);
+
+                            break;
+                        }
+                    }
+                }
+                else
+                    str.push_back(c);
+            }
+
+            return stream;
+        }
+
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
         {
             static const char hex[] = "0123456789ABCDEF";
@@ -753,6 +825,120 @@ namespace cppdatalib
             }
 
             return stream << '"';
+        }
+
+        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        {
+            char chr;
+
+            stream >> std::skipws >> chr, stream.unget(); // Peek at next character past whitespace
+
+            if (stream.good())
+            {
+                switch (chr)
+                {
+                    case '<':
+                        stream >> chr; // Eat '<'
+                        if (stream.get() != '*') throw core::error("expected '*' after '<' in value");
+
+                        stream >> std::noskipws >> chr;
+                        if (!stream || (chr != 'B' && chr != 'I' && chr != 'R'))
+                            throw core::error("expected type specifier after '<*' in value");
+
+                        if (chr == 'B')
+                        {
+                            stream >> chr;
+                            if (!stream || (chr != 'Y' && chr != 'N'))
+                                throw core::error("expected 'boolean' value after '<*B' in value");
+
+                            v.set_bool(chr == 'Y');
+                        }
+                        else if (chr == 'I')
+                        {
+                            core::int_t i;
+                            stream >> i;
+                            if (!stream)
+                                throw core::error("expected 'integer' value after '<*I' in value");
+
+                            v.set_int(i);
+                        }
+                        else if (chr == 'R')
+                        {
+                            core::real_t r;
+                            stream >> r;
+                            if (!stream)
+                                throw core::error("expected 'real' value after '<*R' in value");
+
+                            v.set_real(r);
+                        }
+
+                        if (stream.get() != '>') throw core::error("expected '>' after value");
+                        return stream;
+                    case '"':
+                    {
+                        std::string str;
+                        read_string(stream, str);
+                        v.set_string(str);
+                        return stream;
+                    }
+                    case '(':
+                        stream >> chr; // Eat '('
+                        v.set_array(core::array_t());
+
+                        // Peek at next character past whitespace
+                        stream >> chr;
+                        if (!stream) throw core::error("expected ')' ending array");
+                        else if (chr == ')') return stream;
+
+                        stream.unget(); // Replace character we peeked at
+                        do
+                        {
+                            core::value item;
+                            stream >> item;
+                            v.push_back(item);
+
+                            stream >> chr;
+                            if (!stream || (chr != ',' && chr != ')'))
+                                throw core::error("expected ',' separating array elements or ')' ending array");
+                        } while (stream && chr != ')');
+
+                        return stream;
+                    case '{':
+                        stream >> chr; // Eat '{'
+                        v.set_object(core::object_t());
+
+                        // Peek at next character past whitespace
+                        stream >> chr;
+                        if (!stream) throw core::error("expected '}' ending object");
+                        else if (chr == '}') return stream;
+
+                        stream.unget(); // Replace character we peeked at
+                        do
+                        {
+                            std::string key;
+                            core::value item;
+
+                            read_string(stream, key);
+                            stream >> chr;
+                            if (chr != '=') throw core::error("expected '=' separating key and value in object");
+                            stream >> item;
+                            v[key] = item;
+
+                            stream >> chr;
+                            if (!stream || chr != ';')
+                                throw core::error("expected ';' after value in object");
+
+                            stream >> chr, stream.unget();
+                        } while (stream && chr != '}');
+
+                        stream.get(); // Eat '}'
+                        return stream;
+                    default:
+                        break;
+                }
+            }
+
+            throw core::error("expected JSON value");
         }
 
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
@@ -788,12 +974,71 @@ namespace cppdatalib
             return stream;
         }
 
+        inline std::ostream &pretty_print(std::ostream &stream, const core::value &v, size_t indent_width, size_t start_indent = 0)
+        {
+            switch (v.get_type())
+            {
+                case core::null: throw core::error("'null' value not allowed in property list output");
+                case core::boolean: return stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';
+                case core::integer: return stream << "<*I" << v.get_int() << '>';
+                case core::real: return stream << "<*R" << v.get_real() << '>';
+                case core::string: return write_string(stream, v.get_string());
+                case core::array:
+                {
+                    if (v.get_array().empty())
+                        return stream << "()";
+
+                    stream << "(\n";
+                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
+                    {
+                        if (it != v.get_array().begin())
+                            stream << ",\n";
+                        stream << std::string(indent_width * (start_indent + 1), ' ');
+                        pretty_print(stream, *it, indent_width, start_indent + 1);
+                    }
+                    return stream << '\n' << std::string(indent_width * start_indent, ' ') << ')';
+                }
+                case core::object:
+                {
+                    if (v.get_object().empty())
+                        return stream << "{}";
+
+                    stream << "{\n";
+                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
+                    {
+                        stream << std::string(indent_width * (start_indent + 1), ' ');
+                        pretty_print(write_string(stream, it->first) << " = ", it->second, indent_width, start_indent + 1) << ";\n";
+                    }
+                    return stream << std::string(indent_width * start_indent, ' ') << '}';
+                }
+            }
+
+            // Control will never get here
+            return stream;
+        }
+
+        inline std::istream &input(std::istream &stream, core::value &v) {return stream >> v;}
         inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
+
+        inline core::value from_plain_text_property_list(const std::string &property_list)
+        {
+            std::istringstream stream(property_list);
+            core::value v;
+            stream >> v;
+            return v;
+        }
 
         inline std::string to_plain_text_property_list(const core::value &v)
         {
             std::ostringstream stream;
             stream << v;
+            return stream.str();
+        }
+
+        inline std::string to_pretty_plain_text_property_list(const core::value &v, size_t indent_width)
+        {
+            std::ostringstream stream;
+            pretty_print(stream, v, indent_width);
             return stream.str();
         }
     }
