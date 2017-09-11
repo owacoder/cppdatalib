@@ -8,7 +8,7 @@ Supported formats include
 
    - JSON
    - Bencode
-   - plain text property lists (write-only)
+   - plain text property lists
    - XML property lists (write-only)
    - XML-RPC (write-only)
    - CSV (write-only)
