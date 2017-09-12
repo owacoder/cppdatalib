@@ -2,7 +2,7 @@
 
 Simple, header-only C++ data conversion library
 
-cppdatalib offers implementations of several different serialization formats designed for heirarchical data (and some that aren't).
+cppdatalib offers implementations of several different serialization formats designed for hierarchical data (and some that aren't).
 cppdatalib is able to easily convert to and from a standard internal representation.
 Supported formats include
 
