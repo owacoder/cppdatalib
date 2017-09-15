@@ -7,12 +7,12 @@ cppdatalib is able to easily convert to and from a standard internal representat
 Supported formats include
 
    - JSON
+   - UBJSON
    - Bencode
    - plain text property lists
    - XML property lists (write-only)
    - XML-RPC (write-only)
    - CSV (write-only)
-   - UBJSON (write-only)
 
 ### Usage
 
