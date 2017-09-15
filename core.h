@@ -9,12 +9,274 @@
 #include <codecvt>
 #include <locale>
 #include <type_traits>
-#include <math.h>
+#include <cmath>
+#include <float.h>
+#include <string.h>
 
 namespace cppdatalib
 {
+    namespace base64
+    {
+        inline std::string encode(const std::string &str)
+        {
+            const char alpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            std::string result;
+            uint32_t temp;
+
+            for (size_t i = 0; i < str.size();)
+            {
+                temp = (uint32_t) (str[i++] & 0xFF) << 16;
+                if (i + 2 <= str.size())
+                {
+                    temp |= (uint32_t) (str[i++] & 0xFF) << 8;
+                    temp |= (uint32_t) (str[i++] & 0xFF);
+                    result.push_back(alpha[(temp >> 18) & 0x3F]);
+                    result.push_back(alpha[(temp >> 12) & 0x3F]);
+                    result.push_back(alpha[(temp >>  6) & 0x3F]);
+                    result.push_back(alpha[ temp        & 0x3F]);
+                }
+                else if (i + 1 == str.size())
+                {
+                    temp |= (uint32_t) (str[i++] & 0xFF) << 8;
+                    result.push_back(alpha[(temp >> 18) & 0x3F]);
+                    result.push_back(alpha[(temp >> 12) & 0x3F]);
+                    result.push_back(alpha[(temp >>  6) & 0x3F]);
+                    result.push_back('=');
+                }
+                else if (i == str.size())
+                {
+                    result.push_back(alpha[(temp >> 18) & 0x3F]);
+                    result.push_back(alpha[(temp >> 12) & 0x3F]);
+                    result.push_back('=');
+                    result.push_back('=');
+                }
+            }
+
+            return result;
+        }
+
+        inline std::string decode(const std::string &str)
+        {
+            const std::string alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            std::string result;
+            size_t input = 0;
+            uint32_t temp = 0;
+
+            for (size_t i = 0; i < str.size(); ++i)
+            {
+                size_t pos = alpha.find(str[i]);
+                if (pos == std::string::npos)
+                    continue;
+                temp |= (uint32_t) pos << (18 - 6 * input++);
+                if (input == 4)
+                {
+                    result.push_back((temp >> 16) & 0xFF);
+                    result.push_back((temp >>  8) & 0xFF);
+                    result.push_back( temp        & 0xFF);
+                    input = 0;
+                    temp = 0;
+                }
+            }
+
+            if (input > 1) result.push_back((temp >> 16) & 0xFF);
+            if (input > 2) result.push_back((temp >>  8) & 0xFF);
+
+            return result;
+        }
+    }
+
     namespace core
     {
+        inline uint32_t float_cast_to_ieee_754(float f)
+        {
+            union
+            {
+                uint32_t output;
+                float input;
+            } result;
+
+            result.input = f;
+            return result.output;
+        }
+
+        inline float float_cast_from_ieee_754(uint32_t f)
+        {
+            union
+            {
+                uint32_t input;
+                float output;
+            } result;
+
+            result.input = f;
+            return result.output;
+        }
+
+        inline float float_from_ieee_754(uint32_t f)
+        {
+            const int32_t mantissa_mask = 0x7fffff;
+            const int32_t exponent_offset = 23;
+            const int32_t exponent_mask = 0xff;
+            const int32_t sign_offset = 31;
+
+            float result;
+            int32_t exp, mantissa;
+
+            // Extract exponent and mantissa
+            exp = (f >> exponent_offset) & exponent_mask;
+            mantissa = f & mantissa_mask;
+
+            // Handle special cases
+            if (exp == 0 && mantissa == 0) // 0, -0
+                result = 0;
+            else if (exp == exponent_mask) // +/- Infinity, NaN
+                result = mantissa == 0? INFINITY: NAN;
+            else
+            {
+                const int32_t normal = exp != 0;
+
+                // `mantissa | (normal << exponent_offset)` evaluates to 1.mantissa if normalized number, and 0.mantissa if denormalized
+                // `exp - exponent_offset - 126 - normal` is the adjusted exponent, removing the mantissa bias and the exponent bias (127)
+                // (The mantissa bias is determined by exponent_offset and normal, equal to the binary length of the mantissa, plus the implicit leading 1
+                //  for a normalized number. Denormalized numbers only have a leading 0.)
+
+                result = std::ldexp(static_cast<float>(mantissa | (normal << exponent_offset)),
+                                    exp - exponent_offset - 126 /* sic: the bias is adjusted for the following subtraction */ - normal);
+            }
+
+            return f >> sign_offset? -result: result;
+        }
+
+        inline uint32_t float_to_ieee_754(float f)
+        {
+            uint32_t result = 0;
+            int exp;
+
+            // Enter sign in result
+            result |= static_cast<uint32_t>(std::signbit(f)) << 31;
+            f = std::fabs(f);
+
+            // Handle special cases
+            if (f == 0)
+                return result;
+            else if (std::isinf(f))
+                return result | (0xfful << 23);
+            else if (std::isnan(f))
+                return result | (0x1fful << 22);
+
+            // Then get exponent and significand, base 2
+            f = std::frexp(f, &exp);
+
+            // Enter exponent in result
+            if (exp > -126) // Normalized number
+            {
+                result |= static_cast<uint32_t>((exp + 126) & 0xff) << 23;
+                exp = 0;
+            }
+            else // Denormalized number, adjust shift count
+                exp += 125;
+
+            // Bias significand so we can extract it as an integer
+            f *= std::exp2(24 + exp); // exp will actually be negative here, so this is effectively a subtraction
+            result |= static_cast<uint32_t>(std::trunc(f)) & 0x7fffff;
+
+            return result;
+        }
+
+        inline uint64_t double_cast_to_ieee_754(double d)
+        {
+            union
+            {
+                uint64_t output;
+                double input;
+            } result;
+
+            result.input = d;
+            return result.output;
+        }
+
+        inline double double_cast_from_ieee_754(uint64_t d)
+        {
+            union
+            {
+                uint64_t input;
+                double output;
+            } result;
+
+            result.input = d;
+            return result.output;
+        }
+
+        inline double double_from_ieee_754(uint64_t f)
+        {
+            const int64_t mantissa_mask = 0xfffffffffffff;
+            const int64_t exponent_offset = 52;
+            const int64_t exponent_mask = 0x7ff;
+            const int64_t sign_offset = 63;
+
+            double result;
+            int64_t exp, mantissa;
+
+            // Extract exponent and mantissa
+            exp = (f >> exponent_offset) & exponent_mask;
+            mantissa = f & mantissa_mask;
+
+            // Handle special cases
+            if (exp == 0 && mantissa == 0) // 0, -0
+                result = 0;
+            else if (exp == exponent_mask) // +/- Infinity, NaN
+                result = mantissa == 0? INFINITY: NAN;
+            else
+            {
+                const int64_t normal = exp != 0;
+
+                // `mantissa | (normal << exponent_offset)` evaluates to 1.mantissa if normalized number, and 0.mantissa if denormalized
+                // `exp - exponent_offset - 1022 - normal` is the adjusted exponent, removing the mantissa bias and the exponent bias (1023)
+                // (The mantissa bias is determined by exponent_offset and normal, equal to the binary length of the mantissa, plus the implicit leading 1
+                //  for a normalized number. Denormalized numbers only have a leading 0.)
+
+                result = std::ldexp(static_cast<double>(mantissa | (normal << exponent_offset)),
+                                    exp - exponent_offset - 1022 /* sic: the bias is adjusted for the following subtraction */ - normal);
+            }
+
+            return f >> sign_offset? -result: result;
+        }
+
+        inline uint64_t double_to_ieee_754(double d)
+        {
+            uint64_t result = 0;
+            int exp;
+
+            // Enter sign in result
+            result |= static_cast<uint64_t>(std::signbit(d)) << 63;
+            d = std::fabs(d);
+
+            // Handle special cases
+            if (d == 0)
+                return result;
+            else if (std::isinf(d))
+                return result | (0x7ffull << 52);
+            else if (std::isnan(d))
+                return result | (0xfffull << 51);
+
+            // Then get exponent and significand, base 2
+            d = std::frexp(d, &exp);
+
+            // Enter exponent in result
+            if (exp > -1022) // Normalized number
+            {
+                result |= static_cast<uint64_t>((exp + 1022) & 0x7ff) << 52;
+                exp = 0;
+            }
+            else // Denormalized number, adjust shift count
+                exp += 1021;
+
+            // Bias significand so we can extract it as an integer
+            d *= std::exp2(53 + exp); // exp will actually be negative here, so this is effectively a subtraction
+            result |= static_cast<uint64_t>(std::trunc(d)) & ((1ull << 52) - 1);
+
+            return result;
+        }
+
         enum type
         {
             null,
@@ -250,7 +512,7 @@ namespace cppdatalib
                 case null: return true;
                 case boolean: return lhs.get_bool() == rhs.get_bool();
                 case integer: return lhs.get_int() == rhs.get_int();
-                case real: return lhs.get_real() == rhs.get_real();
+                case real: return lhs.get_real() == rhs.get_real() || (std::isnan(lhs.get_real()) && std::isnan(rhs.get_real()));
                 case string: return lhs.get_string() == rhs.get_string();
                 case array: return lhs.get_array() == rhs.get_array();
                 case object: return lhs.get_object() == rhs.get_object();
@@ -725,7 +987,6 @@ namespace cppdatalib
         inline std::istream &read_string(std::istream &stream, std::string &str)
         {
             static const std::string hex = "0123456789ABCDEF";
-            static const std::string octal = "01234567";
             int c;
 
             c = stream.get();
@@ -769,6 +1030,7 @@ namespace cppdatalib
                             if (isdigit(c))
                             {
                                 uint32_t code = 0;
+                                stream.unget();
                                 for (int i = 0; i < 3; ++i)
                                 {
                                     c = stream.get();
@@ -816,7 +1078,29 @@ namespace cppdatalib
                         case '\t': stream << "\\t"; break;
                         default:
                             if (iscntrl(c))
-                                stream << "\\U00" << hex[c >> 4] << hex[c & 0xf];
+                                stream << '\\' << (c >> 6) << ((c >> 3) & 0x7) << (c & 0x7);
+                            else if (static_cast<unsigned char>(str[i]) > 0x7f)
+                            {
+                                std::string utf8_string;
+                                size_t j;
+                                for (j = i; j < str.size() && static_cast<unsigned char>(str[j]) > 0x7f; ++j)
+                                    utf8_string.push_back(str[j]);
+
+                                if (j < str.size())
+                                    utf8_string.push_back(str[j]);
+
+                                i = j;
+
+                                std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf8;
+                                std::u16string wstr = utf8.from_bytes(utf8_string);
+
+                                for (j = 0; j < wstr.size(); ++j)
+                                {
+                                    uint16_t c = wstr[j];
+
+                                    stream << "\\U" << hex[c >> 12] << hex[(c >> 8) & 0xf] << hex[(c >> 4) & 0xf] << hex[c & 0xf];
+                                }
+                            }
                             else
                                 stream << str[i];
                             break;
@@ -829,6 +1113,7 @@ namespace cppdatalib
 
         inline std::istream &operator>>(std::istream &stream, core::value &v)
         {
+            static const std::string hex = "0123456789ABCDEF";
             char chr;
 
             stream >> std::skipws >> chr, stream.unget(); // Peek at next character past whitespace
@@ -839,9 +1124,35 @@ namespace cppdatalib
                 {
                     case '<':
                         stream >> chr; // Eat '<'
-                        if (stream.get() != '*') throw core::error("expected '*' after '<' in value");
+                        stream >> chr;
+                        if (!stream) throw core::error("expected '*' after '<' in value");
 
-                        stream >> std::noskipws >> chr;
+                        if (chr != '*')
+                        {
+                            v.set_string(core::string_t());
+
+                            unsigned int t = 0;
+                            bool have_first_nibble = false;
+
+                            while (stream && chr != '>')
+                            {
+                                t <<= 4;
+                                size_t p = hex.find(toupper(static_cast<unsigned char>(chr)));
+                                if (p == std::string::npos) throw core::error("expected hexadecimal-encoded binary data in value");
+                                t |= p;
+
+                                if (have_first_nibble)
+                                    v.get_string().push_back(t);
+
+                                have_first_nibble = !have_first_nibble;
+                                stream >> chr;
+                            }
+
+                            if (have_first_nibble) throw core::error("unfinished byte in binary data");
+                            return stream;
+                        }
+
+                        stream >> chr;
                         if (!stream || (chr != 'B' && chr != 'I' && chr != 'R'))
                             throw core::error("expected type specifier after '<*' in value");
 
@@ -938,7 +1249,7 @@ namespace cppdatalib
                 }
             }
 
-            throw core::error("expected JSON value");
+            throw core::error("expected plain text property list value");
         }
 
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
@@ -1075,7 +1386,7 @@ namespace cppdatalib
             switch (v.get_type())
             {
                 case core::null: throw core::error("'null' value not allowed in property list output");
-                case core::boolean: return stream << "<" << (v.get_bool()? "true": "false") << " />";
+                case core::boolean: return stream << "<" << (v.get_bool()? "true": "false") << "/>";
                 case core::integer: return stream << "<integer>" << v.get_int() << "</integer>";
                 case core::real: return stream << "<real>" << v.get_real() << "</real>";
                 case core::string: return write_string(stream << "<string>", v.get_string()) << "</string>";
@@ -1271,6 +1582,136 @@ namespace cppdatalib
                 return 'L';
         }
 
+        inline std::istream &read_int(std::istream &stream, core::int_t &i, char specifier)
+        {
+            uint64_t temp;
+            bool negative = false;
+            int c = stream.get();
+
+            if (c == EOF) throw core::error("expected integer value after type specifier");
+            temp = c & 0xff;
+
+            switch (specifier)
+            {
+                case 'U': // Unsigned byte
+                    break;
+                case 'i': // Signed byte
+                    negative = c >> 7;
+                    temp |= negative * 0xffffffffffffff00ull;
+                    break;
+                case 'I': // Signed word
+                    negative = c >> 7;
+
+                    c = stream.get();
+                    if (c == EOF) throw core::error("expected integer value after type specifier");
+
+                    temp = (temp << 8) | (c & 0xff);
+                    temp |= negative * 0xffffffffffff0000ull;
+                    break;
+                case 'l': // Signed double-word
+                    negative = c >> 7;
+
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        c = stream.get();
+                        if (c == EOF) throw core::error("expected integer value after type specifier");
+
+                        temp = (temp << 8) | (c & 0xff);
+                    }
+                    temp |= negative * 0xffffffff00000000ull;
+                    break;
+                case 'L': // Signed double-word
+                    negative = c >> 7;
+
+                    for (int i = 0; i < 7; ++i)
+                    {
+                        c = stream.get();
+                        if (c == EOF) throw core::error("expected integer value after type specifier");
+
+                        temp = (temp << 8) | (c & 0xff);
+                    }
+                    break;
+            }
+
+            if (negative)
+            {
+                i = (~temp + 1) & ((1ull << 63) - 1);
+                if (i == 0)
+                    i = INT64_MIN;
+                else
+                    i = -i;
+            }
+            else
+                i = temp;
+
+            return stream;
+        }
+
+        inline std::istream &read_float(std::istream &stream, core::real_t &r, char specifier)
+        {
+            uint64_t temp;
+            int c = stream.get();
+
+            if (c == EOF) throw core::error("expected integer value after type specifier");
+            temp = c & 0xff;
+
+            if (specifier == 'd')
+            {
+                for (int i = 0; i < 3; ++i)
+                {
+                    c = stream.get();
+                    if (c == EOF) throw core::error("expected floating-point value after type specifier");
+
+                    temp = (temp << 8) | (c & 0xff);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < 7; ++i)
+                {
+                    c = stream.get();
+                    if (c == EOF) throw core::error("expected floating-point value after type specifier");
+
+                    temp = (temp << 8) | (c & 0xff);
+                }
+            }
+
+            if (specifier == 'd')
+                r = core::float_from_ieee_754(temp);
+            else
+                r = core::double_from_ieee_754(temp);
+
+            return stream;
+        }
+
+        inline std::istream &read_string(std::istream &stream, core::string_t &s, char specifier)
+        {
+            int c = stream.get();
+
+            if (c == EOF) throw core::error("expected string value after type specifier");
+
+            s.clear();
+            if (specifier == 'C')
+                s.push_back(c);
+            else
+            {
+                core::int_t size;
+
+                read_int(stream, size, c);
+                if (size < 0) throw core::error("invalid negative size specified for string");
+
+                while (size-- > 0)
+                {
+                    c = stream.get();
+                    if (c == EOF) throw core::error("expected string value after type specifier");
+
+                    s.push_back(c);
+                }
+            }
+
+            return stream;
+        }
+
         inline std::ostream &write_int(std::ostream &stream, core::int_t i, bool add_specifier, char force_specifier = 0)
         {
             const std::string specifiers = "UiIlL";
@@ -1329,6 +1770,38 @@ namespace cppdatalib
             }
         }
 
+        inline std::ostream &write_float(std::ostream &stream, core::real_t f, bool add_specifier, char force_specifier = 0)
+        {
+            const std::string specifiers = "dD";
+            size_t force_bits = specifiers.find(force_specifier);
+
+            if (force_bits == std::string::npos)
+                force_bits = 0;
+
+            if (force_bits == 0 && (core::float_from_ieee_754(core::float_to_ieee_754(f)) == f || std::isnan(f)))
+            {
+                uint32_t t = core::float_to_ieee_754(f);
+
+                return stream << (add_specifier? "d": "") << static_cast<unsigned char>(t >> 24) <<
+                                                             static_cast<unsigned char>((t >> 16) & 0xff) <<
+                                                             static_cast<unsigned char>((t >>  8) & 0xff) <<
+                                                             static_cast<unsigned char>((t      ) & 0xff);
+            }
+            else
+            {
+                uint64_t t = core::double_to_ieee_754(f);
+
+                return stream << (add_specifier? "L": "") << static_cast<unsigned char>(t >> 56) <<
+                                                             static_cast<unsigned char>((t >> 48) & 0xff) <<
+                                                             static_cast<unsigned char>((t >> 40) & 0xff) <<
+                                                             static_cast<unsigned char>((t >> 32) & 0xff) <<
+                                                             static_cast<unsigned char>((t >> 24) & 0xff) <<
+                                                             static_cast<unsigned char>((t >> 16) & 0xff) <<
+                                                             static_cast<unsigned char>((t >>  8) & 0xff) <<
+                                                             static_cast<unsigned char>((t      ) & 0xff);
+            }
+        }
+
         inline std::ostream &write_string(std::ostream &stream, const std::string &str, bool add_specifier)
         {
             if (str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
@@ -1342,6 +1815,135 @@ namespace cppdatalib
             return stream << str;
         }
 
+        inline std::istream &input(std::istream &stream, core::value &v, char specifier = 0)
+        {
+            struct null_exception {};
+
+            while (true)
+            {
+                int c = specifier? specifier: stream.get();
+
+                switch (c)
+                {
+                    case 'Z': v.set_null(); return stream;
+                    case 'T': v.set_bool(true); return stream;
+                    case 'F': v.set_bool(false); return stream;
+                    case 'U':
+                    case 'i':
+                    case 'I':
+                    case 'l':
+                    case 'L': return read_int(stream, v.get_int(), c);
+                    case 'd':
+                    case 'D': return read_float(stream, v.get_real(), c);
+                    case 'C':
+                    case 'S': return read_string(stream, v.get_string(), c);
+                    case 'N': break;
+                    case '[':
+                    {
+                        int type = 0;
+                        core::int_t size = 0;
+
+                        c = stream.get();
+                        if (c == EOF) throw core::error("expected array value after '['");
+
+                        if (c == '$') // Type specified
+                        {
+                            c = stream.get();
+                            if (c == EOF) throw core::error("expected type specifier after '$'");
+                            type = c;
+                            c = stream.get();
+                            if (c == EOF) throw core::error("unexpected end of array");
+                        }
+
+                        v.set_array(core::array_t());
+                        if (c == '#') // Count specified
+                        {
+                            c = stream.get();
+                            if (c == EOF) throw core::error("expected count specifier after '#'");
+
+                            read_int(stream, size, c);
+                            if (size < 0) throw core::error("invalid negative size specified for array");
+
+                            while (size-- > 0)
+                            {
+                                core::value item;
+                                input(stream, item, type);
+                                v.push_back(item);
+                            }
+                            return stream;
+                        }
+
+                        while (c != ']')
+                        {
+                            core::value item;
+                            input(stream, item, c);
+                            v.push_back(item);
+
+                            c = stream.get();
+                            if (c == EOF) throw core::error("unexpected end of array");
+                        }
+
+                        return stream;
+                    }
+                    case '{':
+                    {
+                        int type = 0;
+                        core::int_t size = 0;
+
+                        c = stream.get();
+                        if (c == EOF) throw core::error("expected object value after '{'");
+
+                        if (c == '$') // Type specified
+                        {
+                            c = stream.get();
+                            if (c == EOF) throw core::error("expected type specifier after '$'");
+                            type = c;
+                            c = stream.get();
+                            if (c == EOF) throw core::error("unexpected end of object");
+                        }
+
+                        v.set_object(core::object_t());
+                        if (c == '#') // Count specified
+                        {
+                            c = stream.get();
+                            if (c == EOF) throw core::error("expected count specifier after '#'");
+
+                            read_int(stream, size, c);
+                            if (size < 0) throw core::error("invalid negative size specified for object");
+
+                            while (size-- > 0)
+                            {
+                                core::value item;
+                                std::string key;
+
+                                read_string(stream, key, 'S');
+                                input(stream, item, type);
+                                v[key] = item;
+                            }
+                            return stream;
+                        }
+
+                        while (c != '}')
+                        {
+                            core::value item;
+                            std::string key;
+
+                            read_string(stream, key, 'S');
+                            input(stream, item, c);
+                            v[key] = item;
+
+                            c = stream.get();
+                            if (c == EOF) throw core::error("unexpected end of object");
+                        }
+
+                        return stream;
+                    }
+                }
+
+                throw core::error("expected UBJSON value");
+            }
+        }
+
         inline std::ostream &print(std::ostream &stream, const core::value &v, bool add_specifier = true, char force_specifier = 0)
         {
             switch (v.get_type())
@@ -1349,7 +1951,7 @@ namespace cppdatalib
                 case core::null: return add_specifier? stream << 'Z': stream;
                 case core::boolean: return add_specifier? stream << (v.get_bool()? 'T': 'F'): stream;
                 case core::integer: return write_int(stream, v.get_int(), add_specifier, force_specifier);
-                case core::real: throw core::error("'real' values are not yet implemented in UBJSON output"); // TODO
+                case core::real: return write_float(stream, v.get_real(), add_specifier, force_specifier);
                 case core::string: return write_string(stream, v.get_string(), add_specifier);
                 case core::array:
                 {
@@ -1359,6 +1961,7 @@ namespace cppdatalib
 
                     bool bool_val = false;
                     bool strings_can_be_chars = true;
+                    bool reals_can_be_floats = true;
                     core::int_t int_min = 0, int_max = 0;
 
                     if (v.size())
@@ -1384,6 +1987,11 @@ namespace cppdatalib
                             else if (it->get_int() > int_max)
                                 int_max = it->get_int();
                         }
+                        else if (it->is_real() && reals_can_be_floats)
+                        {
+                            if (it->get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->get_real())))
+                                reals_can_be_floats = false;
+                        }
                         else if (it->is_string() && strings_can_be_chars)
                         {
                             if (it->get_string().size() != 1 || static_cast<unsigned char>(it->get_string()[0]) >= 128)
@@ -1394,7 +2002,7 @@ namespace cppdatalib
                     if (add_specifier)
                         stream << '[';
 
-                    if (same_types)
+                    if (same_types && v.size() > 1)
                     {
                         stream << '$';
                         switch (type)
@@ -1402,7 +2010,7 @@ namespace cppdatalib
                             case core::null: stream << 'Z'; break;
                             case core::boolean: stream << (bool_val? 'T': 'F'); break;
                             case core::integer: stream << (forced_type = size_specifier(int_min, int_max)); break;
-                            case core::real: break; // TODO
+                            case core::real: stream << (forced_type = (reals_can_be_floats? 'd': 'D')); break;
                             case core::string: stream << (strings_can_be_chars? 'C': 'S'); break;
                             case core::array: stream << '['; break;
                             case core::object: stream << '{'; break;
@@ -1434,6 +2042,7 @@ namespace cppdatalib
 
                     bool bool_val = false;
                     bool strings_can_be_chars = true;
+                    bool reals_can_be_floats = true;
                     core::int_t int_min = 0, int_max = 0;
 
                     if (v.size())
@@ -1459,6 +2068,11 @@ namespace cppdatalib
                             else if (it->second.get_int() > int_max)
                                 int_max = it->second.get_int();
                         }
+                        else if (it->second.is_real() && reals_can_be_floats)
+                        {
+                            if (it->second.get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->second.get_real())))
+                                reals_can_be_floats = false;
+                        }
                         else if (it->second.is_string() && strings_can_be_chars)
                         {
                             if (it->second.get_string().size() != 1 || static_cast<unsigned char>(it->second.get_string()[0]) >= 128)
@@ -1469,7 +2083,7 @@ namespace cppdatalib
                     if (add_specifier)
                         stream << '{';
 
-                    if (same_types)
+                    if (same_types && v.size() > 1)
                     {
                         stream << '$';
                         switch (type)
@@ -1477,7 +2091,7 @@ namespace cppdatalib
                             case core::null: stream << 'Z'; break;
                             case core::boolean: stream << (bool_val? 'T': 'F'); break;
                             case core::integer: stream << (forced_type = size_specifier(int_min, int_max)); break;
-                            case core::real: break; // TODO
+                            case core::real: stream << (forced_type = (reals_can_be_floats? 'd': 'D')); break;
                             case core::string: stream << (strings_can_be_chars? 'C': 'S'); break;
                             case core::array: stream << '['; break;
                             case core::object: stream << '{'; break;
@@ -1495,7 +2109,7 @@ namespace cppdatalib
                         for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
                             print(write_int(stream, it->first.size(), true) << it->first, it->second);
 
-                        return stream << ']';
+                        return stream << '}';
                     }
                 }
             }
@@ -1504,7 +2118,16 @@ namespace cppdatalib
             return stream;
         }
 
+        inline std::istream &operator>>(std::istream &stream, core::value &v) {return input(stream, v);}
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v) {return print(stream, v);}
+
+        inline core::value from_ubjson(const std::string &ubjson)
+        {
+            std::istringstream stream(ubjson);
+            core::value v;
+            stream >> v;
+            return v;
+        }
 
         inline std::string to_ubjson(const core::value &v)
         {
