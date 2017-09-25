@@ -170,7 +170,7 @@ namespace cppdatalib
             if (exp > -14) // Normalized number
             {
                 if (exp + 14 >= 0x1f)
-                    return result | (0x1ful << 10);
+                    return result | (0x1fu << 10);
 
                 result |= static_cast<uint16_t>(exp + 14) << 10;
                 exp = 0;
@@ -342,7 +342,7 @@ namespace cppdatalib
             if (exp > -1022) // Normalized number
             {
                 if (exp + 1022 >= 0x7ff)
-                    return result | (0x7fful << 52);
+                    return result | (0x7ffull << 52);
 
                 result |= static_cast<uint64_t>((exp + 1022) & 0x7ff) << 52;
                 exp = 0;
