@@ -368,6 +368,13 @@ namespace cppdatalib
             object
         };
 
+        enum string_subtype
+        {
+            normal,
+            date,
+            bignum
+        };
+
         class value;
 
         typedef bool bool_t;
@@ -391,18 +398,21 @@ namespace cppdatalib
         class value
         {
         public:
-            value() : type_(null) {}
-            value(bool_t v) : type_(boolean), bool_(v) {}
-            value(int_t v) : type_(integer), int_(v) {}
-            value(real_t v) : type_(real), real_(v) {}
-            value(cstring_t v) : type_(string), str_(v) {}
-            value(const string_t &v) : type_(string), str_(v) {}
-            value(const array_t &v) : type_(array), arr_(v) {}
-            value(const object_t &v) : type_(object), obj_(v) {}
+            value() : type_(null), subtype_(0) {}
+            value(bool_t v) : type_(boolean), bool_(v), subtype_(0) {}
+            value(int_t v) : type_(integer), int_(v), subtype_(0) {}
+            value(real_t v) : type_(real), real_(v), subtype_(0) {}
+            value(cstring_t v) : type_(string), str_(v), subtype_(0) {}
+            value(const string_t &v) : type_(string), str_(v), subtype_(0) {}
+            value(const array_t &v) : type_(array), arr_(v), subtype_(0) {}
+            value(const object_t &v) : type_(object), obj_(v), subtype_(0) {}
             template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-            value(T v) : type_(integer), int_(v) {}
+            value(T v) : type_(integer), int_(v), subtype_(0) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-            value(T v) : type_(real), real_(v) {}
+            value(T v) : type_(real), real_(v), subtype_(0) {}
+
+            long get_subtype() const {return subtype_;}
+            void set_subtype(long _type) {subtype_ = _type;}
 
             type get_type() const {return type_;}
             size_t size() const {return type_ == array? arr_.size(): type_ == object? obj_.size(): 0;}
@@ -438,6 +448,15 @@ namespace cppdatalib
             void set_string(const string_t &v) {clear(string); str_ = v;}
             void set_array(const array_t &v) {clear(array); arr_ = v;}
             void set_object(const object_t &v) {clear(object); obj_ = v;}
+
+            void set_null(long subtype) {clear(null); subtype_ = subtype;}
+            void set_bool(bool_t v, long subtype) {clear(boolean); bool_ = v; subtype_ = subtype;}
+            void set_int(int_t v, long subtype) {clear(integer); int_ = v; subtype_ = subtype;}
+            void set_real(real_t v, long subtype) {clear(real); real_ = v; subtype_ = subtype;}
+            void set_string(cstring_t v, long subtype) {clear(string); str_ = v; subtype_ = subtype;}
+            void set_string(const string_t &v, long subtype) {clear(string); str_ = v; subtype_ = subtype;}
+            void set_array(const array_t &v, long subtype) {clear(array); arr_ = v; subtype_ = subtype;}
+            void set_object(const object_t &v, long subtype) {clear(object); obj_ = v; subtype_ = subtype;}
 
             value operator[](const string_t &key) const
             {
@@ -578,6 +597,7 @@ namespace cppdatalib
             string_t str_;
             array_t arr_;
             object_t obj_;
+            long subtype_;
         };
 
         struct null_t : value {null_t() {}};
