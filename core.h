@@ -1768,6 +1768,7 @@ namespace cppdatalib
         {
             int c = stream.get();
 
+            std::cout << (char) c << std::endl;
             if (c == EOF) throw core::error("expected string value after type specifier");
 
             s.clear();
@@ -1779,6 +1780,7 @@ namespace cppdatalib
 
                 read_int(stream, size, c);
                 if (size < 0) throw core::error("invalid negative size specified for string");
+                std::cout << "size: " << size << " " << (char) c << std::endl;
 
                 while (size-- > 0)
                 {
@@ -2008,8 +2010,9 @@ namespace cppdatalib
                             core::value item;
                             std::string key;
 
+                            stream.unget();
                             read_string(stream, key, 'S');
-                            input(stream, item, c);
+                            input(stream, item);
                             v[key] = item;
 
                             c = stream.get();
