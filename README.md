@@ -10,6 +10,7 @@ Supported formats include
    - UBJSON
    - Bencode
    - plain text property lists
+   - Binn (write-only)
    - XML property lists (write-only)
    - XML-RPC (write-only)
    - CSV (write-only)
@@ -47,18 +48,48 @@ Note: If an `input` or `print` function takes more than two parameters, ignore t
 
 ### Supported datatypes
 
-If a type is unsupported in a serialization format, the type is not converted to something recognizable by the format, but an error is thrown instead, describing the failure.
+If a type is unsupported in a serialization format, the type is not converted to something recognizable by the format, but an error is thrown instead, describing the failure. However, if a subtype is not supported, the value is processed as if it had none (i.e. if a value is a `string`, with unsupported subtype `date`, the value is processed as a meaningless string and the subtype metadata is removed).
+
+If a format-defined limit is reached, such as an object key length limit, an error will be thrown.
 
    - JSON supports `null`, `bool`, `int` and `real`, `string`, `array`, and `object`.<br/>
-     Note: `int`s are mapped onto `double`s in the implementation.
+     Notes:
+       - `int`s are mapped onto `double`s in the implementation.
+       - No subtypes are supported.
+     
    - Bencode supports `int`, `string`, `array`, and `object`.<br/>
-     Note: `null`, `bool`, and `real`s are **not** supported.
+     Notes:
+       - `null`, `bool`, and `real`s are **not** supported.
+       - No subtypes are supported.
+     
    - plain text property lists support `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
-     Note: `null`s are **not** supported.
+     Notes:
+       - `null`s are **not** supported.<br/>
+       - `string` subtypes `date`, `time`, and `datetime` are supported.
+     
+   - Binn supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `date`, `time`, `datetime`, `bignum`, and `blob` are supported.
+       - `object` subtype `map` is supported.
+       - Map keys are limited to signed 32-bit integers.
+       - Object keys are limited to 255 characters or fewer.
+       - Custom subtypes for `null`, `bool`, `int`, `string`, and `array` are supported, as long as they are at least equal to the value of `core::user`.
+   
    - XML property lists support `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
-     Note: `null`s are **not** supported.
+     Notes:
+       - `null`s are **not** supported.
+       - `string` subtypes `date`, `time`, and `datetime` are supported.
+     
    - XML-RPC supports `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
-     Note: `null`s are **not** supported.
+     Notes:
+       - `null`s are **not** supported.
+       - No subtypes are supported.
+     
    - CSV supports `null`, `bool`, `int`, `real`, `string`, and `array`.<br/>
-     Note: `object`s are **not** supported.
+     Notes:
+       - `object`s are **not** supported.
+       - No subtypes are supported.
+     
    - UBJSON supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.
+     Notes:
+       - `string` subtype `bignum` is supported.
