@@ -368,10 +368,14 @@ namespace cppdatalib
             object
         };
 
+        enum default_subtype
+        {
+            normal
+        };
+
         enum string_subtype
         {
-            normal,
-            date,
+            date = normal + 1,
             bignum
         };
 
@@ -399,19 +403,20 @@ namespace cppdatalib
         {
         public:
             value() : type_(null), subtype_(0) {}
-            value(bool_t v) : type_(boolean), bool_(v), subtype_(0) {}
-            value(int_t v) : type_(integer), int_(v), subtype_(0) {}
-            value(real_t v) : type_(real), real_(v), subtype_(0) {}
-            value(cstring_t v) : type_(string), str_(v), subtype_(0) {}
-            value(const string_t &v) : type_(string), str_(v), subtype_(0) {}
-            value(const array_t &v) : type_(array), arr_(v), subtype_(0) {}
-            value(const object_t &v) : type_(object), obj_(v), subtype_(0) {}
+            value(bool_t v, long subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
+            value(int_t v, long subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
+            value(real_t v, long subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
+            value(cstring_t v, long subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
+            value(const string_t &v, long subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
+            value(const array_t &v, long subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
+            value(const object_t &v, long subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-            value(T v) : type_(integer), int_(v), subtype_(0) {}
+            value(T v, long subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-            value(T v) : type_(real), real_(v), subtype_(0) {}
+            value(T v, long subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
 
             long get_subtype() const {return subtype_;}
+            long &get_subtype() {return subtype_;}
             void set_subtype(long _type) {subtype_ = _type;}
 
             type get_type() const {return type_;}
@@ -509,6 +514,7 @@ namespace cppdatalib
                 arr_.clear(); arr_.shrink_to_fit();
                 obj_.clear();
                 type_ = new_type;
+                subtype_ = 0;
             }
 
             value &convert_to(type new_type, value default_value)
@@ -645,17 +651,17 @@ namespace cppdatalib
             int c;
 
             c = stream.get();
-            if (c != '"') throw core::error("expected string");
+            if (c != '"') throw core::error("JSON - expected string");
 
             str.clear();
             while (c = stream.get(), c != '"')
             {
-                if (c == EOF) throw core::error("unexpected end of string");
+                if (c == EOF) throw core::error("JSON - unexpected end of string");
 
                 if (c == '\\')
                 {
                     c = stream.get();
-                    if (c == EOF) throw core::error("unexpected end of string");
+                    if (c == EOF) throw core::error("JSON - unexpected end of string");
 
                     switch (c)
                     {
@@ -670,9 +676,9 @@ namespace cppdatalib
                             for (int i = 0; i < 4; ++i)
                             {
                                 c = stream.get();
-                                if (c == EOF) throw core::error("unexpected end of string");
+                                if (c == EOF) throw core::error("JSON - unexpected end of string");
                                 size_t pos = hex.find(toupper(c));
-                                if (pos == std::string::npos) throw core::error("invalid character escape sequence");
+                                if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
                                 code = (code << 4) | pos;
                             }
 
@@ -737,15 +743,15 @@ namespace cppdatalib
                 switch (chr)
                 {
                     case 'n':
-                        if (!core::stream_starts_with(stream, "null")) throw core::error("expected 'null' value");
+                        if (!core::stream_starts_with(stream, "null")) throw core::error("JSON - expected 'null' value");
                         v.set_null();
                         return stream;
                     case 't':
-                        if (!core::stream_starts_with(stream, "true")) throw core::error("expected 'true' value");
+                        if (!core::stream_starts_with(stream, "true")) throw core::error("JSON - expected 'true' value");
                         v.set_bool(true);
                         return stream;
                     case 'f':
-                        if (!core::stream_starts_with(stream, "false")) throw core::error("expected 'false' value");
+                        if (!core::stream_starts_with(stream, "false")) throw core::error("JSON - expected 'false' value");
                         v.set_bool(false);
                         return stream;
                     case '"':
@@ -761,7 +767,7 @@ namespace cppdatalib
 
                         // Peek at next character past whitespace
                         stream >> chr;
-                        if (!stream) throw core::error("expected ']' ending array");
+                        if (!stream) throw core::error("JSON - expected ']' ending array");
                         else if (chr == ']') return stream;
 
                         stream.unget(); // Replace character we peeked at
@@ -773,7 +779,7 @@ namespace cppdatalib
 
                             stream >> chr;
                             if (!stream || (chr != ',' && chr != ']'))
-                                throw core::error("expected ',' separating array elements or ']' ending array");
+                                throw core::error("JSON - expected ',' separating array elements or ']' ending array");
                         } while (stream && chr != ']');
 
                         return stream;
@@ -783,7 +789,7 @@ namespace cppdatalib
 
                         // Peek at next character past whitespace
                         stream >> chr;
-                        if (!stream) throw core::error("expected '}' ending object");
+                        if (!stream) throw core::error("JSON - expected '}' ending object");
                         else if (chr == '}') return stream;
 
                         stream.unget(); // Replace character we peeked at
@@ -794,13 +800,13 @@ namespace cppdatalib
 
                             read_string(stream, key);
                             stream >> chr;
-                            if (chr != ':') throw core::error("expected ':' separating key and value in object");
+                            if (chr != ':') throw core::error("JSON - expected ':' separating key and value in object");
                             stream >> item;
                             v[key] = item;
 
                             stream >> chr;
                             if (!stream || (chr != ',' && chr != '}'))
-                                throw core::error("expected ',' separating key value pairs or '}' ending object");
+                                throw core::error("JSON - expected ',' separating key value pairs or '}' ending object");
                         } while (stream && chr != '}');
 
                         return stream;
@@ -809,7 +815,7 @@ namespace cppdatalib
                         {
                             core::real_t r;
                             stream >> r;
-                            if (!stream) throw core::error("invalid number");
+                            if (!stream) throw core::error("JSON - invalid number");
 
                             if (r == trunc(r) && r >= INT64_MIN && r <= INT64_MAX)
                                 v.set_int(static_cast<core::int_t>(r));
@@ -822,7 +828,7 @@ namespace cppdatalib
                 }
             }
 
-            throw core::error("expected JSON value");
+            throw core::error("JSON - expected value");
         }
 
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
@@ -949,10 +955,10 @@ namespace cppdatalib
 
                         core::int_t i;
                         stream >> i;
-                        if (!stream) throw core::error("expected 'integer' value");
+                        if (!stream) throw core::error("Bencode - expected 'integer' value");
 
                         v.set_int(i);
-                        if (stream.get() != 'e') throw core::error("invalid 'integer' value");
+                        if (stream.get() != 'e') throw core::error("Bencode - invalid 'integer' value");
 
                         return stream;
                     }
@@ -962,7 +968,7 @@ namespace cppdatalib
 
                         // Peek at next character
                         chr = stream.get();
-                        if (!stream) throw core::error("expected 'e' ending list");
+                        if (!stream) throw core::error("Bencode - expected 'e' ending list");
                         else if (chr == 'e') return stream;
 
                         do
@@ -975,7 +981,7 @@ namespace cppdatalib
 
                             chr = stream.get();
                             if (chr == EOF)
-                                throw core::error("expected 'e' ending list");
+                                throw core::error("Bencode - expected 'e' ending list");
                         } while (stream && chr != 'e');
 
                         return stream;
@@ -985,7 +991,7 @@ namespace cppdatalib
 
                         // Peek at next character
                         chr = stream.get();
-                        if (!stream) throw core::error("expected 'e' ending dictionary");
+                        if (!stream) throw core::error("Bencode - expected 'e' ending dictionary");
                         else if (chr == 'e') return stream;
 
                         do
@@ -997,12 +1003,12 @@ namespace cppdatalib
 
                             stream >> key >> item;
 
-                            if (!key.is_string()) throw core::error("dictionary key is not a string");
+                            if (!key.is_string()) throw core::error("Bencode - dictionary key is not a string");
                             v[key.get_string()] = item;
 
                             chr = stream.get();
                             if (chr == EOF)
-                                throw core::error("expected 'e' ending dictionary");
+                                throw core::error("Bencode - expected 'e' ending dictionary");
                         } while (stream && chr != 'e');
 
                         return stream;
@@ -1013,15 +1019,15 @@ namespace cppdatalib
                             v.set_string(core::string_t());
 
                             stream >> size;
-                            if (size < 0) throw core::error("expected string size");
-                            if (stream.get() != ':') throw core::error("expected ':' separating string size and data");
+                            if (size < 0) throw core::error("Bencode - expected string size");
+                            if (stream.get() != ':') throw core::error("Bencode - expected ':' separating string size and data");
 
                             // TODO: read string
                             v.get_string().reserve(size);
                             while (size--)
                             {
                                 chr = stream.get();
-                                if (chr == EOF) throw core::error("unexpected end of string");
+                                if (chr == EOF) throw core::error("Bencode - unexpected end of string");
                                 v.get_string().push_back(chr);
                             }
 
@@ -1031,17 +1037,17 @@ namespace cppdatalib
                 }
             }
 
-            throw core::error("expected Bencode value");
+            throw core::error("Bencode - expected value");
         }
 
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
         {
             switch (v.get_type())
             {
-                case core::null: throw core::error("'null' value not allowed in Bencode output");
-                case core::boolean: throw core::error("'boolean' value not allowed in Bencode output");
+                case core::null: throw core::error("Bencode - 'null' value not allowed in output");
+                case core::boolean: throw core::error("Bencode - 'boolean' value not allowed in output");
                 case core::integer: return stream << 'i' << v.get_int() << 'e';
-                case core::real: throw core::error("'real' value not allowed in Bencode output");
+                case core::real: throw core::error("Bencode - 'real' value not allowed in output");
                 case core::string: return stream << v.get_string().size() << ':' << v.get_string();
                 case core::array:
                 {
@@ -1090,17 +1096,17 @@ namespace cppdatalib
             int c;
 
             c = stream.get();
-            if (c != '"') throw core::error("expected string");
+            if (c != '"') throw core::error("Plain Text Property List - expected string");
 
             str.clear();
             while (c = stream.get(), c != '"')
             {
-                if (c == EOF) throw core::error("unexpected end of string");
+                if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
 
                 if (c == '\\')
                 {
                     c = stream.get();
-                    if (c == EOF) throw core::error("unexpected end of string");
+                    if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
 
                     switch (c)
                     {
@@ -1114,9 +1120,9 @@ namespace cppdatalib
                             for (int i = 0; i < 4; ++i)
                             {
                                 c = stream.get();
-                                if (c == EOF) throw core::error("unexpected end of string");
+                                if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
                                 size_t pos = hex.find(toupper(c));
-                                if (pos == std::string::npos) throw core::error("invalid character escape sequence");
+                                if (pos == std::string::npos) throw core::error("Plain Text Property List - invalid character escape sequence");
                                 code = (code << 4) | pos;
                             }
 
@@ -1134,8 +1140,8 @@ namespace cppdatalib
                                 for (int i = 0; i < 3; ++i)
                                 {
                                     c = stream.get();
-                                    if (c == EOF) throw core::error("unexpected end of string");
-                                    if (!isdigit(c) || c == '8' || c == '9') throw core::error("invalid character escape sequence");
+                                    if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
+                                    if (!isdigit(c) || c == '8' || c == '9') throw core::error("Plain Text Property List - invalid character escape sequence");
                                     code = (code << 3) | (c - '0');
                                 }
 
@@ -1225,7 +1231,7 @@ namespace cppdatalib
                     case '<':
                         stream >> chr; // Eat '<'
                         stream >> chr;
-                        if (!stream) throw core::error("expected '*' after '<' in value");
+                        if (!stream) throw core::error("Plain Text Property List - expected '*' after '<' in value");
 
                         if (chr != '*')
                         {
@@ -1238,7 +1244,7 @@ namespace cppdatalib
                             {
                                 t <<= 4;
                                 size_t p = hex.find(toupper(static_cast<unsigned char>(chr)));
-                                if (p == std::string::npos) throw core::error("expected hexadecimal-encoded binary data in value");
+                                if (p == std::string::npos) throw core::error("Plain Text Property List - expected hexadecimal-encoded binary data in value");
                                 t |= p;
 
                                 if (have_first_nibble)
@@ -1248,19 +1254,19 @@ namespace cppdatalib
                                 stream >> chr;
                             }
 
-                            if (have_first_nibble) throw core::error("unfinished byte in binary data");
+                            if (have_first_nibble) throw core::error("Plain Text Property List - unfinished byte in binary data");
                             return stream;
                         }
 
                         stream >> chr;
-                        if (!stream || (chr != 'B' && chr != 'I' && chr != 'R'))
-                            throw core::error("expected type specifier after '<*' in value");
+                        if (!stream || !strchr("BIRD", chr))
+                            throw core::error("Plain Text Property List - expected type specifier after '<*' in value");
 
                         if (chr == 'B')
                         {
                             stream >> chr;
                             if (!stream || (chr != 'Y' && chr != 'N'))
-                                throw core::error("expected 'boolean' value after '<*B' in value");
+                                throw core::error("Plain Text Property List - expected 'boolean' value after '<*B' in value");
 
                             v.set_bool(chr == 'Y');
                         }
@@ -1269,7 +1275,7 @@ namespace cppdatalib
                             core::int_t i;
                             stream >> i;
                             if (!stream)
-                                throw core::error("expected 'integer' value after '<*I' in value");
+                                throw core::error("Plain Text Property List - expected 'integer' value after '<*I' in value");
 
                             v.set_int(i);
                         }
@@ -1278,12 +1284,25 @@ namespace cppdatalib
                             core::real_t r;
                             stream >> r;
                             if (!stream)
-                                throw core::error("expected 'real' value after '<*R' in value");
+                                throw core::error("Plain Text Property List - expected 'real' value after '<*R' in value");
 
                             v.set_real(r);
                         }
+                        else if (chr == 'D')
+                        {
+                            int c;
+                            v.set_string(std::string());
+                            while (c = stream.get(), c != '>')
+                            {
+                                if (c == EOF) throw core::error("Plain Text Property List - expected '>' after value");
 
-                        if (stream.get() != '>') throw core::error("expected '>' after value");
+                                v.get_string().push_back(c);
+                            }
+                            stream.unget();
+                            v.set_subtype(core::date);
+                        }
+
+                        if (stream.get() != '>') throw core::error("Plain Text Property List - expected '>' after value");
                         return stream;
                     case '"':
                     {
@@ -1298,7 +1317,7 @@ namespace cppdatalib
 
                         // Peek at next character past whitespace
                         stream >> chr;
-                        if (!stream) throw core::error("expected ')' ending array");
+                        if (!stream) throw core::error("Plain Text Property List - expected ')' ending array");
                         else if (chr == ')') return stream;
 
                         stream.unget(); // Replace character we peeked at
@@ -1310,7 +1329,7 @@ namespace cppdatalib
 
                             stream >> chr;
                             if (!stream || (chr != ',' && chr != ')'))
-                                throw core::error("expected ',' separating array elements or ')' ending array");
+                                throw core::error("Plain Text Property List - expected ',' separating array elements or ')' ending array");
                         } while (stream && chr != ')');
 
                         return stream;
@@ -1320,7 +1339,7 @@ namespace cppdatalib
 
                         // Peek at next character past whitespace
                         stream >> chr;
-                        if (!stream) throw core::error("expected '}' ending object");
+                        if (!stream) throw core::error("Plain Text Property List - expected '}' ending object");
                         else if (chr == '}') return stream;
 
                         stream.unget(); // Replace character we peeked at
@@ -1331,13 +1350,13 @@ namespace cppdatalib
 
                             read_string(stream, key);
                             stream >> chr;
-                            if (chr != '=') throw core::error("expected '=' separating key and value in object");
+                            if (chr != '=') throw core::error("Plain Text Property List - expected '=' separating key and value in object");
                             stream >> item;
                             v[key] = item;
 
                             stream >> chr;
                             if (!stream || chr != ';')
-                                throw core::error("expected ';' after value in object");
+                                throw core::error("Plain Text Property List - expected ';' after value in object");
 
                             stream >> chr, stream.unget();
                         } while (stream && chr != '}');
@@ -1349,18 +1368,18 @@ namespace cppdatalib
                 }
             }
 
-            throw core::error("expected plain text property list value");
+            throw core::error("Plain Text Property List - expected value");
         }
 
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
         {
             switch (v.get_type())
             {
-                case core::null: throw core::error("'null' value not allowed in property list output");
+                case core::null: throw core::error("Plain Text Property List - 'null' value not allowed in output");
                 case core::boolean: return stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';
                 case core::integer: return stream << "<*I" << v.get_int() << '>';
                 case core::real: return stream << "<*R" << v.get_real() << '>';
-                case core::string: return write_string(stream, v.get_string());
+                case core::string: return v.get_subtype() == core::date? (stream << "<*D" << v.get_string() << '>'): write_string(stream, v.get_string());
                 case core::array:
                 {
                     stream << '(';
@@ -1389,11 +1408,11 @@ namespace cppdatalib
         {
             switch (v.get_type())
             {
-                case core::null: throw core::error("'null' value not allowed in property list output");
+                case core::null: throw core::error("Plain Text Property List - 'null' value not allowed in output");
                 case core::boolean: return stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';
                 case core::integer: return stream << "<*I" << v.get_int() << '>';
                 case core::real: return stream << "<*R" << v.get_real() << '>';
-                case core::string: return write_string(stream, v.get_string());
+                case core::string: return v.get_subtype() == core::date? (stream << "<*D" << v.get_string() << '>'): write_string(stream, v.get_string());
                 case core::array:
                 {
                     if (v.get_array().empty())
@@ -1485,11 +1504,11 @@ namespace cppdatalib
         {
             switch (v.get_type())
             {
-                case core::null: throw core::error("'null' value not allowed in property list output");
+                case core::null: throw core::error("XML Property List - 'null' value not allowed in output");
                 case core::boolean: return stream << "<" << (v.get_bool()? "true": "false") << "/>";
                 case core::integer: return stream << "<integer>" << v.get_int() << "</integer>";
                 case core::real: return stream << "<real>" << v.get_real() << "</real>";
-                case core::string: return write_string(stream << "<string>", v.get_string()) << "</string>";
+                case core::string: return v.get_subtype() == core::date? (stream << "<date>" << v.get_string() << "</date>"): write_string(stream << "<string>", v.get_string()) << "</string>";
                 case core::array:
                 {
                     stream << "<array>";
@@ -1551,7 +1570,7 @@ namespace cppdatalib
         {
             switch (v.get_type())
             {
-                case core::null: throw core::error("'null' value not allowed in XML-RPC output");
+                case core::null: throw core::error("XML RPC - 'null' value not allowed in output");
                 case core::boolean: return stream << "<value><boolean>" << v.as_int() << "</boolean></value>";
                 case core::integer: return stream << "<value><int>" << v.get_int() << "</int></value>";
                 case core::real: return stream << "<value><double>" << v.get_real() << "</double></value>";
@@ -1627,7 +1646,7 @@ namespace cppdatalib
                     }
                     return stream;
                 }
-                case core::object: throw core::error("'object' value not allowed in CSV output");
+                case core::object: throw core::error("CSV - 'object' value not allowed in output");
             }
 
             // Control will never get here
@@ -1688,7 +1707,7 @@ namespace cppdatalib
             bool negative = false;
             int c = stream.get();
 
-            if (c == EOF) throw core::error("expected integer value after type specifier");
+            if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
             temp = c & 0xff;
 
             switch (specifier)
@@ -1703,7 +1722,7 @@ namespace cppdatalib
                     negative = c >> 7;
 
                     c = stream.get();
-                    if (c == EOF) throw core::error("expected integer value after type specifier");
+                    if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
 
                     temp = (temp << 8) | (c & 0xff);
                     temp |= negative * 0xffffffffffff0000ull;
@@ -1714,7 +1733,7 @@ namespace cppdatalib
                     for (int i = 0; i < 3; ++i)
                     {
                         c = stream.get();
-                        if (c == EOF) throw core::error("expected integer value after type specifier");
+                        if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
 
                         temp = (temp << 8) | (c & 0xff);
                     }
@@ -1726,7 +1745,7 @@ namespace cppdatalib
                     for (int i = 0; i < 7; ++i)
                     {
                         c = stream.get();
-                        if (c == EOF) throw core::error("expected integer value after type specifier");
+                        if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
 
                         temp = (temp << 8) | (c & 0xff);
                     }
@@ -1752,7 +1771,7 @@ namespace cppdatalib
             uint64_t temp;
             int c = stream.get();
 
-            if (c == EOF) throw core::error("expected integer value after type specifier");
+            if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
             temp = c & 0xff;
 
             if (specifier == 'd')
@@ -1760,7 +1779,7 @@ namespace cppdatalib
                 for (int i = 0; i < 3; ++i)
                 {
                     c = stream.get();
-                    if (c == EOF) throw core::error("expected floating-point value after type specifier");
+                    if (c == EOF) throw core::error("UBJSON - expected floating-point value after type specifier");
 
                     temp = (temp << 8) | (c & 0xff);
                 }
@@ -1770,7 +1789,7 @@ namespace cppdatalib
                 for (int i = 0; i < 7; ++i)
                 {
                     c = stream.get();
-                    if (c == EOF) throw core::error("expected floating-point value after type specifier");
+                    if (c == EOF) throw core::error("UBJSON - expected floating-point value after type specifier");
 
                     temp = (temp << 8) | (c & 0xff);
                 }
@@ -1784,28 +1803,44 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::istream &read_string(std::istream &stream, core::string_t &s, char specifier)
+        inline std::istream &read_string(std::istream &stream, core::string_t &s, char specifier, long &subtype)
         {
             int c = stream.get();
 
-            std::cout << (char) c << std::endl;
-            if (c == EOF) throw core::error("expected string value after type specifier");
+            if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
+
+            subtype = core::normal;
 
             s.clear();
             if (specifier == 'C')
                 s.push_back(c);
+            else if (specifier == 'H')
+            {
+                core::int_t size;
+
+                subtype = core::bignum;
+                read_int(stream, size, c);
+                if (size < 0) throw core::error("UBJSON - invalid negative size specified for high-precision number");
+
+                while (size-- > 0)
+                {
+                    c = stream.get();
+                    if (c == EOF) throw core::error("UBJSON - expected high-precision number value after type specifier");
+
+                    s.push_back(c);
+                }
+            }
             else
             {
                 core::int_t size;
 
                 read_int(stream, size, c);
-                if (size < 0) throw core::error("invalid negative size specified for string");
-                std::cout << "size: " << size << " " << (char) c << std::endl;
+                if (size < 0) throw core::error("UBJSON - invalid negative size specified for string");
 
                 while (size-- > 0)
                 {
                     c = stream.get();
-                    if (c == EOF) throw core::error("expected string value after type specifier");
+                    if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
 
                     s.push_back(c);
                 }
@@ -1904,13 +1939,13 @@ namespace cppdatalib
             }
         }
 
-        inline std::ostream &write_string(std::ostream &stream, const std::string &str, bool add_specifier)
+        inline std::ostream &write_string(std::ostream &stream, const std::string &str, bool add_specifier, long subtype)
         {
-            if (str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
+            if (subtype == core::normal && str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
                 return stream << (add_specifier? "C": "") << str[0];
 
             if (add_specifier)
-                stream << 'S';
+                stream << (subtype == core::bignum? 'H': 'S');
 
             write_int(stream, str.size(), true);
 
@@ -1938,7 +1973,8 @@ namespace cppdatalib
                     case 'd':
                     case 'D': return read_float(stream, v.get_real(), c);
                     case 'C':
-                    case 'S': return read_string(stream, v.get_string(), c);
+                    case 'H':
+                    case 'S': return read_string(stream, v.get_string(), c, v.get_subtype());
                     case 'N': break;
                     case '[':
                     {
@@ -1946,25 +1982,25 @@ namespace cppdatalib
                         core::int_t size = 0;
 
                         c = stream.get();
-                        if (c == EOF) throw core::error("expected array value after '['");
+                        if (c == EOF) throw core::error("UBJSON - expected array value after '['");
 
                         if (c == '$') // Type specified
                         {
                             c = stream.get();
-                            if (c == EOF) throw core::error("expected type specifier after '$'");
+                            if (c == EOF) throw core::error("UBJSON - expected type specifier after '$'");
                             type = c;
                             c = stream.get();
-                            if (c == EOF) throw core::error("unexpected end of array");
+                            if (c == EOF) throw core::error("UBJSON - unexpected end of array");
                         }
 
                         v.set_array(core::array_t());
                         if (c == '#') // Count specified
                         {
                             c = stream.get();
-                            if (c == EOF) throw core::error("expected count specifier after '#'");
+                            if (c == EOF) throw core::error("UBJSON - expected count specifier after '#'");
 
                             read_int(stream, size, c);
-                            if (size < 0) throw core::error("invalid negative size specified for array");
+                            if (size < 0) throw core::error("UBJSON - invalid negative size specified for array");
 
                             while (size-- > 0)
                             {
@@ -1982,7 +2018,7 @@ namespace cppdatalib
                             v.push_back(item);
 
                             c = stream.get();
-                            if (c == EOF) throw core::error("unexpected end of array");
+                            if (c == EOF) throw core::error("UBJSON - unexpected end of array");
                         }
 
                         return stream;
@@ -1993,32 +2029,33 @@ namespace cppdatalib
                         core::int_t size = 0;
 
                         c = stream.get();
-                        if (c == EOF) throw core::error("expected object value after '{'");
+                        if (c == EOF) throw core::error("UBJSON - expected object value after '{'");
 
                         if (c == '$') // Type specified
                         {
                             c = stream.get();
-                            if (c == EOF) throw core::error("expected type specifier after '$'");
+                            if (c == EOF) throw core::error("UBJSON - expected type specifier after '$'");
                             type = c;
                             c = stream.get();
-                            if (c == EOF) throw core::error("unexpected end of object");
+                            if (c == EOF) throw core::error("UBJSON - unexpected end of object");
                         }
 
                         v.set_object(core::object_t());
                         if (c == '#') // Count specified
                         {
                             c = stream.get();
-                            if (c == EOF) throw core::error("expected count specifier after '#'");
+                            if (c == EOF) throw core::error("UBJSON - expected count specifier after '#'");
 
                             read_int(stream, size, c);
-                            if (size < 0) throw core::error("invalid negative size specified for object");
+                            if (size < 0) throw core::error("UBJSON - invalid negative size specified for object");
 
                             while (size-- > 0)
                             {
                                 core::value item;
                                 std::string key;
+                                long dummy;
 
-                                read_string(stream, key, 'S');
+                                read_string(stream, key, 'S', dummy);
                                 input(stream, item, type);
                                 v[key] = item;
                             }
@@ -2029,21 +2066,22 @@ namespace cppdatalib
                         {
                             core::value item;
                             std::string key;
+                            long dummy;
 
                             stream.unget();
-                            read_string(stream, key, 'S');
+                            read_string(stream, key, 'S', dummy);
                             input(stream, item);
                             v[key] = item;
 
                             c = stream.get();
-                            if (c == EOF) throw core::error("unexpected end of object");
+                            if (c == EOF) throw core::error("UBJSON - unexpected end of object");
                         }
 
                         return stream;
                     }
                 }
 
-                throw core::error("expected UBJSON value");
+                throw core::error("UBJSON - expected value");
             }
         }
 
@@ -2055,7 +2093,7 @@ namespace cppdatalib
                 case core::boolean: return add_specifier? stream << (v.get_bool()? 'T': 'F'): stream;
                 case core::integer: return write_int(stream, v.get_int(), add_specifier, force_specifier);
                 case core::real: return write_float(stream, v.get_real(), add_specifier, force_specifier);
-                case core::string: return write_string(stream, v.get_string(), add_specifier);
+                case core::string: return write_string(stream, v.get_string(), add_specifier, v.get_subtype());
                 case core::array:
                 {
                     core::type type = core::null;
