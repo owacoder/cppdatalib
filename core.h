@@ -1737,6 +1737,9 @@ namespace cppdatalib
             print_table(stream, v);
             return stream.str();
         }
+
+        inline std::ostream &print(std::ostream &stream, const core::value &v) {return print_row(stream, v);}
+        inline std::string to_csv(const core::value &v) {return to_csv_row(v);}
     }
 
     namespace ubjson
