@@ -15,12 +15,36 @@
 
 namespace cppdatalib
 {
-    namespace base64
+    namespace hex
     {
+        inline std::ostream &write(std::ostream &stream, unsigned char c)
+        {
+            const char alpha[] = "0123456789ABCDEF";
+
+            return stream << alpha[(c & 0xff) >> 4] << alpha[c & 0xf];
+        }
+
+        inline std::ostream &write(std::ostream &stream, const std::string &str)
+        {
+            for (auto c: str)
+                write(stream, c);
+
+            return stream;
+        }
+
         inline std::string encode(const std::string &str)
         {
+            std::ostringstream stream;
+            write(stream, str);
+            return stream.str();
+        }
+    }
+
+    namespace base64
+    {
+        inline std::ostream &write(std::ostream &stream, const std::string &str)
+        {
             const char alpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-            std::string result;
             uint32_t temp;
 
             for (size_t i = 0; i < str.size();)
@@ -30,29 +54,35 @@ namespace cppdatalib
                 {
                     temp |= (uint32_t) (str[i++] & 0xFF) << 8;
                     temp |= (uint32_t) (str[i++] & 0xFF);
-                    result.push_back(alpha[(temp >> 18) & 0x3F]);
-                    result.push_back(alpha[(temp >> 12) & 0x3F]);
-                    result.push_back(alpha[(temp >>  6) & 0x3F]);
-                    result.push_back(alpha[ temp        & 0x3F]);
+                    stream << alpha[(temp >> 18) & 0x3F]
+                           << alpha[(temp >> 12) & 0x3F]
+                           << alpha[(temp >>  6) & 0x3F]
+                           << alpha[ temp        & 0x3F];
                 }
                 else if (i + 1 == str.size())
                 {
                     temp |= (uint32_t) (str[i++] & 0xFF) << 8;
-                    result.push_back(alpha[(temp >> 18) & 0x3F]);
-                    result.push_back(alpha[(temp >> 12) & 0x3F]);
-                    result.push_back(alpha[(temp >>  6) & 0x3F]);
-                    result.push_back('=');
+                    stream << alpha[(temp >> 18) & 0x3F]
+                           << alpha[(temp >> 12) & 0x3F]
+                           << alpha[(temp >>  6) & 0x3F]
+                           << '=';
                 }
                 else if (i == str.size())
                 {
-                    result.push_back(alpha[(temp >> 18) & 0x3F]);
-                    result.push_back(alpha[(temp >> 12) & 0x3F]);
-                    result.push_back('=');
-                    result.push_back('=');
+                    stream << alpha[(temp >> 18) & 0x3F]
+                           << alpha[(temp >> 12) & 0x3F]
+                           << "==";
                 }
             }
 
-            return result;
+            return stream;
+        }
+
+        inline std::string encode(const std::string &str)
+        {
+            std::ostringstream stream;
+            write(stream, str);
+            return stream.str();
         }
 
         inline std::string decode(const std::string &str)
@@ -368,15 +398,22 @@ namespace cppdatalib
             object
         };
 
-        enum default_subtype
+        enum subtype
         {
-            normal
-        };
+            normal,
 
-        enum string_subtype
-        {
-            date = normal + 1,
-            bignum
+            // Integers
+            timestamp,
+
+            // Strings
+            blob,
+            clob,
+            symbol,
+            date,
+            bignum,
+
+            // Arrays
+            sexp
         };
 
         class value;
@@ -700,7 +737,6 @@ namespace cppdatalib
 
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
         {
-            static const char hex[] = "0123456789ABCDEF";
             stream << '"';
             for (size_t i = 0; i < str.size(); ++i)
             {
@@ -721,7 +757,7 @@ namespace cppdatalib
                         case '\t': stream << "\\t"; break;
                         default:
                             if (iscntrl(c))
-                                stream << "\\u00" << hex[c >> 4] << hex[c & 0xf];
+                                hex::write(stream << "\\u00", c);
                             else
                                 stream << str[i];
                             break;
@@ -1164,7 +1200,6 @@ namespace cppdatalib
 
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
         {
-            static const char hex[] = "0123456789ABCDEF";
             stream << '"';
             for (size_t i = 0; i < str.size(); ++i)
             {
@@ -1204,7 +1239,8 @@ namespace cppdatalib
                                 {
                                     uint16_t c = wstr[j];
 
-                                    stream << "\\U" << hex[c >> 12] << hex[(c >> 8) & 0xf] << hex[(c >> 4) & 0xf] << hex[c & 0xf];
+                                    hex::write(stream << "\\U", c >> 8);
+                                    hex::write(stream, c & 0xff);
                                 }
                             }
                             else
@@ -1235,7 +1271,7 @@ namespace cppdatalib
 
                         if (chr != '*')
                         {
-                            v.set_string(core::string_t());
+                            v.set_string(core::string_t(), core::blob);
 
                             unsigned int t = 0;
                             bool have_first_nibble = false;
@@ -1379,7 +1415,16 @@ namespace cppdatalib
                 case core::boolean: return stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';
                 case core::integer: return stream << "<*I" << v.get_int() << '>';
                 case core::real: return stream << "<*R" << v.get_real() << '>';
-                case core::string: return v.get_subtype() == core::date? (stream << "<*D" << v.get_string() << '>'): write_string(stream, v.get_string());
+                case core::string:
+                {
+                    switch (v.get_subtype())
+                    {
+                        case core::date: return stream << "<*D" << v.get_string() << '>';
+                        case core::blob: return hex::write(stream << '<', v.get_string()) << '>';
+                        default:
+                            return write_string(stream, v.get_string());
+                    }
+                }
                 case core::array:
                 {
                     stream << '(';
@@ -1508,7 +1553,16 @@ namespace cppdatalib
                 case core::boolean: return stream << "<" << (v.get_bool()? "true": "false") << "/>";
                 case core::integer: return stream << "<integer>" << v.get_int() << "</integer>";
                 case core::real: return stream << "<real>" << v.get_real() << "</real>";
-                case core::string: return v.get_subtype() == core::date? (stream << "<date>" << v.get_string() << "</date>"): write_string(stream << "<string>", v.get_string()) << "</string>";
+                case core::string:
+                {
+                    switch (v.get_subtype())
+                    {
+                        case core::date: return write_string(stream << "<date>", v.get_string()) << "</date>";
+                        case core::blob: return base64::write(stream << "<data>", v.get_string()) << "</data>";
+                        default:
+                            return write_string(stream << "<string>", v.get_string()) << "</string>";
+                    }
+                }
                 case core::array:
                 {
                     stream << "<array>";
