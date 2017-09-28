@@ -403,17 +403,25 @@ namespace cppdatalib
             normal,
 
             // Integers
-            timestamp,
+            timestamp, // Number of seconds since the epoch, Jan 1, 1970
 
             // Strings
-            blob,
-            clob,
-            symbol,
-            date,
-            bignum,
+            blob, // A chunk of binary data
+            clob, // A chunk of binary data, that should be interpreted as text
+            symbol, // A symbolic atom, or identifier
+            datetime, // A datetime structure, with unspecified format
+            date, // A date structure, with unspecified format
+            time, // A time structure, with unspecified format
+            bignum, // A high-precision, decimal-encoded, number
 
             // Arrays
-            sexp
+            regexp, // A regular expression definition containing two string elements, the first is the definition, the second is the options list
+            sexp, // Ordered collection of values, distinct from an array only by name
+
+            // Objects
+            map, // A normal object with integral keys (they're still stored as strings, but SHOULD all be valid decimal integers)
+
+            user = 16
         };
 
         class value;
@@ -457,7 +465,7 @@ namespace cppdatalib
             void set_subtype(long _type) {subtype_ = _type;}
 
             type get_type() const {return type_;}
-            size_t size() const {return type_ == array? arr_.size(): type_ == object? obj_.size(): 0;}
+            size_t size() const {return type_ == array? arr_.size(): type_ == object? obj_.size(): type_ == string? str_.size(): 0;}
 
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
@@ -687,7 +695,7 @@ namespace cppdatalib
             static const std::string hex = "0123456789ABCDEF";
             int c;
 
-            c = stream.get();
+            {char chr; stream >> chr; c = chr;} // Skip initial whitespace
             if (c != '"') throw core::error("JSON - expected string");
 
             str.clear();
@@ -1131,7 +1139,7 @@ namespace cppdatalib
             static const std::string hex = "0123456789ABCDEF";
             int c;
 
-            c = stream.get();
+            {char chr; stream >> chr; c = chr;} // Skip initial whitespace
             if (c != '"') throw core::error("Plain Text Property List - expected string");
 
             str.clear();
@@ -1335,7 +1343,7 @@ namespace cppdatalib
                                 v.get_string().push_back(c);
                             }
                             stream.unget();
-                            v.set_subtype(core::date);
+                            v.set_subtype(core::datetime);
                         }
 
                         if (stream.get() != '>') throw core::error("Plain Text Property List - expected '>' after value");
@@ -1419,7 +1427,9 @@ namespace cppdatalib
                 {
                     switch (v.get_subtype())
                     {
-                        case core::date: return stream << "<*D" << v.get_string() << '>';
+                        case core::date:
+                        case core::time:
+                        case core::datetime: return stream << "<*D" << v.get_string() << '>';
                         case core::blob: return hex::write(stream << '<', v.get_string()) << '>';
                         default:
                             return write_string(stream, v.get_string());
@@ -1557,7 +1567,9 @@ namespace cppdatalib
                 {
                     switch (v.get_subtype())
                     {
-                        case core::date: return write_string(stream << "<date>", v.get_string()) << "</date>";
+                        case core::date:
+                        case core::time:
+                        case core::datetime: return write_string(stream << "<date>", v.get_string()) << "</date>";
                         case core::blob: return base64::write(stream << "<data>", v.get_string()) << "</data>";
                         default:
                             return write_string(stream << "<string>", v.get_string()) << "</string>";
@@ -1746,13 +1758,13 @@ namespace cppdatalib
     {
         inline char size_specifier(core::int_t min, core::int_t max)
         {
-            if (min >= 0 && max < 256)
+            if (min >= 0 && max <= UINT8_MAX)
                 return 'U';
-            else if (min >= -128 && max < 128)
+            else if (min >= INT8_MIN && max <= INT8_MAX)
                 return 'i';
-            else if (min >= -32768 && max < 32768)
+            else if (min >= INT16_MIN && max <= INT16_MAX)
                 return 'I';
-            else if (min >= -2147483648 && max < 2147483648)
+            else if (min >= INT32_MIN && max <= INT32_MAX)
                 return 'l';
             else
                 return 'L';
@@ -1914,11 +1926,11 @@ namespace cppdatalib
             if (force_bits == std::string::npos)
                 force_bits = 0;
 
-            if (force_bits == 0 && (i >= 0 && i < 256))
+            if (force_bits == 0 && (i >= 0 && i <= UINT8_MAX))
                 return stream << (add_specifier? "U": "") << static_cast<unsigned char>(i);
-            else if (force_bits <= 1 && (i >= -128 && i < 0))
+            else if (force_bits <= 1 && (i >= INT8_MIN && i < 0))
                 return stream << (add_specifier? "i": "") << static_cast<unsigned char>(0x80 | ((~std::abs(i) & 0xff) + 1));
-            else if (force_bits <= 2 && (i >= -32768 && i < 32768))
+            else if (force_bits <= 2 && (i >= INT16_MIN && i <= INT16_MAX))
             {
                 uint16_t t;
 
@@ -1930,7 +1942,7 @@ namespace cppdatalib
                 return stream << (add_specifier? "I": "") << static_cast<unsigned char>(t >> 8) <<
                                                              static_cast<unsigned char>(t & 0xff);
             }
-            else if (force_bits <= 3 && (i >= -2147483648 && i < 2147483648))
+            else if (force_bits <= 3 && (i >= INT32_MIN && i <= INT32_MAX))
             {
                 uint32_t t;
 
@@ -2187,7 +2199,7 @@ namespace cppdatalib
                         }
                         else if (it->is_real() && reals_can_be_floats)
                         {
-                            if (it->get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->get_real())))
+                            if (it->get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->get_real())) && !std::isnan(it->get_real()))
                                 reals_can_be_floats = false;
                         }
                         else if (it->is_string() && strings_can_be_chars)
@@ -2268,7 +2280,7 @@ namespace cppdatalib
                         }
                         else if (it->second.is_real() && reals_can_be_floats)
                         {
-                            if (it->second.get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->second.get_real())))
+                            if (it->second.get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->second.get_real())) && !std::isnan(it->second.get_real()))
                                 reals_can_be_floats = false;
                         }
                         else if (it->second.is_string() && strings_can_be_chars)
@@ -2328,6 +2340,338 @@ namespace cppdatalib
         }
 
         inline std::string to_ubjson(const core::value &v)
+        {
+            std::ostringstream stream;
+            stream << v;
+            return stream.str();
+        }
+    }
+
+    namespace binn
+    {
+        inline std::ostream &write_type(std::ostream &stream, unsigned int type, unsigned int subtype, int *written = NULL)
+        {
+            char c;
+
+            if (written != NULL)
+                *written = 1 + (subtype > 15);
+
+            c = (type & 0x7) << 5;
+            if (subtype > 15)
+            {
+                c = (c | 0x10) | ((subtype >> 8) & 0xf);
+                return stream << c << static_cast<char>(subtype & 0xff);
+            }
+
+            c = c | subtype;
+            return stream << c;
+        }
+
+        inline std::ostream &write_size(std::ostream &stream, uint64_t size, int *written = NULL)
+        {
+            if (written != NULL)
+                *written = 1 + 3 * (size < 128);
+
+            if (size < 128)
+                return stream << static_cast<char>(size);
+
+            return stream << static_cast<char>(((size >> 24) & 0xff) | 0x80)
+                          << static_cast<char>((size >> 16) & 0xff)
+                          << static_cast<char>((size >>  8) & 0xff)
+                          << static_cast<char>( size        & 0xff);
+        }
+
+        inline size_t get_size(const core::value &v)
+        {
+            switch (v.get_type())
+            {
+                case core::null:
+                case core::boolean: return 1 + (v.get_subtype() >= core::user && v.get_subtype() > 15);
+                case core::integer:
+                {
+                    size_t size = 1; // one byte for type specifier
+
+                    if (v.get_subtype() >= core::user && v.get_subtype() > 15)
+                        ++size; // type specifier requires another byte
+
+                    if (v.get_int() >= INT8_MIN && v.get_int() <= UINT8_MAX)
+                        size += 1;
+                    else if (v.get_int() >= INT16_MIN && v.get_int() <= UINT16_MAX)
+                        size += 2;
+                    else if (v.get_int() >= INT32_MIN && v.get_int() <= UINT32_MAX)
+                        size += 4;
+                    else
+                        size += 8;
+
+                    return size;
+                }
+                case core::real:
+                {
+                    size_t size = 5; // one byte for type specifier, minimum of four bytes for data
+
+                    // A user-specified subtype is not available for reals
+                    // (because when the data is read again, the IEEE-754 representation will be put into an integer instead of a real,
+                    // since there is nothing to show that the data should be read as a floating point number)
+                    // To prevent the loss of data, the subtype is discarded and the value stays the same
+
+                    if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real())) != v.get_real() && !std::isnan(v.get_real()))
+                        size += 4; // requires more than 32-bit float to losslessly encode
+
+                    return size;
+                }
+                case core::string:
+                {
+                    size_t size = 3; // one byte for the type specifier, one for the minimum size specifier of one byte, one for trailing nul
+
+                    if (v.get_subtype() >= core::user && v.get_subtype() > 15)
+                        ++size; // type specifier requires another byte
+
+                    if (size + v.size() >= 128)
+                        size += 3; // requires a four-byte size specifier
+
+                    return size + v.get_string().size();
+                }
+                case core::array:
+                {
+                    size_t size = 3; // one byte for the type specifier,
+                                     // one for the minimum size specifier of one byte,
+                                     // and one for the minimum count specifier of one byte
+
+                    if (v.get_subtype() >= core::user && v.get_subtype() > 15)
+                        ++size; // type specifier requires another byte
+
+                    if (v.size() >= 128)
+                        size += 3; // requires a four-byte count specifier
+
+                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
+                        size += get_size(*it);
+
+                    if (size >= 128)
+                        size += 3; // requires a four-byte size specifier
+
+                    return size;
+                }
+                case core::object:
+                {
+                    size_t size = 3; // one byte for the type specifier,
+                                     // one for the minimum size specifier of one byte,
+                                     // and one for the minimum count specifier of one byte
+
+                    // A user-specified subtype is not available for objects
+                    // (because when the data is read again, there is no way to determine the type of structure the container holds)
+                    // To prevent the loss of data, the subtype is discarded and the value stays the same
+
+                    if (v.size() >= 128)
+                        size += 3; // requires a four-byte count specifier
+
+                    if (v.get_subtype() == core::map)
+                    {
+                        for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
+                            size += 4 /* map ID */ + get_size(it->second) /* value size */;
+                    }
+                    else
+                    {
+                        for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
+                            size += 1 /* key size specifier */ + it->first.size() /* key size */ + get_size(it->second) /* value size */;
+                    }
+
+                    if (size >= 128)
+                        size += 3; // requires a four-byte size specifier
+
+                    return size;
+                }
+            }
+
+            // Control will never get here
+            return 0;
+        }
+
+        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
+        {
+            enum types
+            {
+                nobytes,
+                byte,
+                word,
+                dword,
+                qword,
+                string,
+                blob,
+                container
+            };
+
+            enum subtypes
+            {
+                null = 0,
+                yes, // true
+                no, // false
+
+                uint8 = 0,
+                int8,
+
+                uint16 = 0,
+                int16,
+
+                uint32 = 0,
+                int32,
+                single_float,
+
+                uint64 = 0,
+                int64,
+                double_float,
+
+                text = 0,
+                datetime,
+                date,
+                time,
+                decimal_str,
+
+                blob_data = 0,
+
+                list = 0,
+                map,
+                object
+            };
+
+            switch (v.get_type())
+            {
+                case core::null: return write_type(stream, nobytes, v.get_subtype() >= core::user? static_cast<subtypes>(v.get_subtype()): null);
+                case core::boolean: return write_type(stream, nobytes, v.get_subtype() >= core::user? static_cast<subtypes>(v.get_subtype()): v.get_bool()? yes: no);
+                case core::integer:
+                {
+                    uint64_t out = std::abs(v.get_int());
+                    if (v.get_int() < 0)
+                        out = ~out + 1;
+
+                    if (v.get_int() >= INT8_MIN && v.get_int() <= UINT8_MAX)
+                        return write_type(stream, byte, v.get_subtype() >= core::user? static_cast<subtypes>(v.get_subtype()): v.get_int() < 0? int8: uint8) << static_cast<char>(out);
+                    else if (v.get_int() >= INT16_MIN && v.get_int() <= UINT16_MAX)
+                        return write_type(stream, word, v.get_subtype() >= core::user? static_cast<subtypes>(v.get_subtype()): v.get_int() < 0? int16: uint16)
+                                << static_cast<char>(out >> 8)
+                                << static_cast<char>(out & 0xff);
+                    else if (v.get_int() >= INT32_MIN && v.get_int() <= UINT32_MAX)
+                        return write_type(stream, dword, v.get_subtype() >= core::user? static_cast<subtypes>(v.get_subtype()): v.get_int() < 0? int32: uint32)
+                                << static_cast<char>(out >> 24)
+                                << static_cast<char>((out >> 16) & 0xff)
+                                << static_cast<char>((out >> 8) & 0xff)
+                                << static_cast<char>(out & 0xff);
+                    else
+                        return write_type(stream, qword, v.get_subtype() >= core::user? static_cast<subtypes>(v.get_subtype()): v.get_int() < 0? int64: uint64)
+                                << static_cast<char>(out >> 56)
+                                << static_cast<char>((out >> 48) & 0xff)
+                                << static_cast<char>((out >> 40) & 0xff)
+                                << static_cast<char>((out >> 32) & 0xff)
+                                << static_cast<char>((out >> 24) & 0xff)
+                                << static_cast<char>((out >> 16) & 0xff)
+                                << static_cast<char>((out >> 8) & 0xff)
+                                << static_cast<char>(out & 0xff);
+                }
+                case core::real:
+                {
+                    uint64_t out;
+
+                    if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real())) == v.get_real() || std::isnan(v.get_real()))
+                    {
+                        out = core::float_to_ieee_754(v.get_real());
+                        return write_type(stream, dword, single_float)
+                                << static_cast<char>(out >> 24)
+                                << static_cast<char>((out >> 16) & 0xff)
+                                << static_cast<char>((out >> 8) & 0xff)
+                                << static_cast<char>(out & 0xff);
+                    }
+                    else
+                    {
+                        out = core::double_to_ieee_754(v.get_real());
+                        return write_type(stream, qword, double_float)
+                                << static_cast<char>(out >> 56)
+                                << static_cast<char>((out >> 48) & 0xff)
+                                << static_cast<char>((out >> 40) & 0xff)
+                                << static_cast<char>((out >> 32) & 0xff)
+                                << static_cast<char>((out >> 24) & 0xff)
+                                << static_cast<char>((out >> 16) & 0xff)
+                                << static_cast<char>((out >> 8) & 0xff)
+                                << static_cast<char>(out & 0xff);
+                    }
+                }
+                case core::string:
+                {
+                    switch (v.get_subtype())
+                    {
+                        case core::date: write_type(stream, string, date); break;
+                        case core::time: write_type(stream, string, time); break;
+                        case core::datetime: write_type(stream, string, datetime); break;
+                        case core::bignum: write_type(stream, string, decimal_str); break;
+                        case core::blob: write_type(stream, blob, blob_data); break;
+                        default: write_type(stream, string, v.get_subtype() >= core::user? static_cast<subtypes>(v.get_subtype()): text); break;
+                    }
+
+                    return write_size(stream, v.get_string().size()) << v.get_string() << static_cast<char>(0);
+                }
+                case core::array:
+                {
+                    write_type(stream, container, v.get_subtype() >= core::user? static_cast<subtypes>(v.get_subtype()): list);
+                    write_size(stream, get_size(v));
+                    write_size(stream, v.size());
+
+                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
+                        stream << *it;
+
+                    return stream;
+                }
+                case core::object:
+                {
+                    write_type(stream, container, v.get_subtype() == core::map? map: object);
+                    write_size(stream, get_size(v));
+                    write_size(stream, v.size());
+
+                    if (v.get_subtype() == core::map)
+                    {
+                        for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
+                        {
+                            int64_t key;
+                            uint32_t out;
+
+                            std::istringstream temp_stream(it->first);
+                            temp_stream >> key;
+
+                            if (!temp_stream || temp_stream.get() != EOF)
+                                throw core::error("Binn - map key is not an integer");
+                            else if (key < INT32_MIN || key > INT32_MAX)
+                                throw core::error("Binn - map key is out of range");
+
+                            out = std::abs(key);
+                            if (key < 0)
+                                out = ~out + 1;
+
+                            stream << static_cast<char>(out >> 24) <<
+                                      static_cast<char>((out >> 16) & 0xff) <<
+                                      static_cast<char>((out >>  8) & 0xff) <<
+                                      static_cast<char>(out & 0xff) <<
+                                      it->second;
+                        }
+                    }
+                    else
+                    {
+                        for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
+                        {
+                            if (it->first.size() > 255)
+                                throw core::error("Binn - object key is larger than limit of 255 bytes");
+
+                            stream << static_cast<char>(it->first.size()) << it->first << it->second;
+                        }
+                    }
+
+                    return stream;
+                }
+            }
+
+            // Control will never get here
+            return stream;
+        }
+
+        inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
+
+        inline std::string to_binn(const core::value &v)
         {
             std::ostringstream stream;
             stream << v;
