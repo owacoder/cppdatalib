@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <stack>
 #include <iostream>
 #include <sstream>
 #include <codecvt>
@@ -425,6 +426,8 @@ namespace cppdatalib
         };
 
         class value;
+        class value_builder;
+        class stream_handler;
 
         typedef bool bool_t;
         typedef int64_t int_t;
@@ -432,7 +435,7 @@ namespace cppdatalib
         typedef const char *cstring_t;
         typedef std::string string_t;
         typedef std::vector<value> array_t;
-        typedef std::map<string_t, value> object_t;
+        typedef std::map<value, value> object_t;
 
         struct error
         {
@@ -446,6 +449,157 @@ namespace cppdatalib
 
         class value
         {
+            friend stream_handler &convert(const value &v, stream_handler &handler);
+            friend value &assign(value &dest, const value &src);
+
+            struct traversal_reference
+            {
+                traversal_reference(value *p, array_t::iterator a, object_t::iterator o, bool traversed_key)
+                    : p(p)
+                    , array(a)
+                    , object(o)
+                    , traversed_key_already(traversed_key)
+                {}
+
+                value *p;
+                array_t::iterator array;
+                object_t::iterator object;
+                bool traversed_key_already;
+            };
+
+            struct const_traversal_reference
+            {
+                const_traversal_reference(const value *p, array_t::const_iterator a, object_t::const_iterator o, bool traversed_key)
+                    : p(p)
+                    , array(a)
+                    , object(o)
+                    , traversed_key_already(traversed_key)
+                {}
+
+                const value *p;
+                array_t::const_iterator array;
+                object_t::const_iterator object;
+                bool traversed_key_already;
+            };
+
+            // TODO: this traversal algorithm does not traverse object keys, since they are declared `const` inside
+            // the `std::map` definition. Using complex keys may overflow the stack when the destructor is called.
+            // Using simple scalar keys will not be an issue
+            template<typename PrefixPredicate, typename PostfixPredicate>
+            void traverse_and_edit(PrefixPredicate prefix, PostfixPredicate postfix)
+            {
+                std::stack<traversal_reference> references;
+                value *p = this;
+
+                while (!references.empty() || p != NULL)
+                {
+                    if (p != NULL)
+                    {
+                        prefix(p);
+
+                        if (p->is_array())
+                        {
+                            references.push(traversal_reference(p, p->get_array().begin(), object_t::iterator(), false));
+                            if (!p->get_array().empty())
+                                p = std::addressof(*references.top().array++);
+                            else
+                                p = NULL;
+                        }
+                        else if (p->is_object())
+                        {
+                            references.push(traversal_reference(p, array_t::iterator(), p->get_object().begin(), false));
+                            if (!p->get_object().empty())
+                                p = std::addressof((references.top().object++)->second);
+                            else
+                                p = NULL;
+                        }
+                        else
+                        {
+                            references.push(traversal_reference(p, array_t::iterator(), object_t::iterator(), false));
+                            p = NULL;
+                        }
+                    }
+                    else
+                    {
+                        value *peek = references.top().p;
+                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                            p = std::addressof(*references.top().array++);
+                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                            p = std::addressof((references.top().object++)->second);
+                        else
+                        {
+                            references.pop();
+                            postfix(peek);
+                        }
+                    }
+                }
+            }
+
+            // TODO: this traversal algorithm does not traverse object keys, since they are declared `const` inside
+            // the `std::map` definition. Using complex keys may overflow the stack when the destructor is called.
+            // Using simple scalar keys will not be an issue
+            template<typename PrefixPredicate, typename PostfixPredicate>
+            void traverse(PrefixPredicate prefix, PostfixPredicate postfix) const
+            {
+                std::stack<const_traversal_reference> references;
+                const value *p = this;
+
+                while (!references.empty() || p != NULL)
+                {
+                    if (p != NULL)
+                    {
+                        prefix(p);
+
+                        if (p->is_array())
+                        {
+                            references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                            if (!p->get_array().empty())
+                                p = std::addressof(*references.top().array++);
+                            else
+                                p = NULL;
+                        }
+                        else if (p->is_object())
+                        {
+                            references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                            if (!p->get_object().empty())
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = NULL;
+                        }
+                        else
+                        {
+                            references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                            p = NULL;
+                        }
+                    }
+                    else
+                    {
+                        const value *peek = references.top().p;
+                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                            p = std::addressof(*references.top().array++);
+                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                        {
+                            if (!references.top().traversed_key_already)
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = std::addressof((references.top().object++)->second);
+
+                            references.top().traversed_key_already = !references.top().traversed_key_already;
+                        }
+                        else
+                        {
+                            references.pop();
+                            postfix(peek);
+                        }
+                    }
+                }
+            }
+
+            static void traverse_node_null(value *) {}
+            static void traverse_node_clear(value *arg) {arg->set_null();}
+            struct traverse_node_prefix_serialize;
+            struct traverse_node_postfix_serialize;
+
         public:
             value() : type_(null), subtype_(0) {}
             value(bool_t v, long subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
@@ -459,6 +613,11 @@ namespace cppdatalib
             value(T v, long subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, long subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
+            ~value() {traverse_and_edit(traverse_node_null, traverse_node_clear);}
+
+            value(const value &other) : type_(null), subtype_(0) {assign(*this, other);}
+            value(value &&other) = default;
+            value &operator=(const value &other) {return assign(*this, other);}
 
             long get_subtype() const {return subtype_;}
             long &get_subtype() {return subtype_;}
@@ -516,15 +675,26 @@ namespace cppdatalib
                 return value();
             }
             value &operator[](const string_t &key) {clear(object); return obj_[key];}
+            value member(const value &key) const
+            {
+                auto it = obj_.find(key);
+                if (it != obj_.end())
+                    return it->second;
+                return value();
+            }
+            value &member(const value &key) {clear(object); return obj_[key];}
             bool_t is_member(cstring_t key) const {return obj_.find(key) != obj_.end();}
             bool_t is_member(const string_t &key) const {return obj_.find(key) != obj_.end();}
-            void erase(const string_t &key) {obj_.erase(key);}
+            bool_t is_member(const value &key) const {return obj_.find(key) != obj_.end();}
+            void erase_member(cstring_t key) {obj_.erase(key);}
+            void erase_member(const string_t &key) {obj_.erase(key);}
+            void erase_member(const value &key) {obj_.erase(key);}
 
             void push_back(const value &v) {clear(array); arr_.push_back(v);}
             void push_back(value &&v) {clear(array); arr_.push_back(v);}
             const value &operator[](size_t pos) const {return arr_[pos];}
             value &operator[](size_t pos) {return arr_[pos];}
-            void erase(int_t pos) {arr_.erase(arr_.begin() + pos);}
+            void erase_element(int_t pos) {arr_.erase(arr_.begin() + pos);}
 
             // The following are convenience conversion functions
             bool_t get_bool(bool_t default_) const {return is_bool()? bool_: default_;}
@@ -653,6 +823,26 @@ namespace cppdatalib
 
         struct null_t : value {null_t() {}};
 
+        inline bool operator<(const value &lhs, const value &rhs)
+        {
+            if (lhs.get_type() < rhs.get_type())
+                return true;
+            else if (rhs.get_type() < lhs.get_type())
+                return false;
+
+            switch (lhs.get_type())
+            {
+                case null: return false;
+                case boolean: return lhs.get_bool() < rhs.get_bool();
+                case integer: return lhs.get_int() < rhs.get_int();
+                case real: return lhs.get_real() < rhs.get_real();
+                case string: return lhs.get_string() < rhs.get_string();
+                case array: return lhs.get_array() < rhs.get_array();
+                case object: return lhs.get_object() < rhs.get_object();
+                default: return false;
+            }
+        }
+
         inline bool operator==(const value &lhs, const value &rhs)
         {
             if (lhs.get_type() != rhs.get_type())
@@ -686,11 +876,526 @@ namespace cppdatalib
             }
             return true;
         }
+
+        class stream_writer
+        {
+        protected:
+            std::ostream &output_stream;
+
+        public:
+            stream_writer(std::ostream &stream) : output_stream(stream) {}
+
+            std::ostream &stream() {return output_stream;}
+        };
+
+        class stream_handler
+        {
+        protected:
+            struct scope_data
+            {
+                scope_data(type t, bool parsed_key = false)
+                    : type_(t)
+                    , parsed_key_(parsed_key)
+                    , items_(0)
+                {}
+
+                type get_type() const {return type_;}
+                size_t items_parsed() const {return items_;}
+                bool key_was_parsed() const {return parsed_key_;}
+
+                type type_; // The type of container that is being parsed
+                bool parsed_key_; // false if the object key needs to be or is being parsed, true if it has already been parsed but the value associated with it has not
+                size_t items_; // The number of items parsed into this container
+            };
+
+        public:
+            enum {
+                unknown_size = -1
+            };
+
+            void begin()
+            {
+                while (!nested_scopes.empty())
+                    nested_scopes.pop();
+                begin_();
+            }
+            void end()
+            {
+                if (!nested_scopes.empty())
+                    throw error("cppdatalib::stream_handler - unexpected end of stream");
+                end_();
+            }
+
+        protected:
+            virtual void begin_() {}
+            virtual void end_() {}
+
+        public:
+            size_t nesting_depth() const {return nested_scopes.size();}
+
+            type current_container() const
+            {
+                if (nested_scopes.empty())
+                    return null;
+                return nested_scopes.top().get_type();
+            }
+
+            size_t current_container_size() const
+            {
+                if (nested_scopes.empty())
+                    return 0;
+                return nested_scopes.top().items_parsed();
+            }
+
+            bool container_key_was_just_parsed() const
+            {
+                if (nested_scopes.empty())
+                    return false;
+                return nested_scopes.top().key_was_parsed();
+            }
+
+            // An API must call this when a scalar value is encountered.
+            // Returns true if value was handled, false otherwise
+            bool write(const value &v)
+            {
+                const bool is_key =
+                       !nested_scopes.empty() &&
+                        nested_scopes.top().type_ == object &&
+                       !nested_scopes.top().key_was_parsed();
+
+                if (is_key)
+                    begin_key_(v);
+                else
+                    begin_item_(v);
+                begin_scalar_(v, is_key);
+
+                switch (v.get_type())
+                {
+                    case null: begin_null_(v); null_(v); end_null_(v); break;
+                    case boolean: begin_bool_(v); bool_(v); end_bool_(v); break;
+                    case integer: begin_integer_(v); integer_(v); end_integer_(v); break;
+                    case real: begin_real_(v); real_(v); end_real_(v); break;
+                    case string: begin_string_(v, v.size(), is_key); string_data_(v); end_string_(v, is_key); break;
+                    default: return false;
+                }
+
+                end_scalar_(v, is_key);
+                if (is_key)
+                    end_key_(v);
+                else
+                    end_item_(v);
+
+                if (!nested_scopes.empty())
+                {
+                    if (nested_scopes.top().get_type() == object)
+                    {
+                        nested_scopes.top().items_ += !is_key;
+                        nested_scopes.top().parsed_key_ = !nested_scopes.top().key_was_parsed();
+                    }
+                    else
+                        ++nested_scopes.top().items_;
+                }
+
+                return true;
+            }
+
+        protected:
+            // Called when any non-key item is parsed
+            virtual void begin_item_(const core::value &v) {(void) v;}
+            virtual void end_item_(const core::value &v) {(void) v;}
+
+            // Called when any non-array, non-object item is parsed
+            virtual void begin_scalar_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
+            virtual void end_scalar_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
+
+            // Called when object keys are parsed. Keys may be complex, and have other calls within these events.
+            virtual void begin_key_(const core::value &v) {(void) v;}
+            virtual void end_key_(const core::value &v) {(void) v;}
+
+            // Called when a scalar null is parsed
+            virtual void begin_null_(const core::value &v) {(void) v;}
+            virtual void null_(const core::value &v) {(void) v;}
+            virtual void end_null_(const core::value &v) {(void) v;}
+
+            // Called when a scalar boolean is parsed
+            virtual void begin_bool_(const core::value &v) {(void) v;}
+            virtual void bool_(const core::value &v) {(void) v;}
+            virtual void end_bool_(const core::value &v) {(void) v;}
+
+            // Called when a scalar integer is parsed
+            virtual void begin_integer_(const core::value &v) {(void) v;}
+            virtual void integer_(const core::value &v) {(void) v;}
+            virtual void end_integer_(const core::value &v) {(void) v;}
+
+            // Called when a scalar real is parsed
+            virtual void begin_real_(const core::value &v) {(void) v;}
+            virtual void real_(const core::value &v) {(void) v;}
+            virtual void end_real_(const core::value &v) {(void) v;}
+
+            // Called when a scalar string is parsed
+            virtual void begin_string_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
+            virtual void string_data_(const core::value &v) {(void) v;}
+            virtual void end_string_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
+
+        public:
+            // An API must call these when a long string is parsed. The number of bytes is passed in size, if possible
+            // size < 0 means unknown size
+            void begin_string(const core::value &v, core::int_t size)
+            {
+                if (!nested_scopes.empty() &&
+                     nested_scopes.top().type_ == object &&
+                    !nested_scopes.top().key_was_parsed())
+                {
+                    begin_key_(v);
+                    begin_string_(v, size, true);
+                }
+                else
+                {
+                    begin_item_(v);
+                    begin_string_(v, size, false);
+                }
+
+                if (v.size())
+                    string_data_(v);
+
+                nested_scopes.push(string);
+            }
+            // An API must call these when a long string is parsed. The number of bytes of this chunk is passed in size, if possible
+            void append_to_string(const core::value &v)
+            {
+                if (nested_scopes.empty() || nested_scopes.top().get_type() != string)
+                    throw error("cppdatalib::stream_handler - attempted to append to string that was never begun");
+
+                string_data_(v);
+                nested_scopes.top().items_ += v.get_string().size();
+            }
+            void end_string(const core::value &v)
+            {
+                if (nested_scopes.empty() || nested_scopes.top().get_type() != string)
+                    throw error("cppdatalib::stream_handler - attempted to end string that was never begun");
+
+                // Pop the top scope off so we can look at the parent scope, but put it back on for the callbacks
+                auto save = nested_scopes.top();
+                nested_scopes.pop();
+
+                if (!nested_scopes.empty() &&
+                     nested_scopes.top().get_type() == object &&
+                    !nested_scopes.top().key_was_parsed())
+                {
+                    nested_scopes.push(save);
+                    end_string_(v, true);
+                    end_key_(v);
+                }
+                else
+                {
+                    nested_scopes.push(save);
+                    end_string_(v, false);
+                    end_item_(v);
+                }
+                nested_scopes.pop();
+
+                if (!nested_scopes.empty())
+                {
+                    if (nested_scopes.top().get_type() == object)
+                    {
+                        nested_scopes.top().items_ += nested_scopes.top().key_was_parsed();
+                        nested_scopes.top().parsed_key_ = !nested_scopes.top().key_was_parsed();
+                    }
+                    else
+                        ++nested_scopes.top().items_;
+                }
+            }
+
+            // An API must call these when an array is parsed. The number of elements is passed in size, if possible
+            // size < 0 means unknown size
+            void begin_array(const core::value &v, core::int_t size)
+            {
+                if (!nested_scopes.empty() &&
+                     nested_scopes.top().type_ == object &&
+                    !nested_scopes.top().key_was_parsed())
+                {
+                    begin_key_(v);
+                    begin_array_(v, size, true);
+                }
+                else
+                {
+                    begin_item_(v);
+                    begin_array_(v, size, false);
+                }
+
+                nested_scopes.push(array);
+            }
+            void end_array(const core::value &v)
+            {
+                if (nested_scopes.empty() || nested_scopes.top().get_type() != array)
+                    throw error("cppdatalib::stream_handler - attempted to end array that was never begun");
+
+                // Pop the top scope off so we can look at the parent scope, but put it back on for the callbacks
+                auto save = nested_scopes.top();
+                nested_scopes.pop();
+
+                if (!nested_scopes.empty() &&
+                     nested_scopes.top().get_type() == object &&
+                    !nested_scopes.top().key_was_parsed())
+                {
+                    nested_scopes.push(save);
+                    end_array_(v, true);
+                    end_key_(v);
+                }
+                else
+                {
+                    nested_scopes.push(save);
+                    end_array_(v, false);
+                    end_item_(v);
+                }
+                nested_scopes.pop();
+
+                if (!nested_scopes.empty())
+                {
+                    if (nested_scopes.top().get_type() == object)
+                    {
+                        nested_scopes.top().items_ += nested_scopes.top().key_was_parsed();
+                        nested_scopes.top().parsed_key_ = !nested_scopes.top().key_was_parsed();
+                    }
+                    else
+                        ++nested_scopes.top().items_;
+                }
+            }
+
+            // An API must call these when an object is parsed. The number of key/value pairs is passed in size, if possible
+            // size < 0 means unknown size
+            void begin_object(const core::value &v, core::int_t size)
+            {
+                if (!nested_scopes.empty() &&
+                     nested_scopes.top().type_ == object &&
+                    !nested_scopes.top().key_was_parsed())
+                {
+                    begin_key_(v);
+                    begin_object_(v, size, true);
+                }
+                else
+                {
+                    begin_item_(v);
+                    begin_object_(v, size, false);
+                }
+
+                nested_scopes.push(object);
+            }
+            void end_object(const core::value &v)
+            {
+                if (nested_scopes.empty() || nested_scopes.top().get_type() != object)
+                    throw error("cppdatalib::stream_handler - attempted to end object that was never begun");
+                if (nested_scopes.top().key_was_parsed())
+                    throw error("cppdatalib::stream_handler - attempted to end object before final value was written");
+
+                // Pop the top scope off so we can look at the parent scope, but put it back on for the callbacks
+                auto save = nested_scopes.top();
+                nested_scopes.pop();
+
+                if (!nested_scopes.empty() &&
+                     nested_scopes.top().get_type() == object &&
+                    !nested_scopes.top().key_was_parsed())
+                {
+                    nested_scopes.push(save);
+                    end_object_(v, true);
+                    end_key_(v);
+                }
+                else
+                {
+                    nested_scopes.push(save);
+                    end_object_(v, false);
+                    end_item_(v);
+                }
+                nested_scopes.pop();
+
+                if (!nested_scopes.empty())
+                {
+                    if (nested_scopes.top().get_type() == object)
+                    {
+                        nested_scopes.top().items_ += nested_scopes.top().key_was_parsed();
+                        nested_scopes.top().parsed_key_ = !nested_scopes.top().key_was_parsed();
+                    }
+                    else
+                        ++nested_scopes.top().items_;
+                }
+            }
+
+        protected:
+            // Overloads to detect beginnings and ends of arrays
+            virtual void begin_array_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
+            virtual void end_array_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
+
+            // Overloads to detect beginnings and ends of objects
+            virtual void begin_object_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
+            virtual void end_object_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
+
+            std::stack<scope_data> nested_scopes;
+        };
+
+        class value_builder : public core::stream_handler
+        {
+            core::value &v;
+
+            std::stack<core::value> keys;
+            std::stack<core::value *> references;
+
+        public:
+            value_builder(core::value &bind) : v(bind) {}
+
+            // begin_() clears the bound value to null and pushes a reference to it
+            void begin_()
+            {
+                while (!keys.empty())
+                    keys.pop();
+                while (!references.empty())
+                    references.pop();
+
+                v.set_null();
+                references.push(&this->v);
+            }
+
+            const core::value &value() const {return v;}
+
+            // begin_key_() just queues a new object key in the stack
+            void begin_key_(const core::value &v)
+            {
+                keys.push(v);
+                references.push(&keys.top());
+            }
+            void end_key_(const core::value &)
+            {
+                references.pop();
+            }
+
+            // begin_scalar_() pushes the item to the array if the object to be modified is an array,
+            // adds a member with the specified key, or simply assigns if not in a container
+            void begin_scalar_(const core::value &v, bool is_key)
+            {
+                if (!is_key && current_container() == array)
+                    references.top()->push_back(v);
+                else if (!is_key && current_container() == object)
+                {
+                    references.top()->member(keys.top()) = v;
+                    keys.pop();
+                }
+                else if (v.get_type() != string)
+                    *references.top() = v;
+            }
+
+            void string_data_(const core::value &v)
+            {
+                references.top()->get_string() += v.get_string();
+            }
+
+            // begin_container() operates similarly to begin_scalar_(), but pushes a reference to the container as well
+            void begin_container(const core::value &v, core::int_t size, bool is_key)
+            {
+                (void) size;
+
+                if (!is_key && current_container() == array)
+                {
+                    references.top()->push_back(core::null_t());
+                    references.push(&references.top()->get_array().back());
+                }
+                else if (!is_key && current_container() == object)
+                {
+                    references.top()->member(keys.top());
+                    references.push(&references.top()->member(keys.top()));
+                    keys.pop();
+                }
+
+                // WARNING: If one tries to perform the following assignment `*references.top() = v` here,
+                // an infinite recursion will result, because the `core::value` assignment operator and the
+                // `core::value` copy constructor use this class to build complex (array or object) types.
+                if (v.is_array())
+                    references.top()->set_array(core::array_t(), v.get_subtype());
+                else if (v.is_object())
+                    references.top()->set_object(core::object_t(), v.get_subtype());
+            }
+
+            // end_container_() just removes a container from the stack, because nothing more needs to be done
+            void end_container(bool is_key)
+            {
+                if (!is_key)
+                    references.pop();
+            }
+
+            void begin_array_(const core::value &v, core::int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void end_array_(const core::value &, bool is_key) {end_container(is_key);}
+            void begin_object_(const core::value &v, core::int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void end_object_(const core::value &, bool is_key) {end_container(is_key);}
+        };
+
+        struct value::traverse_node_prefix_serialize
+        {
+            traverse_node_prefix_serialize(stream_handler &handler) : stream(handler) {}
+
+            void operator()(const value *arg)
+            {
+                if (arg->is_array())
+                    stream.begin_array(*arg, stream_handler::unknown_size);
+                else if (arg->is_object())
+                    stream.begin_object(*arg, stream_handler::unknown_size);
+            }
+
+        private:
+            stream_handler &stream;
+        };
+
+        struct value::traverse_node_postfix_serialize
+        {
+            traverse_node_postfix_serialize(stream_handler &handler) : stream(handler) {}
+
+            void operator()(const value *arg)
+            {
+                if (arg->is_array())
+                    stream.end_array(*arg);
+                else if (arg->is_object())
+                    stream.end_object(*arg);
+                else
+                    stream.write(*arg);
+            }
+
+        private:
+            stream_handler &stream;
+        };
+
+        inline stream_handler &convert(const value &v, stream_handler &handler)
+        {
+            value::traverse_node_prefix_serialize prefix(handler);
+            value::traverse_node_postfix_serialize postfix(handler);
+
+            handler.begin();
+            v.traverse(prefix, postfix);
+            handler.end();
+
+            return handler;
+        }
+
+        inline value &assign(value &dst, const value &src)
+        {
+            switch (src.get_type())
+            {
+                case null: dst.set_null(); return dst;
+                case boolean: dst.set_bool(src.get_bool(), src.get_subtype()); return dst;
+                case integer: dst.set_int(src.get_int(), src.get_subtype()); return dst;
+                case real: dst.set_real(src.get_real(), src.get_subtype()); return dst;
+                case string: dst.set_string(src.get_string(), src.get_subtype()); return dst;
+                case array:
+                case object:
+                {
+                    value_builder builder(dst);
+                    convert(src, builder);
+                    return dst;
+                }
+                default: dst.set_null(); return dst;
+            }
+        }
     }
 
     namespace json
     {
-        inline std::istream &read_string(std::istream &stream, std::string &str)
+        inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
         {
             static const std::string hex = "0123456789ABCDEF";
             int c;
@@ -698,7 +1403,7 @@ namespace cppdatalib
             {char chr; stream >> chr; c = chr;} // Skip initial whitespace
             if (c != '"') throw core::error("JSON - expected string");
 
-            str.clear();
+            writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
             while (c = stream.get(), c != '"')
             {
                 if (c == EOF) throw core::error("JSON - unexpected end of string");
@@ -710,11 +1415,11 @@ namespace cppdatalib
 
                     switch (c)
                     {
-                        case 'b': str.push_back('\b'); break;
-                        case 'f': str.push_back('\f'); break;
-                        case 'n': str.push_back('\n'); break;
-                        case 'r': str.push_back('\r'); break;
-                        case 't': str.push_back('\t'); break;
+                        case 'b': writer.append_to_string(core::string_t(1, '\b')); break;
+                        case 'f': writer.append_to_string(core::string_t(1, '\f')); break;
+                        case 'n': writer.append_to_string(core::string_t(1, '\n')); break;
+                        case 'r': writer.append_to_string(core::string_t(1, '\r')); break;
+                        case 't': writer.append_to_string(core::string_t(1, '\t')); break;
                         case 'u':
                         {
                             uint32_t code = 0;
@@ -728,24 +1433,25 @@ namespace cppdatalib
                             }
 
                             std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                            str += utf8.to_bytes(code);
+                            writer.append_to_string(utf8.to_bytes(code));
 
                             break;
                         }
                         default:
-                            str.push_back(c); break;
+                            writer.append_to_string(core::string_t(1, c));
+                            break;
                     }
                 }
                 else
-                    str.push_back(c);
+                    writer.append_to_string(core::string_t(1, c));
             }
 
+            writer.end_string(core::string_t());
             return stream;
         }
 
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
         {
-            stream << '"';
             for (size_t i = 0; i < str.size(); ++i)
             {
                 int c = str[i] & 0xff;
@@ -773,87 +1479,77 @@ namespace cppdatalib
                 }
             }
 
-            return stream << '"';
+            return stream;
         }
 
-        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
         {
+            bool delimiter_required = false;
             char chr;
 
-            stream >> std::skipws >> chr, stream.unget(); // Peek at next character past whitespace
+            writer.begin();
 
-            if (stream.good())
+            while (stream >> std::skipws >> chr, stream.unget(), stream.good() && !stream.eof())
             {
+                if (delimiter_required && !strchr(",:]}", chr))
+                    throw core::error("JSON - expected ',' separating array or object entries");
+
                 switch (chr)
                 {
                     case 'n':
                         if (!core::stream_starts_with(stream, "null")) throw core::error("JSON - expected 'null' value");
-                        v.set_null();
-                        return stream;
+                        writer.write(core::null_t());
+                        delimiter_required = true;
+                        break;
                     case 't':
                         if (!core::stream_starts_with(stream, "true")) throw core::error("JSON - expected 'true' value");
-                        v.set_bool(true);
-                        return stream;
+                        writer.write(true);
+                        delimiter_required = true;
+                        break;
                     case 'f':
                         if (!core::stream_starts_with(stream, "false")) throw core::error("JSON - expected 'false' value");
-                        v.set_bool(false);
-                        return stream;
+                        writer.write(false);
+                        delimiter_required = true;
+                        break;
                     case '"':
-                    {
-                        std::string str;
-                        read_string(stream, str);
-                        v.set_string(str);
-                        return stream;
-                    }
+                        read_string(stream, writer);
+                        delimiter_required = true;
+                        break;
+                    case ',':
+                        stream >> chr; // Eat ','
+                        if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
+                            throw core::error("JSON - invalid ',' does not separate array or object entries");
+                        stream >> chr; stream.unget(); // Peek ahead
+                        if (!stream || chr == ',' || chr == ']' || chr == '}')
+                            throw core::error("JSON - invalid ',' does not separate array or object entries");
+                        delimiter_required = false;
+                        break;
+                    case ':':
+                        stream >> chr; // Eat ':'
+                        if (!writer.container_key_was_just_parsed())
+                            throw core::error("JSON - invalid ':' does not separate a key and value pair");
+                        delimiter_required = false;
+                        break;
                     case '[':
                         stream >> chr; // Eat '['
-                        v.set_array(core::array_t());
-
-                        // Peek at next character past whitespace
-                        stream >> chr;
-                        if (!stream) throw core::error("JSON - expected ']' ending array");
-                        else if (chr == ']') return stream;
-
-                        stream.unget(); // Replace character we peeked at
-                        do
-                        {
-                            core::value item;
-                            stream >> item;
-                            v.push_back(item);
-
-                            stream >> chr;
-                            if (!stream || (chr != ',' && chr != ']'))
-                                throw core::error("JSON - expected ',' separating array elements or ']' ending array");
-                        } while (stream && chr != ']');
-
-                        return stream;
+                        writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                        delimiter_required = false;
+                        break;
+                    case ']':
+                        stream >> chr; // Eat ']'
+                        writer.end_array(core::array_t());
+                        delimiter_required = true;
+                        break;
                     case '{':
                         stream >> chr; // Eat '{'
-                        v.set_object(core::object_t());
-
-                        // Peek at next character past whitespace
-                        stream >> chr;
-                        if (!stream) throw core::error("JSON - expected '}' ending object");
-                        else if (chr == '}') return stream;
-
-                        stream.unget(); // Replace character we peeked at
-                        do
-                        {
-                            std::string key;
-                            core::value item;
-
-                            read_string(stream, key);
-                            stream >> chr;
-                            if (chr != ':') throw core::error("JSON - expected ':' separating key and value in object");
-                            stream >> item;
-                            v[key] = item;
-
-                            stream >> chr;
-                            if (!stream || (chr != ',' && chr != '}'))
-                                throw core::error("JSON - expected ',' separating key value pairs or '}' ending object");
-                        } while (stream && chr != '}');
-
-                        return stream;
+                        writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
+                        delimiter_required = false;
+                        break;
+                    case '}':
+                        stream >> chr; // Eat '}'
+                        writer.end_object(core::object_t());
+                        delimiter_required = true;
+                        break;
                     default:
                         if (isdigit(chr) || chr == '-')
                         {
@@ -862,101 +1558,157 @@ namespace cppdatalib
                             if (!stream) throw core::error("JSON - invalid number");
 
                             if (r == trunc(r) && r >= INT64_MIN && r <= INT64_MAX)
-                                v.set_int(static_cast<core::int_t>(r));
+                                writer.write(static_cast<core::int_t>(r));
                             else
-                                v.set_real(r);
+                                writer.write(r);
 
-                            return stream;
+                            delimiter_required = true;
                         }
+                        else
+                            throw core::error("JSON - expected value");
                         break;
                 }
             }
 
-            throw core::error("JSON - expected value");
+            writer.end();
+            return stream;
+        }
+
+        class stream_writer : public core::stream_handler, public core::stream_writer
+        {
+        public:
+            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_item_(const core::value &)
+            {
+                if (container_key_was_just_parsed())
+                    output_stream << ':';
+                else if (current_container_size() > 0)
+                    output_stream << ',';
+            }
+            void begin_key_(const core::value &v)
+            {
+                if (current_container_size() > 0)
+                    output_stream << ',';
+
+                if (!v.is_string())
+                    throw core::error("JSON - cannot write non-string key");
+            }
+
+            void null_(const core::value &) {output_stream << "null";}
+            void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
+            void integer_(const core::value &v) {output_stream << v.get_int();}
+            void real_(const core::value &v) {output_stream << v.get_real();}
+            void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
+            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void end_string_(const core::value &, bool) {output_stream << '"';}
+
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream << '[';}
+            void end_array_(const core::value &, bool) {output_stream << ']';}
+
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream << '{';}
+            void end_object_(const core::value &, bool) {output_stream << '}';}
+        };
+
+        class pretty_stream_writer : public core::stream_handler, public core::stream_writer
+        {
+            size_t indent_width;
+            size_t current_indent;
+
+        public:
+            pretty_stream_writer(std::ostream &output, size_t indent_width)
+                : core::stream_writer(output)
+                , indent_width(indent_width)
+                , current_indent(0)
+            {}
+
+            size_t indent() {return indent_width;}
+
+        protected:
+            void begin_() {current_indent = 0;}
+
+            void begin_item_(const core::value &)
+            {
+                if (container_key_was_just_parsed())
+                    output_stream << ": ";
+                else if (current_container_size() > 0)
+                    output_stream << ',';
+
+                if (current_container() == core::array)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+            }
+            void begin_key_(const core::value &v)
+            {
+                if (current_container_size() > 0)
+                    output_stream << ',';
+
+                output_stream << '\n' << std::string(current_indent, ' ');
+
+                if (!v.is_string())
+                    throw core::error("JSON - cannot write non-string key");
+            }
+
+            void null_(const core::value &) {output_stream << "null";}
+            void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
+            void integer_(const core::value &v) {output_stream << v.get_int();}
+            void real_(const core::value &v) {output_stream << v.get_real();}
+            void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
+            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void end_string_(const core::value &, bool) {output_stream << '"';}
+
+            void begin_array_(const core::value &, core::int_t, bool)
+            {
+                output_stream << '[';
+                current_indent += indent_width;
+            }
+            void end_array_(const core::value &, bool)
+            {
+                current_indent -= indent_width;
+
+                if (current_container_size() > 0)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+
+                output_stream << ']';
+            }
+
+            void begin_object_(const core::value &, core::int_t, bool)
+            {
+                output_stream << '{';
+                current_indent += indent_width;
+            }
+            void end_object_(const core::value &, bool)
+            {
+                current_indent -= indent_width;
+
+                if (current_container_size() > 0)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+
+                output_stream << '}';
+            }
+        };
+
+        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        {
+            core::value_builder builder(v);
+            convert(stream, builder);
+            return stream;
         }
 
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
         {
-            switch (v.get_type())
-            {
-                case core::null: return stream << "null";
-                case core::boolean: return stream << (v.get_bool()? "true": "false");
-                case core::integer: return stream << v.get_int();
-                case core::real: return stream << v.get_real();
-                case core::string: return write_string(stream, v.get_string());
-                case core::array:
-                {
-                    stream << '[';
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                    {
-                        if (it != v.get_array().begin())
-                            stream << ',';
-                        stream << *it;
-                    }
-                    return stream << ']';
-                }
-                case core::object:
-                {
-                    stream << '{';
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                    {
-                        if (it != v.get_object().begin())
-                            stream << ',';
-                        write_string(stream, it->first) << ':' << it->second;
-                    }
-                    return stream << '}';
-                }
-            }
-
-            // Control will never get here
+            stream_writer writer(stream);
+            core::convert(v, writer);
             return stream;
         }
 
         inline std::istream &input(std::istream &stream, core::value &v) {return stream >> v;}
         inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
 
-        inline std::ostream &pretty_print(std::ostream &stream, const core::value &v, size_t indent_width, size_t start_indent = 0)
+        inline std::ostream &pretty_print(std::ostream &stream, const core::value &v, size_t indent_width)
         {
-            switch (v.get_type())
-            {
-                case core::null: return stream << "null";
-                case core::boolean: return stream << (v.get_bool()? "true": "false");
-                case core::integer: return stream << v.get_int();
-                case core::real: return stream << v.get_real();
-                case core::string: return write_string(stream, v.get_string());
-                case core::array:
-                {
-                    if (v.get_array().empty())
-                        return stream << "[]";
-
-                    stream << "[\n";
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                    {
-                        if (it != v.get_array().begin())
-                            stream << ",\n";
-                        stream << std::string(indent_width * (start_indent + 1), ' ');
-                        pretty_print(stream, *it, indent_width, start_indent + 1);
-                    }
-                    return stream << '\n' << std::string(indent_width * start_indent, ' ') << ']';
-                }
-                case core::object:
-                {
-                    if (v.get_object().empty())
-                        return stream << "{}";
-
-                    stream << "{\n";
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                    {
-                        if (it != v.get_object().begin())
-                            stream << ",\n";
-                        stream << std::string(indent_width * (start_indent + 1), ' ');
-                        pretty_print(write_string(stream, it->first) << ": ", it->second, indent_width, start_indent + 1);
-                    }
-                    return stream << '\n' << std::string(indent_width * start_indent, ' ') << '}';
-                }
-            }
-
-            // Control will never get here
+            pretty_stream_writer writer(stream, indent_width);
+            core::convert(v, writer);
             return stream;
         }
 
@@ -978,138 +1730,123 @@ namespace cppdatalib
         inline std::string to_pretty_json(const core::value &v, size_t indent_width)
         {
             std::ostringstream stream;
-            pretty_print(stream, v, indent_width);
+            pretty_stream_writer writer(stream, indent_width);
+            core::convert(v, writer);
             return stream.str();
         }
     }
 
     namespace bencode
     {
-        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
         {
-            int chr = stream.peek(); // Peek at next character
+            char chr;
 
-            if (chr != EOF)
+            writer.begin();
+
+            while (stream >> std::skipws >> chr, stream.unget(), stream.good() && !stream.eof())
             {
                 switch (chr)
                 {
                     case 'i':
                     {
-                        stream.get(); // Eat 'i'
+                        stream >> chr; // Eat 'i'
 
                         core::int_t i;
                         stream >> i;
                         if (!stream) throw core::error("Bencode - expected 'integer' value");
 
-                        v.set_int(i);
+                        writer.write(i);
                         if (stream.get() != 'e') throw core::error("Bencode - invalid 'integer' value");
-
-                        return stream;
+                        break;
                     }
+                    case 'e':
+                        stream >> chr; // Eat 'e'
+                        switch (writer.current_container())
+                        {
+                            case core::array: writer.end_array(core::array_t()); break;
+                            case core::object: writer.end_object(core::object_t()); break;
+                            default: throw core::error("Bencode - attempt to end element does not exist"); break;
+                        }
+                        break;
                     case 'l':
-                        stream.get(); // Eat '['
-                        v.set_array(core::array_t());
-
-                        // Peek at next character
-                        chr = stream.get();
-                        if (!stream) throw core::error("Bencode - expected 'e' ending list");
-                        else if (chr == 'e') return stream;
-
-                        do
-                        {
-                            stream.unget(); // Replace character we peeked at
-
-                            core::value item;
-                            stream >> item;
-                            v.push_back(item);
-
-                            chr = stream.get();
-                            if (chr == EOF)
-                                throw core::error("Bencode - expected 'e' ending list");
-                        } while (stream && chr != 'e');
-
-                        return stream;
+                        stream >> chr; // Eat 'l'
+                        writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                        break;
                     case 'd':
-                        stream.get(); // Eat 'd'
-                        v.set_object(core::object_t());
-
-                        // Peek at next character
-                        chr = stream.get();
-                        if (!stream) throw core::error("Bencode - expected 'e' ending dictionary");
-                        else if (chr == 'e') return stream;
-
-                        do
-                        {
-                            stream.unget(); // Replace character we peeked at
-
-                            core::value key;
-                            core::value item;
-
-                            stream >> key >> item;
-
-                            if (!key.is_string()) throw core::error("Bencode - dictionary key is not a string");
-                            v[key.get_string()] = item;
-
-                            chr = stream.get();
-                            if (chr == EOF)
-                                throw core::error("Bencode - expected 'e' ending dictionary");
-                        } while (stream && chr != 'e');
-
-                        return stream;
+                        stream >> chr; // Eat 'd'
+                        writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
+                        break;
                     default:
                         if (isdigit(chr))
                         {
                             core::int_t size;
-                            v.set_string(core::string_t());
 
                             stream >> size;
                             if (size < 0) throw core::error("Bencode - expected string size");
                             if (stream.get() != ':') throw core::error("Bencode - expected ':' separating string size and data");
 
-                            // TODO: read string
-                            v.get_string().reserve(size);
+                            writer.begin_string(core::string_t(), size);
                             while (size--)
                             {
                                 chr = stream.get();
                                 if (chr == EOF) throw core::error("Bencode - unexpected end of string");
-                                v.get_string().push_back(chr);
+                                writer.append_to_string(core::string_t(1, chr));
                             }
-
-                            return stream;
+                            writer.end_string(core::string_t());
                         }
+                        else
+                            throw core::error("Bencode - expected value");
                         break;
                 }
             }
 
-            throw core::error("Bencode - expected value");
+            writer.end();
+            return stream;
+        }
+
+        class stream_writer : public core::stream_handler, public core::stream_writer
+        {
+        public:
+            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_key_(const core::value &v)
+            {
+                if (!v.is_string())
+                    throw core::error("Bencode - cannot write non-string key");
+            }
+
+            void null_(const core::value &) {throw core::error("Bencode - 'null' value not allowed in output");}
+            void bool_(const core::value &) {throw core::error("Bencode - 'boolean' value not allowed in output");}
+            void integer_(const core::value &v) {output_stream << 'i' << v.get_int() << 'e';}
+            void real_(const core::value &) {throw core::error("Bencode - 'real' value not allowed in output");}
+            void begin_string_(const core::value &, core::int_t size, bool)
+            {
+                if (size == unknown_size)
+                    throw core::error("Bencode - 'string' value does not have size specified");
+                output_stream << size << ':';
+            }
+            void string_data_(const core::value &v) {output_stream << v.get_string();}
+
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream << 'l';}
+            void end_array_(const core::value &, bool) {output_stream << 'e';}
+
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream << 'd';}
+            void end_object_(const core::value &, bool) {output_stream << 'e';}
+        };
+
+        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        {
+            core::value_builder builder(v);
+            convert(stream, builder);
+            return stream;
         }
 
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
         {
-            switch (v.get_type())
-            {
-                case core::null: throw core::error("Bencode - 'null' value not allowed in output");
-                case core::boolean: throw core::error("Bencode - 'boolean' value not allowed in output");
-                case core::integer: return stream << 'i' << v.get_int() << 'e';
-                case core::real: throw core::error("Bencode - 'real' value not allowed in output");
-                case core::string: return stream << v.get_string().size() << ':' << v.get_string();
-                case core::array:
-                {
-                    stream << 'l';
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                        stream << *it;
-                    return stream << 'e';
-                }
-                case core::object:
-                {
-                    stream << 'd';
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                        stream << it->first.size() << ':' << it->first << it->second;
-                    return stream << 'e';
-                }
-            }
-
-            // Control will never get here
+            stream_writer writer(stream);
+            core::convert(v, writer);
             return stream;
         }
 
@@ -1134,7 +1871,7 @@ namespace cppdatalib
 
     namespace plain_text_property_list
     {
-        inline std::istream &read_string(std::istream &stream, std::string &str)
+        inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
         {
             static const std::string hex = "0123456789ABCDEF";
             int c;
@@ -1142,7 +1879,7 @@ namespace cppdatalib
             {char chr; stream >> chr; c = chr;} // Skip initial whitespace
             if (c != '"') throw core::error("Plain Text Property List - expected string");
 
-            str.clear();
+            writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
             while (c = stream.get(), c != '"')
             {
                 if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
@@ -1154,10 +1891,10 @@ namespace cppdatalib
 
                     switch (c)
                     {
-                        case 'b': str.push_back('\b'); break;
-                        case 'n': str.push_back('\n'); break;
-                        case 'r': str.push_back('\r'); break;
-                        case 't': str.push_back('\t'); break;
+                        case 'b': writer.append_to_string(std::string(1, '\b')); break;
+                        case 'n': writer.append_to_string(std::string(1, '\n')); break;
+                        case 'r': writer.append_to_string(std::string(1, '\r')); break;
+                        case 't': writer.append_to_string(std::string(1, '\t')); break;
                         case 'U':
                         {
                             uint32_t code = 0;
@@ -1171,7 +1908,7 @@ namespace cppdatalib
                             }
 
                             std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                            str += utf8.to_bytes(code);
+                            writer.append_to_string(utf8.to_bytes(code));
 
                             break;
                         }
@@ -1190,25 +1927,25 @@ namespace cppdatalib
                                 }
 
                                 std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                                str += utf8.to_bytes(code);
+                                writer.append_to_string(utf8.to_bytes(code));
                             }
                             else
-                                str.push_back(c);
+                                writer.append_to_string(std::string(1, c));
 
                             break;
                         }
                     }
                 }
                 else
-                    str.push_back(c);
+                    writer.append_to_string(std::string(1, c));
             }
 
+            writer.end_string(core::string_t());
             return stream;
         }
 
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
         {
-            stream << '"';
             for (size_t i = 0; i < str.size(); ++i)
             {
                 int c = str[i] & 0xff;
@@ -1258,18 +1995,22 @@ namespace cppdatalib
                 }
             }
 
-            return stream << '"';
+            return stream;
         }
 
-        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
         {
-            static const std::string hex = "0123456789ABCDEF";
+            const std::string hex = "0123456789ABCDEF";
+            bool delimiter_required = false;
             char chr;
 
-            stream >> std::skipws >> chr, stream.unget(); // Peek at next character past whitespace
+            writer.begin();
 
-            if (stream.good())
+            while (stream >> std::skipws >> chr, stream.unget(), stream.good() && !stream.eof())
             {
+                if (delimiter_required && !strchr(",=)}", chr))
+                    throw core::error("Plain Text Property List - expected ',' separating array or object entries");
+
                 switch (chr)
                 {
                     case '<':
@@ -1279,7 +2020,8 @@ namespace cppdatalib
 
                         if (chr != '*')
                         {
-                            v.set_string(core::string_t(), core::blob);
+                            const core::value value_type(core::string_t(), core::blob);
+                            writer.begin_string(value_type, core::stream_handler::unknown_size);
 
                             unsigned int t = 0;
                             bool have_first_nibble = false;
@@ -1292,14 +2034,16 @@ namespace cppdatalib
                                 t |= p;
 
                                 if (have_first_nibble)
-                                    v.get_string().push_back(t);
+                                    writer.append_to_string(core::string_t(1, t));
 
                                 have_first_nibble = !have_first_nibble;
                                 stream >> chr;
                             }
 
                             if (have_first_nibble) throw core::error("Plain Text Property List - unfinished byte in binary data");
-                            return stream;
+
+                            writer.end_string(value_type);
+                            break;
                         }
 
                         stream >> chr;
@@ -1312,7 +2056,7 @@ namespace cppdatalib
                             if (!stream || (chr != 'Y' && chr != 'N'))
                                 throw core::error("Plain Text Property List - expected 'boolean' value after '<*B' in value");
 
-                            v.set_bool(chr == 'Y');
+                            writer.write(chr == 'Y');
                         }
                         else if (chr == 'I')
                         {
@@ -1321,7 +2065,7 @@ namespace cppdatalib
                             if (!stream)
                                 throw core::error("Plain Text Property List - expected 'integer' value after '<*I' in value");
 
-                            v.set_int(i);
+                            writer.write(i);
                         }
                         else if (chr == 'R')
                         {
@@ -1330,175 +2074,259 @@ namespace cppdatalib
                             if (!stream)
                                 throw core::error("Plain Text Property List - expected 'real' value after '<*R' in value");
 
-                            v.set_real(r);
+                            writer.write(r);
                         }
                         else if (chr == 'D')
                         {
                             int c;
-                            v.set_string(std::string());
+                            const core::value value_type(core::string_t(), core::datetime);
+                            writer.begin_string(value_type, core::stream_handler::unknown_size);
                             while (c = stream.get(), c != '>')
                             {
                                 if (c == EOF) throw core::error("Plain Text Property List - expected '>' after value");
 
-                                v.get_string().push_back(c);
+                                writer.append_to_string(core::string_t(1, c));
                             }
                             stream.unget();
-                            v.set_subtype(core::datetime);
+                            writer.end_string(value_type);
                         }
 
-                        if (stream.get() != '>') throw core::error("Plain Text Property List - expected '>' after value");
-                        return stream;
+                        stream >> chr;
+                        if (chr != '>') throw core::error("Plain Text Property List - expected '>' after value");
+                        break;
                     case '"':
-                    {
-                        std::string str;
-                        read_string(stream, str);
-                        v.set_string(str);
-                        return stream;
-                    }
+                        read_string(stream, writer);
+                        delimiter_required = true;
+                        break;
+                    case ',':
+                        stream >> chr; // Eat ','
+                        if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
+                            throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
+                        stream >> chr; stream.unget(); // Peek ahead
+                        if (!stream || chr == ',' || chr == ']' || chr == '}')
+                            throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
+                        delimiter_required = false;
+                        break;
+                    case '=':
+                        stream >> chr; // Eat '='
+                        if (!writer.container_key_was_just_parsed())
+                            throw core::error("Plain Text Property List - invalid '=' does not separate a key and value pair");
+                        delimiter_required = false;
+                        break;
                     case '(':
                         stream >> chr; // Eat '('
-                        v.set_array(core::array_t());
-
-                        // Peek at next character past whitespace
-                        stream >> chr;
-                        if (!stream) throw core::error("Plain Text Property List - expected ')' ending array");
-                        else if (chr == ')') return stream;
-
-                        stream.unget(); // Replace character we peeked at
-                        do
-                        {
-                            core::value item;
-                            stream >> item;
-                            v.push_back(item);
-
-                            stream >> chr;
-                            if (!stream || (chr != ',' && chr != ')'))
-                                throw core::error("Plain Text Property List - expected ',' separating array elements or ')' ending array");
-                        } while (stream && chr != ')');
-
-                        return stream;
+                        writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                        delimiter_required = false;
+                        break;
+                    case ')':
+                        stream >> chr; // Eat ')'
+                        writer.end_array(core::array_t());
+                        delimiter_required = true;
+                        break;
                     case '{':
                         stream >> chr; // Eat '{'
-                        v.set_object(core::object_t());
-
-                        // Peek at next character past whitespace
-                        stream >> chr;
-                        if (!stream) throw core::error("Plain Text Property List - expected '}' ending object");
-                        else if (chr == '}') return stream;
-
-                        stream.unget(); // Replace character we peeked at
-                        do
-                        {
-                            std::string key;
-                            core::value item;
-
-                            read_string(stream, key);
-                            stream >> chr;
-                            if (chr != '=') throw core::error("Plain Text Property List - expected '=' separating key and value in object");
-                            stream >> item;
-                            v[key] = item;
-
-                            stream >> chr;
-                            if (!stream || chr != ';')
-                                throw core::error("Plain Text Property List - expected ';' after value in object");
-
-                            stream >> chr, stream.unget();
-                        } while (stream && chr != '}');
-
-                        stream.get(); // Eat '}'
-                        return stream;
+                        writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
+                        delimiter_required = false;
+                        break;
+                    case '}':
+                        stream >> chr; // Eat '}'
+                        writer.end_object(core::object_t());
+                        delimiter_required = true;
+                        break;
                     default:
+                        throw core::error("Plain Text Property List - expected value");
                         break;
                 }
             }
 
-            throw core::error("Plain Text Property List - expected value");
+            writer.end();
+            return stream;
+        }
+
+        class stream_writer : public core::stream_handler, public core::stream_writer
+        {
+        public:
+            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_item_(const core::value &)
+            {
+                if (container_key_was_just_parsed())
+                    output_stream << '=';
+                else if (current_container_size() > 0)
+                    output_stream << ',';
+            }
+            void begin_key_(const core::value &v)
+            {
+                if (current_container_size() > 0)
+                    output_stream << ',';
+
+                if (!v.is_string())
+                    throw core::error("Plain Text Property List - cannot write non-string key");
+            }
+
+            void null_(const core::value &) {throw core::error("Plain Text Property List - 'null' value not allowed in output");}
+            void bool_(const core::value &v) {output_stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';}
+            void integer_(const core::value &v) {output_stream << "<*I" << v.get_int() << '>';}
+            void real_(const core::value &v) {output_stream << "<*R" << v.get_real() << '>';}
+            void begin_string_(const core::value &v, core::int_t, bool)
+            {
+                switch (v.get_subtype())
+                {
+                    case core::date:
+                    case core::time:
+                    case core::datetime: output_stream << "<*D"; break;
+                    case core::blob: output_stream << '<'; break;
+                    default: output_stream << '"'; break;
+                }
+            }
+            void string_data_(const core::value &v)
+            {
+                if (v.get_subtype() == core::blob)
+                    hex::write(output_stream, v.get_string());
+                else
+                    write_string(output_stream, v.get_string());
+            }
+            void end_string_(const core::value &v, bool)
+            {
+                switch (v.get_subtype())
+                {
+                    case core::date:
+                    case core::time:
+                    case core::datetime:
+                    case core::blob: output_stream << '>'; break;
+                    default: output_stream << '"'; break;
+                }
+            }
+
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream << '(';}
+            void end_array_(const core::value &, bool) {output_stream << ')';}
+
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream << '{';}
+            void end_object_(const core::value &, bool) {output_stream << '}';}
+        };
+
+        class pretty_stream_writer : public core::stream_handler, public core::stream_writer
+        {
+            size_t indent_width;
+            size_t current_indent;
+
+        public:
+            pretty_stream_writer(std::ostream &output, size_t indent_width)
+                : core::stream_writer(output)
+                , indent_width(indent_width)
+                , current_indent(0)
+            {}
+
+            size_t indent() {return indent_width;}
+
+        protected:
+            void begin_() {current_indent = 0;}
+
+            void begin_item_(const core::value &)
+            {
+                if (container_key_was_just_parsed())
+                    output_stream << " = ";
+                else if (current_container_size() > 0)
+                    output_stream << ',';
+
+                if (current_container() == core::array)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+            }
+            void begin_key_(const core::value &v)
+            {
+                if (current_container_size() > 0)
+                    output_stream << ',';
+
+                output_stream << '\n' << std::string(current_indent, ' ');
+
+                if (!v.is_string())
+                    throw core::error("Plain Text Property List - cannot write non-string key");
+            }
+
+            void null_(const core::value &) {throw core::error("Plain Text Property List - 'null' value not allowed in output");}
+            void bool_(const core::value &v) {output_stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';}
+            void integer_(const core::value &v) {output_stream << "<*I" << v.get_int() << '>';}
+            void real_(const core::value &v) {output_stream << "<*R" << v.get_real() << '>';}
+            void begin_string_(const core::value &v, core::int_t, bool)
+            {
+                switch (v.get_subtype())
+                {
+                    case core::date:
+                    case core::time:
+                    case core::datetime: output_stream << "<*D"; break;
+                    case core::blob: output_stream << '<'; break;
+                    default: output_stream << '"'; break;
+                }
+            }
+            void string_data_(const core::value &v)
+            {
+                if (v.get_subtype() == core::blob)
+                    hex::write(output_stream, v.get_string());
+                else
+                    write_string(output_stream, v.get_string());
+            }
+            void end_string_(const core::value &v, bool)
+            {
+                switch (v.get_subtype())
+                {
+                    case core::date:
+                    case core::time:
+                    case core::datetime:
+                    case core::blob: output_stream << '>'; break;
+                    default: output_stream << '"'; break;
+                }
+            }
+
+            void begin_array_(const core::value &, core::int_t, bool)
+            {
+                output_stream << '(';
+                current_indent += indent_width;
+            }
+            void end_array_(const core::value &, bool)
+            {
+                current_indent -= indent_width;
+
+                if (current_container_size() > 0)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+
+                output_stream << ')';
+            }
+
+            void begin_object_(const core::value &, core::int_t, bool)
+            {
+                output_stream << '{';
+                current_indent += indent_width;
+            }
+            void end_object_(const core::value &, bool)
+            {
+                current_indent -= indent_width;
+
+                if (current_container_size() > 0)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+
+                output_stream << '}';
+            }
+        };
+
+        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        {
+            core::value_builder builder(v);
+            convert(stream, builder);
+            return stream;
         }
 
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
         {
-            switch (v.get_type())
-            {
-                case core::null: throw core::error("Plain Text Property List - 'null' value not allowed in output");
-                case core::boolean: return stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';
-                case core::integer: return stream << "<*I" << v.get_int() << '>';
-                case core::real: return stream << "<*R" << v.get_real() << '>';
-                case core::string:
-                {
-                    switch (v.get_subtype())
-                    {
-                        case core::date:
-                        case core::time:
-                        case core::datetime: return stream << "<*D" << v.get_string() << '>';
-                        case core::blob: return hex::write(stream << '<', v.get_string()) << '>';
-                        default:
-                            return write_string(stream, v.get_string());
-                    }
-                }
-                case core::array:
-                {
-                    stream << '(';
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                    {
-                        if (it != v.get_array().begin())
-                            stream << ',';
-                        stream << *it;
-                    }
-                    return stream << ')';
-                }
-                case core::object:
-                {
-                    stream << '{';
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                        write_string(stream, it->first) << '=' << it->second << ';';
-                    return stream << '}';
-                }
-            }
-
-            // Control will never get here
+            stream_writer writer(stream);
+            core::convert(v, writer);
             return stream;
         }
 
-        inline std::ostream &pretty_print(std::ostream &stream, const core::value &v, size_t indent_width, size_t start_indent = 0)
+        inline std::ostream &pretty_print(std::ostream &stream, const core::value &v, size_t indent_width)
         {
-            switch (v.get_type())
-            {
-                case core::null: throw core::error("Plain Text Property List - 'null' value not allowed in output");
-                case core::boolean: return stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';
-                case core::integer: return stream << "<*I" << v.get_int() << '>';
-                case core::real: return stream << "<*R" << v.get_real() << '>';
-                case core::string: return v.get_subtype() == core::date? (stream << "<*D" << v.get_string() << '>'): write_string(stream, v.get_string());
-                case core::array:
-                {
-                    if (v.get_array().empty())
-                        return stream << "()";
-
-                    stream << "(\n";
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                    {
-                        if (it != v.get_array().begin())
-                            stream << ",\n";
-                        stream << std::string(indent_width * (start_indent + 1), ' ');
-                        pretty_print(stream, *it, indent_width, start_indent + 1);
-                    }
-                    return stream << '\n' << std::string(indent_width * start_indent, ' ') << ')';
-                }
-                case core::object:
-                {
-                    if (v.get_object().empty())
-                        return stream << "{}";
-
-                    stream << "{\n";
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                    {
-                        stream << std::string(indent_width * (start_indent + 1), ' ');
-                        pretty_print(write_string(stream, it->first) << " = ", it->second, indent_width, start_indent + 1) << ";\n";
-                    }
-                    return stream << std::string(indent_width * start_indent, ' ') << '}';
-                }
-            }
-
-            // Control will never get here
+            pretty_stream_writer writer(stream, indent_width);
+            core::convert(v, writer);
             return stream;
         }
 
@@ -1555,43 +2383,196 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
+        class stream_writer : public core::stream_handler, public core::stream_writer
         {
-            switch (v.get_type())
+        public:
+            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_key_(const core::value &v)
             {
-                case core::null: throw core::error("XML Property List - 'null' value not allowed in output");
-                case core::boolean: return stream << "<" << (v.get_bool()? "true": "false") << "/>";
-                case core::integer: return stream << "<integer>" << v.get_int() << "</integer>";
-                case core::real: return stream << "<real>" << v.get_real() << "</real>";
-                case core::string:
-                {
+                if (!v.is_string())
+                    throw core::error("XML Property List - cannot write non-string key");
+            }
+
+            void null_(const core::value &) {throw core::error("XML Property List - 'null' value not allowed in output");}
+            void bool_(const core::value &v) {output_stream << '<' << (v.get_bool()? "true": "false") << "/>";}
+            void integer_(const core::value &v) {output_stream << "<integer>" << v.get_int() << "</integer>";}
+            void real_(const core::value &v) {output_stream << "<real>" << v.get_real() << "</real>";}
+            void begin_string_(const core::value &v, core::int_t, bool is_key)
+            {
+                if (is_key)
+                    output_stream << "<key>";
+                else
                     switch (v.get_subtype())
                     {
                         case core::date:
                         case core::time:
-                        case core::datetime: return write_string(stream << "<date>", v.get_string()) << "</date>";
-                        case core::blob: return base64::write(stream << "<data>", v.get_string()) << "</data>";
-                        default:
-                            return write_string(stream << "<string>", v.get_string()) << "</string>";
+                        case core::datetime: output_stream << "<date>"; break;
+                        case core::blob: output_stream << "<data>"; break;
+                        default: output_stream << "<string>"; break;
                     }
-                }
-                case core::array:
-                {
-                    stream << "<array>";
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                        stream << *it;
-                    return stream << "</array>";
-                }
-                case core::object:
-                {
-                    stream << "<dict>";
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                        write_string(stream << "<key>", it->first) << "</key>" << it->second;
-                    return stream << "</dict>";
-                }
+            }
+            void string_data_(const core::value &v)
+            {
+                if (v.get_subtype() == core::blob)
+                    base64::write(output_stream, v.get_string());
+                else
+                    write_string(output_stream, v.get_string());
+            }
+            void end_string_(const core::value &v, bool is_key)
+            {
+                if (is_key)
+                    output_stream << "</key>";
+                else
+                    switch (v.get_subtype())
+                    {
+                        case core::date:
+                        case core::time:
+                        case core::datetime: output_stream << "</date>"; break;
+                        case core::blob: output_stream << "</data>"; break;
+                        default: output_stream << "</string>"; break;
+                    }
             }
 
-            // Control will never get here
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream << "<array>";}
+            void end_array_(const core::value &, bool) {output_stream << "</array>";}
+
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream << "<dict>";}
+            void end_object_(const core::value &, bool) {output_stream << "</dict>";}
+        };
+
+        class pretty_stream_writer : public core::stream_handler, public core::stream_writer
+        {
+            size_t indent_width;
+            size_t current_indent;
+
+        public:
+            pretty_stream_writer(std::ostream &output, size_t indent_width)
+                : core::stream_writer(output)
+                , indent_width(indent_width)
+                , current_indent(0)
+            {}
+
+            size_t indent() {return indent_width;}
+
+        protected:
+            void begin_() {current_indent = 0;}
+
+            void begin_item_(const core::value &)
+            {
+                if (current_container() != core::null)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+            }
+            void begin_key_(const core::value &v)
+            {
+                output_stream << '\n' << std::string(current_indent, ' ');
+
+                if (!v.is_string())
+                    throw core::error("XML Property List - cannot write non-string key");
+            }
+
+            void bool_(const core::value &v) {output_stream << '<' << (v.get_bool()? "true": "false") << "/>";}
+            void integer_(const core::value &v)
+            {
+                output_stream << "<integer>"
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << v.get_int()
+                              << '\n' << std::string(current_indent, ' ')
+                              << "</integer>";
+            }
+            void real_(const core::value &v)
+            {
+                output_stream << "<real>"
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << v.get_real()
+                              << '\n' << std::string(current_indent, ' ')
+                              << "</real>";
+            }
+            void begin_string_(const core::value &v, core::int_t, bool is_key)
+            {
+                if (is_key)
+                    output_stream << "<key>";
+                else
+                    switch (v.get_subtype())
+                    {
+                        case core::date:
+                        case core::time:
+                        case core::datetime: output_stream << "<date>"; break;
+                        case core::blob: output_stream << "<data>"; break;
+                        default: output_stream << "<string>"; break;
+                    }
+            }
+            void string_data_(const core::value &v)
+            {
+                if (current_container_size() == 0)
+                    output_stream << '\n' << std::string(current_indent + indent_width, ' ');
+
+                if (v.get_subtype() == core::blob)
+                    base64::write(output_stream, v.get_string());
+                else
+                    write_string(output_stream, v.get_string());
+            }
+            void end_string_(const core::value &v, bool is_key)
+            {
+                if (current_container_size() > 0)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+
+                if (is_key)
+                    output_stream << "</key>";
+                else
+                    switch (v.get_subtype())
+                    {
+                        case core::date:
+                        case core::time:
+                        case core::datetime: output_stream << "</date>"; break;
+                        case core::blob: output_stream << "</data>"; break;
+                        default: output_stream << "</string>"; break;
+                    }
+            }
+
+            void begin_array_(const core::value &, core::int_t, bool)
+            {
+                output_stream << "<array>";
+                current_indent += indent_width;
+            }
+            void end_array_(const core::value &, bool)
+            {
+                current_indent -= indent_width;
+
+                if (current_container_size() > 0)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+
+                output_stream << "</array>";
+            }
+
+            void begin_object_(const core::value &, core::int_t, bool)
+            {
+                output_stream << "<dict>";
+                current_indent += indent_width;
+            }
+            void end_object_(const core::value &, bool)
+            {
+                current_indent -= indent_width;
+
+                if (current_container_size() > 0)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+
+                output_stream << "</dict>";
+            }
+        };
+
+        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
+        {
+            stream_writer writer(stream);
+            core::convert(v, writer);
+            return stream;
+        }
+
+        inline std::ostream &pretty_print(std::ostream &stream, const core::value &v, size_t indent_width)
+        {
+            pretty_stream_writer writer(stream, indent_width);
+            core::convert(v, writer);
             return stream;
         }
 
@@ -1601,6 +2582,13 @@ namespace cppdatalib
         {
             std::ostringstream stream;
             stream << v;
+            return stream.str();
+        }
+
+        inline std::string to_pretty_xml_property_list(const core::value &v, size_t indent_width)
+        {
+            std::ostringstream stream;
+            pretty_print(stream, v, indent_width);
             return stream.str();
         }
     }
@@ -1632,32 +2620,214 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
+        class stream_writer : public core::stream_handler, public core::stream_writer
         {
-            switch (v.get_type())
+        public:
+            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_key_(const core::value &v)
             {
-                case core::null: throw core::error("XML RPC - 'null' value not allowed in output");
-                case core::boolean: return stream << "<value><boolean>" << v.as_int() << "</boolean></value>";
-                case core::integer: return stream << "<value><int>" << v.get_int() << "</int></value>";
-                case core::real: return stream << "<value><double>" << v.get_real() << "</double></value>";
-                case core::string: return write_string(stream << "<value><string>", v.get_string()) << "</string></value>";
-                case core::array:
+                if (current_container_size() > 0)
+                    output_stream << "</member>";
+
+                if (!v.is_string())
+                    throw core::error("XML RPC - cannot write non-string key");
+
+                output_stream << "<member>";
+            }
+
+            void null_(const core::value &) {throw core::error("XML RPC - 'null' value not allowed in output");}
+            void bool_(const core::value &v) {output_stream << "<value><boolean>" << v.as_int() << "</boolean></value>";}
+            void integer_(const core::value &v) {output_stream << "<value><int>" << v.get_int() << "</int></value>";}
+            void real_(const core::value &v) {output_stream << "<value><double>" << v.get_real() << "</double></value>";}
+            void begin_string_(const core::value &, core::int_t, bool is_key)
+            {
+                if (is_key)
+                    output_stream << "<name>";
+                else
+                    output_stream << "<value><string>";
+            }
+            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void end_string_(const core::value &, bool is_key)
+            {
+                if (is_key)
+                    output_stream << "</name>";
+                else
+                    output_stream << "</string></value>";
+            }
+
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream << "<value><array><data>";}
+            void end_array_(const core::value &, bool) {output_stream << "</data></array></value>";}
+
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream << "<value><struct>";}
+            void end_object_(const core::value &, bool)
+            {
+                if (current_container_size() > 0)
+                    output_stream << "</member>";
+                output_stream << "</struct></value>";
+            }
+        };
+
+        class pretty_stream_writer : public core::stream_handler, public core::stream_writer
+        {
+            size_t indent_width;
+            size_t current_indent;
+
+        public:
+            pretty_stream_writer(std::ostream &output, size_t indent_width) : core::stream_writer(output), indent_width(indent_width) {}
+
+        protected:
+            void begin_() {current_indent = 0;}
+
+            void begin_key_(const core::value &v)
+            {
+                if (current_container_size() > 0)
                 {
-                    stream << "<value><array><data>";
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                        stream << *it;
-                    return stream << "</data></array></value>";
+                    current_indent -= indent_width;
+                    output_stream << '\n' << std::string(current_indent, ' ')
+                                  << "</member>"
+                                  << '\n' << std::string(current_indent, ' ');
                 }
-                case core::object:
+
+                if (!v.is_string())
+                    throw core::error("XML RPC - cannot write non-string key");
+
+                output_stream << "<member>";
+                current_indent += indent_width;
+                output_stream << '\n' << std::string(current_indent, ' ');
+            }
+            void begin_item_(const core::value &)
+            {
+                if (current_container_size() > 0 || current_container() == core::object)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+            }
+
+            void null_(const core::value &) {throw core::error("XML RPC - 'null' value not allowed in output");}
+            void bool_(const core::value &v)
+            {
+                output_stream << "<value>"
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "<boolean>"
+                              << '\n' << std::string(current_indent + indent_width * 2, ' ')
+                              << v.as_int()
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "</boolean>"
+                              << '\n' << std::string(current_indent, ' ')
+                              << "</value>";
+            }
+            void integer_(const core::value &v)
+            {
+                output_stream << "<value>"
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "<int>"
+                              << '\n' << std::string(current_indent + indent_width * 2, ' ')
+                              << v.get_int()
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "</int>"
+                              << '\n' << std::string(current_indent, ' ')
+                              << "</value>";
+            }
+            void real_(const core::value &v)
+            {
+                output_stream << "<value>"
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "<double>"
+                              << '\n' << std::string(current_indent + indent_width * 2, ' ')
+                              << v.get_real()
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "</double>"
+                              << '\n' << std::string(current_indent, ' ')
+                              << "</value>";
+            }
+            void begin_string_(const core::value &, core::int_t, bool is_key)
+            {
+                if (is_key)
+                    output_stream << "<name>";
+                else
                 {
-                    stream << "<value><struct>";
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                        write_string(stream << "<member><name>", it->first) << "</name>" << it->second << "</member>";
-                    return stream << "</struct></value>";
+                    current_indent += indent_width;
+
+                    output_stream << "<value>"
+                                  << '\n' << std::string(current_indent, ' ')
+                                  << "<string>";
+                }
+            }
+            void string_data_(const core::value &v)
+            {
+                if (current_container_size() == 0)
+                    output_stream << '\n' << std::string(current_indent + indent_width, ' ');
+
+                write_string(output_stream, v.get_string());
+            }
+            void end_string_(const core::value &, bool is_key)
+            {
+                if (current_container_size() > 0)
+                    output_stream << '\n' << std::string(current_indent, ' ');
+
+                if (is_key)
+                    output_stream << "</name>";
+                else
+                {
+                    current_indent -= indent_width;
+
+                    output_stream << "</string>"
+                                  << '\n' << std::string(current_indent, ' ')
+                                  << "</value>";
                 }
             }
 
-            // Control will never get here
+            void begin_array_(const core::value &, core::int_t, bool)
+            {
+                output_stream << "<value>"
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "<array>"
+                              << '\n' << std::string(current_indent + indent_width * 2, ' ')
+                              << "<data>"
+                              << '\n' << std::string(current_indent + indent_width * 3, ' ');
+                current_indent += indent_width * 3;
+            }
+            void end_array_(const core::value &, bool)
+            {
+                current_indent -= indent_width * 3;
+
+                output_stream << '\n' << std::string(current_indent + indent_width * 2, ' ')
+                              << "</data>"
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "</array>"
+                              << '\n' << std::string(current_indent, ' ')
+                              << "</value>";
+            }
+
+            void begin_object_(const core::value &, core::int_t, bool)
+            {
+                output_stream << "<value>"
+                              << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "<struct>"
+                              << '\n' << std::string(current_indent + indent_width * 2, ' ');
+                current_indent += indent_width * 2;
+            }
+            void end_object_(const core::value &, bool)
+            {
+                if (current_container_size() > 0)
+                {
+                    current_indent -= indent_width;
+                    output_stream << '\n' << std::string(current_indent, ' ')
+                                  << "</member>";
+                }
+
+                current_indent -= indent_width * 2;
+                output_stream << '\n' << std::string(current_indent + indent_width, ' ')
+                              << "</struct>"
+                              << '\n' << std::string(current_indent, ' ')
+                              << "</value>";
+            }
+        };
+
+        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
+        {
+            stream_writer writer(stream);
+            core::convert(v, writer);
             return stream;
         }
 
@@ -1675,71 +2845,88 @@ namespace cppdatalib
     {
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
         {
-            if (str.find_first_of("\t\r\n ") != std::string::npos || str.find('"') != std::string::npos) // Contains whitespace or double quote
+            for (size_t i = 0; i < str.size(); ++i)
             {
-                stream << '"';
-                for (size_t i = 0; i < str.size(); ++i)
-                {
-                    int c = str[i] & 0xff;
+                int c = str[i] & 0xff;
 
-                    if (c == '"')
-                        stream << '"';
+                if (c == '"')
+                    stream << '"';
 
-                    stream << str[i];
-                }
-                return stream << '"';
+                stream << str[i];
             }
 
-            return stream << str;
-        }
-
-        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
-        {
-            switch (v.get_type())
-            {
-                case core::null: return stream;
-                case core::boolean: return stream << (v.get_bool()? "true": "false");
-                case core::integer: return stream << v.get_int();
-                case core::real: return stream << v.get_real();
-                case core::string: return write_string(stream, v.get_string());
-                case core::array:
-                {
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                    {
-                        if (it != v.get_array().begin())
-                            stream << ',';
-                        stream << *it;
-                    }
-                    return stream;
-                }
-                case core::object: throw core::error("CSV - 'object' value not allowed in output");
-            }
-
-            // Control will never get here
             return stream;
         }
 
-        inline std::ostream &print_row(std::ostream &stream, const core::value &v) {return stream << v;}
-        inline std::ostream &print_table(std::ostream &stream, const core::value &v)
+        class row_writer : public core::stream_handler, public core::stream_writer
         {
-            if (v.is_array())
+        public:
+            row_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_item_(const core::value &)
             {
-                for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                {
-                    if (it != v.get_array().begin())
-                        stream << '\n';
-                    stream << *it;
-                }
-                return stream;
+                if (current_container_size() > 0)
+                    output_stream << ',';
             }
-            else
-                return stream << v;
+
+            void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
+            void integer_(const core::value &v) {output_stream << v.get_int();}
+            void real_(const core::value &v) {output_stream << v.get_real();}
+            void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
+            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void end_string_(const core::value &, bool) {output_stream << '"';}
+
+            void begin_array_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'array' value not allowed in row output");}
+            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
+        };
+
+        class stream_writer : public core::stream_handler, public core::stream_writer
+        {
+        public:
+            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_item_(const core::value &)
+            {
+                if (current_container_size() > 0)
+                    output_stream << (nesting_depth() == 1? '\n': ',');
+            }
+
+            void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
+            void integer_(const core::value &v) {output_stream << v.get_int();}
+            void real_(const core::value &v) {output_stream << v.get_real();}
+            void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
+            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void end_string_(const core::value &, bool) {output_stream << '"';}
+
+            void begin_array_(const core::value &, core::int_t, bool)
+            {
+                if (nesting_depth() == 2)
+                    throw core::error("CSV - 'array' value not allowed in row output");
+            }
+            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
+        };
+
+        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
+        {
+            stream_writer writer(stream);
+            core::convert(v, writer);
+            return stream;
+        }
+
+        inline std::ostream &print_table(std::ostream &stream, const core::value &v) {return stream << v;}
+        inline std::ostream &print_row(std::ostream &stream, const core::value &v)
+        {
+            row_writer writer(stream);
+            core::convert(v, writer);
+            return stream;
         }
 
         inline std::string to_csv_row(const core::value &v)
         {
             std::ostringstream stream;
-            stream << v;
+            print_row(stream, v);
             return stream.str();
         }
 
@@ -1750,8 +2937,8 @@ namespace cppdatalib
             return stream.str();
         }
 
-        inline std::ostream &print(std::ostream &stream, const core::value &v) {return print_row(stream, v);}
-        inline std::string to_csv(const core::value &v) {return to_csv_row(v);}
+        inline std::ostream &print(std::ostream &stream, const core::value &v) {return print_table(stream, v);}
+        inline std::string to_csv(const core::value &v) {return to_csv_table(v);}
     }
 
     namespace ubjson
@@ -2310,14 +3497,24 @@ namespace cppdatalib
                         write_int(stream << '#', v.size(), true);
 
                         for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                            print(write_int(stream, it->first.size(), true) << it->first, it->second, false, forced_type);
+                        {
+                            if (!it->first.is_string())
+                                throw core::error("UBJSON - object key is not a string");
+
+                            print(write_int(stream, it->first.size(), true) << it->first.get_string(), it->second, false, forced_type);
+                        }
 
                         return stream;
                     }
                     else
                     {
                         for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                            print(write_int(stream, it->first.size(), true) << it->first, it->second);
+                        {
+                            if (!it->first.is_string())
+                                throw core::error("UBJSON - object key is not a string");
+
+                            print(write_int(stream, it->first.size(), true) << it->first.get_string(), it->second);
+                        }
 
                         return stream << '}';
                     }
@@ -2628,13 +3825,10 @@ namespace cppdatalib
                     {
                         for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
                         {
-                            int64_t key;
+                            int64_t key = it->first.get_int();
                             uint32_t out;
 
-                            std::istringstream temp_stream(it->first);
-                            temp_stream >> key;
-
-                            if (!temp_stream || temp_stream.get() != EOF)
+                            if (!it->first.is_int())
                                 throw core::error("Binn - map key is not an integer");
                             else if (key < INT32_MIN || key > INT32_MAX)
                                 throw core::error("Binn - map key is out of range");
@@ -2654,10 +3848,13 @@ namespace cppdatalib
                     {
                         for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
                         {
+                            if (!it->first.is_string())
+                                throw core::error("Binn - object key is not a string");
+
                             if (it->first.size() > 255)
                                 throw core::error("Binn - object key is larger than limit of 255 bytes");
 
-                            stream << static_cast<char>(it->first.size()) << it->first << it->second;
+                            stream << static_cast<char>(it->first.size()) << it->first.get_string() << it->second;
                         }
                     }
 
@@ -2672,6 +3869,107 @@ namespace cppdatalib
         inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
 
         inline std::string to_binn(const core::value &v)
+        {
+            std::ostringstream stream;
+            stream << v;
+            return stream.str();
+        }
+    }
+
+    namespace netstrings
+    {
+        inline size_t get_size(const core::value &v)
+        {
+            switch (v.get_type())
+            {
+                case core::null: return 3; // "0:,"
+                case core::boolean: return 7 + v.get_bool(); // "4:true," or "5:false,"
+                case core::integer:
+                {
+                    std::ostringstream str;
+                    str << ":" << v.get_int() << ',';
+                    str << (str.str().size() - 2);
+                    return str.str().size();
+                }
+                case core::real:
+                {
+                    std::ostringstream str;
+                    str << ":" << v.get_real() << ',';
+                    str << (str.str().size() - 2);
+                    return str.str().size();
+                }
+                case core::string:
+                    return floor(log10(std::max(v.size(), size_t(1))) + 1) + v.size() + 2;
+                case core::array:
+                {
+                    size_t size = 0;
+
+                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
+                        size += get_size(*it);
+
+                    return floor(log10(std::max(size, size_t(1))) + 1) + size + 2;
+                }
+                case core::object:
+                {
+                    size_t size = 0;
+
+                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
+                        size += get_size(it->first) + get_size(it->second);
+
+                    return floor(log10(std::max(size, size_t(1))) + 1) + size + 2;
+                }
+            }
+
+            // Control will never get here
+            return 0;
+        }
+
+        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
+        {
+            switch (v.get_type())
+            {
+                case core::null: return stream << "0:,";
+                case core::boolean: return stream << (v.get_bool()? "4:true,": "5:false,");
+                case core::integer: return stream << std::to_string(v.get_int()).size() << ':' << v.get_int() << ',';
+                case core::real: return stream << std::to_string(v.get_real()).size() << ':' << v.get_real() << ',';
+                case core::string: return stream << v.size() << ':' << v.get_string() << ',';
+                case core::array:
+                {
+                    size_t size = 0;
+
+                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
+                        size += get_size(*it);
+
+                    stream << size << ':';
+
+                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
+                        stream << *it;
+
+                    return stream << ',';
+                }
+                case core::object:
+                {
+                    size_t size = 0;
+
+                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
+                        size += get_size(it->first) + get_size(it->second);
+
+                    stream << size << ':';
+
+                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
+                        stream << it->first << it->second;
+
+                    return stream << ',';
+                }
+            }
+
+            // Control will never get here
+            return stream;
+        }
+
+        inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
+
+        inline std::string to_netstrings(const core::value &v)
         {
             std::ostringstream stream;
             stream << v;
