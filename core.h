@@ -596,7 +596,7 @@ namespace cppdatalib
             }
 
             static void traverse_node_null(value *) {}
-            static void traverse_node_clear(value *arg) {arg->set_null();}
+            static void traverse_node_clear(value *arg) {arg->shallow_clear();}
             struct traverse_node_prefix_serialize;
             struct traverse_node_postfix_serialize;
 
@@ -613,7 +613,11 @@ namespace cppdatalib
             value(T v, long subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, long subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
-            ~value() {traverse_and_edit(traverse_node_null, traverse_node_clear);}
+            ~value()
+            {
+                if (get_type() == array || get_type() == object)
+                    traverse_and_edit(traverse_node_null, traverse_node_clear);
+            }
 
             value(const value &other) : type_(null), subtype_(0) {assign(*this, other);}
             value(value &&other) = default;
@@ -720,6 +724,14 @@ namespace cppdatalib
             object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_;}
 
         private:
+            void shallow_clear()
+            {
+                str_.clear();
+                arr_.clear();
+                obj_.clear();
+                type_ = null;
+            }
+
             void clear(type new_type)
             {
                 if (type_ == new_type)
