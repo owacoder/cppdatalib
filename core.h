@@ -1304,6 +1304,8 @@ namespace cppdatalib
                     references.top()->set_array(core::array_t(), v.get_subtype());
                 else if (v.is_object())
                     references.top()->set_object(core::object_t(), v.get_subtype());
+                else if (v.is_string())
+                    references.top()->set_string(core::string_t(), v.get_subtype());
             }
 
             // end_container_() just removes a container from the stack, because nothing more needs to be done
@@ -1313,6 +1315,8 @@ namespace cppdatalib
                     references.pop();
             }
 
+            void begin_string_(const core::value &v, int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void end_string_(const core::value &, bool is_key) {end_container(is_key);}
             void begin_array_(const core::value &v, core::int_t size, bool is_key) {begin_container(v, size, is_key);}
             void end_array_(const core::value &, bool is_key) {end_container(is_key);}
             void begin_object_(const core::value &v, core::int_t size, bool is_key) {begin_container(v, size, is_key);}
@@ -2876,14 +2880,16 @@ namespace cppdatalib
 
         class row_writer : public core::stream_handler, public core::stream_writer
         {
+            char separator;
+
         public:
-            row_writer(std::ostream &output) : core::stream_writer(output) {}
+            row_writer(std::ostream &output, char separator = ',') : core::stream_writer(output), separator(separator) {}
 
         protected:
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
-                    output_stream << ',';
+                    output_stream << separator;
             }
 
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
@@ -2899,14 +2905,16 @@ namespace cppdatalib
 
         class stream_writer : public core::stream_handler, public core::stream_writer
         {
+            char separator;
+
         public:
-            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+            stream_writer(std::ostream &output, char separator = ',') : core::stream_writer(output), separator(separator) {}
 
         protected:
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
-                    output_stream << (nesting_depth() == 1? '\n': ',');
+                    output_stream << (nesting_depth() == 1? '\n': separator);
             }
 
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
@@ -2931,25 +2939,30 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::ostream &print_table(std::ostream &stream, const core::value &v) {return stream << v;}
-        inline std::ostream &print_row(std::ostream &stream, const core::value &v)
+        inline std::ostream &print_table(std::ostream &stream, const core::value &v, char separator = ',')
         {
-            row_writer writer(stream);
+            stream_writer writer(stream, separator);
+            core::convert(v, writer);
+            return stream;
+        }
+        inline std::ostream &print_row(std::ostream &stream, const core::value &v, char separator = ',')
+        {
+            row_writer writer(stream, separator);
             core::convert(v, writer);
             return stream;
         }
 
-        inline std::string to_csv_row(const core::value &v)
+        inline std::string to_csv_row(const core::value &v, char separator = ',')
         {
             std::ostringstream stream;
-            print_row(stream, v);
+            print_row(stream, v, separator);
             return stream.str();
         }
 
-        inline std::string to_csv_table(const core::value &v)
+        inline std::string to_csv_table(const core::value &v, char separator = ',')
         {
             std::ostringstream stream;
-            print_table(stream, v);
+            print_table(stream, v, separator);
             return stream.str();
         }
 
