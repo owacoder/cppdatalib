@@ -454,17 +454,15 @@ namespace cppdatalib
 
             struct traversal_reference
             {
-                traversal_reference(value *p, array_t::iterator a, object_t::iterator o, bool traversed_key)
+                traversal_reference(value *p, array_t::iterator a, object_t::iterator o)
                     : p(p)
                     , array(a)
                     , object(o)
-                    , traversed_key_already(traversed_key)
                 {}
 
                 value *p;
                 array_t::iterator array;
                 object_t::iterator object;
-                bool traversed_key_already;
             };
 
             struct const_traversal_reference
@@ -499,7 +497,7 @@ namespace cppdatalib
 
                         if (p->is_array())
                         {
-                            references.push(traversal_reference(p, p->get_array().begin(), object_t::iterator(), false));
+                            references.push(traversal_reference(p, p->get_array().begin(), object_t::iterator()));
                             if (!p->get_array().empty())
                                 p = std::addressof(*references.top().array++);
                             else
@@ -507,7 +505,7 @@ namespace cppdatalib
                         }
                         else if (p->is_object())
                         {
-                            references.push(traversal_reference(p, array_t::iterator(), p->get_object().begin(), false));
+                            references.push(traversal_reference(p, array_t::iterator(), p->get_object().begin()));
                             if (!p->get_object().empty())
                                 p = std::addressof((references.top().object++)->second);
                             else
@@ -515,7 +513,7 @@ namespace cppdatalib
                         }
                         else
                         {
-                            references.push(traversal_reference(p, array_t::iterator(), object_t::iterator(), false));
+                            references.push(traversal_reference(p, array_t::iterator(), object_t::iterator()));
                             p = NULL;
                         }
                     }
@@ -535,9 +533,6 @@ namespace cppdatalib
                 }
             }
 
-            // TODO: this traversal algorithm does not traverse object keys, since they are declared `const` inside
-            // the `std::map` definition. Using complex keys may overflow the stack when the destructor is called.
-            // Using simple scalar keys will not be an issue
             template<typename PrefixPredicate, typename PostfixPredicate>
             void traverse(PrefixPredicate prefix, PostfixPredicate postfix) const
             {
@@ -618,7 +613,8 @@ namespace cppdatalib
             value(T v, long subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
             ~value()
             {
-                if (get_type() == array || get_type() == object)
+                if ((type_ == array && arr_.size() > 0) ||
+                    (type_ == object && obj_.size() > 0))
                     traverse_and_edit(traverse_node_null, traverse_node_clear);
             }
 
@@ -931,7 +927,7 @@ namespace cppdatalib
             void begin()
             {
                 while (!nested_scopes.empty())
-                    nested_scopes.pop();
+                    nested_scopes.pop_back();
                 begin_();
             }
             void end()
@@ -952,21 +948,21 @@ namespace cppdatalib
             {
                 if (nested_scopes.empty())
                     return null;
-                return nested_scopes.top().get_type();
+                return nested_scopes.back().get_type();
             }
 
             size_t current_container_size() const
             {
                 if (nested_scopes.empty())
                     return 0;
-                return nested_scopes.top().items_parsed();
+                return nested_scopes.back().items_parsed();
             }
 
             bool container_key_was_just_parsed() const
             {
                 if (nested_scopes.empty())
                     return false;
-                return nested_scopes.top().key_was_parsed();
+                return nested_scopes.back().key_was_parsed();
             }
 
             // An API must call this when a scalar value is encountered.
@@ -975,8 +971,8 @@ namespace cppdatalib
             {
                 const bool is_key =
                        !nested_scopes.empty() &&
-                        nested_scopes.top().type_ == object &&
-                       !nested_scopes.top().key_was_parsed();
+                        nested_scopes.back().type_ == object &&
+                       !nested_scopes.back().key_was_parsed();
 
                 if (is_key)
                     begin_key_(v);
@@ -1002,13 +998,13 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
-                    if (nested_scopes.top().get_type() == object)
+                    if (nested_scopes.back().get_type() == object)
                     {
-                        nested_scopes.top().items_ += !is_key;
-                        nested_scopes.top().parsed_key_ = !nested_scopes.top().key_was_parsed();
+                        nested_scopes.back().items_ += !is_key;
+                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                     }
                     else
-                        ++nested_scopes.top().items_;
+                        ++nested_scopes.back().items_;
                 }
 
                 return true;
@@ -1058,8 +1054,8 @@ namespace cppdatalib
             void begin_string(const core::value &v, core::int_t size)
             {
                 if (!nested_scopes.empty() &&
-                     nested_scopes.top().type_ == object &&
-                    !nested_scopes.top().key_was_parsed())
+                     nested_scopes.back().type_ == object &&
+                    !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
                     begin_string_(v, size, true);
@@ -1073,51 +1069,45 @@ namespace cppdatalib
                 if (v.size())
                     string_data_(v);
 
-                nested_scopes.push(string);
+                nested_scopes.push_back(string);
             }
             // An API must call these when a long string is parsed. The number of bytes of this chunk is passed in size, if possible
             void append_to_string(const core::value &v)
             {
-                if (nested_scopes.empty() || nested_scopes.top().get_type() != string)
+                if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::stream_handler - attempted to append to string that was never begun");
 
                 string_data_(v);
-                nested_scopes.top().items_ += v.get_string().size();
+                nested_scopes.back().items_ += v.get_string().size();
             }
             void end_string(const core::value &v)
             {
-                if (nested_scopes.empty() || nested_scopes.top().get_type() != string)
+                if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::stream_handler - attempted to end string that was never begun");
 
-                // Pop the top scope off so we can look at the parent scope, but put it back on for the callbacks
-                auto save = nested_scopes.top();
-                nested_scopes.pop();
-
-                if (!nested_scopes.empty() &&
-                     nested_scopes.top().get_type() == object &&
-                    !nested_scopes.top().key_was_parsed())
+                if ( nested_scopes.size() > 1 &&
+                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
+                    !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
                 {
-                    nested_scopes.push(save);
                     end_string_(v, true);
                     end_key_(v);
                 }
                 else
                 {
-                    nested_scopes.push(save);
                     end_string_(v, false);
                     end_item_(v);
                 }
-                nested_scopes.pop();
+                nested_scopes.pop_back();
 
                 if (!nested_scopes.empty())
                 {
-                    if (nested_scopes.top().get_type() == object)
+                    if (nested_scopes.back().get_type() == object)
                     {
-                        nested_scopes.top().items_ += nested_scopes.top().key_was_parsed();
-                        nested_scopes.top().parsed_key_ = !nested_scopes.top().key_was_parsed();
+                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                     }
                     else
-                        ++nested_scopes.top().items_;
+                        ++nested_scopes.back().items_;
                 }
             }
 
@@ -1126,8 +1116,8 @@ namespace cppdatalib
             void begin_array(const core::value &v, core::int_t size)
             {
                 if (!nested_scopes.empty() &&
-                     nested_scopes.top().type_ == object &&
-                    !nested_scopes.top().key_was_parsed())
+                     nested_scopes.back().type_ == object &&
+                    !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
                     begin_array_(v, size, true);
@@ -1138,42 +1128,36 @@ namespace cppdatalib
                     begin_array_(v, size, false);
                 }
 
-                nested_scopes.push(array);
+                nested_scopes.push_back(array);
             }
             void end_array(const core::value &v)
             {
-                if (nested_scopes.empty() || nested_scopes.top().get_type() != array)
+                if (nested_scopes.empty() || nested_scopes.back().get_type() != array)
                     throw error("cppdatalib::stream_handler - attempted to end array that was never begun");
 
-                // Pop the top scope off so we can look at the parent scope, but put it back on for the callbacks
-                auto save = nested_scopes.top();
-                nested_scopes.pop();
-
-                if (!nested_scopes.empty() &&
-                     nested_scopes.top().get_type() == object &&
-                    !nested_scopes.top().key_was_parsed())
+                if ( nested_scopes.size() > 1 &&
+                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
+                    !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
                 {
-                    nested_scopes.push(save);
                     end_array_(v, true);
                     end_key_(v);
                 }
                 else
                 {
-                    nested_scopes.push(save);
                     end_array_(v, false);
                     end_item_(v);
                 }
-                nested_scopes.pop();
+                nested_scopes.pop_back();
 
                 if (!nested_scopes.empty())
                 {
-                    if (nested_scopes.top().get_type() == object)
+                    if (nested_scopes.back().get_type() == object)
                     {
-                        nested_scopes.top().items_ += nested_scopes.top().key_was_parsed();
-                        nested_scopes.top().parsed_key_ = !nested_scopes.top().key_was_parsed();
+                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                     }
                     else
-                        ++nested_scopes.top().items_;
+                        ++nested_scopes.back().items_;
                 }
             }
 
@@ -1182,8 +1166,8 @@ namespace cppdatalib
             void begin_object(const core::value &v, core::int_t size)
             {
                 if (!nested_scopes.empty() &&
-                     nested_scopes.top().type_ == object &&
-                    !nested_scopes.top().key_was_parsed())
+                     nested_scopes.back().type_ == object &&
+                    !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
                     begin_object_(v, size, true);
@@ -1194,44 +1178,38 @@ namespace cppdatalib
                     begin_object_(v, size, false);
                 }
 
-                nested_scopes.push(object);
+                nested_scopes.push_back(object);
             }
             void end_object(const core::value &v)
             {
-                if (nested_scopes.empty() || nested_scopes.top().get_type() != object)
+                if (nested_scopes.empty() || nested_scopes.back().get_type() != object)
                     throw error("cppdatalib::stream_handler - attempted to end object that was never begun");
-                if (nested_scopes.top().key_was_parsed())
+                if (nested_scopes.back().key_was_parsed())
                     throw error("cppdatalib::stream_handler - attempted to end object before final value was written");
 
-                // Pop the top scope off so we can look at the parent scope, but put it back on for the callbacks
-                auto save = nested_scopes.top();
-                nested_scopes.pop();
-
-                if (!nested_scopes.empty() &&
-                     nested_scopes.top().get_type() == object &&
-                    !nested_scopes.top().key_was_parsed())
+                if ( nested_scopes.size() > 1 &&
+                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
+                    !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
                 {
-                    nested_scopes.push(save);
                     end_object_(v, true);
                     end_key_(v);
                 }
                 else
                 {
-                    nested_scopes.push(save);
                     end_object_(v, false);
                     end_item_(v);
                 }
-                nested_scopes.pop();
+                nested_scopes.pop_back();
 
                 if (!nested_scopes.empty())
                 {
-                    if (nested_scopes.top().get_type() == object)
+                    if (nested_scopes.back().get_type() == object)
                     {
-                        nested_scopes.top().items_ += nested_scopes.top().key_was_parsed();
-                        nested_scopes.top().parsed_key_ = !nested_scopes.top().key_was_parsed();
+                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                     }
                     else
-                        ++nested_scopes.top().items_;
+                        ++nested_scopes.back().items_;
                 }
             }
 
@@ -1244,7 +1222,7 @@ namespace cppdatalib
             virtual void begin_object_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void end_object_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
-            std::stack<scope_data, std::vector<scope_data>> nested_scopes;
+            std::vector<scope_data> nested_scopes; // Used as a stack, but not a stack so we can peek below the top
         };
 
         class value_builder : public core::stream_handler
@@ -1539,7 +1517,7 @@ namespace cppdatalib
                         delimiter_required = true;
                         break;
                     case ',':
-                        stream >> chr; // Eat ','
+                        stream.get(); // Eat ','
                         if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
                             throw core::error("JSON - invalid ',' does not separate array or object entries");
                         stream >> chr; stream.unget(); // Peek ahead
@@ -1548,28 +1526,28 @@ namespace cppdatalib
                         delimiter_required = false;
                         break;
                     case ':':
-                        stream >> chr; // Eat ':'
+                        stream.get(); // Eat ':'
                         if (!writer.container_key_was_just_parsed())
                             throw core::error("JSON - invalid ':' does not separate a key and value pair");
                         delimiter_required = false;
                         break;
                     case '[':
-                        stream >> chr; // Eat '['
+                        stream.get(); // Eat '['
                         writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
                         delimiter_required = false;
                         break;
                     case ']':
-                        stream >> chr; // Eat ']'
+                        stream.get(); // Eat ']'
                         writer.end_array(core::array_t());
                         delimiter_required = true;
                         break;
                     case '{':
-                        stream >> chr; // Eat '{'
+                        stream.get(); // Eat '{'
                         writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
                         delimiter_required = false;
                         break;
                     case '}':
-                        stream >> chr; // Eat '}'
+                        stream.get(); // Eat '}'
                         writer.end_object(core::object_t());
                         delimiter_required = true;
                         break;
@@ -1642,6 +1620,12 @@ namespace cppdatalib
             size_t indent_width;
             size_t current_indent;
 
+            void output_padding(size_t padding)
+            {
+                while (padding-- > 0)
+                    output_stream << ' ';
+            }
+
         public:
             pretty_stream_writer(std::ostream &output, size_t indent_width)
                 : core::stream_writer(output)
@@ -1662,14 +1646,14 @@ namespace cppdatalib
                     output_stream << ',';
 
                 if (current_container() == core::array)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
             }
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
                     output_stream << ',';
 
-                output_stream << '\n' << std::string(current_indent, ' ');
+                output_stream << '\n', output_padding(current_indent);
 
                 if (!v.is_string())
                     throw core::error("JSON - cannot write non-string key");
@@ -1693,7 +1677,7 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
 
                 output_stream << ']';
             }
@@ -1708,7 +1692,7 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
 
                 output_stream << '}';
             }
@@ -1767,11 +1751,11 @@ namespace cppdatalib
         inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
         {
             bool written = false;
-            char chr;
+            int chr;
 
             writer.begin();
 
-            while (stream >> std::skipws >> chr, stream.unget(), stream.good() && !stream.eof())
+            while (chr = stream.peek(), chr != EOF)
             {
                 written = true;
 
@@ -1779,7 +1763,7 @@ namespace cppdatalib
                 {
                     case 'i':
                     {
-                        stream >> chr; // Eat 'i'
+                        stream.get(); // Eat 'i'
 
                         core::int_t i;
                         stream >> i;
@@ -1790,7 +1774,7 @@ namespace cppdatalib
                         break;
                     }
                     case 'e':
-                        stream >> chr; // Eat 'e'
+                        stream.get(); // Eat 'e'
                         switch (writer.current_container())
                         {
                             case core::array: writer.end_array(core::array_t()); break;
@@ -1799,11 +1783,11 @@ namespace cppdatalib
                         }
                         break;
                     case 'l':
-                        stream >> chr; // Eat 'l'
+                        stream.get(); // Eat 'l'
                         writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
                         break;
                     case 'd':
-                        stream >> chr; // Eat 'd'
+                        stream.get(); // Eat 'd'
                         writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
                         break;
                     default:
@@ -2052,7 +2036,7 @@ namespace cppdatalib
                 switch (chr)
                 {
                     case '<':
-                        stream >> chr; // Eat '<'
+                        stream.get(); // Eat '<'
                         stream >> chr;
                         if (!stream) throw core::error("Plain Text Property List - expected '*' after '<' in value");
 
@@ -2137,7 +2121,7 @@ namespace cppdatalib
                         delimiter_required = true;
                         break;
                     case ',':
-                        stream >> chr; // Eat ','
+                        stream.get(); // Eat ','
                         if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
                             throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
                         stream >> chr; stream.unget(); // Peek ahead
@@ -2146,28 +2130,28 @@ namespace cppdatalib
                         delimiter_required = false;
                         break;
                     case '=':
-                        stream >> chr; // Eat '='
+                        stream.get(); // Eat '='
                         if (!writer.container_key_was_just_parsed())
                             throw core::error("Plain Text Property List - invalid '=' does not separate a key and value pair");
                         delimiter_required = false;
                         break;
                     case '(':
-                        stream >> chr; // Eat '('
+                        stream.get(); // Eat '('
                         writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
                         delimiter_required = false;
                         break;
                     case ')':
-                        stream >> chr; // Eat ')'
+                        stream.get(); // Eat ')'
                         writer.end_array(core::array_t());
                         delimiter_required = true;
                         break;
                     case '{':
-                        stream >> chr; // Eat '{'
+                        stream.get(); // Eat '{'
                         writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
                         delimiter_required = false;
                         break;
                     case '}':
-                        stream >> chr; // Eat '}'
+                        stream.get(); // Eat '}'
                         writer.end_object(core::object_t());
                         delimiter_required = true;
                         break;
@@ -2252,6 +2236,12 @@ namespace cppdatalib
             size_t indent_width;
             size_t current_indent;
 
+            void output_padding(size_t padding)
+            {
+                while (padding-- > 0)
+                    output_stream << ' ';
+            }
+
         public:
             pretty_stream_writer(std::ostream &output, size_t indent_width)
                 : core::stream_writer(output)
@@ -2272,14 +2262,14 @@ namespace cppdatalib
                     output_stream << ',';
 
                 if (current_container() == core::array)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
             }
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
                     output_stream << ',';
 
-                output_stream << '\n' << std::string(current_indent, ' ');
+                output_stream << '\n', output_padding(current_indent);
 
                 if (!v.is_string())
                     throw core::error("Plain Text Property List - cannot write non-string key");
@@ -2329,7 +2319,7 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
 
                 output_stream << ')';
             }
@@ -2344,7 +2334,7 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
 
                 output_stream << '}';
             }
@@ -2488,6 +2478,12 @@ namespace cppdatalib
             size_t indent_width;
             size_t current_indent;
 
+            void output_padding(size_t padding)
+            {
+                while (padding-- > 0)
+                    output_stream << ' ';
+            }
+
         public:
             pretty_stream_writer(std::ostream &output, size_t indent_width)
                 : core::stream_writer(output)
@@ -2503,11 +2499,11 @@ namespace cppdatalib
             void begin_item_(const core::value &)
             {
                 if (current_container() != core::null)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
             }
             void begin_key_(const core::value &v)
             {
-                output_stream << '\n' << std::string(current_indent, ' ');
+                output_stream << '\n', output_padding(current_indent);
 
                 if (!v.is_string())
                     throw core::error("XML Property List - cannot write non-string key");
@@ -2516,19 +2512,15 @@ namespace cppdatalib
             void bool_(const core::value &v) {output_stream << '<' << (v.get_bool()? "true": "false") << "/>";}
             void integer_(const core::value &v)
             {
-                output_stream << "<integer>"
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << v.get_int()
-                              << '\n' << std::string(current_indent, ' ')
-                              << "</integer>";
+                output_stream << "<integer>\n", output_padding(current_indent + indent_width);
+                output_stream << v.get_int() << '\n'; output_padding(current_indent);
+                output_stream << "</integer>";
             }
             void real_(const core::value &v)
             {
-                output_stream << "<real>"
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << v.get_real()
-                              << '\n' << std::string(current_indent, ' ')
-                              << "</real>";
+                output_stream << "<real>\n", output_padding(current_indent + indent_width);
+                output_stream << v.get_int() << '\n'; output_padding(current_indent);
+                output_stream << "</real>";
             }
             void begin_string_(const core::value &v, core::int_t, bool is_key)
             {
@@ -2547,7 +2539,7 @@ namespace cppdatalib
             void string_data_(const core::value &v)
             {
                 if (current_container_size() == 0)
-                    output_stream << '\n' << std::string(current_indent + indent_width, ' ');
+                    output_stream << '\n', output_padding(current_indent + indent_width);
 
                 if (v.get_subtype() == core::blob)
                     base64::write(output_stream, v.get_string());
@@ -2557,7 +2549,7 @@ namespace cppdatalib
             void end_string_(const core::value &v, bool is_key)
             {
                 if (current_container_size() > 0)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
 
                 if (is_key)
                     output_stream << "</key>";
@@ -2582,7 +2574,7 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
 
                 output_stream << "</array>";
             }
@@ -2597,7 +2589,7 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
 
                 output_stream << "</dict>";
             }
@@ -2715,6 +2707,12 @@ namespace cppdatalib
             size_t indent_width;
             size_t current_indent;
 
+            void output_padding(size_t padding)
+            {
+                while (padding-- > 0)
+                    output_stream << ' ';
+            }
+
         public:
             pretty_stream_writer(std::ostream &output, size_t indent_width) : core::stream_writer(output), indent_width(indent_width) {}
 
@@ -2726,9 +2724,8 @@ namespace cppdatalib
                 if (current_container_size() > 0)
                 {
                     current_indent -= indent_width;
-                    output_stream << '\n' << std::string(current_indent, ' ')
-                                  << "</member>"
-                                  << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
+                    output_stream << "</member>\n", output_padding(current_indent);
                 }
 
                 if (!v.is_string())
@@ -2736,50 +2733,38 @@ namespace cppdatalib
 
                 output_stream << "<member>";
                 current_indent += indent_width;
-                output_stream << '\n' << std::string(current_indent, ' ');
+                output_stream << '\n', output_padding(current_indent);
             }
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0 || current_container() == core::object)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
             }
 
             void null_(const core::value &) {throw core::error("XML RPC - 'null' value not allowed in output");}
             void bool_(const core::value &v)
             {
-                output_stream << "<value>"
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "<boolean>"
-                              << '\n' << std::string(current_indent + indent_width * 2, ' ')
-                              << v.as_int()
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "</boolean>"
-                              << '\n' << std::string(current_indent, ' ')
-                              << "</value>";
+                output_stream << "<value>\n"; output_padding(current_indent + indent_width);
+                output_stream << "<boolean>\n"; output_padding(current_indent + indent_width * 2);
+                output_stream << v.as_int() << '\n'; output_padding(current_indent + indent_width);
+                output_stream << "</boolean>\n"; output_padding(current_indent);
+                output_stream << "</value>";
             }
             void integer_(const core::value &v)
             {
-                output_stream << "<value>"
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "<int>"
-                              << '\n' << std::string(current_indent + indent_width * 2, ' ')
-                              << v.get_int()
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "</int>"
-                              << '\n' << std::string(current_indent, ' ')
-                              << "</value>";
+                output_stream << "<value>\n"; output_padding(current_indent + indent_width);
+                output_stream << "<int>\n"; output_padding(current_indent + indent_width * 2);
+                output_stream << v.get_int() << '\n'; output_padding(current_indent + indent_width);
+                output_stream << "</int>\n"; output_padding(current_indent);
+                output_stream << "</value>";
             }
             void real_(const core::value &v)
             {
-                output_stream << "<value>"
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "<double>"
-                              << '\n' << std::string(current_indent + indent_width * 2, ' ')
-                              << v.get_real()
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "</double>"
-                              << '\n' << std::string(current_indent, ' ')
-                              << "</value>";
+                output_stream << "<value>\n"; output_padding(current_indent + indent_width);
+                output_stream << "<double>\n"; output_padding(current_indent + indent_width * 2);
+                output_stream << v.get_real() << '\n'; output_padding(current_indent + indent_width);
+                output_stream << "</double>\n"; output_padding(current_indent);
+                output_stream << "</value>";
             }
             void begin_string_(const core::value &, core::int_t, bool is_key)
             {
@@ -2789,22 +2774,21 @@ namespace cppdatalib
                 {
                     current_indent += indent_width;
 
-                    output_stream << "<value>"
-                                  << '\n' << std::string(current_indent, ' ')
-                                  << "<string>";
+                    output_stream << "<value>\n", output_padding(current_indent);
+                    output_stream << "<string>";
                 }
             }
             void string_data_(const core::value &v)
             {
                 if (current_container_size() == 0)
-                    output_stream << '\n' << std::string(current_indent + indent_width, ' ');
+                    output_stream << '\n', output_padding(current_indent + indent_width);
 
                 write_string(output_stream, v.get_string());
             }
             void end_string_(const core::value &, bool is_key)
             {
                 if (current_container_size() > 0)
-                    output_stream << '\n' << std::string(current_indent, ' ');
+                    output_stream << '\n', output_padding(current_indent);
 
                 if (is_key)
                     output_stream << "</name>";
@@ -2812,40 +2796,32 @@ namespace cppdatalib
                 {
                     current_indent -= indent_width;
 
-                    output_stream << "</string>"
-                                  << '\n' << std::string(current_indent, ' ')
-                                  << "</value>";
+                    output_stream << "</string>\n"; output_padding(current_indent);
+                    output_stream << "</value>";
                 }
             }
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
-                output_stream << "<value>"
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "<array>"
-                              << '\n' << std::string(current_indent + indent_width * 2, ' ')
-                              << "<data>"
-                              << '\n' << std::string(current_indent + indent_width * 3, ' ');
+                output_stream << "<value>\n", output_padding(current_indent + indent_width);
+                output_stream << "<array>\n", output_padding(current_indent + indent_width * 2);
+                output_stream << "<data>", output_padding(current_indent + indent_width * 3);
                 current_indent += indent_width * 3;
             }
             void end_array_(const core::value &, bool)
             {
                 current_indent -= indent_width * 3;
 
-                output_stream << '\n' << std::string(current_indent + indent_width * 2, ' ')
-                              << "</data>"
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "</array>"
-                              << '\n' << std::string(current_indent, ' ')
-                              << "</value>";
+                output_stream << '\n', output_padding(current_indent + indent_width * 2);
+                output_stream << "</data>\n", output_padding(current_indent + indent_width);
+                output_stream << "</array>\n", output_padding(current_indent);
+                output_stream << "</value>";
             }
 
             void begin_object_(const core::value &, core::int_t, bool)
             {
-                output_stream << "<value>"
-                              << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "<struct>"
-                              << '\n' << std::string(current_indent + indent_width * 2, ' ');
+                output_stream << "<value>\n", output_padding(current_indent + indent_width);
+                output_stream << "<struct>\n", output_padding(current_indent + indent_width * 2);
                 current_indent += indent_width * 2;
             }
             void end_object_(const core::value &, bool)
@@ -2853,15 +2829,14 @@ namespace cppdatalib
                 if (current_container_size() > 0)
                 {
                     current_indent -= indent_width;
-                    output_stream << '\n' << std::string(current_indent, ' ')
-                                  << "</member>";
+                    output_stream << '\n', output_padding(current_indent);
+                    output_stream << "</member>";
                 }
 
                 current_indent -= indent_width * 2;
-                output_stream << '\n' << std::string(current_indent + indent_width, ' ')
-                              << "</struct>"
-                              << '\n' << std::string(current_indent, ' ')
-                              << "</value>";
+                output_stream << '\n', output_padding(current_indent + indent_width);
+                output_stream << "</struct>\n", output_padding(current_indent);
+                output_stream << "</value>";
             }
         };
 
