@@ -1465,7 +1465,7 @@ namespace cppdatalib
                     writer.append_to_string(buffer), buffer.clear();
             }
 
-            //writer.append_to_string(buffer);
+            writer.append_to_string(buffer);
             writer.end_string(core::string_t());
             return stream;
         }
@@ -1592,6 +1592,9 @@ namespace cppdatalib
                         break;
                 }
             }
+
+            if (!delimiter_required)
+                throw core::error("JSON - expected value");
 
             writer.end();
             return stream;
@@ -1763,12 +1766,15 @@ namespace cppdatalib
     {
         inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
         {
+            bool written = false;
             char chr;
 
             writer.begin();
 
             while (stream >> std::skipws >> chr, stream.unget(), stream.good() && !stream.eof())
             {
+                written = true;
+
                 switch (chr)
                 {
                     case 'i':
@@ -1826,6 +1832,9 @@ namespace cppdatalib
                 if (writer.nesting_depth() == 0)
                     break;
             }
+
+            if (!written)
+                throw core::error("Bencode - expected value");
 
             writer.end();
             return stream;
@@ -2167,6 +2176,9 @@ namespace cppdatalib
                         break;
                 }
             }
+
+            if (!delimiter_required)
+                throw core::error("Plain Text Property List - expected value");
 
             writer.end();
             return stream;
