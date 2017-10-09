@@ -488,7 +488,7 @@ namespace cppdatalib
             template<typename PrefixPredicate, typename PostfixPredicate>
             void traverse_and_edit(PrefixPredicate prefix, PostfixPredicate postfix)
             {
-                std::stack<traversal_reference> references;
+                std::stack<traversal_reference, std::vector<traversal_reference>> references;
                 value *p = this;
 
                 while (!references.empty() || p != NULL)
@@ -541,7 +541,7 @@ namespace cppdatalib
             template<typename PrefixPredicate, typename PostfixPredicate>
             void traverse(PrefixPredicate prefix, PostfixPredicate postfix) const
             {
-                std::stack<const_traversal_reference> references;
+                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
                 const value *p = this;
 
                 while (!references.empty() || p != NULL)
@@ -607,8 +607,11 @@ namespace cppdatalib
             value(real_t v, long subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
             value(cstring_t v, long subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
             value(const string_t &v, long subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
+            value(string_t &&v, long subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
             value(const array_t &v, long subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
+            value(array_t &&v, long subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
             value(const object_t &v, long subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
+            value(object_t &&v, long subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
             value(T v, long subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
@@ -1241,15 +1244,15 @@ namespace cppdatalib
             virtual void begin_object_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void end_object_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
-            std::stack<scope_data> nested_scopes;
+            std::stack<scope_data, std::vector<scope_data>> nested_scopes;
         };
 
         class value_builder : public core::stream_handler
         {
             core::value &v;
 
-            std::stack<core::value> keys;
-            std::stack<core::value *> references;
+            std::stack<core::value, std::vector<core::value>> keys;
+            std::stack<core::value *, std::vector<core::value *>> references;
 
         public:
             value_builder(core::value &bind) : v(bind) {}
@@ -1411,6 +1414,7 @@ namespace cppdatalib
         {
             static const std::string hex = "0123456789ABCDEF";
             int c;
+            std::string buffer;
 
             {char chr; stream >> chr; c = chr;} // Skip initial whitespace
             if (c != '"') throw core::error("JSON - expected string");
@@ -1427,11 +1431,11 @@ namespace cppdatalib
 
                     switch (c)
                     {
-                        case 'b': writer.append_to_string(core::string_t(1, '\b')); break;
-                        case 'f': writer.append_to_string(core::string_t(1, '\f')); break;
-                        case 'n': writer.append_to_string(core::string_t(1, '\n')); break;
-                        case 'r': writer.append_to_string(core::string_t(1, '\r')); break;
-                        case 't': writer.append_to_string(core::string_t(1, '\t')); break;
+                        case 'b': buffer.push_back('\b'); break;
+                        case 'f': buffer.push_back('\f'); break;
+                        case 'n': buffer.push_back('\n'); break;
+                        case 'r': buffer.push_back('\r'); break;
+                        case 't': buffer.push_back('\t'); break;
                         case 'u':
                         {
                             uint32_t code = 0;
@@ -1445,19 +1449,23 @@ namespace cppdatalib
                             }
 
                             std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                            writer.append_to_string(utf8.to_bytes(code));
+                            buffer += utf8.to_bytes(code);
 
                             break;
                         }
                         default:
-                            writer.append_to_string(core::string_t(1, c));
+                            buffer.push_back(c);
                             break;
                     }
                 }
                 else
-                    writer.append_to_string(core::string_t(1, c));
+                    buffer.push_back(c);
+
+                if (buffer.size() >= 65536)
+                    writer.append_to_string(buffer), buffer.clear();
             }
 
+            //writer.append_to_string(buffer);
             writer.end_string(core::string_t());
             return stream;
         }
@@ -1503,6 +1511,9 @@ namespace cppdatalib
 
             while (stream >> std::skipws >> chr, stream.unget(), stream.good() && !stream.eof())
             {
+                if (writer.nesting_depth() == 0 && delimiter_required)
+                    break;
+
                 if (delimiter_required && !strchr(",:]}", chr))
                     throw core::error("JSON - expected ',' separating array or object entries");
 
@@ -1811,6 +1822,9 @@ namespace cppdatalib
                             throw core::error("Bencode - expected value");
                         break;
                 }
+
+                if (writer.nesting_depth() == 0)
+                    break;
             }
 
             writer.end();
@@ -2020,6 +2034,9 @@ namespace cppdatalib
 
             while (stream >> std::skipws >> chr, stream.unget(), stream.good() && !stream.eof())
             {
+                if (writer.nesting_depth() == 0 && delimiter_required)
+                    break;
+
                 if (delimiter_required && !strchr(",=)}", chr))
                     throw core::error("Plain Text Property List - expected ',' separating array or object entries");
 
