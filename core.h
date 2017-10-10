@@ -1235,6 +1235,9 @@ namespace cppdatalib
         public:
             value_builder(core::value &bind) : v(bind) {}
 
+            const core::value &value() const {return v;}
+
+        protected:
             // begin_() clears the bound value to null and pushes a reference to it
             void begin_()
             {
@@ -1246,8 +1249,6 @@ namespace cppdatalib
                 v.set_null();
                 references.push(&this->v);
             }
-
-            const core::value &value() const {return v;}
 
             // begin_key_() just queues a new object key in the stack
             void begin_key_(const core::value &v)
@@ -3051,8 +3052,9 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::istream &read_float(std::istream &stream, core::real_t &r, char specifier)
+        inline std::istream &read_float(std::istream &stream, char specifier, core::stream_handler &writer)
         {
+            core::real_t r;
             uint64_t temp;
             int c = stream.get();
 
@@ -3085,35 +3087,38 @@ namespace cppdatalib
             else
                 r = core::double_from_ieee_754(temp);
 
+            writer.write(r);
             return stream;
         }
 
-        inline std::istream &read_string(std::istream &stream, core::string_t &s, char specifier, long &subtype)
+        inline std::istream &read_string(std::istream &stream, char specifier, core::stream_handler &writer)
         {
             int c = stream.get();
 
             if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
 
-            subtype = core::normal;
-
-            s.clear();
             if (specifier == 'C')
-                s.push_back(c);
+            {
+                writer.begin_string(core::string_t(), 1);
+                writer.write(std::string(1, c));
+                writer.end_string(core::string_t());
+            }
             else if (specifier == 'H')
             {
                 core::int_t size;
 
-                subtype = core::bignum;
                 read_int(stream, size, c);
                 if (size < 0) throw core::error("UBJSON - invalid negative size specified for high-precision number");
 
+                writer.begin_string(core::value(core::string_t(), core::bignum), size);
                 while (size-- > 0)
                 {
                     c = stream.get();
                     if (c == EOF) throw core::error("UBJSON - expected high-precision number value after type specifier");
 
-                    s.push_back(c);
+                    writer.append_to_string(std::string(1, c));
                 }
+                writer.end_string(core::value(core::string_t(), core::bignum));
             }
             else
             {
@@ -3122,13 +3127,15 @@ namespace cppdatalib
                 read_int(stream, size, c);
                 if (size < 0) throw core::error("UBJSON - invalid negative size specified for string");
 
+                writer.begin_string(core::string_t(), size);
                 while (size-- > 0)
                 {
                     c = stream.get();
                     if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
 
-                    s.push_back(c);
+                    writer.append_to_string(std::string(1, c));
                 }
+                writer.end_string(core::string_t());
             }
 
             return stream;
@@ -3237,77 +3244,127 @@ namespace cppdatalib
             return stream << str;
         }
 
-        inline std::istream &input(std::istream &stream, core::value &v, char specifier = 0)
+        inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
         {
-            struct null_exception {};
+            struct container_data
+            {
+                container_data(char content_type, core::int_t remaining_size, bool key_parsed)
+                    : content_type(content_type)
+                    , remaining_size(remaining_size)
+                    , key_parsed(key_parsed)
+                {}
+
+                char content_type;
+                core::int_t remaining_size;
+                bool key_parsed;
+            };
+
+            std::stack<container_data, std::vector<container_data>> containers;
+            bool written = false;
+            int chr;
+
+            writer.begin();
 
             while (true)
             {
-                int c = specifier? specifier: stream.get();
-
-                switch (c)
+                if (containers.size() > 0)
                 {
-                    case 'Z': v.set_null(); return stream;
-                    case 'T': v.set_bool(true); return stream;
-                    case 'F': v.set_bool(false); return stream;
+                    if (containers.top().content_type)
+                        chr = containers.top().content_type;
+                    else
+                    {
+                        chr = stream.get();
+                        if (chr == EOF) break;
+                    }
+
+                    if (containers.top().remaining_size > 0)
+                        --containers.top().remaining_size;
+                    if (writer.current_container() == core::object)
+                        containers.top().key_parsed = !containers.top().key_parsed;
+                }
+                else
+                {
+                    chr = stream.get();
+                    if (chr == EOF) break;
+                }
+
+                written = true;
+
+                switch (chr)
+                {
+                    case 'Z':
+                        writer.write(core::null_t());
+                        break;
+                    case 'T':
+                        writer.write(true);
+                        break;
+                    case 'F':
+                        writer.write(false);
+                        break;
                     case 'U':
                     case 'i':
                     case 'I':
                     case 'l':
-                    case 'L': return read_int(stream, v.get_int(), c);
+                    case 'L':
+                    {
+                        core::int_t i;
+                        read_int(stream, i, chr);
+                        writer.write(i);
+                        break;
+                    }
                     case 'd':
-                    case 'D': return read_float(stream, v.get_real(), c);
+                    case 'D':
+                        read_float(stream, chr, writer);
+                        break;
                     case 'C':
                     case 'H':
-                    case 'S': return read_string(stream, v.get_string(), c, v.get_subtype());
+                    case 'S':
+                        read_string(stream, chr, writer);
+                        break;
                     case 'N': break;
                     case '[':
                     {
                         int type = 0;
-                        core::int_t size = 0;
+                        core::int_t size = -1;
 
-                        c = stream.get();
-                        if (c == EOF) throw core::error("UBJSON - expected array value after '['");
+                        chr = stream.get();
+                        if (chr == EOF) throw core::error("UBJSON - expected array value after '['");
 
-                        if (c == '$') // Type specified
+                        if (chr == '$') // Type specified
                         {
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - expected type specifier after '$'");
-                            type = c;
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - unexpected end of array");
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - expected type specifier after '$'");
+                            type = chr;
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - unexpected end of array");
                         }
 
-                        v.set_array(core::array_t());
-                        if (c == '#') // Count specified
+                        if (chr == '#') // Count specified
                         {
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - expected count specifier after '#'");
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
 
-                            read_int(stream, size, c);
+                            read_int(stream, size, chr);
                             if (size < 0) throw core::error("UBJSON - invalid negative size specified for array");
-
-                            while (size-- > 0)
-                            {
-                                core::value item;
-                                input(stream, item, type);
-                                v.push_back(item);
-                            }
-                            return stream;
                         }
 
-                        while (c != ']')
-                        {
-                            core::value item;
-                            input(stream, item, c);
-                            v.push_back(item);
+                        // If type != 0, then size must be >= 0
+                        if (type != 0 && size < 0)
+                            throw core::error("UBJSON - array element type specified but number of elements is not specified");
 
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - unexpected end of array");
-                        }
+                        writer.begin_array(core::array_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
+                        containers.push(container_data(type, size, false));
 
-                        return stream;
+                        break;
                     }
+                    case ']':
+                        if (!containers.empty() && containers.top().remaining_size >= 0)
+                            throw core::error("UBJSON - attempted to end an array with size specified already");
+
+                        writer.end_array(core::array_t());
+                        containers.pop();
+                        break;
+#if 0
                     case '{':
                     {
                         int type = 0;
@@ -3364,10 +3421,28 @@ namespace cppdatalib
 
                         return stream;
                     }
+#endif
+                    default:
+                        throw core::error("UBJSON - expected value");
                 }
 
-                throw core::error("UBJSON - expected value");
+                if (containers.size() > 0 && containers.top().remaining_size == 0 && !containers.top().key_parsed)
+                {
+                    if (writer.current_container() == core::array)
+                        writer.end_array(core::array_t());
+                    else if (writer.current_container() == core::object)
+                        writer.end_object(core::object_t());
+                    containers.pop();
+                }
             }
+
+            if (!written)
+                throw core::error("UBJSON - expected value");
+            else if (containers.size() > 0)
+                throw core::error("UBJSON - unexpected end of data");
+
+            writer.end();
+            return stream;
         }
 
         inline std::ostream &print(std::ostream &stream, const core::value &v, bool add_specifier = true, char force_specifier = 0)
@@ -3551,6 +3626,13 @@ namespace cppdatalib
             }
 
             // Control will never get here
+            return stream;
+        }
+
+        inline std::istream &input(std::istream &stream, core::value &v)
+        {
+            core::value_builder builder(v);
+            convert(stream, builder);
             return stream;
         }
 
