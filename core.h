@@ -1235,6 +1235,9 @@ namespace cppdatalib
         public:
             value_builder(core::value &bind) : v(bind) {}
 
+            const core::value &value() const {return v;}
+
+        protected:
             // begin_() clears the bound value to null and pushes a reference to it
             void begin_()
             {
@@ -1246,8 +1249,6 @@ namespace cppdatalib
                 v.set_null();
                 references.push(&this->v);
             }
-
-            const core::value &value() const {return v;}
 
             // begin_key_() just queues a new object key in the stack
             void begin_key_(const core::value &v)
@@ -3035,6 +3036,8 @@ namespace cppdatalib
                         temp = (temp << 8) | (c & 0xff);
                     }
                     break;
+                default:
+                    throw core::error("UBJSON - invalid integer specifier found in input");
             }
 
             if (negative)
@@ -3051,12 +3054,13 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::istream &read_float(std::istream &stream, core::real_t &r, char specifier)
+        inline std::istream &read_float(std::istream &stream, char specifier, core::stream_handler &writer)
         {
+            core::real_t r;
             uint64_t temp;
             int c = stream.get();
 
-            if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
+            if (c == EOF) throw core::error("UBJSON - expected floating-point value after type specifier");
             temp = c & 0xff;
 
             if (specifier == 'd')
@@ -3069,7 +3073,7 @@ namespace cppdatalib
                     temp = (temp << 8) | (c & 0xff);
                 }
             }
-            else
+            else if (specifier == 'D')
             {
                 for (int i = 0; i < 7; ++i)
                 {
@@ -3079,57 +3083,66 @@ namespace cppdatalib
                     temp = (temp << 8) | (c & 0xff);
                 }
             }
+            else
+                throw core::error("UBJSON - invalid floating-point specifier found in input");
 
             if (specifier == 'd')
                 r = core::float_from_ieee_754(temp);
             else
                 r = core::double_from_ieee_754(temp);
 
+            writer.write(r);
             return stream;
         }
 
-        inline std::istream &read_string(std::istream &stream, core::string_t &s, char specifier, long &subtype)
+        inline std::istream &read_string(std::istream &stream, char specifier, core::stream_handler &writer)
         {
             int c = stream.get();
 
             if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
 
-            subtype = core::normal;
-
-            s.clear();
             if (specifier == 'C')
-                s.push_back(c);
+            {
+                writer.begin_string(core::string_t(), 1);
+                writer.write(std::string(1, c));
+                writer.end_string(core::string_t());
+            }
             else if (specifier == 'H')
             {
                 core::int_t size;
 
-                subtype = core::bignum;
                 read_int(stream, size, c);
                 if (size < 0) throw core::error("UBJSON - invalid negative size specified for high-precision number");
 
+                writer.begin_string(core::value(core::string_t(), core::bignum), size);
                 while (size-- > 0)
                 {
                     c = stream.get();
                     if (c == EOF) throw core::error("UBJSON - expected high-precision number value after type specifier");
 
-                    s.push_back(c);
+                    writer.append_to_string(std::string(1, c));
                 }
+                writer.end_string(core::value(core::string_t(), core::bignum));
             }
-            else
+            else if (specifier == 'S')
             {
                 core::int_t size;
 
                 read_int(stream, size, c);
                 if (size < 0) throw core::error("UBJSON - invalid negative size specified for string");
 
+                writer.begin_string(core::string_t(), size);
                 while (size-- > 0)
                 {
                     c = stream.get();
                     if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
 
-                    s.push_back(c);
+                    writer.append_to_string(std::string(1, c));
                 }
+                writer.end_string(core::string_t());
             }
+            else
+                throw core::error("UBJSON - invalid string specifier found in input");
 
             return stream;
         }
@@ -3226,7 +3239,7 @@ namespace cppdatalib
 
         inline std::ostream &write_string(std::ostream &stream, const std::string &str, bool add_specifier, long subtype)
         {
-            if (subtype == core::normal && str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
+            if (subtype != core::bignum && str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
                 return stream << (add_specifier? "C": "") << str[0];
 
             if (add_specifier)
@@ -3237,320 +3250,245 @@ namespace cppdatalib
             return stream << str;
         }
 
-        inline std::istream &input(std::istream &stream, core::value &v, char specifier = 0)
+        inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
         {
-            struct null_exception {};
-
-            while (true)
+            struct container_data
             {
-                int c = specifier? specifier: stream.get();
+                container_data(char content_type, core::int_t remaining_size)
+                    : content_type(content_type)
+                    , remaining_size(remaining_size)
+                {}
 
-                switch (c)
+                char content_type;
+                core::int_t remaining_size;
+            };
+
+            const char valid_types[] = "ZTFUiIlLdDCHS[{";
+            std::stack<container_data, std::vector<container_data>> containers;
+            bool written = false;
+            int chr;
+
+            writer.begin();
+
+            while (!written || writer.nesting_depth() > 0)
+            {
+                if (containers.size() > 0)
                 {
-                    case 'Z': v.set_null(); return stream;
-                    case 'T': v.set_bool(true); return stream;
-                    case 'F': v.set_bool(false); return stream;
+                    if (containers.top().content_type)
+                        chr = containers.top().content_type;
+                    else
+                    {
+                        chr = stream.get();
+                        if (chr == EOF) break;
+                    }
+
+                    if (containers.top().remaining_size > 0 && !writer.container_key_was_just_parsed())
+                        --containers.top().remaining_size;
+                    if (writer.current_container() == core::object && chr != 'N' && chr != '}' && !writer.container_key_was_just_parsed())
+                    {
+                        // Parse key here, remap read character to 'N' (the no-op instruction)
+                        if (!containers.top().content_type)
+                            stream.unget();
+                        read_string(stream, 'S', writer);
+                        chr = 'N';
+                    }
+                }
+                else
+                {
+                    chr = stream.get();
+                    if (chr == EOF) break;
+                }
+
+                written |= chr != 'N';
+
+                switch (chr)
+                {
+                    case 'Z':
+                        writer.write(core::null_t());
+                        break;
+                    case 'T':
+                        writer.write(true);
+                        break;
+                    case 'F':
+                        writer.write(false);
+                        break;
                     case 'U':
                     case 'i':
                     case 'I':
                     case 'l':
-                    case 'L': return read_int(stream, v.get_int(), c);
+                    case 'L':
+                    {
+                        core::int_t i;
+                        read_int(stream, i, chr);
+                        writer.write(i);
+                        break;
+                    }
                     case 'd':
-                    case 'D': return read_float(stream, v.get_real(), c);
+                    case 'D':
+                        read_float(stream, chr, writer);
+                        break;
                     case 'C':
                     case 'H':
-                    case 'S': return read_string(stream, v.get_string(), c, v.get_subtype());
+                    case 'S':
+                        read_string(stream, chr, writer);
+                        break;
                     case 'N': break;
                     case '[':
                     {
                         int type = 0;
-                        core::int_t size = 0;
+                        core::int_t size = -1;
 
-                        c = stream.get();
-                        if (c == EOF) throw core::error("UBJSON - expected array value after '['");
+                        chr = stream.get();
+                        if (chr == EOF) throw core::error("UBJSON - expected array value after '['");
 
-                        if (c == '$') // Type specified
+                        if (chr == '$') // Type specified
                         {
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - expected type specifier after '$'");
-                            type = c;
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - unexpected end of array");
+                            chr = stream.get();
+                            if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
+                            type = chr;
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - unexpected end of array");
                         }
 
-                        v.set_array(core::array_t());
-                        if (c == '#') // Count specified
+                        if (chr == '#') // Count specified
                         {
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - expected count specifier after '#'");
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
 
-                            read_int(stream, size, c);
+                            read_int(stream, size, chr);
                             if (size < 0) throw core::error("UBJSON - invalid negative size specified for array");
-
-                            while (size-- > 0)
-                            {
-                                core::value item;
-                                input(stream, item, type);
-                                v.push_back(item);
-                            }
-                            return stream;
                         }
 
-                        while (c != ']')
-                        {
-                            core::value item;
-                            input(stream, item, c);
-                            v.push_back(item);
+                        // If type != 0, then size must be >= 0
+                        if (type != 0 && size < 0)
+                            throw core::error("UBJSON - array element type specified but number of elements is not specified");
+                        else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
+                            stream.unget();
 
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - unexpected end of array");
-                        }
+                        writer.begin_array(core::array_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
+                        containers.push(container_data(type, size));
 
-                        return stream;
+                        break;
                     }
+                    case ']':
+                        if (!containers.empty() && containers.top().remaining_size >= 0)
+                            throw core::error("UBJSON - attempted to end an array with size specified already");
+
+                        writer.end_array(core::array_t());
+                        containers.pop();
+                        break;
                     case '{':
                     {
                         int type = 0;
-                        core::int_t size = 0;
+                        core::int_t size = -1;
 
-                        c = stream.get();
-                        if (c == EOF) throw core::error("UBJSON - expected object value after '{'");
+                        chr = stream.get();
+                        if (chr == EOF) throw core::error("UBJSON - expected object value after '{'");
 
-                        if (c == '$') // Type specified
+                        if (chr == '$') // Type specified
                         {
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - expected type specifier after '$'");
-                            type = c;
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - unexpected end of object");
+                            chr = stream.get();
+                            if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
+                            type = chr;
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - unexpected end of object");
                         }
 
-                        v.set_object(core::object_t());
-                        if (c == '#') // Count specified
+                        if (chr == '#') // Count specified
                         {
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - expected count specifier after '#'");
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
 
-                            read_int(stream, size, c);
+                            read_int(stream, size, chr);
                             if (size < 0) throw core::error("UBJSON - invalid negative size specified for object");
-
-                            while (size-- > 0)
-                            {
-                                core::value item;
-                                std::string key;
-                                long dummy;
-
-                                read_string(stream, key, 'S', dummy);
-                                input(stream, item, type);
-                                v[key] = item;
-                            }
-                            return stream;
                         }
 
-                        while (c != '}')
-                        {
-                            core::value item;
-                            std::string key;
-                            long dummy;
-
+                        // If type != 0, then size must be >= 0
+                        if (type != 0 && size < 0)
+                            throw core::error("UBJSON - object element type specified but number of elements is not specified");
+                        else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
                             stream.unget();
-                            read_string(stream, key, 'S', dummy);
-                            input(stream, item);
-                            v[key] = item;
 
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - unexpected end of object");
-                        }
+                        writer.begin_object(core::object_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
+                        containers.push(container_data(type, size));
 
-                        return stream;
+                        break;
                     }
+                    case '}':
+                        if (!containers.empty() && containers.top().remaining_size >= 0)
+                            throw core::error("UBJSON - attempted to end an object with size specified already");
+
+                        writer.end_object(core::object_t());
+                        containers.pop();
+                        break;
+                    default:
+                        throw core::error("UBJSON - expected value");
                 }
 
-                throw core::error("UBJSON - expected value");
+                if (containers.size() > 0 && !writer.container_key_was_just_parsed() && containers.top().remaining_size == 0)
+                {
+                    if (writer.current_container() == core::array)
+                        writer.end_array(core::array_t());
+                    else if (writer.current_container() == core::object)
+                        writer.end_object(core::object_t());
+                    containers.pop();
+                }
             }
+
+            if (!written)
+                throw core::error("UBJSON - expected value");
+            else if (containers.size() > 0)
+                throw core::error("UBJSON - unexpected end of data");
+
+            writer.end();
+            return stream;
         }
 
-        inline std::ostream &print(std::ostream &stream, const core::value &v, bool add_specifier = true, char force_specifier = 0)
+        class stream_writer : public core::stream_handler, public core::stream_writer
         {
-            switch (v.get_type())
+        public:
+            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_key_(const core::value &v)
             {
-                case core::null: return add_specifier? stream << 'Z': stream;
-                case core::boolean: return add_specifier? stream << (v.get_bool()? 'T': 'F'): stream;
-                case core::integer: return write_int(stream, v.get_int(), add_specifier, force_specifier);
-                case core::real: return write_float(stream, v.get_real(), add_specifier, force_specifier);
-                case core::string: return write_string(stream, v.get_string(), add_specifier, v.get_subtype());
-                case core::array:
-                {
-                    core::type type = core::null;
-                    char forced_type = 0;
-                    bool same_types = true;
-
-                    bool bool_val = false;
-                    bool strings_can_be_chars = true;
-                    bool reals_can_be_floats = true;
-                    core::int_t int_min = 0, int_max = 0;
-
-                    if (v.size())
-                    {
-                        auto it = *v.get_array().begin();
-                        type = it.get_type();
-                        int_min = int_max = it.as_int();
-                        bool_val = it.as_bool();
-                    }
-
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                    {
-                        if (it->get_type() != type || (type == core::boolean && bool_val != it->get_bool()))
-                        {
-                            same_types = false;
-                            break;
-                        }
-
-                        if (it->is_int())
-                        {
-                            if (it->get_int() < int_min)
-                                int_min = it->get_int();
-                            else if (it->get_int() > int_max)
-                                int_max = it->get_int();
-                        }
-                        else if (it->is_real() && reals_can_be_floats)
-                        {
-                            if (it->get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->get_real())) && !std::isnan(it->get_real()))
-                                reals_can_be_floats = false;
-                        }
-                        else if (it->is_string() && strings_can_be_chars)
-                        {
-                            if (it->get_string().size() != 1 || static_cast<unsigned char>(it->get_string()[0]) >= 128)
-                                strings_can_be_chars = false;
-                        }
-                    }
-
-                    if (add_specifier)
-                        stream << '[';
-
-                    if (same_types && v.size() > 1)
-                    {
-                        stream << '$';
-                        switch (type)
-                        {
-                            case core::null: stream << 'Z'; break;
-                            case core::boolean: stream << (bool_val? 'T': 'F'); break;
-                            case core::integer: stream << (forced_type = size_specifier(int_min, int_max)); break;
-                            case core::real: stream << (forced_type = (reals_can_be_floats? 'd': 'D')); break;
-                            case core::string: stream << (strings_can_be_chars? 'C': 'S'); break;
-                            case core::array: stream << '['; break;
-                            case core::object: stream << '{'; break;
-                        }
-
-                        write_int(stream << '#', v.size(), true);
-
-                        if (type != core::null && type != core::boolean)
-                        {
-                            for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                                print(stream, *it, false, forced_type);
-                        }
-
-                        return stream;
-                    }
-                    else
-                    {
-                        for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                            print(stream, *it);
-
-                        return stream << ']';
-                    }
-                }
-                case core::object:
-                {
-                    core::type type = core::null;
-                    char forced_type = 0;
-                    bool same_types = true;
-
-                    bool bool_val = false;
-                    bool strings_can_be_chars = true;
-                    bool reals_can_be_floats = true;
-                    core::int_t int_min = 0, int_max = 0;
-
-                    if (v.size())
-                    {
-                        auto it = v.get_object().begin();
-                        type = it->second.get_type();
-                        int_min = int_max = it->second.as_int();
-                        bool_val = it->second.as_bool();
-                    }
-
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                    {
-                        if (it->second.get_type() != type || (type == core::boolean && bool_val != it->second.get_bool()))
-                        {
-                            same_types = false;
-                            break;
-                        }
-
-                        if (it->second.is_int())
-                        {
-                            if (it->second.get_int() < int_min)
-                                int_min = it->second.get_int();
-                            else if (it->second.get_int() > int_max)
-                                int_max = it->second.get_int();
-                        }
-                        else if (it->second.is_real() && reals_can_be_floats)
-                        {
-                            if (it->second.get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->second.get_real())) && !std::isnan(it->second.get_real()))
-                                reals_can_be_floats = false;
-                        }
-                        else if (it->second.is_string() && strings_can_be_chars)
-                        {
-                            if (it->second.get_string().size() != 1 || static_cast<unsigned char>(it->second.get_string()[0]) >= 128)
-                                strings_can_be_chars = false;
-                        }
-                    }
-
-                    if (add_specifier)
-                        stream << '{';
-
-                    if (same_types && v.size() > 1)
-                    {
-                        stream << '$';
-                        switch (type)
-                        {
-                            case core::null: stream << 'Z'; break;
-                            case core::boolean: stream << (bool_val? 'T': 'F'); break;
-                            case core::integer: stream << (forced_type = size_specifier(int_min, int_max)); break;
-                            case core::real: stream << (forced_type = (reals_can_be_floats? 'd': 'D')); break;
-                            case core::string: stream << (strings_can_be_chars? 'C': 'S'); break;
-                            case core::array: stream << '['; break;
-                            case core::object: stream << '{'; break;
-                        }
-
-                        write_int(stream << '#', v.size(), true);
-
-                        for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                        {
-                            if (!it->first.is_string())
-                                throw core::error("UBJSON - object key is not a string");
-
-                            print(write_int(stream, it->first.size(), true) << it->first.get_string(), it->second, false, forced_type);
-                        }
-
-                        return stream;
-                    }
-                    else
-                    {
-                        for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                        {
-                            if (!it->first.is_string())
-                                throw core::error("UBJSON - object key is not a string");
-
-                            print(write_int(stream, it->first.size(), true) << it->first.get_string(), it->second);
-                        }
-
-                        return stream << '}';
-                    }
-                }
+                if (!v.is_string())
+                    throw core::error("UBJSON - cannot write non-string key");
             }
 
-            // Control will never get here
+            void null_(const core::value &) {output_stream << 'Z';}
+            void bool_(const core::value &v) {output_stream << (v.get_bool()? 'T': 'F');}
+            void integer_(const core::value &v) {write_int(output_stream, v.get_int(), true);}
+            void real_(const core::value &v) {write_float(output_stream, v.get_real(), true);}
+            void begin_string_(const core::value &v, core::int_t size, bool is_key)
+            {
+                if (size == unknown_size)
+                    throw core::error("UBJSON - 'string' value does not have size specified");
+
+                if (!is_key)
+                    output_stream << (v.get_subtype() == core::bignum? 'H': 'S');
+                write_int(output_stream, size, true);
+            }
+            void string_data_(const core::value &v) {output_stream << v.get_string();}
+
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream << '[';}
+            void end_array_(const core::value &, bool) {output_stream << ']';}
+
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream << '{';}
+            void end_object_(const core::value &, bool) {output_stream << '}';}
+        };
+
+        inline std::ostream &print(std::ostream &stream, const core::value &v)
+        {
+            stream_writer writer(stream);
+            core::convert(v, writer);
+            return stream;
+        }
+
+        inline std::istream &input(std::istream &stream, core::value &v)
+        {
+            core::value_builder builder(v);
+            convert(stream, builder);
             return stream;
         }
 
