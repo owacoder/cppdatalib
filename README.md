@@ -10,10 +10,10 @@ Supported formats include
    - UBJSON
    - Bencode
    - plain text property lists
+   - CSV
    - Binn (write-only)
    - XML property lists (write-only)
    - XML-RPC (write-only)
-   - CSV (write-only)
 
 ### Usage
 
@@ -43,8 +43,6 @@ int main() {
 When using more than one format, you either should use the `to_xxx` and `from_xxx` string functions for a specific format,
 or the `input` and `print` functions that take two parameters, instead of the `>>` and `<<` operators.
 The operators are ambiguous when using more than one format.
-
-Note: If an `input` or `print` function takes more than two parameters, ignore the extra parameters. They are only needed for internal use.
 
 ### Supported datatypes
 
