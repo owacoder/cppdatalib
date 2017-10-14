@@ -978,19 +978,29 @@ namespace cppdatalib
                     begin_key_(v);
                 else
                     begin_item_(v);
-                begin_scalar_(v, is_key);
 
-                switch (v.get_type())
+                if (v.get_type() != string)
                 {
-                    case null: begin_null_(v); null_(v); end_null_(v); break;
-                    case boolean: begin_bool_(v); bool_(v); end_bool_(v); break;
-                    case integer: begin_integer_(v); integer_(v); end_integer_(v); break;
-                    case real: begin_real_(v); real_(v); end_real_(v); break;
-                    case string: begin_string_(v, v.size(), is_key); string_data_(v); end_string_(v, is_key); break;
-                    default: return false;
+                    begin_scalar_(v, is_key);
+
+                    switch (v.get_type())
+                    {
+                        case null: begin_null_(v); null_(v); end_null_(v); break;
+                        case boolean: begin_bool_(v); bool_(v); end_bool_(v); break;
+                        case integer: begin_integer_(v); integer_(v); end_integer_(v); break;
+                        case real: begin_real_(v); real_(v); end_real_(v); break;
+                        default: return false;
+                    }
+
+                    end_scalar_(v, is_key);
+                }
+                else // is string
+                {
+                    begin_string_(v, v.size(), is_key);
+                    string_data_(v);
+                    end_string_(v, is_key);
                 }
 
-                end_scalar_(v, is_key);
                 if (is_key)
                     end_key_(v);
                 else
@@ -1015,7 +1025,7 @@ namespace cppdatalib
             virtual void begin_item_(const core::value &v) {(void) v;}
             virtual void end_item_(const core::value &v) {(void) v;}
 
-            // Called when any non-array, non-object item is parsed
+            // Called when any non-array, non-object, non-string item is parsed
             virtual void begin_scalar_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
             virtual void end_scalar_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
@@ -1065,9 +1075,6 @@ namespace cppdatalib
                     begin_item_(v);
                     begin_string_(v, size, false);
                 }
-
-                if (v.size())
-                    string_data_(v);
 
                 nested_scopes.push_back(string);
             }
@@ -1272,7 +1279,7 @@ namespace cppdatalib
                     references.top()->member(keys.top()) = v;
                     keys.pop();
                 }
-                else if (v.get_type() != string)
+                else
                     *references.top() = v;
             }
 
@@ -2864,6 +2871,182 @@ namespace cppdatalib
 
     namespace csv
     {
+        struct options {virtual ~options() {}};
+        struct convert_all_fields_as_strings : options {};
+        struct convert_fields_by_deduction : options {};
+
+        inline void deduce_type(const std::string &buffer, core::stream_handler &writer)
+        {
+            if (buffer.empty() ||
+                    buffer == "~" ||
+                    buffer == "null" ||
+                    buffer == "Null" ||
+                    buffer == "NULL")
+                writer.write(core::null_t());
+            else if (buffer == "Y" ||
+                     buffer == "y" ||
+                     buffer == "yes" ||
+                     buffer == "Yes" ||
+                     buffer == "YES" ||
+                     buffer == "on" ||
+                     buffer == "On" ||
+                     buffer == "ON" ||
+                     buffer == "true" ||
+                     buffer == "True" ||
+                     buffer == "TRUE")
+                writer.write(true);
+            else if (buffer == "N" ||
+                     buffer == "n" ||
+                     buffer == "no" ||
+                     buffer == "No" ||
+                     buffer == "NO" ||
+                     buffer == "off" ||
+                     buffer == "Off" ||
+                     buffer == "OFF" ||
+                     buffer == "false" ||
+                     buffer == "False" ||
+                     buffer == "FALSE")
+                writer.write(false);
+            else
+            {
+                // Attempt to read as an integer
+                {
+                    std::istringstream temp_stream(buffer);
+                    core::int_t value;
+                    temp_stream >> value;
+                    if (!temp_stream.fail() && temp_stream.get() == EOF)
+                    {
+                        writer.write(value);
+                        return;
+                    }
+                }
+
+                // Attempt to read as a real
+                {
+                    std::istringstream temp_stream(buffer);
+                    core::real_t value;
+                    temp_stream >> value;
+                    if (!temp_stream.fail() && temp_stream.get() == EOF)
+                    {
+                        writer.write(value);
+                        return;
+                    }
+                }
+
+                // Revert to string
+                writer.write(buffer);
+            }
+        }
+
+        inline std::istream &read_string(std::istream &stream, core::stream_handler &writer, bool parse_as_strings)
+        {
+            int chr;
+            std::string buffer;
+
+            if (parse_as_strings)
+            {
+                writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+
+                // buffer is used to temporarily store whitespace for reading strings
+                while (chr = stream.get(), stream.good() && !stream.eof() && chr != ',' && chr != '\n')
+                {
+                    if (isspace(chr))
+                    {
+                        buffer.push_back(chr);
+                        continue;
+                    }
+                    else if (buffer.size())
+                    {
+                        writer.append_to_string(buffer);
+                        buffer.clear();
+                    }
+
+                    writer.append_to_string(core::string_t(1, chr));
+                }
+
+                if (chr != EOF)
+                    stream.unget();
+
+                writer.end_string(core::string_t());
+            }
+            else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
+            {
+                while (chr = stream.get(), stream.good() && !stream.eof() && chr != ',' && chr != '\n')
+                    buffer.push_back(chr);
+
+                if (chr != EOF)
+                    stream.unget();
+
+                while (!buffer.empty() && isspace(buffer.back() & 0xff))
+                    buffer.pop_back();
+
+                deduce_type(buffer, writer);
+            }
+
+            return stream;
+        }
+
+        // Expects that the leading quote has already been parsed out of the stream
+        inline std::istream &read_quoted_string(std::istream &stream, core::stream_handler &writer, bool parse_as_strings)
+        {
+            int chr;
+            std::string buffer;
+
+            if (parse_as_strings)
+            {
+                writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+
+                // buffer is used to temporarily store whitespace for reading strings
+                while (chr = stream.get(), stream.good() && !stream.eof())
+                {
+                    if (chr == '"')
+                    {
+                        if (stream.peek() == '"')
+                            chr = stream.get();
+                        else
+                            break;
+                    }
+
+                    if (isspace(chr))
+                    {
+                        buffer.push_back(chr);
+                        continue;
+                    }
+                    else if (buffer.size())
+                    {
+                        writer.append_to_string(buffer);
+                        buffer.clear();
+                    }
+
+                    writer.append_to_string(core::string_t(1, chr));
+                }
+
+                writer.end_string(core::string_t());
+            }
+            else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
+            {
+                while (chr = stream.get(), stream.good() && !stream.eof())
+                {
+                    if (chr == '"')
+                    {
+                        if (stream.peek() == '"')
+                            chr = stream.get();
+                        else
+                            break;
+                    }
+
+                    buffer.push_back(chr);
+                }
+
+                while (!buffer.empty() && isspace(buffer.back() & 0xff))
+                    buffer.pop_back();
+
+                deduce_type(buffer, writer);
+            }
+
+            return stream;
+        }
+
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
         {
             for (size_t i = 0; i < str.size(); ++i)
@@ -2876,6 +3059,81 @@ namespace cppdatalib
                 stream << str[i];
             }
 
+            return stream;
+        }
+
+        inline std::istream &convert(std::istream &stream, core::stream_handler &writer, const options &opts = convert_fields_by_deduction())
+        {
+            const bool parse_as_strings = dynamic_cast<const convert_all_fields_as_strings *>(&opts) != NULL;
+            int chr;
+            bool comma_just_parsed = true;
+            bool newline_just_parsed = true;
+
+            writer.begin();
+            writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+
+            while (chr = stream.get(), stream.good() && !stream.eof())
+            {
+                if (newline_just_parsed)
+                {
+                    writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                    newline_just_parsed = false;
+                }
+
+                switch (chr)
+                {
+                    case '"':
+                        read_quoted_string(stream, writer, parse_as_strings);
+                        comma_just_parsed = false;
+                        break;
+                    case ',':
+                        if (comma_just_parsed)
+                        {
+                            if (parse_as_strings)
+                                writer.write(core::string_t());
+                            else // parse by deduction of types, assume `,,` means null instead of empty string
+                                writer.write(core::null_t());
+                        }
+                        comma_just_parsed = true;
+                        break;
+                    case '\n':
+                        if (comma_just_parsed)
+                        {
+                            if (parse_as_strings)
+                                writer.write(core::string_t());
+                            else // parse by deduction of types, assume `,,` means null instead of empty string
+                                writer.write(core::null_t());
+                        }
+                        comma_just_parsed = newline_just_parsed = true;
+                        writer.end_array(core::array_t());
+                        break;
+                    default:
+                        if (!isspace(chr))
+                        {
+                            stream.unget();
+                            read_string(stream, writer, parse_as_strings);
+                            comma_just_parsed = false;
+                        }
+                        break;
+                }
+            }
+
+            if (!newline_just_parsed)
+            {
+                if (comma_just_parsed)
+                {
+                    if (parse_as_strings)
+                        writer.write(core::string_t());
+                    else // parse by deduction of types, assume `,,` means null instead of empty string
+                        writer.write(core::null_t());
+                }
+
+                writer.end_array(core::array_t());
+            }
+
+
+            writer.end_array(core::array_t());
+            writer.end();
             return stream;
         }
 
@@ -2915,7 +3173,12 @@ namespace cppdatalib
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
-                    output_stream << (nesting_depth() == 1? '\n': separator);
+                {
+                    if (nesting_depth() == 1)
+                        output_stream << "\r\n";
+                    else
+                        output_stream << separator;
+                }
             }
 
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
@@ -2933,10 +3196,24 @@ namespace cppdatalib
             void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
         };
 
+        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        {
+            core::value_builder builder(v);
+            convert(stream, builder);
+            return stream;
+        }
+
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
         {
             stream_writer writer(stream);
             core::convert(v, writer);
+            return stream;
+        }
+
+        inline std::istream &input_table(std::istream &stream, core::value &v, const options &opts = convert_fields_by_deduction())
+        {
+            core::value_builder builder(v);
+            convert(stream, builder, opts);
             return stream;
         }
 
@@ -2953,6 +3230,15 @@ namespace cppdatalib
             return stream;
         }
 
+        inline core::value from_csv_table(const std::string &csv, const options &opts = convert_fields_by_deduction())
+        {
+            std::istringstream stream(csv);
+            core::value v;
+            core::value_builder builder(v);
+            convert(stream, builder, opts);
+            return v;
+        }
+
         inline std::string to_csv_row(const core::value &v, char separator = ',')
         {
             std::ostringstream stream;
@@ -2967,6 +3253,8 @@ namespace cppdatalib
             return stream.str();
         }
 
+        inline std::istream &input(std::istream &stream, core::value &v) {return input_table(stream, v);}
+        inline core::value from_csv(const std::string &csv) {return from_csv_table(csv);}
         inline std::ostream &print(std::ostream &stream, const core::value &v) {return print_table(stream, v);}
         inline std::string to_csv(const core::value &v) {return to_csv_table(v);}
     }
