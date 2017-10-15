@@ -686,6 +686,13 @@ namespace cppdatalib
                 return value();
             }
             value &member(const value &key) {clear(object); return obj_[key];}
+            const value *member_ptr(const value &key) const
+            {
+                auto it = obj_.find(key);
+                if (it != obj_.end())
+                    return std::addressof(it->second);
+                return NULL;
+            }
             bool_t is_member(cstring_t key) const {return obj_.find(key) != obj_.end();}
             bool_t is_member(const string_t &key) const {return obj_.find(key) != obj_.end();}
             bool_t is_member(const value &key) const {return obj_.find(key) != obj_.end();}
@@ -1400,6 +1407,78 @@ namespace cppdatalib
 
     namespace json
     {
+        namespace pointer
+        {
+            const core::value *evaluate(const core::value &json, const std::string &pointer)
+            {
+                size_t idx = 1, end_idx = 0;
+                std::string path_node;
+                const core::value *reference = &json;
+
+                if (pointer.find('/') != 0)
+                    return reference;
+
+                end_idx = pointer.find('/', idx);
+                while (idx <= pointer.size())
+                {
+                    // Extract the current node from pointer
+                    if (end_idx == std::string::npos)
+                        path_node = pointer.substr(idx, end_idx);
+                    else
+                        path_node = pointer.substr(idx, end_idx - idx);
+                    idx += path_node.size() + 1;
+
+                    std::cout << path_node << std::endl;
+
+                    // Escape special characters in strings
+                    for (size_t i = 0; i < path_node.size(); ++i)
+                    {
+                        if (path_node[i] == '~')
+                        {
+                            if (i + 1 == path_node.size())
+                                throw core::error("JSON Pointer - Expected identifier following '~'");
+                            switch (path_node[i+1])
+                            {
+                                case '0': path_node.replace(i, 2, "~"); break;
+                                case '1': path_node.replace(i, 2, "/"); break;
+                                default: throw core::error("JSON Pointer - Expected identifier following '~'");
+                            }
+                        }
+                    }
+
+                    // Dereference
+                    if (reference->is_object())
+                    {
+                        if (reference->is_member(path_node))
+                            reference = reference->member_ptr(path_node);
+                        else
+                            throw core::error("JSON Pointer - Attempted to dereference non-existent member in object");
+                    }
+                    else if (reference->is_array())
+                    {
+                        for (auto c: path_node)
+                            if (!isdigit(c & 0xff))
+                                throw core::error("JSON Pointer - Attempted to dereference invalid array index");
+
+                        core::int_t array_index;
+                        std::istringstream stream(path_node);
+                        stream >> array_index;
+                        if (stream.fail() || stream.get() != EOF || (path_node.front() == '0' && path_node != "0")) // Check whether there are leading zeroes
+                            throw core::error("JSON Pointer - Attempted to dereference invalid array index");
+
+                        reference = &reference->get_array()[array_index];
+                    }
+                    else
+                        throw core::error("JSON Pointer - Attempted to dereference a scalar value");
+
+                    // Look for the next node
+                    end_idx = pointer.find('/', idx);
+                }
+
+                return reference;
+            }
+        }
+
         inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
         {
             static const std::string hex = "0123456789ABCDEF";
@@ -1615,7 +1694,12 @@ namespace cppdatalib
             void null_(const core::value &) {output_stream << "null";}
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
+            void real_(const core::value &v)
+            {
+                if (!std::isfinite(v.get_real()))
+                    throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
+                output_stream << v.get_real();
+            }
             void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool) {output_stream << '"';}
@@ -1674,7 +1758,12 @@ namespace cppdatalib
             void null_(const core::value &) {output_stream << "null";}
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
+            void real_(const core::value &v)
+            {
+                if (!std::isfinite(v.get_real()))
+                    throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
+                output_stream << v.get_real();
+            }
             void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool) {output_stream << '"';}
