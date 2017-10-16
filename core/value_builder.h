@@ -1,0 +1,131 @@
+#ifndef CPPDATALIB_VALUE_BUILDER_H
+#define CPPDATALIB_VALUE_BUILDER_H
+
+#include "stream_base.h"
+
+namespace cppdatalib
+{
+    namespace core
+    {
+        class value_builder : public core::stream_handler
+        {
+            core::value &v;
+
+            std::stack<core::value, std::vector<core::value>> keys;
+            std::stack<core::value *, std::vector<core::value *>> references;
+
+        public:
+            value_builder(core::value &bind) : v(bind) {}
+
+            const core::value &value() const {return v;}
+
+        protected:
+            // begin_() clears the bound value to null and pushes a reference to it
+            void begin_()
+            {
+                while (!keys.empty())
+                    keys.pop();
+                while (!references.empty())
+                    references.pop();
+
+                v.set_null();
+                references.push(&this->v);
+            }
+
+            // begin_key_() just queues a new object key in the stack
+            void begin_key_(const core::value &v)
+            {
+                keys.push(v);
+                references.push(&keys.top());
+            }
+            void end_key_(const core::value &)
+            {
+                references.pop();
+            }
+
+            // begin_scalar_() pushes the item to the array if the object to be modified is an array,
+            // adds a member with the specified key, or simply assigns if not in a container
+            void begin_scalar_(const core::value &v, bool is_key)
+            {
+                if (!is_key && current_container() == array)
+                    references.top()->push_back(v);
+                else if (!is_key && current_container() == object)
+                {
+                    references.top()->member(keys.top()) = v;
+                    keys.pop();
+                }
+                else
+                    *references.top() = v;
+            }
+
+            void string_data_(const core::value &v)
+            {
+                references.top()->get_string() += v.get_string();
+            }
+
+            // begin_container() operates similarly to begin_scalar_(), but pushes a reference to the container as well
+            void begin_container(const core::value &v, core::int_t size, bool is_key)
+            {
+                (void) size;
+
+                if (!is_key && current_container() == array)
+                {
+                    references.top()->push_back(core::null_t());
+                    references.push(&references.top()->get_array().back());
+                }
+                else if (!is_key && current_container() == object)
+                {
+                    references.top()->member(keys.top());
+                    references.push(&references.top()->member(keys.top()));
+                    keys.pop();
+                }
+
+                // WARNING: If one tries to perform the following assignment `*references.top() = v` here,
+                // an infinite recursion will result, because the `core::value` assignment operator and the
+                // `core::value` copy constructor use this class to build complex (array or object) types.
+                if (v.is_array())
+                    references.top()->set_array(core::array_t(), v.get_subtype());
+                else if (v.is_object())
+                    references.top()->set_object(core::object_t(), v.get_subtype());
+                else if (v.is_string())
+                    references.top()->set_string(core::string_t(), v.get_subtype());
+            }
+
+            // end_container_() just removes a container from the stack, because nothing more needs to be done
+            void end_container(bool is_key)
+            {
+                if (!is_key)
+                    references.pop();
+            }
+
+            void begin_string_(const core::value &v, int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void end_string_(const core::value &, bool is_key) {end_container(is_key);}
+            void begin_array_(const core::value &v, core::int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void end_array_(const core::value &, bool is_key) {end_container(is_key);}
+            void begin_object_(const core::value &v, core::int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void end_object_(const core::value &, bool is_key) {end_container(is_key);}
+        };
+
+        inline value &assign(value &dst, const value &src)
+        {
+            switch (src.get_type())
+            {
+                case null: dst.set_null(); return dst;
+                case boolean: dst.set_bool(src.get_bool(), src.get_subtype()); return dst;
+                case integer: dst.set_int(src.get_int(), src.get_subtype()); return dst;
+                case real: dst.set_real(src.get_real(), src.get_subtype()); return dst;
+                case string: dst.set_string(src.get_string(), src.get_subtype()); return dst;
+                case array:
+                case object:
+                {
+                    value_builder builder(dst);
+                    convert(src, builder);
+                    return dst;
+                }
+                default: dst.set_null(); return dst;
+            }
+        }
+    }
+}
+
+#endif // CPPDATALIB_VALUE_BUILDER_H
