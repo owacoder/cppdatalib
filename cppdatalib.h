@@ -11,6 +11,7 @@
 #include "csv/csv.h"
 #include "binn/binn.h"
 #include "ubjson/ubjson.h"
+#include "xls/xml.h"
 #include "netstrings/netstrings.h"
 
 #endif // CPPDATALIB_H

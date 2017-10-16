@@ -14,6 +14,7 @@ Supported formats include
    - Binn (write-only)
    - XML property lists (write-only)
    - XML-RPC (write-only)
+   - XML-XLS (write-only)
 
 ### Usage
 
@@ -91,3 +92,8 @@ If a format-defined limit is reached, such as an object key length limit, an err
    - UBJSON supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.
      Notes:
        - `string` subtype `bignum` is supported.
+
+   - XML-XLS supports `null`, `bool`, `int`, `real`, `string`, and `array`.<br/>
+     Notes:
+       - `object`s are **not** supported.
+       - `string` subtypes `date`, `time`, and `datetime` are supported.
