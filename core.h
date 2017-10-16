@@ -480,9 +480,6 @@ namespace cppdatalib
                 bool traversed_key_already;
             };
 
-            // TODO: this traversal algorithm does not traverse object keys, since they are declared `const` inside
-            // the `std::map` definition. Using complex keys may overflow the stack when the destructor is called.
-            // Using simple scalar keys will not be an issue
             template<typename PrefixPredicate, typename PostfixPredicate>
             void traverse_and_edit(PrefixPredicate prefix, PostfixPredicate postfix)
             {
@@ -533,6 +530,9 @@ namespace cppdatalib
                 }
             }
 
+            // TODO: this traversal algorithm does not traverse object keys, since they are declared `const` inside
+            // the `std::map` definition. Using complex keys may overflow the stack when the destructor is called.
+            // Using simple scalar keys will not be an issue
             template<typename PrefixPredicate, typename PostfixPredicate>
             void traverse(PrefixPredicate prefix, PostfixPredicate postfix) const
             {
@@ -686,6 +686,13 @@ namespace cppdatalib
                 return value();
             }
             value &member(const value &key) {clear(object); return obj_[key];}
+            const value *member_ptr(const value &key) const
+            {
+                auto it = obj_.find(key);
+                if (it != obj_.end())
+                    return std::addressof(it->second);
+                return NULL;
+            }
             bool_t is_member(cstring_t key) const {return obj_.find(key) != obj_.end();}
             bool_t is_member(const string_t &key) const {return obj_.find(key) != obj_.end();}
             bool_t is_member(const value &key) const {return obj_.find(key) != obj_.end();}
@@ -834,6 +841,8 @@ namespace cppdatalib
 
         struct null_t : value {null_t() {}};
 
+        // TODO: comparisons need to be non-recursive, iterative versions for stack overflow protection
+
         inline bool operator<(const value &lhs, const value &rhs)
         {
             if (lhs.get_type() < rhs.get_type())
@@ -978,19 +987,29 @@ namespace cppdatalib
                     begin_key_(v);
                 else
                     begin_item_(v);
-                begin_scalar_(v, is_key);
 
-                switch (v.get_type())
+                if (v.get_type() != string)
                 {
-                    case null: begin_null_(v); null_(v); end_null_(v); break;
-                    case boolean: begin_bool_(v); bool_(v); end_bool_(v); break;
-                    case integer: begin_integer_(v); integer_(v); end_integer_(v); break;
-                    case real: begin_real_(v); real_(v); end_real_(v); break;
-                    case string: begin_string_(v, v.size(), is_key); string_data_(v); end_string_(v, is_key); break;
-                    default: return false;
+                    begin_scalar_(v, is_key);
+
+                    switch (v.get_type())
+                    {
+                        case null: begin_null_(v); null_(v); end_null_(v); break;
+                        case boolean: begin_bool_(v); bool_(v); end_bool_(v); break;
+                        case integer: begin_integer_(v); integer_(v); end_integer_(v); break;
+                        case real: begin_real_(v); real_(v); end_real_(v); break;
+                        default: return false;
+                    }
+
+                    end_scalar_(v, is_key);
+                }
+                else // is string
+                {
+                    begin_string_(v, v.size(), is_key);
+                    string_data_(v);
+                    end_string_(v, is_key);
                 }
 
-                end_scalar_(v, is_key);
                 if (is_key)
                     end_key_(v);
                 else
@@ -1015,7 +1034,7 @@ namespace cppdatalib
             virtual void begin_item_(const core::value &v) {(void) v;}
             virtual void end_item_(const core::value &v) {(void) v;}
 
-            // Called when any non-array, non-object item is parsed
+            // Called when any non-array, non-object, non-string item is parsed
             virtual void begin_scalar_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
             virtual void end_scalar_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
@@ -1065,9 +1084,6 @@ namespace cppdatalib
                     begin_item_(v);
                     begin_string_(v, size, false);
                 }
-
-                if (v.size())
-                    string_data_(v);
 
                 nested_scopes.push_back(string);
             }
@@ -1272,7 +1288,7 @@ namespace cppdatalib
                     references.top()->member(keys.top()) = v;
                     keys.pop();
                 }
-                else if (v.get_type() != string)
+                else
                     *references.top() = v;
             }
 
@@ -1393,6 +1409,304 @@ namespace cppdatalib
 
     namespace json
     {
+        namespace pointer
+        {
+            inline bool normalize_node_path(std::string &path_node)
+            {
+                for (size_t i = 0; i < path_node.size(); ++i)
+                {
+                    if (path_node[i] == '~')
+                    {
+                        if (i + 1 == path_node.size())
+                            return false;
+                        switch (path_node[i+1])
+                        {
+                            case '0': path_node.replace(i, 2, "~"); break;
+                            case '1': path_node.replace(i, 2, "/"); break;
+                            default: return false;
+                        }
+                    }
+                }
+
+                return true;
+            }
+
+            inline const core::value *evaluate(const core::value &value, const std::string &pointer, bool throw_on_errors = true)
+            {
+                size_t idx = 1, end_idx = 0;
+                std::string path_node;
+                const core::value *reference = &value;
+
+                if (pointer.empty())
+                    return reference;
+                else if (pointer.find('/') != 0)
+                {
+                    if (throw_on_errors)
+                        throw core::error("JSON Pointer - Expected empty path or '/' beginning path");
+                    else
+                        return NULL;
+                }
+
+                end_idx = pointer.find('/', idx);
+                while (idx <= pointer.size())
+                {
+                    // Extract the current node from pointer
+                    if (end_idx == std::string::npos)
+                        path_node = pointer.substr(idx, end_idx);
+                    else
+                        path_node = pointer.substr(idx, end_idx - idx);
+                    idx += path_node.size() + 1;
+
+                    // Escape special characters in strings
+                    if (!normalize_node_path(path_node))
+                    {
+                        if (throw_on_errors)
+                            throw core::error("JSON Pointer - Expected identifier following '~'");
+                        else
+                            return NULL;
+                    }
+
+                    // Dereference
+                    if (reference->is_object())
+                    {
+                        if (reference->is_member(path_node))
+                            reference = reference->member_ptr(path_node);
+                        else if (throw_on_errors)
+                            throw core::error("JSON Pointer - Attempted to dereference non-existent member in object");
+                        else
+                            return NULL;
+                    }
+                    else if (reference->is_array())
+                    {
+                        for (auto c: path_node)
+                        {
+                            if (!isdigit(c & 0xff))
+                            {
+                                if (throw_on_errors)
+                                    throw core::error("JSON Pointer - Attempted to dereference invalid array index");
+                                else
+                                    return NULL;
+                            }
+                        }
+
+                        core::int_t array_index;
+                        std::istringstream stream(path_node);
+                        stream >> array_index;
+                        if (stream.fail() || stream.get() != EOF || (path_node.front() == '0' && path_node != "0")) // Check whether there are leading zeroes
+                        {
+                            if (throw_on_errors)
+                                throw core::error("JSON Pointer - Attempted to dereference invalid array index");
+                            else
+                                return NULL;
+                        }
+
+                        reference = &reference->get_array()[array_index];
+                    }
+                    else
+                    {
+                        if (throw_on_errors)
+                            throw core::error("JSON Pointer - Attempted to dereference a scalar value");
+                        else
+                            return NULL;
+                    }
+
+                    // Look for the next node
+                    end_idx = pointer.find('/', idx);
+                }
+
+                return reference;
+            }
+
+            /* Evaluates the pointer, with special behaviors
+             *
+             * `value` is the root value
+             * `pointer` is the string representation of the JSON Pointer
+             * `parent` is a reference to a variable outside the function, in which the parent of the returned value is placed
+             *   `parent` may contain NULL even if the return value is non-zero if the return value is the root, without a known parent
+             *   If the return value is NULL (only possible when `throw_on_errors == false`), `parent` is meaningless
+             *   If `destroy_element` is specified, the return value is the parent of the destroyed value, and `parent` is the grandparent of the destroyed value
+             * `throw_on_errors == true` throws an error if the element does not exist (unless `allow_add_element == true`, in which case the last node path may not exist)
+             *   If `throw_on_errors == true`, the return value will never be NULL
+             * `throw_on_errors == false` returns NULL if the element does not exist (unless `allow_add_element == true`, in which case the last node path may not exist)
+             * `allow_add_element == true` allows the last node element to not exist, or be "-" to append to the end of an existing array
+             *   A null value will always be added if the element does not exist
+             * `destroy_element == true` destroys the node (if it exists) and returns the parent as the return value, and the grandparent in `parent`
+             *   The exception is when destroying the root, the root will be set to null and a pointer to the root will be returned (otherwise there's no way to tell, when `throw_on_errors == false`, whether the element was destroyed if NULL was returned)
+             */
+            inline core::value *evaluate(core::value &value, const std::string &pointer, core::value *&parent, bool throw_on_errors = true, bool allow_add_element = false, bool destroy_element = false)
+            {
+                size_t idx = 1, end_idx = 0;
+                std::string path_node;
+                core::value *reference = &value;
+
+                parent = NULL;
+
+                if (pointer.empty())
+                {
+                    if (destroy_element)
+                        reference->set_null();
+
+                    return reference;
+                }
+                else if (pointer.find('/') != 0)
+                {
+                    if (throw_on_errors)
+                        throw core::error("JSON Pointer - Expected empty path or '/' beginning path");
+                    else
+                        return NULL;
+                }
+
+                end_idx = pointer.find('/', idx);
+                while (idx <= pointer.size())
+                {
+                    // Extract the current node from pointer
+                    if (end_idx == std::string::npos)
+                        path_node = pointer.substr(idx, end_idx);
+                    else
+                        path_node = pointer.substr(idx, end_idx - idx);
+                    idx += path_node.size() + 1;
+
+                    // Escape special characters in strings
+                    if (!normalize_node_path(path_node))
+                    {
+                        if (throw_on_errors)
+                            throw core::error("JSON Pointer - Expected identifier following '~'");
+                        else
+                            return NULL;
+                    }
+
+                    // Dereference
+                    if (reference->is_object())
+                    {
+                        if (destroy_element && idx > pointer.size())
+                        {
+                            reference->erase_member(path_node);
+                            return reference;
+                        }
+                        else if (reference->is_member(path_node))
+                        {
+                            parent = reference;
+                            reference = &reference->member(path_node);
+                        }
+                        else if (allow_add_element && idx > pointer.size())
+                        {
+                            parent = reference;
+                            return &reference->member(path_node);
+                        }
+                        else if (throw_on_errors)
+                            throw core::error("JSON Pointer - Attempted to dereference non-existent member in object");
+                        else
+                            return NULL;
+                    }
+                    else if (reference->is_array())
+                    {
+                        if (allow_add_element && idx > pointer.size() && path_node == "-")
+                        {
+                            parent = reference;
+                            reference->push_back(core::null_t());
+                            return &reference->get_array().back();
+                        }
+
+                        for (auto c: path_node)
+                        {
+                            if (!isdigit(c & 0xff))
+                            {
+                                if (throw_on_errors)
+                                    throw core::error("JSON Pointer - Attempted to dereference invalid array index");
+                                else
+                                    return NULL;
+                            }
+                        }
+
+                        core::int_t array_index;
+                        std::istringstream stream(path_node);
+                        stream >> array_index;
+                        if (stream.fail() || stream.get() != EOF || (path_node.front() == '0' && path_node != "0")) // Check whether there are leading zeroes
+                        {
+                            if (throw_on_errors)
+                                throw core::error("JSON Pointer - Attempted to dereference invalid array index");
+                            else
+                                return NULL;
+                        }
+
+                        if (destroy_element && idx > pointer.size())
+                        {
+                            reference->erase_element(array_index);
+                            return reference;
+                        }
+
+                        parent = reference;
+                        reference = &reference->get_array()[array_index];
+                    }
+                    else
+                    {
+                        if (throw_on_errors)
+                            throw core::error("JSON Pointer - Attempted to dereference a scalar value");
+                        else
+                            return NULL;
+                    }
+
+                    // Look for the next node
+                    end_idx = pointer.find('/', idx);
+                }
+
+                return reference;
+            }
+
+            // Returns the object pointed to by pointer
+            inline const core::value &deref(const core::value &value, const std::string &pointer)
+            {
+                return *evaluate(value, pointer);
+            }
+
+            // Returns the object pointed to by pointer
+            inline core::value &deref(core::value &value, const std::string &pointer)
+            {
+                core::value *parent;
+                return *evaluate(value, pointer, parent, true, false, false);
+            }
+
+            // Returns newly inserted element
+            inline core::value &add(core::value &value, const std::string &pointer, const core::value &src)
+            {
+                core::value *parent;
+                return *evaluate(value, pointer, parent, true, true, false) = src;
+            }
+
+            inline void remove(core::value &value, const std::string &pointer)
+            {
+                core::value *parent;
+                evaluate(value, pointer, parent, true, false, true);
+            }
+
+            // Returns newly replaced element
+            inline core::value &replace(core::value &value, const std::string &pointer, const core::value &src)
+            {
+                return deref(value, pointer) = src;
+            }
+
+            // Returns newly inserted destination element
+            inline core::value &move(core::value &value, const std::string &dst_pointer, const std::string &src_pointer)
+            {
+                core::value src = deref(value, src_pointer);
+                remove(value, src_pointer);
+                return add(value, dst_pointer, src);
+            }
+
+            // Returns newly inserted destination element
+            inline core::value &copy(core::value &value, const std::string &dst_pointer, const std::string &src_pointer)
+            {
+                core::value src = deref(value, src_pointer);
+                return add(value, dst_pointer, src);
+            }
+
+            // Returns true if the value pointed to by `pointer` equals the value of `src`
+            inline bool test(core::value &value, const std::string &pointer, const core::value &src)
+            {
+                return deref(value, pointer) == src;
+            }
+        }
+
         inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
         {
             static const std::string hex = "0123456789ABCDEF";
@@ -1608,7 +1922,12 @@ namespace cppdatalib
             void null_(const core::value &) {output_stream << "null";}
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
+            void real_(const core::value &v)
+            {
+                if (!std::isfinite(v.get_real()))
+                    throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
+                output_stream << v.get_real();
+            }
             void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool) {output_stream << '"';}
@@ -1667,7 +1986,12 @@ namespace cppdatalib
             void null_(const core::value &) {output_stream << "null";}
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
+            void real_(const core::value &v)
+            {
+                if (!std::isfinite(v.get_real()))
+                    throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
+                output_stream << v.get_real();
+            }
             void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool) {output_stream << '"';}
@@ -2864,6 +3188,182 @@ namespace cppdatalib
 
     namespace csv
     {
+        struct options {virtual ~options() {}};
+        struct convert_all_fields_as_strings : options {};
+        struct convert_fields_by_deduction : options {};
+
+        inline void deduce_type(const std::string &buffer, core::stream_handler &writer)
+        {
+            if (buffer.empty() ||
+                    buffer == "~" ||
+                    buffer == "null" ||
+                    buffer == "Null" ||
+                    buffer == "NULL")
+                writer.write(core::null_t());
+            else if (buffer == "Y" ||
+                     buffer == "y" ||
+                     buffer == "yes" ||
+                     buffer == "Yes" ||
+                     buffer == "YES" ||
+                     buffer == "on" ||
+                     buffer == "On" ||
+                     buffer == "ON" ||
+                     buffer == "true" ||
+                     buffer == "True" ||
+                     buffer == "TRUE")
+                writer.write(true);
+            else if (buffer == "N" ||
+                     buffer == "n" ||
+                     buffer == "no" ||
+                     buffer == "No" ||
+                     buffer == "NO" ||
+                     buffer == "off" ||
+                     buffer == "Off" ||
+                     buffer == "OFF" ||
+                     buffer == "false" ||
+                     buffer == "False" ||
+                     buffer == "FALSE")
+                writer.write(false);
+            else
+            {
+                // Attempt to read as an integer
+                {
+                    std::istringstream temp_stream(buffer);
+                    core::int_t value;
+                    temp_stream >> value;
+                    if (!temp_stream.fail() && temp_stream.get() == EOF)
+                    {
+                        writer.write(value);
+                        return;
+                    }
+                }
+
+                // Attempt to read as a real
+                {
+                    std::istringstream temp_stream(buffer);
+                    core::real_t value;
+                    temp_stream >> value;
+                    if (!temp_stream.fail() && temp_stream.get() == EOF)
+                    {
+                        writer.write(value);
+                        return;
+                    }
+                }
+
+                // Revert to string
+                writer.write(buffer);
+            }
+        }
+
+        inline std::istream &read_string(std::istream &stream, core::stream_handler &writer, bool parse_as_strings)
+        {
+            int chr;
+            std::string buffer;
+
+            if (parse_as_strings)
+            {
+                writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+
+                // buffer is used to temporarily store whitespace for reading strings
+                while (chr = stream.get(), stream.good() && !stream.eof() && chr != ',' && chr != '\n')
+                {
+                    if (isspace(chr))
+                    {
+                        buffer.push_back(chr);
+                        continue;
+                    }
+                    else if (buffer.size())
+                    {
+                        writer.append_to_string(buffer);
+                        buffer.clear();
+                    }
+
+                    writer.append_to_string(core::string_t(1, chr));
+                }
+
+                if (chr != EOF)
+                    stream.unget();
+
+                writer.end_string(core::string_t());
+            }
+            else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
+            {
+                while (chr = stream.get(), stream.good() && !stream.eof() && chr != ',' && chr != '\n')
+                    buffer.push_back(chr);
+
+                if (chr != EOF)
+                    stream.unget();
+
+                while (!buffer.empty() && isspace(buffer.back() & 0xff))
+                    buffer.pop_back();
+
+                deduce_type(buffer, writer);
+            }
+
+            return stream;
+        }
+
+        // Expects that the leading quote has already been parsed out of the stream
+        inline std::istream &read_quoted_string(std::istream &stream, core::stream_handler &writer, bool parse_as_strings)
+        {
+            int chr;
+            std::string buffer;
+
+            if (parse_as_strings)
+            {
+                writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+
+                // buffer is used to temporarily store whitespace for reading strings
+                while (chr = stream.get(), stream.good() && !stream.eof())
+                {
+                    if (chr == '"')
+                    {
+                        if (stream.peek() == '"')
+                            chr = stream.get();
+                        else
+                            break;
+                    }
+
+                    if (isspace(chr))
+                    {
+                        buffer.push_back(chr);
+                        continue;
+                    }
+                    else if (buffer.size())
+                    {
+                        writer.append_to_string(buffer);
+                        buffer.clear();
+                    }
+
+                    writer.append_to_string(core::string_t(1, chr));
+                }
+
+                writer.end_string(core::string_t());
+            }
+            else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
+            {
+                while (chr = stream.get(), stream.good() && !stream.eof())
+                {
+                    if (chr == '"')
+                    {
+                        if (stream.peek() == '"')
+                            chr = stream.get();
+                        else
+                            break;
+                    }
+
+                    buffer.push_back(chr);
+                }
+
+                while (!buffer.empty() && isspace(buffer.back() & 0xff))
+                    buffer.pop_back();
+
+                deduce_type(buffer, writer);
+            }
+
+            return stream;
+        }
+
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
         {
             for (size_t i = 0; i < str.size(); ++i)
@@ -2876,6 +3376,81 @@ namespace cppdatalib
                 stream << str[i];
             }
 
+            return stream;
+        }
+
+        inline std::istream &convert(std::istream &stream, core::stream_handler &writer, const options &opts = convert_fields_by_deduction())
+        {
+            const bool parse_as_strings = dynamic_cast<const convert_all_fields_as_strings *>(&opts) != NULL;
+            int chr;
+            bool comma_just_parsed = true;
+            bool newline_just_parsed = true;
+
+            writer.begin();
+            writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+
+            while (chr = stream.get(), stream.good() && !stream.eof())
+            {
+                if (newline_just_parsed)
+                {
+                    writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                    newline_just_parsed = false;
+                }
+
+                switch (chr)
+                {
+                    case '"':
+                        read_quoted_string(stream, writer, parse_as_strings);
+                        comma_just_parsed = false;
+                        break;
+                    case ',':
+                        if (comma_just_parsed)
+                        {
+                            if (parse_as_strings)
+                                writer.write(core::string_t());
+                            else // parse by deduction of types, assume `,,` means null instead of empty string
+                                writer.write(core::null_t());
+                        }
+                        comma_just_parsed = true;
+                        break;
+                    case '\n':
+                        if (comma_just_parsed)
+                        {
+                            if (parse_as_strings)
+                                writer.write(core::string_t());
+                            else // parse by deduction of types, assume `,,` means null instead of empty string
+                                writer.write(core::null_t());
+                        }
+                        comma_just_parsed = newline_just_parsed = true;
+                        writer.end_array(core::array_t());
+                        break;
+                    default:
+                        if (!isspace(chr))
+                        {
+                            stream.unget();
+                            read_string(stream, writer, parse_as_strings);
+                            comma_just_parsed = false;
+                        }
+                        break;
+                }
+            }
+
+            if (!newline_just_parsed)
+            {
+                if (comma_just_parsed)
+                {
+                    if (parse_as_strings)
+                        writer.write(core::string_t());
+                    else // parse by deduction of types, assume `,,` means null instead of empty string
+                        writer.write(core::null_t());
+                }
+
+                writer.end_array(core::array_t());
+            }
+
+
+            writer.end_array(core::array_t());
+            writer.end();
             return stream;
         }
 
@@ -2915,7 +3490,12 @@ namespace cppdatalib
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
-                    output_stream << (nesting_depth() == 1? '\n': separator);
+                {
+                    if (nesting_depth() == 1)
+                        output_stream << "\r\n";
+                    else
+                        output_stream << separator;
+                }
             }
 
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
@@ -2933,10 +3513,24 @@ namespace cppdatalib
             void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
         };
 
+        inline std::istream &operator>>(std::istream &stream, core::value &v)
+        {
+            core::value_builder builder(v);
+            convert(stream, builder);
+            return stream;
+        }
+
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
         {
             stream_writer writer(stream);
             core::convert(v, writer);
+            return stream;
+        }
+
+        inline std::istream &input_table(std::istream &stream, core::value &v, const options &opts = convert_fields_by_deduction())
+        {
+            core::value_builder builder(v);
+            convert(stream, builder, opts);
             return stream;
         }
 
@@ -2953,6 +3547,15 @@ namespace cppdatalib
             return stream;
         }
 
+        inline core::value from_csv_table(const std::string &csv, const options &opts = convert_fields_by_deduction())
+        {
+            std::istringstream stream(csv);
+            core::value v;
+            core::value_builder builder(v);
+            convert(stream, builder, opts);
+            return v;
+        }
+
         inline std::string to_csv_row(const core::value &v, char separator = ',')
         {
             std::ostringstream stream;
@@ -2967,6 +3570,8 @@ namespace cppdatalib
             return stream.str();
         }
 
+        inline std::istream &input(std::istream &stream, core::value &v) {return input_table(stream, v);}
+        inline core::value from_csv(const std::string &csv) {return from_csv_table(csv);}
         inline std::ostream &print(std::ostream &stream, const core::value &v) {return print_table(stream, v);}
         inline std::string to_csv(const core::value &v) {return to_csv_table(v);}
     }
@@ -3036,6 +3641,8 @@ namespace cppdatalib
                         temp = (temp << 8) | (c & 0xff);
                     }
                     break;
+                default:
+                    throw core::error("UBJSON - invalid integer specifier found in input");
             }
 
             if (negative)
@@ -3058,7 +3665,7 @@ namespace cppdatalib
             uint64_t temp;
             int c = stream.get();
 
-            if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
+            if (c == EOF) throw core::error("UBJSON - expected floating-point value after type specifier");
             temp = c & 0xff;
 
             if (specifier == 'd')
@@ -3071,7 +3678,7 @@ namespace cppdatalib
                     temp = (temp << 8) | (c & 0xff);
                 }
             }
-            else
+            else if (specifier == 'D')
             {
                 for (int i = 0; i < 7; ++i)
                 {
@@ -3081,6 +3688,8 @@ namespace cppdatalib
                     temp = (temp << 8) | (c & 0xff);
                 }
             }
+            else
+                throw core::error("UBJSON - invalid floating-point specifier found in input");
 
             if (specifier == 'd')
                 r = core::float_from_ieee_754(temp);
@@ -3120,7 +3729,7 @@ namespace cppdatalib
                 }
                 writer.end_string(core::value(core::string_t(), core::bignum));
             }
-            else
+            else if (specifier == 'S')
             {
                 core::int_t size;
 
@@ -3137,6 +3746,8 @@ namespace cppdatalib
                 }
                 writer.end_string(core::string_t());
             }
+            else
+                throw core::error("UBJSON - invalid string specifier found in input");
 
             return stream;
         }
@@ -3233,7 +3844,7 @@ namespace cppdatalib
 
         inline std::ostream &write_string(std::ostream &stream, const std::string &str, bool add_specifier, long subtype)
         {
-            if (subtype == core::normal && str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
+            if (subtype != core::bignum && str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
                 return stream << (add_specifier? "C": "") << str[0];
 
             if (add_specifier)
@@ -3248,24 +3859,23 @@ namespace cppdatalib
         {
             struct container_data
             {
-                container_data(char content_type, core::int_t remaining_size, bool key_parsed)
+                container_data(char content_type, core::int_t remaining_size)
                     : content_type(content_type)
                     , remaining_size(remaining_size)
-                    , key_parsed(key_parsed)
                 {}
 
                 char content_type;
                 core::int_t remaining_size;
-                bool key_parsed;
             };
 
+            const char valid_types[] = "ZTFUiIlLdDCHS[{";
             std::stack<container_data, std::vector<container_data>> containers;
             bool written = false;
             int chr;
 
             writer.begin();
 
-            while (true)
+            while (!written || writer.nesting_depth() > 0)
             {
                 if (containers.size() > 0)
                 {
@@ -3277,10 +3887,16 @@ namespace cppdatalib
                         if (chr == EOF) break;
                     }
 
-                    if (containers.top().remaining_size > 0)
+                    if (containers.top().remaining_size > 0 && !writer.container_key_was_just_parsed())
                         --containers.top().remaining_size;
-                    if (writer.current_container() == core::object)
-                        containers.top().key_parsed = !containers.top().key_parsed;
+                    if (writer.current_container() == core::object && chr != 'N' && chr != '}' && !writer.container_key_was_just_parsed())
+                    {
+                        // Parse key here, remap read character to 'N' (the no-op instruction)
+                        if (!containers.top().content_type)
+                            stream.unget();
+                        read_string(stream, 'S', writer);
+                        chr = 'N';
+                    }
                 }
                 else
                 {
@@ -3288,7 +3904,7 @@ namespace cppdatalib
                     if (chr == EOF) break;
                 }
 
-                written = true;
+                written |= chr != 'N';
 
                 switch (chr)
                 {
@@ -3333,7 +3949,7 @@ namespace cppdatalib
                         if (chr == '$') // Type specified
                         {
                             chr = stream.get();
-                            if (chr == EOF) throw core::error("UBJSON - expected type specifier after '$'");
+                            if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
                             type = chr;
                             chr = stream.get();
                             if (chr == EOF) throw core::error("UBJSON - unexpected end of array");
@@ -3351,9 +3967,11 @@ namespace cppdatalib
                         // If type != 0, then size must be >= 0
                         if (type != 0 && size < 0)
                             throw core::error("UBJSON - array element type specified but number of elements is not specified");
+                        else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
+                            stream.unget();
 
                         writer.begin_array(core::array_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
-                        containers.push(container_data(type, size, false));
+                        containers.push(container_data(type, size));
 
                         break;
                     }
@@ -3364,69 +3982,55 @@ namespace cppdatalib
                         writer.end_array(core::array_t());
                         containers.pop();
                         break;
-#if 0
                     case '{':
                     {
                         int type = 0;
-                        core::int_t size = 0;
+                        core::int_t size = -1;
 
-                        c = stream.get();
-                        if (c == EOF) throw core::error("UBJSON - expected object value after '{'");
+                        chr = stream.get();
+                        if (chr == EOF) throw core::error("UBJSON - expected object value after '{'");
 
-                        if (c == '$') // Type specified
+                        if (chr == '$') // Type specified
                         {
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - expected type specifier after '$'");
-                            type = c;
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - unexpected end of object");
+                            chr = stream.get();
+                            if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
+                            type = chr;
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - unexpected end of object");
                         }
 
-                        v.set_object(core::object_t());
-                        if (c == '#') // Count specified
+                        if (chr == '#') // Count specified
                         {
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - expected count specifier after '#'");
+                            chr = stream.get();
+                            if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
 
-                            read_int(stream, size, c);
+                            read_int(stream, size, chr);
                             if (size < 0) throw core::error("UBJSON - invalid negative size specified for object");
-
-                            while (size-- > 0)
-                            {
-                                core::value item;
-                                std::string key;
-                                long dummy;
-
-                                read_string(stream, key, 'S', dummy);
-                                input(stream, item, type);
-                                v[key] = item;
-                            }
-                            return stream;
                         }
 
-                        while (c != '}')
-                        {
-                            core::value item;
-                            std::string key;
-                            long dummy;
-
+                        // If type != 0, then size must be >= 0
+                        if (type != 0 && size < 0)
+                            throw core::error("UBJSON - object element type specified but number of elements is not specified");
+                        else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
                             stream.unget();
-                            read_string(stream, key, 'S', dummy);
-                            input(stream, item);
-                            v[key] = item;
 
-                            c = stream.get();
-                            if (c == EOF) throw core::error("UBJSON - unexpected end of object");
-                        }
+                        writer.begin_object(core::object_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
+                        containers.push(container_data(type, size));
 
-                        return stream;
+                        break;
                     }
-#endif
+                    case '}':
+                        if (!containers.empty() && containers.top().remaining_size >= 0)
+                            throw core::error("UBJSON - attempted to end an object with size specified already");
+
+                        writer.end_object(core::object_t());
+                        containers.pop();
+                        break;
                     default:
                         throw core::error("UBJSON - expected value");
                 }
 
-                if (containers.size() > 0 && containers.top().remaining_size == 0 && !containers.top().key_parsed)
+                if (containers.size() > 0 && !writer.container_key_was_just_parsed() && containers.top().remaining_size == 0)
                 {
                     if (writer.current_container() == core::array)
                         writer.end_array(core::array_t());
@@ -3445,187 +4049,44 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::ostream &print(std::ostream &stream, const core::value &v, bool add_specifier = true, char force_specifier = 0)
+        class stream_writer : public core::stream_handler, public core::stream_writer
         {
-            switch (v.get_type())
+        public:
+            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+        protected:
+            void begin_key_(const core::value &v)
             {
-                case core::null: return add_specifier? stream << 'Z': stream;
-                case core::boolean: return add_specifier? stream << (v.get_bool()? 'T': 'F'): stream;
-                case core::integer: return write_int(stream, v.get_int(), add_specifier, force_specifier);
-                case core::real: return write_float(stream, v.get_real(), add_specifier, force_specifier);
-                case core::string: return write_string(stream, v.get_string(), add_specifier, v.get_subtype());
-                case core::array:
-                {
-                    core::type type = core::null;
-                    char forced_type = 0;
-                    bool same_types = true;
-
-                    bool bool_val = false;
-                    bool strings_can_be_chars = true;
-                    bool reals_can_be_floats = true;
-                    core::int_t int_min = 0, int_max = 0;
-
-                    if (v.size())
-                    {
-                        auto it = *v.get_array().begin();
-                        type = it.get_type();
-                        int_min = int_max = it.as_int();
-                        bool_val = it.as_bool();
-                    }
-
-                    for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                    {
-                        if (it->get_type() != type || (type == core::boolean && bool_val != it->get_bool()))
-                        {
-                            same_types = false;
-                            break;
-                        }
-
-                        if (it->is_int())
-                        {
-                            if (it->get_int() < int_min)
-                                int_min = it->get_int();
-                            else if (it->get_int() > int_max)
-                                int_max = it->get_int();
-                        }
-                        else if (it->is_real() && reals_can_be_floats)
-                        {
-                            if (it->get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->get_real())) && !std::isnan(it->get_real()))
-                                reals_can_be_floats = false;
-                        }
-                        else if (it->is_string() && strings_can_be_chars)
-                        {
-                            if (it->get_string().size() != 1 || static_cast<unsigned char>(it->get_string()[0]) >= 128)
-                                strings_can_be_chars = false;
-                        }
-                    }
-
-                    if (add_specifier)
-                        stream << '[';
-
-                    if (same_types && v.size() > 1)
-                    {
-                        stream << '$';
-                        switch (type)
-                        {
-                            case core::null: stream << 'Z'; break;
-                            case core::boolean: stream << (bool_val? 'T': 'F'); break;
-                            case core::integer: stream << (forced_type = size_specifier(int_min, int_max)); break;
-                            case core::real: stream << (forced_type = (reals_can_be_floats? 'd': 'D')); break;
-                            case core::string: stream << (strings_can_be_chars? 'C': 'S'); break;
-                            case core::array: stream << '['; break;
-                            case core::object: stream << '{'; break;
-                        }
-
-                        write_int(stream << '#', v.size(), true);
-
-                        if (type != core::null && type != core::boolean)
-                        {
-                            for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                                print(stream, *it, false, forced_type);
-                        }
-
-                        return stream;
-                    }
-                    else
-                    {
-                        for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                            print(stream, *it);
-
-                        return stream << ']';
-                    }
-                }
-                case core::object:
-                {
-                    core::type type = core::null;
-                    char forced_type = 0;
-                    bool same_types = true;
-
-                    bool bool_val = false;
-                    bool strings_can_be_chars = true;
-                    bool reals_can_be_floats = true;
-                    core::int_t int_min = 0, int_max = 0;
-
-                    if (v.size())
-                    {
-                        auto it = v.get_object().begin();
-                        type = it->second.get_type();
-                        int_min = int_max = it->second.as_int();
-                        bool_val = it->second.as_bool();
-                    }
-
-                    for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                    {
-                        if (it->second.get_type() != type || (type == core::boolean && bool_val != it->second.get_bool()))
-                        {
-                            same_types = false;
-                            break;
-                        }
-
-                        if (it->second.is_int())
-                        {
-                            if (it->second.get_int() < int_min)
-                                int_min = it->second.get_int();
-                            else if (it->second.get_int() > int_max)
-                                int_max = it->second.get_int();
-                        }
-                        else if (it->second.is_real() && reals_can_be_floats)
-                        {
-                            if (it->second.get_real() != core::float_from_ieee_754(core::float_to_ieee_754(it->second.get_real())) && !std::isnan(it->second.get_real()))
-                                reals_can_be_floats = false;
-                        }
-                        else if (it->second.is_string() && strings_can_be_chars)
-                        {
-                            if (it->second.get_string().size() != 1 || static_cast<unsigned char>(it->second.get_string()[0]) >= 128)
-                                strings_can_be_chars = false;
-                        }
-                    }
-
-                    if (add_specifier)
-                        stream << '{';
-
-                    if (same_types && v.size() > 1)
-                    {
-                        stream << '$';
-                        switch (type)
-                        {
-                            case core::null: stream << 'Z'; break;
-                            case core::boolean: stream << (bool_val? 'T': 'F'); break;
-                            case core::integer: stream << (forced_type = size_specifier(int_min, int_max)); break;
-                            case core::real: stream << (forced_type = (reals_can_be_floats? 'd': 'D')); break;
-                            case core::string: stream << (strings_can_be_chars? 'C': 'S'); break;
-                            case core::array: stream << '['; break;
-                            case core::object: stream << '{'; break;
-                        }
-
-                        write_int(stream << '#', v.size(), true);
-
-                        for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                        {
-                            if (!it->first.is_string())
-                                throw core::error("UBJSON - object key is not a string");
-
-                            print(write_int(stream, it->first.size(), true) << it->first.get_string(), it->second, false, forced_type);
-                        }
-
-                        return stream;
-                    }
-                    else
-                    {
-                        for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                        {
-                            if (!it->first.is_string())
-                                throw core::error("UBJSON - object key is not a string");
-
-                            print(write_int(stream, it->first.size(), true) << it->first.get_string(), it->second);
-                        }
-
-                        return stream << '}';
-                    }
-                }
+                if (!v.is_string())
+                    throw core::error("UBJSON - cannot write non-string key");
             }
 
-            // Control will never get here
+            void null_(const core::value &) {output_stream << 'Z';}
+            void bool_(const core::value &v) {output_stream << (v.get_bool()? 'T': 'F');}
+            void integer_(const core::value &v) {write_int(output_stream, v.get_int(), true);}
+            void real_(const core::value &v) {write_float(output_stream, v.get_real(), true);}
+            void begin_string_(const core::value &v, core::int_t size, bool is_key)
+            {
+                if (size == unknown_size)
+                    throw core::error("UBJSON - 'string' value does not have size specified");
+
+                if (!is_key)
+                    output_stream << (v.get_subtype() == core::bignum? 'H': 'S');
+                write_int(output_stream, size, true);
+            }
+            void string_data_(const core::value &v) {output_stream << v.get_string();}
+
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream << '[';}
+            void end_array_(const core::value &, bool) {output_stream << ']';}
+
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream << '{';}
+            void end_object_(const core::value &, bool) {output_stream << '}';}
+        };
+
+        inline std::ostream &print(std::ostream &stream, const core::value &v)
+        {
+            stream_writer writer(stream);
+            core::convert(v, writer);
             return stream;
         }
 
