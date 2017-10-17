@@ -104,40 +104,49 @@ namespace cppdatalib
                         nested_scopes.back().type_ == object &&
                        !nested_scopes.back().key_was_parsed();
 
-                if (write_(v, is_key))
-                    return true;
-
-                if (is_key)
-                    begin_key_(v);
-                else
-                    begin_item_(v);
-
-                if (v.get_type() != string)
+                if (!write_(v, is_key))
                 {
-                    begin_scalar_(v, is_key);
+                    if (is_key)
+                        begin_key_(v);
+                    else
+                        begin_item_(v);
 
                     switch (v.get_type())
                     {
-                        case null: begin_null_(v); null_(v); end_null_(v); break;
-                        case boolean: begin_bool_(v); bool_(v); end_bool_(v); break;
-                        case integer: begin_integer_(v); integer_(v); end_integer_(v); break;
-                        case real: begin_real_(v); real_(v); end_real_(v); break;
-                        default: return false;
+                        case string:
+                            begin_string_(v, v.size(), is_key);
+                            string_data_(v);
+                            end_string_(v, is_key);
+                            break;
+                        case array:
+                            begin_array_(v, 0, is_key);
+                            end_array_(v, is_key);
+                            break;
+                        case object:
+                            begin_object_(v, 0, is_key);
+                            end_object_(v, is_key);
+                            break;
+                        default:
+                            begin_scalar_(v, is_key);
+
+                            switch (v.get_type())
+                            {
+                                case null: begin_null_(v); null_(v); end_null_(v); break;
+                                case boolean: begin_bool_(v); bool_(v); end_bool_(v); break;
+                                case integer: begin_integer_(v); integer_(v); end_integer_(v); break;
+                                case real: begin_real_(v); real_(v); end_real_(v); break;
+                                default: return false;
+                            }
+
+                            end_scalar_(v, is_key);
+                            break;
                     }
 
-                    end_scalar_(v, is_key);
+                    if (is_key)
+                        end_key_(v);
+                    else
+                        end_item_(v);
                 }
-                else // is string
-                {
-                    begin_string_(v, v.size(), is_key);
-                    string_data_(v);
-                    end_string_(v, is_key);
-                }
-
-                if (is_key)
-                    end_key_(v);
-                else
-                    end_item_(v);
 
                 if (!nested_scopes.empty())
                 {

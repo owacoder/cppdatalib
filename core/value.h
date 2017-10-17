@@ -358,10 +358,6 @@ namespace cppdatalib
             array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_;}
             object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_;}
 
-            // TODO: always convert to specified type (convert_to() doesn't force conversion, since it has a default value)
-            // The conversion may not always be accurate, but it should always convert.
-            value &convert_to_type(type new_type) {return convert_to(new_type, value());}
-
         private:
             void shallow_clear()
             {
@@ -423,7 +419,13 @@ namespace cppdatalib
                         {
                             case boolean: bool_ = real_ != 0.0; break;
                             case integer: int_ = (real_ >= INT64_MIN && real_ <= INT64_MAX)? trunc(real_): 0; break;
-                            case string: str_ = std::to_string(real_); break;
+                            case string:
+                            {
+                                std::ostringstream str;
+                                str << real_;
+                                str_ = str.str();
+                                break;
+                            }
                             default: *this = default_value; break;
                         }
                         break;
