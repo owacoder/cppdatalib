@@ -358,6 +358,10 @@ namespace cppdatalib
             array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_;}
             object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_;}
 
+            // TODO: always convert to specified type (convert_to() doesn't force conversion, since it has a default value)
+            // The conversion may not always be accurate, but it should always convert.
+            value &convert_to_type(type new_type) {return convert_to(new_type, value());}
+
         private:
             void shallow_clear()
             {
@@ -379,7 +383,8 @@ namespace cppdatalib
                 subtype_ = 0;
             }
 
-            value &convert_to(type new_type, value default_value)
+            // TODO: ensure that all conversions are generic enough (for example, string -> bool doesn't just need to be "true")
+            value &convert_to(type new_type, const value &default_value)
             {
                 if (type_ == new_type)
                     return *this;

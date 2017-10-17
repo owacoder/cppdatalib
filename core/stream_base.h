@@ -104,6 +104,9 @@ namespace cppdatalib
                         nested_scopes.back().type_ == object &&
                        !nested_scopes.back().key_was_parsed();
 
+                if (write_(v, is_key))
+                    return true;
+
                 if (is_key)
                     begin_key_(v);
                 else
@@ -151,6 +154,12 @@ namespace cppdatalib
             }
 
         protected:
+            // Called when write() is written
+            // Return value from external routine:
+            //     true: item was written, cancel write routine
+            //     false: item was not written, continue write routine
+            virtual bool write_(const core::value &v, bool is_key) {(void) v; (void) is_key; return false;}
+
             // Called when any non-key item is parsed
             virtual void begin_item_(const core::value &v) {(void) v;}
             virtual void end_item_(const core::value &v) {(void) v;}
