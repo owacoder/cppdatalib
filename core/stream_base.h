@@ -29,6 +29,17 @@ namespace cppdatalib
             std::ostream &stream() {return output_stream;}
         };
 
+        class string_writer
+        {
+        protected:
+            std::string &output_string;
+
+        public:
+            string_writer(std::string &string) : output_string(string) {}
+
+            std::string &string() {return output_string;}
+        };
+
         class stream_handler
         {
         protected:
@@ -131,10 +142,10 @@ namespace cppdatalib
 
                             switch (v.get_type())
                             {
-                                case null: begin_null_(v); null_(v); end_null_(v); break;
-                                case boolean: begin_bool_(v); bool_(v); end_bool_(v); break;
-                                case integer: begin_integer_(v); integer_(v); end_integer_(v); break;
-                                case real: begin_real_(v); real_(v); end_real_(v); break;
+                                case null: null_(v); break;
+                                case boolean: bool_(v); break;
+                                case integer: integer_(v); break;
+                                case real: real_(v); break;
                                 default: return false;
                             }
 
@@ -150,13 +161,10 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
+                    nested_scopes.back().items_ += !is_key;
+
                     if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += !is_key;
                         nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
                 }
 
                 return true;
@@ -182,24 +190,16 @@ namespace cppdatalib
             virtual void end_key_(const core::value &v) {(void) v;}
 
             // Called when a scalar null is parsed
-            virtual void begin_null_(const core::value &v) {(void) v;}
             virtual void null_(const core::value &v) {(void) v;}
-            virtual void end_null_(const core::value &v) {(void) v;}
 
             // Called when a scalar boolean is parsed
-            virtual void begin_bool_(const core::value &v) {(void) v;}
             virtual void bool_(const core::value &v) {(void) v;}
-            virtual void end_bool_(const core::value &v) {(void) v;}
 
             // Called when a scalar integer is parsed
-            virtual void begin_integer_(const core::value &v) {(void) v;}
             virtual void integer_(const core::value &v) {(void) v;}
-            virtual void end_integer_(const core::value &v) {(void) v;}
 
             // Called when a scalar real is parsed
-            virtual void begin_real_(const core::value &v) {(void) v;}
             virtual void real_(const core::value &v) {(void) v;}
-            virtual void end_real_(const core::value &v) {(void) v;}
 
             // Called when a scalar string is parsed
             virtual void begin_string_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
@@ -256,13 +256,10 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
+                    nested_scopes.back().items_ += !nested_scopes.back().key_was_parsed();
+
                     if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
                         nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
                 }
             }
 
@@ -306,13 +303,10 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
+                    nested_scopes.back().items_ += !nested_scopes.back().key_was_parsed();
+
                     if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
                         nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
                 }
             }
 
@@ -358,13 +352,10 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
+                    nested_scopes.back().items_ += !nested_scopes.back().key_was_parsed();
+
                     if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
                         nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
                 }
             }
 

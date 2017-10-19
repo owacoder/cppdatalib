@@ -75,7 +75,6 @@ namespace cppdatalib
                 }
                 else if (!is_key && current_container() == object)
                 {
-                    references.top()->member(keys.top());
                     references.push(&references.top()->member(keys.top()));
                     keys.pop();
                 }

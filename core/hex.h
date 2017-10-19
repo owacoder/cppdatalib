@@ -12,7 +12,10 @@ namespace cppdatalib
         {
             const char alpha[] = "0123456789ABCDEF";
 
-            return stream << alpha[(c & 0xff) >> 4] << alpha[c & 0xf];
+            stream.put(alpha[(c & 0xff) >> 4]);
+            stream.put(alpha[c & 0xf]);
+
+            return stream;
         }
 
         inline std::ostream &write(std::ostream &stream, const std::string &str)

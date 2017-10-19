@@ -271,7 +271,7 @@ namespace cppdatalib
             }
         }
 
-        inline std::ostream &write_string(std::ostream &stream, const std::string &str, bool add_specifier, long subtype)
+        inline std::ostream &write_string(std::ostream &stream, const std::string &str, bool add_specifier, core::subtype_t subtype)
         {
             if (subtype != core::bignum && str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
                 return stream << (add_specifier? "C": "") << str[0];

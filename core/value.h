@@ -65,6 +65,7 @@ namespace cppdatalib
         typedef std::string string_t;
         typedef std::vector<value> array_t;
         typedef std::map<value, value> object_t;
+        typedef long subtype_t;
 
         struct error
         {
@@ -226,20 +227,20 @@ namespace cppdatalib
 
         public:
             value() : type_(null), subtype_(0) {}
-            value(bool_t v, long subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
-            value(int_t v, long subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
-            value(real_t v, long subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
-            value(cstring_t v, long subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
-            value(const string_t &v, long subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
-            value(string_t &&v, long subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
-            value(const array_t &v, long subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
-            value(array_t &&v, long subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
-            value(const object_t &v, long subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
-            value(object_t &&v, long subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
+            value(bool_t v, subtype_t subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
+            value(int_t v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
+            value(real_t v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
+            value(cstring_t v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
+            value(const string_t &v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
+            value(string_t &&v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
+            value(const array_t &v, subtype_t subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
+            value(array_t &&v, subtype_t subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
+            value(const object_t &v, subtype_t subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
+            value(object_t &&v, subtype_t subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-            value(T v, long subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
+            value(T v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-            value(T v, long subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
+            value(T v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
             ~value()
             {
                 if ((type_ == array && arr_.size() > 0) ||
@@ -251,9 +252,9 @@ namespace cppdatalib
             value(value &&other) = default;
             value &operator=(const value &other) {return assign(*this, other);}
 
-            long get_subtype() const {return subtype_;}
-            long &get_subtype() {return subtype_;}
-            void set_subtype(long _type) {subtype_ = _type;}
+            subtype_t get_subtype() const {return subtype_;}
+            subtype_t &get_subtype() {return subtype_;}
+            void set_subtype(subtype_t _type) {subtype_ = _type;}
 
             type get_type() const {return type_;}
             size_t size() const {return type_ == array? arr_.size(): type_ == object? obj_.size(): type_ == string? str_.size(): 0;}
@@ -290,14 +291,14 @@ namespace cppdatalib
             void set_array(const array_t &v) {clear(array); arr_ = v;}
             void set_object(const object_t &v) {clear(object); obj_ = v;}
 
-            void set_null(long subtype) {clear(null); subtype_ = subtype;}
-            void set_bool(bool_t v, long subtype) {clear(boolean); bool_ = v; subtype_ = subtype;}
-            void set_int(int_t v, long subtype) {clear(integer); int_ = v; subtype_ = subtype;}
-            void set_real(real_t v, long subtype) {clear(real); real_ = v; subtype_ = subtype;}
-            void set_string(cstring_t v, long subtype) {clear(string); str_ = v; subtype_ = subtype;}
-            void set_string(const string_t &v, long subtype) {clear(string); str_ = v; subtype_ = subtype;}
-            void set_array(const array_t &v, long subtype) {clear(array); arr_ = v; subtype_ = subtype;}
-            void set_object(const object_t &v, long subtype) {clear(object); obj_ = v; subtype_ = subtype;}
+            void set_null(subtype_t subtype) {clear(null); subtype_ = subtype;}
+            void set_bool(bool_t v, subtype_t subtype) {clear(boolean); bool_ = v; subtype_ = subtype;}
+            void set_int(int_t v, subtype_t subtype) {clear(integer); int_ = v; subtype_ = subtype;}
+            void set_real(real_t v, subtype_t subtype) {clear(real); real_ = v; subtype_ = subtype;}
+            void set_string(cstring_t v, subtype_t subtype) {clear(string); str_ = v; subtype_ = subtype;}
+            void set_string(const string_t &v, subtype_t subtype) {clear(string); str_ = v; subtype_ = subtype;}
+            void set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ = v; subtype_ = subtype;}
+            void set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ = v; subtype_ = subtype;}
 
             value operator[](const string_t &key) const
             {
@@ -472,7 +473,7 @@ namespace cppdatalib
             string_t str_;
             array_t arr_;
             object_t obj_;
-            long subtype_;
+            subtype_t subtype_;
         };
 
         struct null_t : value {null_t() {}};
