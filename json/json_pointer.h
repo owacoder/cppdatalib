@@ -251,6 +251,12 @@ namespace cppdatalib
                 return reference;
             }
 
+            // Returns true if the object pointed to by pointer exists
+            inline bool exists(const core::value &value, const std::string &pointer)
+            {
+                return evaluate(value, pointer, false) != NULL;
+            }
+
             // Returns the object pointed to by pointer
             inline const core::value &deref(const core::value &value, const std::string &pointer)
             {
