@@ -20,24 +20,24 @@ namespace cppdatalib
                 {
                     temp |= (uint32_t) (str[i++] & 0xFF) << 8;
                     temp |= (uint32_t) (str[i++] & 0xFF);
-                    stream << alpha[(temp >> 18) & 0x3F]
-                           << alpha[(temp >> 12) & 0x3F]
-                           << alpha[(temp >>  6) & 0x3F]
-                           << alpha[ temp        & 0x3F];
+                    stream.put(alpha[(temp >> 18) & 0x3F]);
+                    stream.put(alpha[(temp >> 12) & 0x3F]);
+                    stream.put(alpha[(temp >>  6) & 0x3F]);
+                    stream.put(alpha[ temp        & 0x3F]);
                 }
                 else if (i + 1 == str.size())
                 {
                     temp |= (uint32_t) (str[i++] & 0xFF) << 8;
-                    stream << alpha[(temp >> 18) & 0x3F]
-                           << alpha[(temp >> 12) & 0x3F]
-                           << alpha[(temp >>  6) & 0x3F]
-                           << '=';
+                    stream.put(alpha[(temp >> 18) & 0x3F]);
+                    stream.put(alpha[(temp >> 12) & 0x3F]);
+                    stream.put(alpha[(temp >>  6) & 0x3F]);
+                    stream.put('=');
                 }
                 else if (i == str.size())
                 {
-                    stream << alpha[(temp >> 18) & 0x3F]
-                           << alpha[(temp >> 12) & 0x3F]
-                           << "==";
+                    stream.put(alpha[(temp >> 18) & 0x3F]);
+                    stream.put(alpha[(temp >> 12) & 0x3F]);
+                    stream.write("==", 2);
                 }
             }
 
