@@ -12,77 +12,72 @@ namespace cppdatalib
         inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
         {
             const size_t buffer_size = 65536;
+            const size_t max_utf8_code_sequence_size = 4;
             static const std::string hex = "0123456789ABCDEF";
+
             int c;
-            bool continue_loop = false;
-            char buffer[buffer_size];
+            char buffer[buffer_size + max_utf8_code_sequence_size + 1];
+            char *write = buffer;
 
             writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
-            do
+            while (c = stream.get(), c != '"' && c != EOF)
             {
-                char *write = buffer;
-
-                if (stream.peek() == '"')
-                    break;
-
-                continue_loop = false;
-                stream.get(buffer, buffer_size, '"');
-
-                for (char *p = buffer; *p; ++p)
+                if (c == '\\')
                 {
-                    if (*p == '\\')
+                    c = stream.get();
+                    if (c == EOF) throw core::error("JSON - unexpected end of string");
+
+                    switch (c)
                     {
-                        ++p;
-                        if (*p == 0)
+                        case 'b': *write++ = ('\b'); break;
+                        case 'f': *write++ = ('\f'); break;
+                        case 'n': *write++ = ('\n'); break;
+                        case 'r': *write++ = ('\r'); break;
+                        case 't': *write++ = ('\t'); break;
+                        case 'u':
                         {
-                            *write++ = '"';
-                            continue_loop = true;
-                            if (stream.get() != '"') throw core::error("JSON - unexpected end of string");
+                            uint32_t code = 0;
+                            for (int i = 0; i < 4; ++i)
+                            {
+                                c = stream.get();
+                                if (c == EOF) throw core::error("JSON - unexpected end of string");
+                                size_t pos = hex.find(toupper(c));
+                                if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
+                                code = (code << 4) | pos;
+                            }
+
+                            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+                            std::string bytes = utf8.to_bytes(code);
+
+                            memcpy(write, bytes.c_str(), bytes.size());
+                            write += bytes.size();
+
                             break;
                         }
-
-                        switch (*p)
-                        {
-                            case 'b': *write++ = '\b'; break;
-                            case 'f': *write++ = '\f'; break;
-                            case 'n': *write++ = '\n'; break;
-                            case 'r': *write++ = '\r'; break;
-                            case 't': *write++ = '\t'; break;
-                            case 'u':
-                            {
-                                uint32_t code = 0;
-                                for (int i = 0; i < 4; ++i)
-                                {
-                                    c = *++p & 0xff;
-                                    if (c == EOF) throw core::error("JSON - unexpected end of string");
-                                    size_t pos = hex.find(toupper(c));
-                                    if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
-                                    code = (code << 4) | pos;
-                                }
-
-                                std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                                std::string bytes = utf8.to_bytes(code);
-
-                                memcpy(write, bytes.c_str(), bytes.size());
-                                write += bytes.size();
-
-                                break;
-                            }
-                            default:
-                                *write++ = *p;
-                                break;
-                        }
+                        default:
+                            *write++ = c;
+                            break;
                     }
-                    else
-                        *write++ = *p;
                 }
+                else
+                    *write++ = c;
 
+                if (size_t(write - buffer) >= buffer_size)
+                {
+                    *write = 0;
+                    writer.append_to_string(buffer);
+                    write = buffer;
+                }
+            }
+
+            if (c == EOF)
+                throw core::error("JSON - unexpected end of string");
+
+            if (write != buffer)
+            {
                 *write = 0;
                 writer.append_to_string(buffer);
-            } while (continue_loop);
-
-            if (stream.get() != '"') throw core::error("JSON - unexpected end of string");
-
+            }
             writer.end_string(core::string_t());
             return stream;
         }
@@ -195,37 +190,16 @@ namespace cppdatalib
                         stream.unget();
                         if (isdigit(chr) || chr == '-')
                         {
-                            std::string str;
-                            core::int_t i;
                             core::real_t r;
-                            int c;
-
-                            while (c = stream.get(), isdigit(c) || strchr("+-.eE", c))
-                                str.push_back(c);
-                            stream.unget();
+                            stream >> r;
+                            if (!stream)
+                                writer.write(core::null_t());
+                            else if (r == std::trunc(r) && r >= INT64_MIN && r <= INT64_MAX)
+                                writer.write(static_cast<core::int_t>(r));
+                            else
+                                writer.write(r);
 
                             delimiter_required = true;
-
-                            // Check if read element is an integer
-                            {
-                                std::istringstream istream(str);
-                                istream >> i;
-                                if (!istream.fail() && istream.get() == EOF)
-                                {
-                                    writer.write(i);
-                                    break;
-                                }
-                            }
-
-                            // Check if read element is a real
-                            {
-                                std::istringstream istream(str);
-                                istream >> r;
-                                if (!istream.fail() && istream.get() == EOF)
-                                    writer.write(r);
-                                else
-                                    throw core::error("JSON - invalid number");
-                            }
                         }
                         else
                             throw core::error("JSON - expected value");
