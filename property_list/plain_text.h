@@ -9,17 +9,17 @@ namespace cppdatalib
     {
         inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
         {
+            const size_t buffer_size = 65536;
+            const size_t max_utf8_code_sequence_size = 4;
             static const std::string hex = "0123456789ABCDEF";
-            int c;
 
-            {char chr; stream >> chr; c = chr;} // Skip initial whitespace
-            if (c != '"') throw core::error("Plain Text Property List - expected string");
+            int c;
+            char buffer[buffer_size + max_utf8_code_sequence_size + 1];
+            char *write = buffer;
 
             writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
-            while (c = stream.get(), c != '"')
+            while (c = stream.get(), c != '"' && c != EOF)
             {
-                if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
-
                 if (c == '\\')
                 {
                     c = stream.get();
@@ -27,10 +27,10 @@ namespace cppdatalib
 
                     switch (c)
                     {
-                        case 'b': writer.append_to_string(std::string(1, '\b')); break;
-                        case 'n': writer.append_to_string(std::string(1, '\n')); break;
-                        case 'r': writer.append_to_string(std::string(1, '\r')); break;
-                        case 't': writer.append_to_string(std::string(1, '\t')); break;
+                        case 'b': *write++ = ('\b'); break;
+                        case 'n': *write++ = ('\n'); break;
+                        case 'r': *write++ = ('\r'); break;
+                        case 't': *write++ = ('\t'); break;
                         case 'U':
                         {
                             uint32_t code = 0;
@@ -44,7 +44,10 @@ namespace cppdatalib
                             }
 
                             std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                            writer.append_to_string(utf8.to_bytes(code));
+                            std::string bytes = utf8.to_bytes(code);
+
+                            memcpy(write, bytes.c_str(), bytes.size());
+                            write += bytes.size();
 
                             break;
                         }
@@ -63,19 +66,37 @@ namespace cppdatalib
                                 }
 
                                 std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                                writer.append_to_string(utf8.to_bytes(code));
+                                std::string bytes = utf8.to_bytes(code);
+
+                                memcpy(write, bytes.c_str(), bytes.size());
+                                write += bytes.size();
                             }
                             else
-                                writer.append_to_string(std::string(1, c));
+                                *write++ = c;
 
                             break;
                         }
                     }
                 }
                 else
-                    writer.append_to_string(std::string(1, c));
+                    *write++ = c;
+
+                if (size_t(write - buffer) >= buffer_size)
+                {
+                    *write = 0;
+                    writer.append_to_string(buffer);
+                    write = buffer;
+                }
             }
 
+            if (c == EOF)
+                throw core::error("Plain Text Property List - unexpected end of string");
+
+            if (write != buffer)
+            {
+                *write = 0;
+                writer.append_to_string(buffer);
+            }
             writer.end_string(core::string_t());
             return stream;
         }
@@ -142,7 +163,7 @@ namespace cppdatalib
 
             writer.begin();
 
-            while (stream >> std::skipws >> chr, stream.unget(), stream.good() && !stream.eof())
+            while (stream >> std::skipws >> chr, stream.good() && !stream.eof())
             {
                 if (writer.nesting_depth() == 0 && delimiter_required)
                     break;
@@ -153,7 +174,6 @@ namespace cppdatalib
                 switch (chr)
                 {
                     case '<':
-                        stream.get(); // Eat '<'
                         stream >> chr;
                         if (!stream) throw core::error("Plain Text Property List - expected '*' after '<' in value");
 
@@ -238,7 +258,6 @@ namespace cppdatalib
                         delimiter_required = true;
                         break;
                     case ',':
-                        stream.get(); // Eat ','
                         if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
                             throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
                         stream >> chr; stream.unget(); // Peek ahead
@@ -247,28 +266,23 @@ namespace cppdatalib
                         delimiter_required = false;
                         break;
                     case '=':
-                        stream.get(); // Eat '='
                         if (!writer.container_key_was_just_parsed())
                             throw core::error("Plain Text Property List - invalid '=' does not separate a key and value pair");
                         delimiter_required = false;
                         break;
                     case '(':
-                        stream.get(); // Eat '('
                         writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
                         delimiter_required = false;
                         break;
                     case ')':
-                        stream.get(); // Eat ')'
                         writer.end_array(core::array_t());
                         delimiter_required = true;
                         break;
                     case '{':
-                        stream.get(); // Eat '{'
                         writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
                         delimiter_required = false;
                         break;
                     case '}':
-                        stream.get(); // Eat '}'
                         writer.end_object(core::object_t());
                         delimiter_required = true;
                         break;
