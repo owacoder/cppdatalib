@@ -47,7 +47,7 @@ namespace cppdatalib
             void null_(const core::value &) {throw core::error("XML Property List - 'null' value not allowed in output");}
             void bool_(const core::value &v) {output_stream << '<' << (v.get_bool()? "true": "false") << "/>";}
             void integer_(const core::value &v) {output_stream << "<integer>" << v.get_int() << "</integer>";}
-            void real_(const core::value &v) {output_stream << "<real>" << v.get_real() << "</real>";}
+            void real_(const core::value &v) {output_stream << "<real>" << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << "</real>";}
             void begin_string_(const core::value &v, core::int_t, bool is_key)
             {
                 if (is_key)
@@ -137,7 +137,7 @@ namespace cppdatalib
             void real_(const core::value &v)
             {
                 output_stream << "<real>\n", output_padding(current_indent + indent_width);
-                output_stream << v.get_int() << '\n'; output_padding(current_indent);
+                output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << '\n'; output_padding(current_indent);
                 output_stream << "</real>";
             }
             void begin_string_(const core::value &v, core::int_t, bool is_key)

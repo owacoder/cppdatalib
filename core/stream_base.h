@@ -29,17 +29,6 @@ namespace cppdatalib
             std::ostream &stream() {return output_stream;}
         };
 
-        class string_writer
-        {
-        protected:
-            std::string &output_string;
-
-        public:
-            string_writer(std::string &string) : output_string(string) {}
-
-            std::string &string() {return output_string;}
-        };
-
         class stream_handler
         {
         protected:
@@ -161,10 +150,13 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
-                    nested_scopes.back().items_ += !is_key;
-
                     if (nested_scopes.back().get_type() == object)
+                    {
+                        nested_scopes.back().items_ += !is_key;
                         nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
+                    }
+                    else
+                        ++nested_scopes.back().items_;
                 }
 
                 return true;
@@ -256,10 +248,13 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
-                    nested_scopes.back().items_ += !nested_scopes.back().key_was_parsed();
-
                     if (nested_scopes.back().get_type() == object)
+                    {
+                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
                         nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
+                    }
+                    else
+                        ++nested_scopes.back().items_;
                 }
             }
 
@@ -303,10 +298,13 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
-                    nested_scopes.back().items_ += !nested_scopes.back().key_was_parsed();
-
                     if (nested_scopes.back().get_type() == object)
+                    {
+                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
                         nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
+                    }
+                    else
+                        ++nested_scopes.back().items_;
                 }
             }
 
@@ -352,10 +350,13 @@ namespace cppdatalib
 
                 if (!nested_scopes.empty())
                 {
-                    nested_scopes.back().items_ += !nested_scopes.back().key_was_parsed();
-
                     if (nested_scopes.back().get_type() == object)
+                    {
+                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
                         nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
+                    }
+                    else
+                        ++nested_scopes.back().items_;
                 }
             }
 

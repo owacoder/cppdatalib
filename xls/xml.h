@@ -83,7 +83,7 @@ namespace cppdatalib
 
             void bool_(const core::value &v) {output_stream << v.as_int();}
             void integer_(const core::value &v) {output_stream << v.get_int();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
+            void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
 
             void begin_array_(const core::value &, core::int_t, bool)

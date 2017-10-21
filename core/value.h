@@ -1,17 +1,19 @@
 #ifndef CPPDATALIB_VALUE_H
 #define CPPDATALIB_VALUE_H
 
-#include <stdint.h>
-#include <string.h>
+#include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 #include <map>
 #include <stack>
-#include <math.h>
+#include <cmath>
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <codecvt>
 #include <locale>
+#include <cfloat>
 
 namespace cppdatalib
 {
@@ -61,6 +63,7 @@ namespace cppdatalib
         typedef bool bool_t;
         typedef int64_t int_t;
         typedef double real_t;
+#define CPPDATALIB_REAL_DIG DBL_DIG
         typedef const char *cstring_t;
         typedef std::string string_t;
         typedef std::vector<value> array_t;
@@ -423,7 +426,7 @@ namespace cppdatalib
                             case string:
                             {
                                 std::ostringstream str;
-                                str << real_;
+                                str << std::setprecision(CPPDATALIB_REAL_DIG) << real_;
                                 str_ = str.str();
                                 break;
                             }

@@ -310,7 +310,7 @@ namespace cppdatalib
             void null_(const core::value &) {throw core::error("Plain Text Property List - 'null' value not allowed in output");}
             void bool_(const core::value &v) {output_stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';}
             void integer_(const core::value &v) {output_stream << "<*I" << v.get_int() << '>';}
-            void real_(const core::value &v) {output_stream << "<*R" << v.get_real() << '>';}
+            void real_(const core::value &v) {output_stream << "<*R" << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << '>';}
             void begin_string_(const core::value &v, core::int_t, bool)
             {
                 switch (v.get_subtype())
@@ -395,7 +395,7 @@ namespace cppdatalib
             void null_(const core::value &) {throw core::error("Plain Text Property List - 'null' value not allowed in output");}
             void bool_(const core::value &v) {output_stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';}
             void integer_(const core::value &v) {output_stream << "<*I" << v.get_int() << '>';}
-            void real_(const core::value &v) {output_stream << "<*R" << v.get_real() << '>';}
+            void real_(const core::value &v) {output_stream << "<*R" << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << '>';}
             void begin_string_(const core::value &v, core::int_t, bool)
             {
                 switch (v.get_subtype())
