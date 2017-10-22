@@ -9,6 +9,7 @@ namespace cppdatalib
     {
         inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
         {
+            char buffer[core::buffer_size];
             bool written = false;
             int chr;
 
@@ -59,11 +60,14 @@ namespace cppdatalib
                             if (stream.get() != ':') throw core::error("Bencode - expected ':' separating string size and data");
 
                             writer.begin_string(core::string_t(), size);
-                            while (size--)
+                            while (size > 0)
                             {
-                                chr = stream.get();
-                                if (chr == EOF) throw core::error("Bencode - unexpected end of string");
-                                writer.append_to_string(core::string_t(1, chr));
+                                core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
+                                stream.read(buffer, buffer_size);
+                                if (!stream)
+                                    throw core::error("Bencode - unexpected end of string");
+                                writer.append_to_string(core::string_t(buffer, buffer_size));
+                                size -= buffer_size;
                             }
                             writer.end_string(core::string_t());
                         }

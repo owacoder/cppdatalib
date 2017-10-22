@@ -56,6 +56,12 @@ namespace cppdatalib
             user = 16
         };
 
+        enum
+        {
+            max_utf8_code_sequence_size = 4,
+            buffer_size = 65535
+        };
+
         class value;
         class value_builder;
         class stream_handler;

@@ -9,12 +9,10 @@ namespace cppdatalib
     {
         inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
         {
-            const size_t buffer_size = 65536;
-            const size_t max_utf8_code_sequence_size = 4;
             static const std::string hex = "0123456789ABCDEF";
 
             int c;
-            char buffer[buffer_size + max_utf8_code_sequence_size + 1];
+            char buffer[core::buffer_size + core::max_utf8_code_sequence_size + 1];
             char *write = buffer;
 
             writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
@@ -81,7 +79,7 @@ namespace cppdatalib
                 else
                     *write++ = c;
 
-                if (size_t(write - buffer) >= buffer_size)
+                if (write - buffer >= core::buffer_size)
                 {
                     *write = 0;
                     writer.append_to_string(buffer);
