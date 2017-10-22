@@ -1,7 +1,7 @@
 #ifndef CPPDATALIB_BENCODE_H
 #define CPPDATALIB_BENCODE_H
 
-#include "../core/value_builder.h"
+#include "../core/core.h"
 
 namespace cppdatalib
 {
@@ -64,7 +64,7 @@ namespace cppdatalib
                             {
                                 core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
                                 stream.read(buffer, buffer_size);
-                                if (!stream)
+                                if (stream.fail())
                                     throw core::error("Bencode - unexpected end of string");
                                 writer.append_to_string(core::string_t(buffer, buffer_size));
                                 size -= buffer_size;
@@ -101,21 +101,27 @@ namespace cppdatalib
 
             void null_(const core::value &) {throw core::error("Bencode - 'null' value not allowed in output");}
             void bool_(const core::value &) {throw core::error("Bencode - 'boolean' value not allowed in output");}
-            void integer_(const core::value &v) {output_stream << 'i' << v.get_int() << 'e';}
+            void integer_(const core::value &v)
+            {
+                output_stream.put('i');
+                output_stream << v.get_int();
+                output_stream.put('e');
+            }
             void real_(const core::value &) {throw core::error("Bencode - 'real' value not allowed in output");}
             void begin_string_(const core::value &, core::int_t size, bool)
             {
                 if (size == unknown_size)
                     throw core::error("Bencode - 'string' value does not have size specified");
-                output_stream << size << ':';
+                output_stream << size;
+                output_stream.put(':');
             }
             void string_data_(const core::value &v) {output_stream << v.get_string();}
 
-            void begin_array_(const core::value &, core::int_t, bool) {output_stream << 'l';}
-            void end_array_(const core::value &, bool) {output_stream << 'e';}
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('l');}
+            void end_array_(const core::value &, bool) {output_stream.put('e');}
 
-            void begin_object_(const core::value &, core::int_t, bool) {output_stream << 'd';}
-            void end_object_(const core::value &, bool) {output_stream << 'e';}
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream.put('d');}
+            void end_object_(const core::value &, bool) {output_stream.put('e');}
         };
 
         inline std::istream &operator>>(std::istream &stream, core::value &v)

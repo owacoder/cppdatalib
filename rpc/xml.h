@@ -5,6 +5,8 @@
 
 namespace cppdatalib
 {
+    // TODO: per stream, change single character writes to put() calls, and string writes to write() calls
+
     namespace xml_rpc
     {
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)

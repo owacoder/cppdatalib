@@ -1,10 +1,12 @@
 #ifndef CPPDATALIB_BINN_H
 #define CPPDATALIB_BINN_H
 
-#include "../core/value_builder.h"
+#include "../core/core.h"
 
 namespace cppdatalib
 {
+    // TODO: per stream, change single character writes to put() calls, and string writes to write() calls
+
     namespace binn
     {
         inline std::ostream &write_type(std::ostream &stream, unsigned int type, unsigned int subtype, int *written = NULL)

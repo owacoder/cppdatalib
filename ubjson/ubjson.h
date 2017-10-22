@@ -5,6 +5,8 @@
 
 namespace cppdatalib
 {
+    // TODO: per stream, change single character writes to put() calls, and string writes to write() calls
+
     namespace ubjson
     {
         inline char size_specifier(core::int_t min, core::int_t max)
@@ -131,6 +133,7 @@ namespace cppdatalib
 
         inline std::istream &read_string(std::istream &stream, char specifier, core::stream_handler &writer)
         {
+            char buffer[core::buffer_size];
             int c = stream.get();
 
             if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
@@ -149,12 +152,14 @@ namespace cppdatalib
                 if (size < 0) throw core::error("UBJSON - invalid negative size specified for high-precision number");
 
                 writer.begin_string(core::value(core::string_t(), core::bignum), size);
-                while (size-- > 0)
+                while (size > 0)
                 {
-                    c = stream.get();
-                    if (c == EOF) throw core::error("UBJSON - expected high-precision number value after type specifier");
-
-                    writer.append_to_string(std::string(1, c));
+                    core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
+                    stream.read(buffer, buffer_size);
+                    if (stream.fail())
+                        throw core::error("UBJSON - expected high-precision number value after type specifier");
+                    writer.append_to_string(core::string_t(buffer, buffer_size));
+                    size -= buffer_size;
                 }
                 writer.end_string(core::value(core::string_t(), core::bignum));
             }
@@ -166,12 +171,14 @@ namespace cppdatalib
                 if (size < 0) throw core::error("UBJSON - invalid negative size specified for string");
 
                 writer.begin_string(core::string_t(), size);
-                while (size-- > 0)
+                while (size > 0)
                 {
-                    c = stream.get();
-                    if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
-
-                    writer.append_to_string(std::string(1, c));
+                    core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
+                    stream.read(buffer, buffer_size);
+                    if (stream.fail())
+                        throw core::error("UBJSON - expected string value after type specifier");
+                    writer.append_to_string(core::string_t(buffer, buffer_size));
+                    size -= buffer_size;
                 }
                 writer.end_string(core::string_t());
             }

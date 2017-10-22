@@ -1,7 +1,7 @@
 #ifndef CPPDATALIB_PLAIN_TEXT_PROPERTY_LIST_H
 #define CPPDATALIB_PLAIN_TEXT_PROPERTY_LIST_H
 
-#include "../core/value_builder.h"
+#include "../core/core.h"
 
 namespace cppdatalib
 {
@@ -106,20 +106,23 @@ namespace cppdatalib
                 int c = str[i] & 0xff;
 
                 if (c == '"' || c == '\\')
-                    stream << '\\' << static_cast<char>(c);
+                {
+                    stream.put('\\');
+                    stream.put(c);
+                }
                 else
                 {
                     switch (c)
                     {
                         case '"':
-                        case '\\': stream << '\\' << static_cast<char>(c); break;
-                        case '\b': stream << "\\b"; break;
-                        case '\n': stream << "\\n"; break;
-                        case '\r': stream << "\\r"; break;
-                        case '\t': stream << "\\t"; break;
+                        case '\\': stream.put('\\'); stream.put(c); break;
+                        case '\b': stream.write("\\b", 2); break;
+                        case '\n': stream.write("\\n", 2); break;
+                        case '\r': stream.write("\\r", 2); break;
+                        case '\t': stream.write("\\t", 2); break;
                         default:
                             if (iscntrl(c))
-                                stream << '\\' << (c >> 6) << ((c >> 3) & 0x7) << (c & 0x7);
+                                stream.put('\\').put(c >> 6).put((c >> 3) & 0x7).put(c & 0x7);
                             else if (static_cast<unsigned char>(str[i]) > 0x7f)
                             {
                                 std::string utf8_string;
@@ -139,12 +142,12 @@ namespace cppdatalib
                                 {
                                     uint16_t c = wstr[j];
 
-                                    hex::write(stream << "\\U", c >> 8);
+                                    hex::write(stream.write("\\U", 2), c >> 8);
                                     hex::write(stream, c & 0xff);
                                 }
                             }
                             else
-                                stream << str[i];
+                                stream.put(str[i]);
                             break;
                     }
                 }
@@ -306,23 +309,38 @@ namespace cppdatalib
             void begin_item_(const core::value &)
             {
                 if (container_key_was_just_parsed())
-                    output_stream << '=';
+                    output_stream.put('=');
                 else if (current_container_size() > 0)
-                    output_stream << ',';
+                    output_stream.put(',');
             }
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
-                    output_stream << ',';
+                    output_stream.put(',');
 
                 if (!v.is_string())
                     throw core::error("Plain Text Property List - cannot write non-string key");
             }
 
             void null_(const core::value &) {throw core::error("Plain Text Property List - 'null' value not allowed in output");}
-            void bool_(const core::value &v) {output_stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';}
-            void integer_(const core::value &v) {output_stream << "<*I" << v.get_int() << '>';}
-            void real_(const core::value &v) {output_stream << "<*R" << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << '>';}
+            void bool_(const core::value &v)
+            {
+                output_stream << "<*B";
+                output_stream.put(v.get_bool()? 'Y': 'N');
+                output_stream.put('>');
+            }
+            void integer_(const core::value &v)
+            {
+                output_stream << "<*I"
+                              << v.get_int();
+                output_stream.put('>');
+            }
+            void real_(const core::value &v)
+            {
+                output_stream << "<*R"
+                              << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();
+                output_stream.put('>');
+            }
             void begin_string_(const core::value &v, core::int_t, bool)
             {
                 switch (v.get_subtype())
@@ -330,8 +348,8 @@ namespace cppdatalib
                     case core::date:
                     case core::time:
                     case core::datetime: output_stream << "<*D"; break;
-                    case core::blob: output_stream << '<'; break;
-                    default: output_stream << '"'; break;
+                    case core::blob: output_stream.put('<'); break;
+                    default: output_stream.put('"'); break;
                 }
             }
             void string_data_(const core::value &v)
@@ -348,16 +366,16 @@ namespace cppdatalib
                     case core::date:
                     case core::time:
                     case core::datetime:
-                    case core::blob: output_stream << '>'; break;
-                    default: output_stream << '"'; break;
+                    case core::blob: output_stream.put('>'); break;
+                    default: output_stream.put('"'); break;
                 }
             }
 
-            void begin_array_(const core::value &, core::int_t, bool) {output_stream << '(';}
-            void end_array_(const core::value &, bool) {output_stream << ')';}
+            void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('(');}
+            void end_array_(const core::value &, bool) {output_stream.put(')');}
 
-            void begin_object_(const core::value &, core::int_t, bool) {output_stream << '{';}
-            void end_object_(const core::value &, bool) {output_stream << '}';}
+            void begin_object_(const core::value &, core::int_t, bool) {output_stream.put('{');}
+            void end_object_(const core::value &, bool) {output_stream.put('}');}
         };
 
         class pretty_stream_writer : public core::stream_handler, public core::stream_writer
@@ -367,8 +385,17 @@ namespace cppdatalib
 
             void output_padding(size_t padding)
             {
-                while (padding-- > 0)
-                    output_stream << ' ';
+                while (padding > 0)
+                {
+                    char buffer[core::buffer_size];
+                    size_t size = std::min(sizeof(buffer)-1, padding);
+
+                    memset(buffer, ' ', size);
+                    buffer[size] = 0;
+
+                    output_stream.write(buffer, size);
+                    padding -= size;
+                }
             }
 
         public:
@@ -388,26 +415,41 @@ namespace cppdatalib
                 if (container_key_was_just_parsed())
                     output_stream << " = ";
                 else if (current_container_size() > 0)
-                    output_stream << ',';
+                    output_stream.put(',');
 
                 if (current_container() == core::array)
-                    output_stream << '\n', output_padding(current_indent);
+                    output_stream.put('\n'), output_padding(current_indent);
             }
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
-                    output_stream << ',';
+                    output_stream.put(',');
 
-                output_stream << '\n', output_padding(current_indent);
+                output_stream.put('\n'), output_padding(current_indent);
 
                 if (!v.is_string())
                     throw core::error("Plain Text Property List - cannot write non-string key");
             }
 
             void null_(const core::value &) {throw core::error("Plain Text Property List - 'null' value not allowed in output");}
-            void bool_(const core::value &v) {output_stream << "<*B" << (v.get_bool()? 'Y': 'N') << '>';}
-            void integer_(const core::value &v) {output_stream << "<*I" << v.get_int() << '>';}
-            void real_(const core::value &v) {output_stream << "<*R" << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << '>';}
+            void bool_(const core::value &v)
+            {
+                output_stream << "<*B";
+                output_stream.put(v.get_bool()? 'Y': 'N');
+                output_stream.put('>');
+            }
+            void integer_(const core::value &v)
+            {
+                output_stream << "<*I"
+                              << v.get_int();
+                output_stream.put('>');
+            }
+            void real_(const core::value &v)
+            {
+                output_stream << "<*R"
+                              << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();
+                output_stream.put('>');
+            }
             void begin_string_(const core::value &v, core::int_t, bool)
             {
                 switch (v.get_subtype())
@@ -415,8 +457,8 @@ namespace cppdatalib
                     case core::date:
                     case core::time:
                     case core::datetime: output_stream << "<*D"; break;
-                    case core::blob: output_stream << '<'; break;
-                    default: output_stream << '"'; break;
+                    case core::blob: output_stream.put('<'); break;
+                    default: output_stream.put('"'); break;
                 }
             }
             void string_data_(const core::value &v)
@@ -433,14 +475,14 @@ namespace cppdatalib
                     case core::date:
                     case core::time:
                     case core::datetime:
-                    case core::blob: output_stream << '>'; break;
-                    default: output_stream << '"'; break;
+                    case core::blob: output_stream.put('>'); break;
+                    default: output_stream.put('"'); break;
                 }
             }
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
-                output_stream << '(';
+                output_stream.put('(');
                 current_indent += indent_width;
             }
             void end_array_(const core::value &, bool)
@@ -448,14 +490,14 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream << '\n', output_padding(current_indent);
+                    output_stream.put('\n'), output_padding(current_indent);
 
-                output_stream << ')';
+                output_stream.put(')');
             }
 
             void begin_object_(const core::value &, core::int_t, bool)
             {
-                output_stream << '{';
+                output_stream.put('{');
                 current_indent += indent_width;
             }
             void end_object_(const core::value &, bool)
@@ -463,9 +505,9 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream << '\n', output_padding(current_indent);
+                    output_stream.put('\n'), output_padding(current_indent);
 
-                output_stream << '}';
+                output_stream.put('}');
             }
         };
 

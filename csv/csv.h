@@ -1,7 +1,7 @@
 #ifndef CPPDATALIB_CSV_H
 #define CPPDATALIB_CSV_H
 
-#include "../core/value_builder.h"
+#include "../core/core.h"
 
 namespace cppdatalib
 {
@@ -84,7 +84,7 @@ namespace cppdatalib
                 writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
 
                 // buffer is used to temporarily store whitespace for reading strings
-                while (chr = stream.get(), stream.good() && !stream.eof() && chr != ',' && chr != '\n')
+                while (chr = stream.get(), chr != EOF && chr != ',' && chr != '\n')
                 {
                     if (isspace(chr))
                     {
@@ -107,7 +107,7 @@ namespace cppdatalib
             }
             else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
             {
-                while (chr = stream.get(), stream.good() && !stream.eof() && chr != ',' && chr != '\n')
+                while (chr = stream.get(), chr != EOF && chr != ',' && chr != '\n')
                     buffer.push_back(chr);
 
                 if (chr != EOF)
@@ -133,7 +133,7 @@ namespace cppdatalib
                 writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
 
                 // buffer is used to temporarily store whitespace for reading strings
-                while (chr = stream.get(), stream.good() && !stream.eof())
+                while (chr = stream.get(), chr != EOF)
                 {
                     if (chr == '"')
                     {
@@ -161,7 +161,7 @@ namespace cppdatalib
             }
             else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
             {
-                while (chr = stream.get(), stream.good() && !stream.eof())
+                while (chr = stream.get(), chr != EOF)
                 {
                     if (chr == '"')
                     {
@@ -190,9 +190,9 @@ namespace cppdatalib
                 int c = str[i] & 0xff;
 
                 if (c == '"')
-                    stream << '"';
+                    stream.put('"');
 
-                stream << str[i];
+                stream.put(str[i]);
             }
 
             return stream;
@@ -208,7 +208,7 @@ namespace cppdatalib
             writer.begin();
             writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
 
-            while (chr = stream.get(), stream.good() && !stream.eof())
+            while (chr = stream.get(), chr != EOF)
             {
                 if (newline_just_parsed)
                 {
@@ -284,15 +284,15 @@ namespace cppdatalib
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
-                    output_stream << separator;
+                    output_stream.put(separator);
             }
 
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
             void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
-            void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
+            void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
-            void end_string_(const core::value &, bool) {output_stream << '"';}
+            void end_string_(const core::value &, bool) {output_stream.put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'array' value not allowed in row output");}
             void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
@@ -313,16 +313,16 @@ namespace cppdatalib
                     if (nesting_depth() == 1)
                         output_stream << "\r\n";
                     else
-                        output_stream << separator;
+                        output_stream.put(separator);
                 }
             }
 
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
             void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
-            void begin_string_(const core::value &, core::int_t, bool) {output_stream << '"';}
+            void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
-            void end_string_(const core::value &, bool) {output_stream << '"';}
+            void end_string_(const core::value &, bool) {output_stream.put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
@@ -389,10 +389,10 @@ namespace cppdatalib
             return stream.str();
         }
 
-        inline std::istream &input(std::istream &stream, core::value &v) {return input_table(stream, v);}
-        inline core::value from_csv(const std::string &csv) {return from_csv_table(csv);}
-        inline std::ostream &print(std::ostream &stream, const core::value &v) {return print_table(stream, v);}
-        inline std::string to_csv(const core::value &v) {return to_csv_table(v);}
+        inline std::istream &input(std::istream &stream, core::value &v, const options &opts = convert_fields_by_deduction()) {return input_table(stream, v, opts);}
+        inline core::value from_csv(const std::string &csv, const options &opts = convert_fields_by_deduction()) {return from_csv_table(csv, opts);}
+        inline std::ostream &print(std::ostream &stream, const core::value &v, char separator = ',') {return print_table(stream, v, separator);}
+        inline std::string to_csv(const core::value &v, char separator = ',') {return to_csv_table(v, separator);}
     }
 }
 

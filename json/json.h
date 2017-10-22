@@ -1,8 +1,7 @@
 #ifndef CPPDATALIB_JSON_H
 #define CPPDATALIB_JSON_H
 
-#include "../core/value_builder.h"
-#include "../core/hex.h"
+#include "../core/core.h"
 
 namespace cppdatalib
 {
@@ -261,13 +260,15 @@ namespace cppdatalib
 
             void output_padding(size_t padding)
             {
-                const size_t buffer_size = 65536;
-
                 while (padding > 0)
                 {
-                    size_t size = std::min(buffer_size, padding);
-                    std::string buffer(size, ' ');
-                    output_stream.write(&buffer[0], size);
+                    char buffer[core::buffer_size];
+                    size_t size = std::min(sizeof(buffer)-1, padding);
+
+                    memset(buffer, ' ', size);
+                    buffer[size] = 0;
+
+                    output_stream.write(buffer, size);
                     padding -= size;
                 }
             }
