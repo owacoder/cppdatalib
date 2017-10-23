@@ -335,6 +335,12 @@ namespace cppdatalib
                               << v.get_int();
                 output_stream.put('>');
             }
+            void uinteger_(const core::value &v)
+            {
+                output_stream << "<*I"
+                              << v.get_uint();
+                output_stream.put('>');
+            }
             void real_(const core::value &v)
             {
                 output_stream << "<*R"
@@ -442,6 +448,12 @@ namespace cppdatalib
             {
                 output_stream << "<*I"
                               << v.get_int();
+                output_stream.put('>');
+            }
+            void uinteger_(const core::value &v)
+            {
+                output_stream << "<*I"
+                              << v.get_uint();
                 output_stream.put('>');
             }
             void real_(const core::value &v)

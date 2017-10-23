@@ -5,8 +5,6 @@
 
 namespace cppdatalib
 {
-    // TODO: per stream, change single character writes to put() calls, and string writes to write() calls
-
     namespace xml_xls
     {
         inline std::ostream &write_string(std::ostream &stream, const std::string &str)
@@ -17,16 +15,16 @@ namespace cppdatalib
 
                 switch (c)
                 {
-                    case '"': stream << "&quot;"; break;
-                    case '&': stream << "&amp;"; break;
-                    case '\'': stream << "&apos;"; break;
-                    case '<': stream << "&lt;"; break;
-                    case '>': stream << "&gt;"; break;
+                    case '"': stream.write("&quot;", 6); break;
+                    case '&': stream.write("&amp;", 5); break;
+                    case '\'': stream.write("&apos;", 6); break;
+                    case '<': stream.write("&lt;", 4); break;
+                    case '>': stream.write("&gt;", 4); break;
                     default:
                         if (iscntrl(c))
-                            stream << "&#" << c << ';';
+                            stream.write("&#", 2).put(c).put(';');
                         else
-                            stream << str[i];
+                            stream.put(str[i]);
                         break;
                 }
             }
@@ -52,6 +50,7 @@ namespace cppdatalib
                     case core::null: type = "String"; break;
                     case core::boolean: type = "Boolean"; break;
                     case core::integer:
+                    case core::uinteger:
                     case core::real: type = "Number"; break;
                     case core::string:
                         if (v.get_subtype() == core::date ||
@@ -85,6 +84,7 @@ namespace cppdatalib
 
             void bool_(const core::value &v) {output_stream << v.as_int();}
             void integer_(const core::value &v) {output_stream << v.get_int();}
+            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
             void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
 

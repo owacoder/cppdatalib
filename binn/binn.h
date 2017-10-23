@@ -65,6 +65,24 @@ namespace cppdatalib
 
                     return size;
                 }
+                case core::uinteger:
+                {
+                    size_t size = 1; // one byte for type specifier
+
+                    if (v.get_subtype() >= core::user && v.get_subtype() > 15)
+                        ++size; // type specifier requires another byte
+
+                    if (v.get_uint() <= UINT8_MAX)
+                        size += 1;
+                    else if (v.get_uint() <= UINT16_MAX)
+                        size += 2;
+                    else if (v.get_uint() <= UINT32_MAX)
+                        size += 4;
+                    else
+                        size += 8;
+
+                    return size;
+                }
                 case core::real:
                 {
                     size_t size = 5; // one byte for type specifier, minimum of four bytes for data
@@ -323,6 +341,7 @@ namespace cppdatalib
 
                     return stream;
                 }
+                default: break;
             }
 
             // Control will never get here

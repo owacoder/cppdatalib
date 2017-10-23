@@ -134,6 +134,7 @@ namespace cppdatalib
                                 case null: null_(v); break;
                                 case boolean: bool_(v); break;
                                 case integer: integer_(v); break;
+                                case uinteger: uinteger_(v); break;
                                 case real: real_(v); break;
                                 default: return false;
                             }
@@ -189,6 +190,9 @@ namespace cppdatalib
 
             // Called when a scalar integer is parsed
             virtual void integer_(const core::value &v) {(void) v;}
+
+            // Called when a scalar unsigned integer is parsed
+            virtual void uinteger_(const core::value &v) {(void) v;}
 
             // Called when a scalar real is parsed
             virtual void real_(const core::value &v) {(void) v;}
@@ -379,9 +383,9 @@ namespace cppdatalib
             void operator()(const value *arg)
             {
                 if (arg->is_array())
-                    stream.begin_array(*arg, stream_handler::unknown_size);
+                    stream.begin_array(*arg, arg->size());
                 else if (arg->is_object())
-                    stream.begin_object(*arg, stream_handler::unknown_size);
+                    stream.begin_object(*arg, arg->size());
             }
 
         private:

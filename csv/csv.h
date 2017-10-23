@@ -289,6 +289,7 @@ namespace cppdatalib
 
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
+            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
             void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
@@ -319,6 +320,7 @@ namespace cppdatalib
 
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
+            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
             void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
             void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}

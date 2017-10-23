@@ -22,6 +22,7 @@ namespace cppdatalib
                         {
                             case boolean: value.set_bool(false); break;
                             case integer: value.set_int(0); break;
+                            case uinteger: value.set_uint(0); break;
                             case real: value.set_real(0.0); break;
                             case string: value.set_string(""); break;
                             case array: value.set_array(array_t()); break;
@@ -34,6 +35,7 @@ namespace cppdatalib
                         {
                             case null: value.set_null(); break;
                             case integer: value.set_int(value.get_bool()); break;
+                            case uinteger: value.set_uint(value.get_bool()); break;
                             case real: value.set_real(value.get_bool()); break;
                             case string: value.set_string(value.get_bool()? "true": "false"); break;
                             case array: value.set_array(array_t()); break;
@@ -46,6 +48,7 @@ namespace cppdatalib
                         {
                             case null: value.set_null(); break;
                             case boolean: value.set_bool(value.get_int() != 0); break;
+                            case uinteger: value.convert_to_uint(); break;
                             case real: value.set_real(value.get_int()); break;
                             case string: value.convert_to_string(); break;
                             case array: value.set_array(array_t()); break;
@@ -59,6 +62,7 @@ namespace cppdatalib
                             case null: value.set_null(); break;
                             case boolean: value.set_bool(value.get_real() != 0.0); break;
                             case integer: value.convert_to_int(); break;
+                            case uinteger: value.convert_to_uint(); break;
                             case string: value.convert_to_string(); break;
                             case array: value.set_array(array_t()); break;
                             case object: value.set_object(object_t()); break;
@@ -71,6 +75,7 @@ namespace cppdatalib
                             case null: value.set_null(); break;
                             case boolean: value.set_bool(value.get_string() == "true" || value.as_int()); break;
                             case integer: value.convert_to_int(); break;
+                            case uinteger: value.convert_to_uint(); break;
                             case real: value.convert_to_real(); break;
                             case array: value.set_array(array_t()); break;
                             case object: value.set_object(object_t()); break;
@@ -83,6 +88,7 @@ namespace cppdatalib
                             case null: value.set_null(); break;
                             case boolean: value.set_bool(false); break;
                             case integer: value.set_int(0); break;
+                            case uinteger: value.set_uint(0); break;
                             case real: value.set_real(0.0); break;
                             case string: value.set_string(""); break;
                             case object:
@@ -106,6 +112,7 @@ namespace cppdatalib
                             case null: value.set_null(); break;
                             case boolean: value.set_bool(false); break;
                             case integer: value.set_int(0); break;
+                            case uinteger: value.set_uint(0); break;
                             case real: value.set_real(0.0); break;
                             case string: value.set_string(""); break;
                             case array:

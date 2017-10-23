@@ -1,5 +1,5 @@
-#ifndef CPPDATALIB_UBJSON_H
-#define CPPDATALIB_UBJSON_H
+#ifndef CPPDATALIB_MESSAGE_PACK_H
+#define CPPDATALIB_MESSAGE_PACK_H
 
 #include "../core/core.h"
 
@@ -7,22 +7,8 @@ namespace cppdatalib
 {
     // TODO: per stream, change single character writes to put() calls, and string writes to write() calls
 
-    namespace ubjson
+    namespace message_pack
     {
-        inline char size_specifier(core::int_t min, core::int_t max)
-        {
-            if (min >= 0 && max <= UINT8_MAX)
-                return 'U';
-            else if (min >= INT8_MIN && max <= INT8_MAX)
-                return 'i';
-            else if (min >= INT16_MIN && max <= INT16_MAX)
-                return 'I';
-            else if (min >= INT32_MIN && max <= INT32_MAX)
-                return 'l';
-            else
-                return 'L';
-        }
-
         inline std::istream &read_int(std::istream &stream, core::int_t &i, char specifier)
         {
             uint64_t temp;
@@ -188,107 +174,170 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::ostream &write_int(std::ostream &stream, core::int_t i, bool add_specifier, char force_specifier = 0)
+        inline std::ostream &write_int(std::ostream &stream, core::uint_t i)
         {
-            const std::string specifiers = "UiIlL";
-            size_t force_bits = specifiers.find(force_specifier);
+            if (i <= UINT8_MAX / 2)
+                return stream.put(i);
+            else if (i <= UINT8_MAX)
+                return stream.put(0xcc).put(i);
+            else if (i <= UINT16_MAX)
+                return stream.put(0xcd).put(i >> 8).put(i & 0xff);
+            else if (i <= UINT32_MAX)
+                return stream.put(0xce)
+                        .put(i >> 24)
+                        .put((i >> 16) & 0xff)
+                        .put((i >> 8) & 0xff)
+                        .put(i & 0xff);
+            else
+                return stream.put(0xcf)
+                        .put((i >> 56) & 0xff)
+                        .put((i >> 48) & 0xff)
+                        .put((i >> 40) & 0xff)
+                        .put((i >> 32) & 0xff)
+                        .put((i >> 24) & 0xff)
+                        .put((i >> 16) & 0xff)
+                        .put((i >> 8) & 0xff)
+                        .put(i & 0xff);
+        }
 
-            if (force_bits == std::string::npos)
-                force_bits = 0;
-
-            if (force_bits == 0 && (i >= 0 && i <= UINT8_MAX))
-                return stream << (add_specifier? "U": "") << static_cast<unsigned char>(i);
-            else if (force_bits <= 1 && (i >= INT8_MIN && i < 0))
-                return stream << (add_specifier? "i": "") << static_cast<unsigned char>(0x80 | ((~std::abs(i) & 0xff) + 1));
-            else if (force_bits <= 2 && (i >= INT16_MIN && i <= INT16_MAX))
+        inline std::ostream &write_int(std::ostream &stream, core::int_t i)
+        {
+            if (i >= 0)
             {
-                uint16_t t;
-
-                if (i < 0)
-                    t = 0x8000u | ((~std::abs(i) & 0xffffu) + 1);
+                if (i <= UINT8_MAX / 2)
+                    return stream.put(i);
+                else if (i <= UINT8_MAX)
+                    return stream.put(0xcc).put(i);
+                else if (i <= UINT16_MAX)
+                    return stream.put(0xcd).put(i >> 8).put(i & 0xff);
+                else if (i <= UINT32_MAX)
+                    return stream.put(0xce)
+                            .put(i >> 24)
+                            .put((i >> 16) & 0xff)
+                            .put((i >> 8) & 0xff)
+                            .put(i & 0xff);
                 else
-                    t = i;
-
-                return stream << (add_specifier? "I": "") << static_cast<unsigned char>(t >> 8) <<
-                                                             static_cast<unsigned char>(t & 0xff);
-            }
-            else if (force_bits <= 3 && (i >= INT32_MIN && i <= INT32_MAX))
-            {
-                uint32_t t;
-
-                if (i < 0)
-                    t = 0x80000000u | ((~std::abs(i) & 0xffffffffu) + 1);
-                else
-                    t = i;
-
-                return stream << (add_specifier? "l": "") << static_cast<unsigned char>(t >> 24) <<
-                                                             static_cast<unsigned char>((t >> 16) & 0xff) <<
-                                                             static_cast<unsigned char>((t >>  8) & 0xff) <<
-                                                             static_cast<unsigned char>((t      ) & 0xff);
+                    return stream.put(0xcf)
+                            .put((i >> 56) & 0xff)
+                            .put((i >> 48) & 0xff)
+                            .put((i >> 40) & 0xff)
+                            .put((i >> 32) & 0xff)
+                            .put((i >> 24) & 0xff)
+                            .put((i >> 16) & 0xff)
+                            .put((i >> 8) & 0xff)
+                            .put(i & 0xff);
             }
             else
             {
-                uint64_t t;
-
-                if (i < 0)
-                    t = 0x8000000000000000u | ((~std::abs(i) & 0xffffffffffffffffu) + 1);
+                uint64_t temp;
+                if (i < -std::numeric_limits<core::int_t>::max())
+                {
+                    i = uint64_t(INT32_MAX) + 1; // this assignment ensures that the 64-bit write will occur, since the most negative
+                                                 // value is (in binary) 1000...0000
+                    temp = 0; // The initial set bit is implied, and ORed in with `0x80 | xxx` later on
+                }
                 else
-                    t = i;
+                {
+                    i = -i; // Make i positive
+                    temp = ~uint64_t(i) + 1;
+                }
 
-                return stream << (add_specifier? "L": "") << static_cast<unsigned char>(t >> 56) <<
-                                                             static_cast<unsigned char>((t >> 48) & 0xff) <<
-                                                             static_cast<unsigned char>((t >> 40) & 0xff) <<
-                                                             static_cast<unsigned char>((t >> 32) & 0xff) <<
-                                                             static_cast<unsigned char>((t >> 24) & 0xff) <<
-                                                             static_cast<unsigned char>((t >> 16) & 0xff) <<
-                                                             static_cast<unsigned char>((t >>  8) & 0xff) <<
-                                                             static_cast<unsigned char>((t      ) & 0xff);
+                if (i <= 31)
+                    return stream.put(0xe0 + (temp & 0x1f));
+                else if (i <= INT8_MAX)
+                    return stream.put(0xd0).put(0x80 | (temp & 0xff));
+                else if (i <= INT16_MAX)
+                    return stream.put(0xd1).put(0x80 | ((temp >> 8) & 0xff)).put(temp & 0xff);
+                else if (i <= INT32_MAX)
+                    return stream.put(0xd2)
+                            .put(0x80 | ((temp >> 24) & 0xff))
+                            .put((temp >> 16) & 0xff)
+                            .put((temp >> 8) & 0xff)
+                            .put(temp & 0xff);
+                else
+                    return stream.put(0xd3)
+                            .put(0x80 | (temp >> 56))
+                            .put((temp >> 48) & 0xff)
+                            .put((temp >> 40) & 0xff)
+                            .put((temp >> 32) & 0xff)
+                            .put((temp >> 24) & 0xff)
+                            .put((temp >> 16) & 0xff)
+                            .put((temp >> 8) & 0xff)
+                            .put(temp & 0xff);
             }
         }
 
-        inline std::ostream &write_float(std::ostream &stream, core::real_t f, bool add_specifier, char force_specifier = 0)
+        inline std::ostream &write_float(std::ostream &stream, core::real_t f)
         {
-            const std::string specifiers = "dD";
-            size_t force_bits = specifiers.find(force_specifier);
-
-            if (force_bits == std::string::npos)
-                force_bits = 0;
-
-            if (force_bits == 0 && (core::float_from_ieee_754(core::float_to_ieee_754(f)) == f || std::isnan(f)))
+            if (core::float_from_ieee_754(core::float_to_ieee_754(f)) == f || std::isnan(f))
             {
-                uint32_t t = core::float_to_ieee_754(f);
+                uint32_t temp = core::float_to_ieee_754(f);
 
-                return stream << (add_specifier? "d": "") << static_cast<unsigned char>(t >> 24) <<
-                                                             static_cast<unsigned char>((t >> 16) & 0xff) <<
-                                                             static_cast<unsigned char>((t >>  8) & 0xff) <<
-                                                             static_cast<unsigned char>((t      ) & 0xff);
+                return stream.put(0xca)
+                        .put((temp >> 24) & 0xff)
+                        .put((temp >> 16) & 0xff)
+                        .put((temp >> 8) & 0xff)
+                        .put(temp & 0xff);
             }
             else
             {
-                uint64_t t = core::double_to_ieee_754(f);
+                uint64_t temp = core::double_to_ieee_754(f);
 
-                return stream << (add_specifier? "L": "") << static_cast<unsigned char>(t >> 56) <<
-                                                             static_cast<unsigned char>((t >> 48) & 0xff) <<
-                                                             static_cast<unsigned char>((t >> 40) & 0xff) <<
-                                                             static_cast<unsigned char>((t >> 32) & 0xff) <<
-                                                             static_cast<unsigned char>((t >> 24) & 0xff) <<
-                                                             static_cast<unsigned char>((t >> 16) & 0xff) <<
-                                                             static_cast<unsigned char>((t >>  8) & 0xff) <<
-                                                             static_cast<unsigned char>((t      ) & 0xff);
+                return stream.put(0xcb)
+                        .put(temp >> 56)
+                        .put((temp >> 48) & 0xff)
+                        .put((temp >> 40) & 0xff)
+                        .put((temp >> 32) & 0xff)
+                        .put((temp >> 24) & 0xff)
+                        .put((temp >> 16) & 0xff)
+                        .put((temp >> 8) & 0xff)
+                        .put(temp & 0xff);
             }
         }
 
-        inline std::ostream &write_string(std::ostream &stream, const std::string &str, bool add_specifier, core::subtype_t subtype)
+        inline std::ostream &write_string_size(std::ostream &stream, size_t str_size, core::subtype_t subtype)
         {
-            if (subtype != core::bignum && str.size() == 1 && static_cast<unsigned char>(str[0]) < 128)
-                return stream << (add_specifier? "C": "") << str[0];
+            // Binary string?
+            if (subtype == core::blob)
+            {
+                if (str_size <= UINT8_MAX)
+                    return stream.put(0xc4).put(str_size);
+                else if (str_size <= UINT16_MAX)
+                    return stream.put(0xc5)
+                            .put(str_size >> 8)
+                            .put(str_size & 0xff);
+                else if (str_size <= UINT32_MAX)
+                    return stream.put(0xc6)
+                            .put(str_size >> 24)
+                            .put((str_size >> 16) & 0xff)
+                            .put((str_size >> 8) & 0xff)
+                            .put(str_size & 0xff);
+                else
+                    throw core::error("MessagePack - 'blob' value is too long");
+            }
+            // Normal string?
+            else
+            {
+                if (str_size <= 31)
+                    return stream.put(0xa0 + str_size);
+                else if (str_size <= UINT8_MAX)
+                    return stream.put(0xd9).put(str_size);
+                else if (str_size <= UINT16_MAX)
+                    return stream.put(0xda)
+                            .put(str_size >> 8)
+                            .put(str_size & 0xff);
+                else if (str_size <= UINT32_MAX)
+                    return stream.put(0xdb)
+                            .put(str_size >> 24)
+                            .put((str_size >> 16) & 0xff)
+                            .put((str_size >> 8) & 0xff)
+                            .put(str_size & 0xff);
+                else
+                    throw core::error("MessagePack - 'string' value is too long");
+            }
 
-            if (add_specifier)
-                stream << (subtype == core::bignum? 'H': 'S');
-
-            write_int(stream, str.size(), true);
-
-            return stream << str;
+            // TODO: handle user-specified string types
+            return stream;
         }
 
         inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
@@ -491,33 +540,55 @@ namespace cppdatalib
             stream_writer(std::ostream &output) : core::stream_writer(output) {}
 
         protected:
-            void begin_key_(const core::value &v)
-            {
-                if (!v.is_string())
-                    throw core::error("UBJSON - cannot write non-string key");
-            }
-
-            void null_(const core::value &) {output_stream << 'Z';}
-            void bool_(const core::value &v) {output_stream << (v.get_bool()? 'T': 'F');}
-            void integer_(const core::value &v) {write_int(output_stream, v.get_int(), true);}
-            // TODO: write unsigned integer value
-            void real_(const core::value &v) {write_float(output_stream, v.get_real(), true);}
-            void begin_string_(const core::value &v, core::int_t size, bool is_key)
+            void null_(const core::value &) {output_stream.put(0xc0);}
+            void bool_(const core::value &v) {output_stream.put(0xc2 + v.get_bool());}
+            void integer_(const core::value &v) {write_int(output_stream, v.get_int());}
+            void uinteger_(const core::value &v) {write_int(output_stream, v.get_uint());}
+            void real_(const core::value &v) {write_float(output_stream, v.get_real());}
+            void begin_string_(const core::value &v, core::int_t size, bool)
             {
                 if (size == unknown_size)
-                    throw core::error("UBJSON - 'string' value does not have size specified");
+                    throw core::error("MessagePack - 'string' value does not have size specified");
 
-                if (!is_key)
-                    output_stream << (v.get_subtype() == core::bignum? 'H': 'S');
-                write_int(output_stream, size, true);
+                write_string_size(output_stream, size, v.get_subtype());
             }
-            void string_data_(const core::value &v) {output_stream << v.get_string();}
+            void string_data_(const core::value &v) {output_stream.write(v.get_string().c_str(), v.get_string().size());}
 
-            void begin_array_(const core::value &, core::int_t, bool) {output_stream << '[';}
-            void end_array_(const core::value &, bool) {output_stream << ']';}
+            void begin_array_(const core::value &, core::int_t size, bool)
+            {
+                if (size == unknown_size)
+                    throw core::error("MessagePack - 'array' value does not have size specified");
+                else if (size <= 15)
+                    output_stream.put(0x90 + size);
+                else if (size <= UINT16_MAX)
+                    output_stream.put(0xdc).put(size >> 8).put(size & 0xff);
+                else if (size <= UINT32_MAX)
+                    output_stream.put(0xdd)
+                            .put(size >> 24)
+                            .put((size >> 16) & 0xff)
+                            .put((size >> 8) & 0xff)
+                            .put(size & 0xff);
+                else
+                    throw core::error("MessagePack - 'array' value is too long");
+            }
 
-            void begin_object_(const core::value &, core::int_t, bool) {output_stream << '{';}
-            void end_object_(const core::value &, bool) {output_stream << '}';}
+            void begin_object_(const core::value &, core::int_t size, bool)
+            {
+                if (size == unknown_size)
+                    throw core::error("MessagePack - 'object' value does not have size specified");
+                else if (size <= 15)
+                    output_stream.put(0x80 + size);
+                else if (size <= UINT16_MAX)
+                    output_stream.put(0xde).put(size >> 8).put(size & 0xff);
+                else if (size <= UINT32_MAX)
+                    output_stream.put(0xdf)
+                            .put(size >> 24)
+                            .put((size >> 16) & 0xff)
+                            .put((size >> 8) & 0xff)
+                            .put(size & 0xff);
+                else
+                    throw core::error("MessagePack - 'object' value is too long");
+            }
         };
 
         inline std::ostream &print(std::ostream &stream, const core::value &v)
@@ -537,15 +608,15 @@ namespace cppdatalib
         inline std::istream &operator>>(std::istream &stream, core::value &v) {return input(stream, v);}
         inline std::ostream &operator<<(std::ostream &stream, const core::value &v) {return print(stream, v);}
 
-        inline core::value from_ubjson(const std::string &ubjson)
+        inline core::value from_message_pack(const std::string &msgpack)
         {
-            std::istringstream stream(ubjson);
+            std::istringstream stream(msgpack);
             core::value v;
             stream >> v;
             return v;
         }
 
-        inline std::string to_ubjson(const core::value &v)
+        inline std::string to_message_pack(const core::value &v)
         {
             std::ostringstream stream;
             stream << v;
@@ -554,4 +625,4 @@ namespace cppdatalib
     }
 }
 
-#endif // CPPDATALIB_UBJSON_H
+#endif // CPPDATALIB_MESSAGE_PACK_H

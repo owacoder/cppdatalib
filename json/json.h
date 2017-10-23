@@ -236,6 +236,7 @@ namespace cppdatalib
             void null_(const core::value &) {output_stream << "null";}
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
+            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
             void real_(const core::value &v)
             {
                 if (!std::isfinite(v.get_real()))
@@ -309,6 +310,7 @@ namespace cppdatalib
             void null_(const core::value &) {output_stream << "null";}
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
+            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
             void real_(const core::value &v)
             {
                 if (!std::isfinite(v.get_real()))

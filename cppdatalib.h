@@ -13,5 +13,6 @@
 #include "ubjson/ubjson.h"
 #include "xls/xml.h"
 #include "netstrings/netstrings.h"
+#include "message_pack/message_pack.h"
 
 #endif // CPPDATALIB_H

@@ -107,6 +107,12 @@ namespace cppdatalib
                 output_stream << v.get_int();
                 output_stream.put('e');
             }
+            void uinteger_(const core::value &v)
+            {
+                output_stream.put('i');
+                output_stream << v.get_uint();
+                output_stream.put('e');
+            }
             void real_(const core::value &) {throw core::error("Bencode - 'real' value not allowed in output");}
             void begin_string_(const core::value &, core::int_t size, bool)
             {

@@ -47,6 +47,7 @@ namespace cppdatalib
 
                     return floor(log10(std::max(size, size_t(1))) + 1) + size + 2;
                 }
+                default: break;
             }
 
             // Control will never get here
@@ -90,6 +91,7 @@ namespace cppdatalib
 
                     return stream << ',';
                 }
+                default: break;
             }
 
             // Control will never get here

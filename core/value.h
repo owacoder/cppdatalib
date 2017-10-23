@@ -14,6 +14,7 @@
 #include <codecvt>
 #include <locale>
 #include <cfloat>
+#include <limits>
 
 namespace cppdatalib
 {
@@ -24,6 +25,7 @@ namespace cppdatalib
             null,
             boolean,
             integer,
+            uinteger,
             real,
             string,
             array,
@@ -68,6 +70,7 @@ namespace cppdatalib
 
         typedef bool bool_t;
         typedef int64_t int_t;
+        typedef uint64_t uint_t;
         typedef double real_t;
 #define CPPDATALIB_REAL_DIG DBL_DIG
         typedef const char *cstring_t;
@@ -238,6 +241,7 @@ namespace cppdatalib
             value() : type_(null), subtype_(0) {}
             value(bool_t v, subtype_t subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
             value(int_t v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
+            value(uint_t v, subtype_t subtype = 0) : type_(uinteger), uint_(v), subtype_(subtype) {}
             value(real_t v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
             value(cstring_t v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
             value(const string_t &v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
@@ -246,7 +250,9 @@ namespace cppdatalib
             value(array_t &&v, subtype_t subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
             value(const object_t &v, subtype_t subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
             value(object_t &&v, subtype_t subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
-            template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+            template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0>
+            value(T v, subtype_t subtype = 0) : type_(uinteger), uint_(v), subtype_(subtype) {}
+            template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
@@ -271,14 +277,16 @@ namespace cppdatalib
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
             bool_t is_int() const {return type_ == integer;}
-            bool_t is_real() const {return type_ == real || type_ == integer;}
+            bool_t is_uint() const {return type_ == uinteger;}
+            bool_t is_real() const {return type_ == real;}
             bool_t is_string() const {return type_ == string;}
             bool_t is_array() const {return type_ == array;}
             bool_t is_object() const {return type_ == object;}
 
             bool_t get_bool() const {return bool_;}
             int_t get_int() const {return int_;}
-            real_t get_real() const {return type_ == integer? int_: real_;}
+            uint_t get_uint() const {return uint_;}
+            real_t get_real() const {return real_;}
             cstring_t get_cstring() const {return str_.c_str();}
             const string_t &get_string() const {return str_;}
             const array_t &get_array() const {return arr_;}
@@ -286,6 +294,7 @@ namespace cppdatalib
 
             bool_t &get_bool() {clear(boolean); return bool_;}
             int_t &get_int() {clear(integer); return int_;}
+            uint_t &get_uint() {clear(uinteger); return uint_;}
             real_t &get_real() {clear(real); return real_;}
             string_t &get_string() {clear(string); return str_;}
             array_t &get_array() {clear(array); return arr_;}
@@ -294,6 +303,7 @@ namespace cppdatalib
             void set_null() {clear(null);}
             void set_bool(bool_t v) {clear(boolean); bool_ = v;}
             void set_int(int_t v) {clear(integer); int_ = v;}
+            void set_uint(uint_t v) {clear(uinteger); uint_ = v;}
             void set_real(real_t v) {clear(real); real_ = v;}
             void set_string(cstring_t v) {clear(string); str_ = v;}
             void set_string(const string_t &v) {clear(string); str_ = v;}
@@ -303,6 +313,7 @@ namespace cppdatalib
             void set_null(subtype_t subtype) {clear(null); subtype_ = subtype;}
             void set_bool(bool_t v, subtype_t subtype) {clear(boolean); bool_ = v; subtype_ = subtype;}
             void set_int(int_t v, subtype_t subtype) {clear(integer); int_ = v; subtype_ = subtype;}
+            void set_uint(uint_t v, subtype_t subtype) {clear(uinteger); uint_ = v; subtype_ = subtype;}
             void set_real(real_t v, subtype_t subtype) {clear(real); real_ = v; subtype_ = subtype;}
             void set_string(cstring_t v, subtype_t subtype) {clear(string); str_ = v; subtype_ = subtype;}
             void set_string(const string_t &v, subtype_t subtype) {clear(string); str_ = v; subtype_ = subtype;}
@@ -348,6 +359,7 @@ namespace cppdatalib
             // The following are convenience conversion functions
             bool_t get_bool(bool_t default_) const {return is_bool()? bool_: default_;}
             int_t get_int(int_t default_) const {return is_int()? int_: default_;}
+            uint_t get_uint(uint_t default_) const {return is_uint()? uint_: default_;}
             real_t get_real(real_t default_) const {return is_real()? real_: default_;}
             cstring_t get_string(cstring_t default_) const {return is_string()? str_.c_str(): default_;}
             string_t get_string(const string_t &default_) const {return is_string()? str_: default_;}
@@ -356,6 +368,7 @@ namespace cppdatalib
 
             bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, default_).bool_;}
             int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, default_).int_;}
+            uint_t as_uint(uint_t default_ = 0) const {return value(*this).convert_to(uinteger, default_).uint_;}
             real_t as_real(real_t default_ = 0.0) const {return value(*this).convert_to(real, default_).real_;}
             string_t as_string(const string_t &default_ = string_t()) const {return value(*this).convert_to(string, default_).str_;}
             array_t as_array(const array_t &default_ = array_t()) const {return value(*this).convert_to(array, default_).arr_;}
@@ -363,6 +376,7 @@ namespace cppdatalib
 
             bool_t &convert_to_bool(bool_t default_ = false) {return convert_to(boolean, default_).bool_;}
             int_t &convert_to_int(int_t default_ = 0) {return convert_to(integer, default_).int_;}
+            uint_t &convert_to_uint(uint_t default_ = 0) {return convert_to(uinteger, default_).uint_;}
             real_t &convert_to_real(real_t default_ = 0.0) {return convert_to(real, default_).real_;}
             string_t &convert_to_string(const string_t &default_ = string_t()) {return convert_to(string, default_).str_;}
             array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_;}
@@ -404,6 +418,7 @@ namespace cppdatalib
                         switch (new_type)
                         {
                             case integer: int_ = bool_; break;
+                            case uinteger: uint_ = bool_; break;
                             case real: real_ = bool_; break;
                             case string: str_ = bool_? "true": "false"; break;
                             default: *this = default_value; break;
@@ -416,6 +431,7 @@ namespace cppdatalib
                         switch (new_type)
                         {
                             case boolean: bool_ = int_ != 0; break;
+                            case uinteger: uint_ = int_ > 0? int_: 0; break;
                             case real: real_ = int_; break;
                             case string: str_ = std::to_string(int_); break;
                             default: *this = default_value; break;
@@ -429,6 +445,7 @@ namespace cppdatalib
                         {
                             case boolean: bool_ = real_ != 0.0; break;
                             case integer: int_ = (real_ >= INT64_MIN && real_ <= INT64_MAX)? trunc(real_): 0; break;
+                            case uinteger: uint_ = (real_ >= 0 && real_ <= UINT64_MAX)? trunc(real_): 0; break;
                             case string:
                             {
                                 std::ostringstream str;
@@ -451,6 +468,14 @@ namespace cppdatalib
                                 str >> int_;
                                 if (!str)
                                     int_ = 0;
+                                break;
+                            }
+                            case uinteger:
+                            {
+                                std::istringstream str(str_);
+                                str >> uint_;
+                                if (!str)
+                                    uint_ = 0;
                                 break;
                             }
                             case real:
@@ -477,6 +502,7 @@ namespace cppdatalib
             {
                 bool_t bool_;
                 int_t int_;
+                uint_t uint_;
                 real_t real_;
             };
             string_t str_;

@@ -17,16 +17,16 @@ namespace cppdatalib
 
                 switch (c)
                 {
-                    case '"': stream << "&quot;"; break;
-                    case '&': stream << "&amp;"; break;
-                    case '\'': stream << "&apos;"; break;
-                    case '<': stream << "&lt;"; break;
-                    case '>': stream << "&gt;"; break;
+                    case '"': stream.write("&quot;", 6); break;
+                    case '&': stream.write("&amp;", 5); break;
+                    case '\'': stream.write("&apos;", 6); break;
+                    case '<': stream.write("&lt;", 4); break;
+                    case '>': stream.write("&gt;", 4); break;
                     default:
                         if (iscntrl(c))
-                            stream << "&#" << c << ';';
+                            stream.write("&#", 2).put(c).put(';');
                         else
-                            stream << str[i];
+                            stream.put(str[i]);
                         break;
                 }
             }
@@ -54,6 +54,7 @@ namespace cppdatalib
             void null_(const core::value &) {throw core::error("XML RPC - 'null' value not allowed in output");}
             void bool_(const core::value &v) {output_stream << "<value><boolean>" << v.as_int() << "</boolean></value>";}
             void integer_(const core::value &v) {output_stream << "<value><int>" << v.get_int() << "</int></value>";}
+            void uinteger_(const core::value &v) {output_stream << "<value><int>" << v.get_uint() << "</int></value>";}
             void real_(const core::value &v) {output_stream << "<value><double>" << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << "</double></value>";}
             void begin_string_(const core::value &, core::int_t, bool is_key)
             {
@@ -136,6 +137,14 @@ namespace cppdatalib
                 output_stream << "<value>\n"; output_padding(current_indent + indent_width);
                 output_stream << "<int>\n"; output_padding(current_indent + indent_width * 2);
                 output_stream << v.get_int() << '\n'; output_padding(current_indent + indent_width);
+                output_stream << "</int>\n"; output_padding(current_indent);
+                output_stream << "</value>";
+            }
+            void uinteger_(const core::value &v)
+            {
+                output_stream << "<value>\n"; output_padding(current_indent + indent_width);
+                output_stream << "<int>\n"; output_padding(current_indent + indent_width * 2);
+                output_stream << v.get_uint() << '\n'; output_padding(current_indent + indent_width);
                 output_stream << "</int>\n"; output_padding(current_indent);
                 output_stream << "</value>";
             }
