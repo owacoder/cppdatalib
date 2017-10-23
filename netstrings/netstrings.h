@@ -20,6 +20,13 @@ namespace cppdatalib
                     str << (str.str().size() - 2);
                     return str.str().size();
                 }
+                case core::uinteger:
+                {
+                    std::ostringstream str;
+                    str << ":" << v.get_uint() << ',';
+                    str << (str.str().size() - 2);
+                    return str.str().size();
+                }
                 case core::real:
                 {
                     std::ostringstream str;
@@ -47,7 +54,6 @@ namespace cppdatalib
 
                     return floor(log10(std::max(size, size_t(1))) + 1) + size + 2;
                 }
-                default: break;
             }
 
             // Control will never get here
@@ -61,6 +67,7 @@ namespace cppdatalib
                 case core::null: return stream << "0:,";
                 case core::boolean: return stream << (v.get_bool()? "4:true,": "5:false,");
                 case core::integer: return stream << std::to_string(v.get_int()).size() << ':' << v.get_int() << ',';
+                case core::uinteger: return stream << std::to_string(v.get_uint()).size() << ':' << v.get_uint() << ',';
                 case core::real: return stream << std::to_string(v.get_real()).size() << ':' << v.get_real() << ',';
                 case core::string: return stream << v.size() << ':' << v.get_string() << ',';
                 case core::array:
@@ -91,7 +98,6 @@ namespace cppdatalib
 
                     return stream << ',';
                 }
-                default: break;
             }
 
             // Control will never get here

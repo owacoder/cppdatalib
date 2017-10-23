@@ -57,6 +57,18 @@ namespace cppdatalib
                     }
                 }
 
+                // Attempt to read as an unsigned integer
+                {
+                    std::istringstream temp_stream(buffer);
+                    core::uint_t value;
+                    temp_stream >> value;
+                    if (!temp_stream.fail() && temp_stream.get() == EOF)
+                    {
+                        writer.write(value);
+                        return;
+                    }
+                }
+
                 // Attempt to read as a real
                 {
                     std::istringstream temp_stream(buffer);

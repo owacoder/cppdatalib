@@ -153,19 +153,21 @@ If a type is unsupported in a serialization format, the type is not converted to
 
 If a format-defined limit is reached, such as an object key length limit, an error will be thrown.
 
-   - JSON supports `null`, `bool`, `int` and `real`, `string`, `array`, and `object`.<br/>
+   - JSON supports `null`, `bool`, `uint` and `int` and `real`, `string`, `array`, and `object`.<br/>
      Notes:
-       - `int`s are mapped onto `double`s in the implementation.
+       - `uint`s and `int`s are read as `real`s in the implementation, losing some precision.
        - No subtypes are supported.
      
-   - Bencode supports `int`, `string`, `array`, and `object`.<br/>
+   - Bencode supports `uint`, `int`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`, `bool`, and `real`s are **not** supported.
+       - integers are limited to two's complement 64-bit integers when reading.
        - No subtypes are supported.
      
-   - plain text property lists support `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
+   - plain text property lists support `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`s are **not** supported.<br/>
+       - integers are limited to two's complement 64-bit integers when reading.
        - `string` subtypes `date`, `time`, and `datetime` are supported.
      
    - Binn supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
@@ -176,26 +178,28 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - Object keys are limited to 255 characters or fewer.
        - Custom subtypes for `null`, `bool`, `int`, `string`, and `array` are supported, as long as they are at least equal to the value of `core::user`.
    
-   - XML property lists support `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
+   - XML property lists support `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`s are **not** supported.
        - `string` subtypes `date`, `time`, and `datetime` are supported.
      
-   - XML-RPC supports `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
+   - XML-RPC supports `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`s are **not** supported.
        - No subtypes are supported.
      
-   - CSV supports `null`, `bool`, `int`, `real`, `string`, and `array`.<br/>
+   - CSV supports `null`, `uint`, `bool`, `int`, `real`, `string`, and `array`.<br/>
      Notes:
        - `object`s are **not** supported.
+       - `uint` values are fully supported when reading.
        - No subtypes are supported.
      
-   - UBJSON supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.
+   - UBJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.
      Notes:
        - `string` subtype `bignum` is supported.
+       - `uint` values are limited to the `int` value range when reading or writing, due to lack of format support for unsigned types
 
-   - XML-XLS supports `null`, `bool`, `int`, `real`, `string`, and `array`.<br/>
+   - XML-XLS supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:
        - `object`s are **not** supported.
        - `string` subtypes `date`, `time`, and `datetime` are supported.

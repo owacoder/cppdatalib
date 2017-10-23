@@ -500,7 +500,12 @@ namespace cppdatalib
             void null_(const core::value &) {output_stream << 'Z';}
             void bool_(const core::value &v) {output_stream << (v.get_bool()? 'T': 'F');}
             void integer_(const core::value &v) {write_int(output_stream, v.get_int(), true);}
-            // TODO: write unsigned integer value
+            void uinteger_(const core::value &v)
+            {
+                if (v.get_uint() > std::numeric_limits<core::int_t>::max())
+                    throw core::error("UBJSON - 'integer' value is out of range of output format");
+                write_int(output_stream, v.get_uint(), true);
+            }
             void real_(const core::value &v) {write_float(output_stream, v.get_real(), true);}
             void begin_string_(const core::value &v, core::int_t size, bool is_key)
             {
