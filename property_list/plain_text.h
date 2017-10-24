@@ -3,6 +3,8 @@
 
 #include "../core/core.h"
 
+// TODO: Refactor into stream_parser API
+
 namespace cppdatalib
 {
     namespace plain_text_property_list
@@ -96,63 +98,6 @@ namespace cppdatalib
                 writer.append_to_string(buffer);
             }
             writer.end_string(core::string_t());
-            return stream;
-        }
-
-        inline std::ostream &write_string(std::ostream &stream, const std::string &str)
-        {
-            for (size_t i = 0; i < str.size(); ++i)
-            {
-                int c = str[i] & 0xff;
-
-                if (c == '"' || c == '\\')
-                {
-                    stream.put('\\');
-                    stream.put(c);
-                }
-                else
-                {
-                    switch (c)
-                    {
-                        case '"':
-                        case '\\': stream.put('\\'); stream.put(c); break;
-                        case '\b': stream.write("\\b", 2); break;
-                        case '\n': stream.write("\\n", 2); break;
-                        case '\r': stream.write("\\r", 2); break;
-                        case '\t': stream.write("\\t", 2); break;
-                        default:
-                            if (iscntrl(c))
-                                stream.put('\\').put(c >> 6).put((c >> 3) & 0x7).put(c & 0x7);
-                            else if (static_cast<unsigned char>(str[i]) > 0x7f)
-                            {
-                                std::string utf8_string;
-                                size_t j;
-                                for (j = i; j < str.size() && static_cast<unsigned char>(str[j]) > 0x7f; ++j)
-                                    utf8_string.push_back(str[j]);
-
-                                if (j < str.size())
-                                    utf8_string.push_back(str[j]);
-
-                                i = j;
-
-                                std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf8;
-                                std::u16string wstr = utf8.from_bytes(utf8_string);
-
-                                for (j = 0; j < wstr.size(); ++j)
-                                {
-                                    uint16_t c = wstr[j];
-
-                                    hex::write(stream.write("\\U", 2), c >> 8);
-                                    hex::write(stream, c & 0xff);
-                                }
-                            }
-                            else
-                                stream.put(str[i]);
-                            break;
-                    }
-                }
-            }
-
             return stream;
         }
 
@@ -300,10 +245,77 @@ namespace cppdatalib
             return stream;
         }
 
-        class stream_writer : public core::stream_handler, public core::stream_writer
+        namespace impl
+        {
+            class stream_writer_base : public core::stream_handler, public core::stream_writer
+            {
+            public:
+                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+
+            protected:
+                std::ostream &write_string(std::ostream &stream, const std::string &str)
+                {
+                    for (size_t i = 0; i < str.size(); ++i)
+                    {
+                        int c = str[i] & 0xff;
+
+                        if (c == '"' || c == '\\')
+                        {
+                            stream.put('\\');
+                            stream.put(c);
+                        }
+                        else
+                        {
+                            switch (c)
+                            {
+                                case '"':
+                                case '\\': stream.put('\\'); stream.put(c); break;
+                                case '\b': stream.write("\\b", 2); break;
+                                case '\n': stream.write("\\n", 2); break;
+                                case '\r': stream.write("\\r", 2); break;
+                                case '\t': stream.write("\\t", 2); break;
+                                default:
+                                    if (iscntrl(c))
+                                        stream.put('\\').put(c >> 6).put((c >> 3) & 0x7).put(c & 0x7);
+                                    else if (static_cast<unsigned char>(str[i]) > 0x7f)
+                                    {
+                                        std::string utf8_string;
+                                        size_t j;
+                                        for (j = i; j < str.size() && static_cast<unsigned char>(str[j]) > 0x7f; ++j)
+                                            utf8_string.push_back(str[j]);
+
+                                        if (j < str.size())
+                                            utf8_string.push_back(str[j]);
+
+                                        i = j;
+
+                                        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf8;
+                                        std::u16string wstr = utf8.from_bytes(utf8_string);
+
+                                        for (j = 0; j < wstr.size(); ++j)
+                                        {
+                                            uint16_t c = wstr[j];
+
+                                            hex::write(stream.write("\\U", 2), c >> 8);
+                                            hex::write(stream, c & 0xff);
+                                        }
+                                    }
+                                    else
+                                        stream.put(str[i]);
+                                    break;
+                            }
+                        }
+                    }
+
+                    return stream;
+                }
+            };
+        }
+
+        class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+            stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
             void begin_item_(const core::value &)
@@ -358,7 +370,7 @@ namespace cppdatalib
                     default: output_stream.put('"'); break;
                 }
             }
-            void string_data_(const core::value &v)
+            void string_data_(const core::value &v, bool)
             {
                 if (v.get_subtype() == core::blob)
                     hex::write(output_stream, v.get_string());
@@ -384,7 +396,7 @@ namespace cppdatalib
             void end_object_(const core::value &, bool) {output_stream.put('}');}
         };
 
-        class pretty_stream_writer : public core::stream_handler, public core::stream_writer
+        class pretty_stream_writer : public impl::stream_writer_base
         {
             size_t indent_width;
             size_t current_indent;
@@ -406,7 +418,7 @@ namespace cppdatalib
 
         public:
             pretty_stream_writer(std::ostream &output, size_t indent_width)
-                : core::stream_writer(output)
+                : impl::stream_writer_base(output)
                 , indent_width(indent_width)
                 , current_indent(0)
             {}
@@ -473,7 +485,7 @@ namespace cppdatalib
                     default: output_stream.put('"'); break;
                 }
             }
-            void string_data_(const core::value &v)
+            void string_data_(const core::value &v, bool)
             {
                 if (v.get_subtype() == core::blob)
                     hex::write(output_stream, v.get_string());
@@ -523,49 +535,27 @@ namespace cppdatalib
             }
         };
 
-        inline std::istream &operator>>(std::istream &stream, core::value &v)
-        {
-            core::value_builder builder(v);
-            convert(stream, builder);
-            return stream;
-        }
-
-        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
-        {
-            stream_writer writer(stream);
-            core::convert(v, writer);
-            return stream;
-        }
-
-        inline std::ostream &pretty_print(std::ostream &stream, const core::value &v, size_t indent_width)
-        {
-            pretty_stream_writer writer(stream, indent_width);
-            core::convert(v, writer);
-            return stream;
-        }
-
-        inline std::istream &input(std::istream &stream, core::value &v) {return stream >> v;}
-        inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
-
-        inline core::value from_plain_text_property_list(const std::string &property_list)
+        /*inline core::value from_plain_text_property_list(const std::string &property_list)
         {
             std::istringstream stream(property_list);
             core::value v;
             stream >> v;
             return v;
-        }
+        }*/
 
         inline std::string to_plain_text_property_list(const core::value &v)
         {
             std::ostringstream stream;
-            stream << v;
+            stream_writer writer(stream);
+            writer << v;
             return stream.str();
         }
 
         inline std::string to_pretty_plain_text_property_list(const core::value &v, size_t indent_width)
         {
             std::ostringstream stream;
-            pretty_print(stream, v, indent_width);
+            pretty_stream_writer writer(stream, indent_width);
+            writer << v;
             return stream.str();
         }
     }

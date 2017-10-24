@@ -9,35 +9,45 @@ namespace cppdatalib
 
     namespace xml_rpc
     {
-        inline std::ostream &write_string(std::ostream &stream, const std::string &str)
+        namespace impl
         {
-            for (size_t i = 0; i < str.size(); ++i)
+            class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
-                int c = str[i] & 0xff;
+            public:
+                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
 
-                switch (c)
+            protected:
+                std::ostream &write_string(std::ostream &stream, const std::string &str)
                 {
-                    case '"': stream.write("&quot;", 6); break;
-                    case '&': stream.write("&amp;", 5); break;
-                    case '\'': stream.write("&apos;", 6); break;
-                    case '<': stream.write("&lt;", 4); break;
-                    case '>': stream.write("&gt;", 4); break;
-                    default:
-                        if (iscntrl(c))
-                            stream.write("&#", 2).put(c).put(';');
-                        else
-                            stream.put(str[i]);
-                        break;
-                }
-            }
+                    for (size_t i = 0; i < str.size(); ++i)
+                    {
+                        int c = str[i] & 0xff;
 
-            return stream;
+                        switch (c)
+                        {
+                            case '"': stream.write("&quot;", 6); break;
+                            case '&': stream.write("&amp;", 5); break;
+                            case '\'': stream.write("&apos;", 6); break;
+                            case '<': stream.write("&lt;", 4); break;
+                            case '>': stream.write("&gt;", 4); break;
+                            default:
+                                if (iscntrl(c))
+                                    stream.write("&#", 2).put(c).put(';');
+                                else
+                                    stream.put(str[i]);
+                                break;
+                        }
+                    }
+
+                    return stream;
+                }
+            };
         }
 
-        class stream_writer : public core::stream_handler, public core::stream_writer
+        class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+            stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
             void begin_key_(const core::value &v)
@@ -63,7 +73,7 @@ namespace cppdatalib
                 else
                     output_stream << "<value><string>";
             }
-            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool is_key)
             {
                 if (is_key)
@@ -84,7 +94,7 @@ namespace cppdatalib
             }
         };
 
-        class pretty_stream_writer : public core::stream_handler, public core::stream_writer
+        class pretty_stream_writer : public impl::stream_writer_base
         {
             size_t indent_width;
             size_t current_indent;
@@ -96,7 +106,7 @@ namespace cppdatalib
             }
 
         public:
-            pretty_stream_writer(std::ostream &output, size_t indent_width) : core::stream_writer(output), indent_width(indent_width) {}
+            pretty_stream_writer(std::ostream &output, size_t indent_width) : impl::stream_writer_base(output), indent_width(indent_width) {}
 
         protected:
             void begin_() {current_indent = 0;}
@@ -168,7 +178,7 @@ namespace cppdatalib
                     output_stream << "<string>";
                 }
             }
-            void string_data_(const core::value &v)
+            void string_data_(const core::value &v, bool)
             {
                 if (current_container_size() == 0)
                     output_stream << '\n', output_padding(current_indent + indent_width);
@@ -230,19 +240,11 @@ namespace cppdatalib
             }
         };
 
-        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
-        {
-            stream_writer writer(stream);
-            core::convert(v, writer);
-            return stream;
-        }
-
-        inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
-
         inline std::string to_xml_rpc(const core::value &v)
         {
             std::ostringstream stream;
-            stream << v;
+            stream_writer writer(stream);
+            writer << v;
             return stream.str();
         }
     }

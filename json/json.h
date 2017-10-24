@@ -7,214 +7,231 @@ namespace cppdatalib
 {
     namespace json
     {
-        // Opening quote should already be read
-        inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
+        class parser : public core::stream_parser
         {
-            static const std::string hex = "0123456789ABCDEF";
-
-            int c;
-            char buffer[core::buffer_size + core::max_utf8_code_sequence_size + 1];
-            char *write = buffer;
-
-            writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
-            while (c = stream.get(), c != '"' && c != EOF)
+        private:
+            // Opening quote should already be read
+            std::istream &read_string(std::istream &stream, core::stream_handler &writer)
             {
-                if (c == '\\')
+                static const std::string hex = "0123456789ABCDEF";
+
+                int c;
+                char buffer[core::buffer_size + core::max_utf8_code_sequence_size + 1];
+                char *write = buffer;
+
+                writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+                while (c = stream.get(), c != '"' && c != EOF)
                 {
-                    c = stream.get();
-                    if (c == EOF) throw core::error("JSON - unexpected end of string");
-
-                    switch (c)
+                    if (c == '\\')
                     {
-                        case 'b': *write++ = ('\b'); break;
-                        case 'f': *write++ = ('\f'); break;
-                        case 'n': *write++ = ('\n'); break;
-                        case 'r': *write++ = ('\r'); break;
-                        case 't': *write++ = ('\t'); break;
-                        case 'u':
+                        c = stream.get();
+                        if (c == EOF) throw core::error("JSON - unexpected end of string");
+
+                        switch (c)
                         {
-                            uint32_t code = 0;
-                            for (int i = 0; i < 4; ++i)
+                            case 'b': *write++ = ('\b'); break;
+                            case 'f': *write++ = ('\f'); break;
+                            case 'n': *write++ = ('\n'); break;
+                            case 'r': *write++ = ('\r'); break;
+                            case 't': *write++ = ('\t'); break;
+                            case 'u':
                             {
-                                c = stream.get();
-                                if (c == EOF) throw core::error("JSON - unexpected end of string");
-                                size_t pos = hex.find(toupper(c));
-                                if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
-                                code = (code << 4) | pos;
+                                uint32_t code = 0;
+                                for (int i = 0; i < 4; ++i)
+                                {
+                                    c = stream.get();
+                                    if (c == EOF) throw core::error("JSON - unexpected end of string");
+                                    size_t pos = hex.find(toupper(c));
+                                    if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
+                                    code = (code << 4) | pos;
+                                }
+
+                                std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+                                std::string bytes = utf8.to_bytes(code);
+
+                                memcpy(write, bytes.c_str(), bytes.size());
+                                write += bytes.size();
+
+                                break;
                             }
-
-                            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                            std::string bytes = utf8.to_bytes(code);
-
-                            memcpy(write, bytes.c_str(), bytes.size());
-                            write += bytes.size();
-
-                            break;
+                            default:
+                                *write++ = c;
+                                break;
                         }
-                        default:
-                            *write++ = c;
-                            break;
+                    }
+                    else
+                        *write++ = c;
+
+                    if (write - buffer >= core::buffer_size)
+                    {
+                        *write = 0;
+                        writer.append_to_string(buffer);
+                        write = buffer;
                     }
                 }
-                else
-                    *write++ = c;
 
-                if (write - buffer >= core::buffer_size)
+                if (c == EOF)
+                    throw core::error("JSON - unexpected end of string");
+
+                if (write != buffer)
                 {
                     *write = 0;
                     writer.append_to_string(buffer);
-                    write = buffer;
                 }
+                writer.end_string(core::string_t());
+                return stream;
             }
 
-            if (c == EOF)
-                throw core::error("JSON - unexpected end of string");
+        public:
+            parser(std::istream &input) : core::stream_parser(input) {}
 
-            if (write != buffer)
+            core::stream_parser &convert(core::stream_handler &writer)
             {
-                *write = 0;
-                writer.append_to_string(buffer);
-            }
-            writer.end_string(core::string_t());
-            return stream;
-        }
+                bool delimiter_required = false;
+                char chr;
 
-        inline std::ostream &write_string(std::ostream &stream, const std::string &str)
-        {
-            for (size_t i = 0; i < str.size(); ++i)
-            {
-                int c = str[i] & 0xff;
+                writer.begin();
 
-                if (c == '"' || c == '\\')
+                input_stream >> std::skipws;
+                while (input_stream >> chr, input_stream.good() && !input_stream.eof())
                 {
-                    stream.put('\\');
-                    stream.put(c);
-                }
-                else
-                {
-                    switch (c)
+                    if (writer.nesting_depth() == 0 && delimiter_required)
+                        break;
+
+                    if (delimiter_required && !strchr(",:]}", chr))
+                        throw core::error("JSON - expected ',' separating array or object entries");
+
+                    switch (chr)
                     {
-                        case '"':
-                        case '\\':
-                            stream.put('\\');
-                            stream.put(c);
+                        case 'n':
+                            if (!core::stream_starts_with(input_stream, "ull")) throw core::error("JSON - expected 'null' value");
+                            writer.write(core::null_t());
+                            delimiter_required = true;
                             break;
-                        case '\b': stream.write("\\b", 2); break;
-                        case '\f': stream.write("\\f", 2); break;
-                        case '\n': stream.write("\\n", 2); break;
-                        case '\r': stream.write("\\r", 2); break;
-                        case '\t': stream.write("\\t", 2); break;
+                        case 't':
+                            if (!core::stream_starts_with(input_stream, "rue")) throw core::error("JSON - expected 'true' value");
+                            writer.write(true);
+                            delimiter_required = true;
+                            break;
+                        case 'f':
+                            if (!core::stream_starts_with(input_stream, "alse")) throw core::error("JSON - expected 'false' value");
+                            writer.write(false);
+                            delimiter_required = true;
+                            break;
+                        case '"':
+                            read_string(input_stream, writer);
+                            delimiter_required = true;
+                            break;
+                        case ',':
+                            if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
+                                throw core::error("JSON - invalid ',' does not separate array or object entries");
+                            input_stream >> chr; input_stream.unget(); // Peek ahead
+                            if (!input_stream || chr == ',' || chr == ']' || chr == '}')
+                                throw core::error("JSON - invalid ',' does not separate array or object entries");
+                            delimiter_required = false;
+                            break;
+                        case ':':
+                            if (!writer.container_key_was_just_parsed())
+                                throw core::error("JSON - invalid ':' does not separate a key and value pair");
+                            delimiter_required = false;
+                            break;
+                        case '[':
+                            writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                            delimiter_required = false;
+                            break;
+                        case ']':
+                            writer.end_array(core::array_t());
+                            delimiter_required = true;
+                            break;
+                        case '{':
+                            writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
+                            delimiter_required = false;
+                            break;
+                        case '}':
+                            writer.end_object(core::object_t());
+                            delimiter_required = true;
+                            break;
                         default:
-                            if (iscntrl(c))
-                                hex::write(stream.write("\\u00", 4), c);
+                            input_stream.unget();
+                            if (isdigit(chr) || chr == '-')
+                            {
+                                core::real_t r;
+                                input_stream >> r;
+                                if (!input_stream)
+                                    writer.write(core::null_t());
+                                else if (r == std::trunc(r) && r >= INT64_MIN && r <= INT64_MAX)
+                                    writer.write(static_cast<core::int_t>(r));
+                                else
+                                    writer.write(r);
+
+                                delimiter_required = true;
+                            }
                             else
-                                stream.put(str[i]);
+                                throw core::error("JSON - expected value");
                             break;
                     }
                 }
+
+                if (!delimiter_required)
+                    throw core::error("JSON - expected value");
+
+                writer.end();
+                return *this;
             }
+        };
 
-            return stream;
-        }
-
-        inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
+        namespace impl
         {
-            bool delimiter_required = false;
-            char chr;
-
-            writer.begin();
-
-            stream >> std::skipws;
-            while (stream >> chr, stream.good() && !stream.eof())
+            class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
-                if (writer.nesting_depth() == 0 && delimiter_required)
-                    break;
+            public:
+                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
 
-                if (delimiter_required && !strchr(",:]}", chr))
-                    throw core::error("JSON - expected ',' separating array or object entries");
-
-                switch (chr)
+            protected:
+                std::ostream &write_string(std::ostream &stream, const std::string &str)
                 {
-                    case 'n':
-                        if (!core::stream_starts_with(stream, "ull")) throw core::error("JSON - expected 'null' value");
-                        writer.write(core::null_t());
-                        delimiter_required = true;
-                        break;
-                    case 't':
-                        if (!core::stream_starts_with(stream, "rue")) throw core::error("JSON - expected 'true' value");
-                        writer.write(true);
-                        delimiter_required = true;
-                        break;
-                    case 'f':
-                        if (!core::stream_starts_with(stream, "alse")) throw core::error("JSON - expected 'false' value");
-                        writer.write(false);
-                        delimiter_required = true;
-                        break;
-                    case '"':
-                        read_string(stream, writer);
-                        delimiter_required = true;
-                        break;
-                    case ',':
-                        if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
-                            throw core::error("JSON - invalid ',' does not separate array or object entries");
-                        stream >> chr; stream.unget(); // Peek ahead
-                        if (!stream || chr == ',' || chr == ']' || chr == '}')
-                            throw core::error("JSON - invalid ',' does not separate array or object entries");
-                        delimiter_required = false;
-                        break;
-                    case ':':
-                        if (!writer.container_key_was_just_parsed())
-                            throw core::error("JSON - invalid ':' does not separate a key and value pair");
-                        delimiter_required = false;
-                        break;
-                    case '[':
-                        writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
-                        delimiter_required = false;
-                        break;
-                    case ']':
-                        writer.end_array(core::array_t());
-                        delimiter_required = true;
-                        break;
-                    case '{':
-                        writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
-                        delimiter_required = false;
-                        break;
-                    case '}':
-                        writer.end_object(core::object_t());
-                        delimiter_required = true;
-                        break;
-                    default:
-                        stream.unget();
-                        if (isdigit(chr) || chr == '-')
-                        {
-                            core::real_t r;
-                            stream >> r;
-                            if (!stream)
-                                writer.write(core::null_t());
-                            else if (r == std::trunc(r) && r >= INT64_MIN && r <= INT64_MAX)
-                                writer.write(static_cast<core::int_t>(r));
-                            else
-                                writer.write(r);
+                    for (size_t i = 0; i < str.size(); ++i)
+                    {
+                        int c = str[i] & 0xff;
 
-                            delimiter_required = true;
+                        if (c == '"' || c == '\\')
+                        {
+                            stream.put('\\');
+                            stream.put(c);
                         }
                         else
-                            throw core::error("JSON - expected value");
-                        break;
+                        {
+                            switch (c)
+                            {
+                                case '"':
+                                case '\\':
+                                    stream.put('\\');
+                                    stream.put(c);
+                                    break;
+                                case '\b': stream.write("\\b", 2); break;
+                                case '\f': stream.write("\\f", 2); break;
+                                case '\n': stream.write("\\n", 2); break;
+                                case '\r': stream.write("\\r", 2); break;
+                                case '\t': stream.write("\\t", 2); break;
+                                default:
+                                    if (iscntrl(c))
+                                        hex::write(stream.write("\\u00", 4), c);
+                                    else
+                                        stream.put(str[i]);
+                                    break;
+                            }
+                        }
+                    }
+
+                    return stream;
                 }
-            }
-
-            if (!delimiter_required)
-                throw core::error("JSON - expected value");
-
-            writer.end();
-            return stream;
+            };
         }
 
-        class stream_writer : public core::stream_handler, public core::stream_writer
+        class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+            stream_writer(std::ostream &output) : stream_writer_base(output) {}
 
         protected:
             void begin_item_(const core::value &)
@@ -229,8 +246,9 @@ namespace cppdatalib
                 if (current_container_size() > 0)
                     output_stream.put(',');
 
-                if (!v.is_string())
-                    throw core::error("JSON - cannot write non-string key");
+                (void) v;
+                //if (!v.is_string())
+                //    throw core::error("JSON - cannot write non-string key");
             }
 
             void null_(const core::value &) {output_stream << "null";}
@@ -244,7 +262,7 @@ namespace cppdatalib
                 output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();
             }
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
-            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool) {output_stream.put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('[');}
@@ -254,7 +272,7 @@ namespace cppdatalib
             void end_object_(const core::value &, bool) {output_stream.put('}');}
         };
 
-        class pretty_stream_writer : public core::stream_handler, public core::stream_writer
+        class pretty_stream_writer : public impl::stream_writer_base
         {
             size_t indent_width;
             size_t current_indent;
@@ -276,7 +294,7 @@ namespace cppdatalib
 
         public:
             pretty_stream_writer(std::ostream &output, size_t indent_width)
-                : core::stream_writer(output)
+                : stream_writer_base(output)
                 , indent_width(indent_width)
                 , current_indent(0)
             {}
@@ -318,7 +336,7 @@ namespace cppdatalib
                 output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();
             }
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
-            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool) {output_stream.put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool)
@@ -352,42 +370,20 @@ namespace cppdatalib
             }
         };
 
-        inline std::istream &operator>>(std::istream &stream, core::value &v)
-        {
-            core::value_builder builder(v);
-            convert(stream, builder);
-            return stream;
-        }
-
-        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
-        {
-            stream_writer writer(stream);
-            core::convert(v, writer);
-            return stream;
-        }
-
-        inline std::istream &input(std::istream &stream, core::value &v) {return stream >> v;}
-        inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
-
-        inline std::ostream &pretty_print(std::ostream &stream, const core::value &v, size_t indent_width)
-        {
-            pretty_stream_writer writer(stream, indent_width);
-            core::convert(v, writer);
-            return stream;
-        }
-
         inline core::value from_json(const std::string &json)
         {
             std::istringstream stream(json);
+            parser reader(stream);
             core::value v;
-            stream >> v;
+            reader >> v;
             return v;
         }
 
         inline std::string to_json(const core::value &v)
         {
             std::ostringstream stream;
-            stream << v;
+            stream_writer writer(stream);
+            writer << v;
             return stream.str();
         }
 
@@ -395,7 +391,7 @@ namespace cppdatalib
         {
             std::ostringstream stream;
             pretty_stream_writer writer(stream, indent_width);
-            core::convert(v, writer);
+            writer << v;
             return stream.str();
         }
     }

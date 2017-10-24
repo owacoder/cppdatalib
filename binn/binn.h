@@ -3,6 +3,8 @@
 
 #include "../core/core.h"
 
+// TODO: Refactor into stream_parser API and impl::stream_writer_base API
+
 namespace cppdatalib
 {
     // TODO: per stream, change single character writes to put() calls, and string writes to write() calls

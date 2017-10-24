@@ -1,7 +1,8 @@
 #ifndef CPPDATALIB_STREAM_FILTERS_H
 #define CPPDATALIB_STREAM_FILTERS_H
 
-#include "stream_base.h"
+#include "value_builder.h"
+#include <set> // For duplicate_key_check_filter
 
 namespace cppdatalib
 {
@@ -186,7 +187,7 @@ namespace cppdatalib
                 output1.begin_string(v, size);
                 output2.begin_string(v, size);
             }
-            void string_data_(const value &v)
+            void string_data_(const value &v, bool)
             {
                 output1.append_to_string(v);
                 output2.append_to_string(v);
@@ -195,6 +196,125 @@ namespace cppdatalib
             {
                 output1.end_string(v);
                 output2.end_string(v);
+            }
+        };
+
+        // TODO: duplicate_key_check_filter doesn't do much good as a separate filter unless core::value supports duplicate-key maps
+        class duplicate_key_check_filter : public core::stream_handler
+        {
+            class layer
+            {
+                void operator=(const layer &) {}
+
+            public:
+                layer() : key_builder(key) {}
+                // WARNING: layers should NOT be copied while key_builder.active() is true!!!
+                // This will corrupt the internal state, since value_builders cannot be copied!
+                // The following constructors are SOLELY for interoperability with the STL, when the layer is inactive
+                layer(const layer &other)
+                    : key(other.key)
+                    , key_builder(key)
+                    , keys(other.keys)
+                {}
+                layer(layer &&other)
+                    : key(std::move(other.key))
+                    , key_builder(key)
+                    , keys(std::move(other.keys))
+                {}
+
+                void begin() {key_builder.begin();}
+                void end() {key_builder.end();}
+
+                value key;
+                value_builder key_builder;
+                std::set<core::value> keys;
+            };
+
+            core::stream_handler &output;
+
+            // WARNING: Underlying container type of `layer`s MUST not copy stored layers when adding to it,
+            // so the value_builders in the layer don't get corrupted (i.e. DON'T USE A VECTOR)
+            std::list<layer> layers;
+
+        public:
+            duplicate_key_check_filter(core::stream_handler &output) : output(output) {}
+
+        protected:
+            void begin_() {output.begin();}
+            void end_() {output.end();}
+
+            void begin_key_(const value &) {layers.back().begin();}
+            void end_key_(const value &)
+            {
+                layers.back().end();
+
+                // Check against already parsed keys for current object, if it exists, throw an error
+                if (layers.back().keys.find(layers.back().key) != layers.back().keys.end())
+                    throw core::error("cppdatalib::duplicate_key_check_filter - Invalid duplicate object key found");
+                else
+                    layers.back().keys.insert(layers.back().key);
+            }
+
+            void begin_scalar_(const value &v, bool)
+            {
+                output.write(v);
+                for (auto i = layers.begin(); i != layers.end(); ++i)
+                    if (i->key_builder.active())
+                        i->key_builder.write(v);
+            }
+
+            void begin_array_(const value &v, int_t size, bool)
+            {
+                output.begin_array(v, size);
+                for (auto i = layers.begin(); i != layers.end(); ++i)
+                    if (i->key_builder.active())
+                        i->key_builder.begin_array(v, size);
+            }
+            void end_array_(const value &v, bool)
+            {
+                output.end_array(v);
+                for (auto i = layers.begin(); i != layers.end(); ++i)
+                    if (i->key_builder.active())
+                        i->key_builder.end_array(v);
+            }
+
+            void begin_object_(const value &v, int_t size, bool)
+            {
+                output.begin_object(v, size);
+                for (auto i = layers.begin(); i != layers.end(); ++i)
+                    if (i->key_builder.active())
+                        i->key_builder.begin_object(v, size);
+                layers.push_back(layer());
+            }
+            void end_object_(const value &v, bool)
+            {
+                output.end_object(v);
+                layers.pop_back();
+                for (auto i = layers.begin(); i != layers.end(); ++i)
+                    if (i->key_builder.active())
+                        i->key_builder.end_object(v);
+            }
+
+            void begin_string_(const value &v, int_t size, bool)
+            {
+                output.begin_string(v, size);
+                for (auto i = layers.begin(); i != layers.end(); ++i)
+                    if (i->key_builder.active())
+                        i->key_builder.begin_string(v, size);
+            }
+            void string_data_(const value &v, bool)
+            {
+                output.append_to_string(v);
+                for (auto i = layers.begin(); i != layers.end(); ++i)
+                    if (i->key_builder.active())
+                        i->key_builder.append_to_string(v);
+            }
+            void end_string_(const value &v, bool)
+            {
+                output.end_string(v);
+                for (auto i = layers.begin(); i != layers.end(); ++i)
+                    if (i->key_builder.active())
+                        i->key_builder.end_string(v);
             }
         };
 
@@ -239,7 +359,7 @@ namespace cppdatalib
                 else
                     output.begin_string(v, size);
             }
-            void string_data_(const value &v)
+            void string_data_(const value &v, bool)
             {
                 if (from == core::string && from != to)
                     str.get_string() += v.get_string();
@@ -299,7 +419,7 @@ namespace cppdatalib
                 else
                     output.begin_string(v, size);
             }
-            void string_data_(const value &v)
+            void string_data_(const value &v, bool)
             {
                 if (from == core::string)
                     str.get_string() += v.get_string();
@@ -349,7 +469,7 @@ namespace cppdatalib
             void end_object_(const value &v, bool) {output.end_object(v);}
 
             void begin_string_(const value &, int_t, bool) {str.set_string("");}
-            void string_data_(const value &v) {str.get_string() += v.get_string();}
+            void string_data_(const value &v, bool) {str.get_string() += v.get_string();}
             void end_string_(const value &, bool)
             {
                 convert(str);

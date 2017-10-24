@@ -7,35 +7,45 @@ namespace cppdatalib
 {
     namespace xml_xls
     {
-        inline std::ostream &write_string(std::ostream &stream, const std::string &str)
+        namespace impl
         {
-            for (size_t i = 0; i < str.size(); ++i)
+            class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
-                int c = str[i] & 0xff;
+            public:
+                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
 
-                switch (c)
+            protected:
+                std::ostream &write_string(std::ostream &stream, const std::string &str)
                 {
-                    case '"': stream.write("&quot;", 6); break;
-                    case '&': stream.write("&amp;", 5); break;
-                    case '\'': stream.write("&apos;", 6); break;
-                    case '<': stream.write("&lt;", 4); break;
-                    case '>': stream.write("&gt;", 4); break;
-                    default:
-                        if (iscntrl(c))
-                            stream.write("&#", 2).put(c).put(';');
-                        else
-                            stream.put(str[i]);
-                        break;
-                }
-            }
+                    for (size_t i = 0; i < str.size(); ++i)
+                    {
+                        int c = str[i] & 0xff;
 
-            return stream;
+                        switch (c)
+                        {
+                            case '"': stream.write("&quot;", 6); break;
+                            case '&': stream.write("&amp;", 5); break;
+                            case '\'': stream.write("&apos;", 6); break;
+                            case '<': stream.write("&lt;", 4); break;
+                            case '>': stream.write("&gt;", 4); break;
+                            default:
+                                if (iscntrl(c))
+                                    stream.write("&#", 2).put(c).put(';');
+                                else
+                                    stream.put(str[i]);
+                                break;
+                        }
+                    }
+
+                    return stream;
+                }
+            };
         }
 
-        class table_writer : public core::stream_handler, public core::stream_writer
+        class table_writer : public impl::stream_writer_base
         {
         public:
-            table_writer(std::ostream &output) : core::stream_writer(output) {}
+            table_writer(std::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
             void begin_() {output_stream << "<Table>";}
@@ -86,7 +96,7 @@ namespace cppdatalib
             void integer_(const core::value &v) {output_stream << v.get_int();}
             void uinteger_(const core::value &v) {output_stream << v.get_uint();}
             void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
-            void string_data_(const core::value &v) {write_string(output_stream, v.get_string());}
+            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
@@ -165,21 +175,39 @@ namespace cppdatalib
             }
         };
 
-        inline std::ostream &operator<<(std::ostream &stream, const core::value &v)
-        {
-            table_writer writer(stream);
-            core::convert(v, writer);
-            return stream;
-        }
-
-        inline std::ostream &print(std::ostream &stream, const core::value &v) {return stream << v;}
-
-        inline std::string to_xml_xls(const core::value &v)
+        inline std::string to_xml_xls_table(const core::value &v)
         {
             std::ostringstream stream;
-            stream << v;
+            table_writer writer(stream);
+            writer << v;
             return stream.str();
         }
+
+        inline std::string to_xml_xls_worksheet(const core::value &v, const std::string &worksheet_name)
+        {
+            std::ostringstream stream;
+            worksheet_writer writer(stream, worksheet_name);
+            writer << v;
+            return stream.str();
+        }
+
+        inline std::string to_xml_xls_workbook(const core::value &v, const std::string &worksheet_name)
+        {
+            std::ostringstream stream;
+            workbook_writer writer(stream, worksheet_name);
+            writer << v;
+            return stream.str();
+        }
+
+        inline std::string to_xml_xls_document(const core::value &v, const std::string &worksheet_name)
+        {
+            std::ostringstream stream;
+            document_writer writer(stream, worksheet_name);
+            writer << v;
+            return stream.str();
+        }
+
+        inline std::string to_xml_xls(const core::value &v, const std::string &worksheet_name) {return to_xml_xls_document(v, worksheet_name);}
     }
 }
 

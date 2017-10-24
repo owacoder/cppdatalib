@@ -2,6 +2,7 @@
 #define CPPDATALIB_VALUE_BUILDER_H
 
 #include "stream_base.h"
+#include <list>
 
 namespace cppdatalib
 {
@@ -11,7 +12,9 @@ namespace cppdatalib
         {
             core::value &v;
 
-            std::stack<core::value, std::vector<core::value>> keys;
+            // WARNING: Underlying container type of `keys` MUST be able to maintain element positions
+            // so their addresses don't change (i.e. NOT VECTOR)
+            std::stack<core::value, std::list<core::value>> keys;
             std::stack<core::value *, std::vector<core::value *>> references;
 
         public:
@@ -23,10 +26,8 @@ namespace cppdatalib
             // begin_() clears the bound value to null and pushes a reference to it
             void begin_()
             {
-                while (!keys.empty())
-                    keys.pop();
-                while (!references.empty())
-                    references.pop();
+                keys = decltype(keys)();
+                references = decltype(references)();
 
                 v.set_null();
                 references.push(&this->v);
@@ -58,7 +59,7 @@ namespace cppdatalib
                     *references.top() = v;
             }
 
-            void string_data_(const core::value &v)
+            void string_data_(const core::value &v, bool)
             {
                 references.top()->get_string() += v.get_string();
             }
@@ -105,7 +106,7 @@ namespace cppdatalib
             void end_object_(const core::value &, bool is_key) {end_container(is_key);}
         };
 
-        inline value &assign(value &dst, const value &src)
+        inline value &value::assign(value &dst, const value &src)
         {
             switch (src.get_type())
             {
@@ -118,11 +119,32 @@ namespace cppdatalib
                 case object:
                 {
                     value_builder builder(dst);
-                    convert(src, builder);
+                    builder << src;
                     return dst;
                 }
                 default: dst.set_null(); return dst;
             }
+        }
+
+        // Convert directly from value to serializer
+        stream_handler &operator<<(stream_handler &output, const value &input)
+        {
+            value::traverse_node_prefix_serialize prefix(output);
+            value::traverse_node_postfix_serialize postfix(output);
+
+            output.begin();
+            input.traverse(prefix, postfix);
+            output.end();
+
+            return output;
+        }
+
+        // Convert directly from parser to value
+        stream_parser &operator>>(stream_parser &input, value &output)
+        {
+            value_builder builder(output);
+            input.convert(builder);
+            return input;
         }
     }
 }

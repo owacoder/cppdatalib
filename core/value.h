@@ -91,9 +91,6 @@ namespace cppdatalib
 
         class value
         {
-            friend stream_handler &convert(const value &v, stream_handler &handler);
-            friend value &assign(value &dest, const value &src);
-
             struct traversal_reference
             {
                 traversal_reference(value *p, array_t::iterator a, object_t::iterator o)
@@ -237,6 +234,9 @@ namespace cppdatalib
             struct traverse_node_prefix_serialize;
             struct traverse_node_postfix_serialize;
 
+            friend stream_handler &operator<<(stream_handler &output, const value &input);
+            static value &assign(value &dst, const value &src);
+
         public:
             value() : type_(null), subtype_(0) {}
             value(bool_t v, subtype_t subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
@@ -328,6 +328,7 @@ namespace cppdatalib
                 return value();
             }
             value &operator[](const string_t &key) {clear(object); return obj_[key];}
+            value &operator[](string_t &&key) {clear(object); return obj_[key];}
             value member(const value &key) const
             {
                 auto it = obj_.find(key);
@@ -336,6 +337,7 @@ namespace cppdatalib
                 return value();
             }
             value &member(const value &key) {clear(object); return obj_[key];}
+            value &member(value &&key) {clear(object); return obj_[key];}
             const value *member_ptr(const value &key) const
             {
                 auto it = obj_.find(key);

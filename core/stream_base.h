@@ -25,6 +25,7 @@ namespace cppdatalib
 
         public:
             stream_writer(std::ostream &stream) : output_stream(stream) {}
+            virtual ~stream_writer() {}
 
             std::ostream &stream() {return output_stream;}
         };
@@ -49,13 +50,21 @@ namespace cppdatalib
                 size_t items_; // The number of items parsed into this container
             };
 
+            bool active_;
+
         public:
+            stream_handler() : active_(false) {}
+            virtual ~stream_handler() {}
+
             enum {
                 unknown_size = -1
             };
 
+            bool active() const {return active_;}
+
             void begin()
             {
+                active_ = true;
                 while (!nested_scopes.empty())
                     nested_scopes.pop_back();
                 begin_();
@@ -65,6 +74,7 @@ namespace cppdatalib
                 if (!nested_scopes.empty())
                     throw error("cppdatalib::stream_handler - unexpected end of stream");
                 end_();
+                active_ = false;
             }
 
         protected:
@@ -115,7 +125,7 @@ namespace cppdatalib
                     {
                         case string:
                             begin_string_(v, v.size(), is_key);
-                            string_data_(v);
+                            string_data_(v, is_key);
                             end_string_(v, is_key);
                             break;
                         case array:
@@ -199,7 +209,7 @@ namespace cppdatalib
 
             // Called when a scalar string is parsed
             virtual void begin_string_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
-            virtual void string_data_(const core::value &v) {(void) v;}
+            virtual void string_data_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
             virtual void end_string_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
         public:
@@ -228,7 +238,9 @@ namespace cppdatalib
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::stream_handler - attempted to append to string that was never begun");
 
-                string_data_(v);
+                string_data_(v, nested_scopes.size() > 1 &&
+                                 nested_scopes[nested_scopes.size() - 2].get_type() == object &&
+                                !nested_scopes[nested_scopes.size() - 2].key_was_parsed());
                 nested_scopes.back().items_ += v.get_string().size();
             }
             void end_string(const core::value &v)
@@ -376,6 +388,34 @@ namespace cppdatalib
             std::vector<scope_data> nested_scopes; // Used as a stack, but not a stack so we can peek below the top
         };
 
+        class stream_parser
+        {
+        protected:
+            std::istream &input_stream;
+
+        public:
+            stream_parser(std::istream &input) : input_stream(input) {}
+            virtual ~stream_parser() {}
+
+            std::istream &stream() {return input_stream;}
+
+            virtual stream_parser &convert(core::stream_handler &output) = 0;
+        };
+
+        // Convert directly from parser to serializer
+        stream_handler &operator<<(stream_handler &output, stream_parser &input)
+        {
+            input.convert(output);
+            return output;
+        }
+
+        // Convert directly from parser to serializer
+        stream_parser &operator>>(stream_parser &input, stream_handler &output)
+        {
+            input.convert(output);
+            return input;
+        }
+
         struct value::traverse_node_prefix_serialize
         {
             traverse_node_prefix_serialize(stream_handler &handler) : stream(handler) {}
@@ -409,18 +449,6 @@ namespace cppdatalib
         private:
             stream_handler &stream;
         };
-
-        inline stream_handler &convert(const value &v, stream_handler &handler)
-        {
-            value::traverse_node_prefix_serialize prefix(handler);
-            value::traverse_node_postfix_serialize postfix(handler);
-
-            handler.begin();
-            v.traverse(prefix, postfix);
-            handler.end();
-
-            return handler;
-        }
     }
 }
 

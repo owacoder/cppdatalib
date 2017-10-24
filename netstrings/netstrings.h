@@ -3,6 +3,8 @@
 
 #include "../core/value_builder.h"
 
+// TODO: Refactor into stream_parser API and impl::stream_writer_base API
+
 namespace cppdatalib
 {
     namespace netstrings
