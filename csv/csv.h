@@ -3,8 +3,6 @@
 
 #include "../core/core.h"
 
-// TODO: Refactor into stream_parser API and impl::stream_writer_base API
-
 namespace cppdatalib
 {
     namespace csv
@@ -94,7 +92,7 @@ namespace cppdatalib
                 }
             }
 
-            std::istream &read_string(std::istream &stream, core::stream_handler &writer, bool parse_as_strings)
+            std::istream &read_string(core::stream_handler &writer, bool parse_as_strings)
             {
                 int chr;
                 std::string buffer;
@@ -104,7 +102,7 @@ namespace cppdatalib
                     writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
 
                     // buffer is used to temporarily store whitespace for reading strings
-                    while (chr = stream.get(), chr != EOF && chr != ',' && chr != '\n')
+                    while (chr = input_stream.get(), chr != EOF && chr != ',' && chr != '\n')
                     {
                         if (isspace(chr))
                         {
@@ -121,17 +119,17 @@ namespace cppdatalib
                     }
 
                     if (chr != EOF)
-                        stream.unget();
+                        input_stream.unget();
 
                     writer.end_string(core::string_t());
                 }
                 else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
                 {
-                    while (chr = stream.get(), chr != EOF && chr != ',' && chr != '\n')
+                    while (chr = input_stream.get(), chr != EOF && chr != ',' && chr != '\n')
                         buffer.push_back(chr);
 
                     if (chr != EOF)
-                        stream.unget();
+                        input_stream.unget();
 
                     while (!buffer.empty() && isspace(buffer.back() & 0xff))
                         buffer.pop_back();
@@ -139,11 +137,11 @@ namespace cppdatalib
                     deduce_type(buffer, writer);
                 }
 
-                return stream;
+                return input_stream;
             }
 
-            // Expects that the leading quote has already been parsed out of the stream
-            std::istream &read_quoted_string(std::istream &stream, core::stream_handler &writer, bool parse_as_strings)
+            // Expects that the leading quote has already been parsed out of the input_stream
+            std::istream &read_quoted_string(core::stream_handler &writer, bool parse_as_strings)
             {
                 int chr;
                 std::string buffer;
@@ -153,12 +151,12 @@ namespace cppdatalib
                     writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
 
                     // buffer is used to temporarily store whitespace for reading strings
-                    while (chr = stream.get(), chr != EOF)
+                    while (chr = input_stream.get(), chr != EOF)
                     {
                         if (chr == '"')
                         {
-                            if (stream.peek() == '"')
-                                chr = stream.get();
+                            if (input_stream.peek() == '"')
+                                chr = input_stream.get();
                             else
                                 break;
                         }
@@ -181,12 +179,12 @@ namespace cppdatalib
                 }
                 else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
                 {
-                    while (chr = stream.get(), chr != EOF)
+                    while (chr = input_stream.get(), chr != EOF)
                     {
                         if (chr == '"')
                         {
-                            if (stream.peek() == '"')
-                                chr = stream.get();
+                            if (input_stream.peek() == '"')
+                                chr = input_stream.get();
                             else
                                 break;
                         }
@@ -200,7 +198,7 @@ namespace cppdatalib
                     deduce_type(buffer, writer);
                 }
 
-                return stream;
+                return input_stream;
             }
 
             options opts;
@@ -229,7 +227,7 @@ namespace cppdatalib
                     switch (chr)
                     {
                         case '"':
-                            read_quoted_string(input_stream, writer, parse_as_strings);
+                            read_quoted_string(writer, parse_as_strings);
                             comma_just_parsed = false;
                             break;
                         case ',':
@@ -257,7 +255,7 @@ namespace cppdatalib
                             if (!isspace(chr))
                             {
                                 input_stream.unget();
-                                read_string(input_stream, writer, parse_as_strings);
+                                read_string(writer, parse_as_strings);
                                 comma_just_parsed = false;
                             }
                             break;
@@ -317,6 +315,8 @@ namespace cppdatalib
             row_writer(std::ostream &output, char separator = ',') : stream_writer_base(output), separator(separator) {}
 
         protected:
+            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
@@ -326,7 +326,7 @@ namespace cppdatalib
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
             void uinteger_(const core::value &v) {output_stream << v.get_uint();}
-            void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
+            void real_(const core::value &v) {output_stream << v.get_real();}
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
             void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool) {output_stream.put('"');}
@@ -343,6 +343,8 @@ namespace cppdatalib
             stream_writer(std::ostream &output, char separator = ',') : stream_writer_base(output), separator(separator) {}
 
         protected:
+            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
@@ -357,7 +359,7 @@ namespace cppdatalib
             void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
             void integer_(const core::value &v) {output_stream << v.get_int();}
             void uinteger_(const core::value &v) {output_stream << v.get_uint();}
-            void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
+            void real_(const core::value &v) {output_stream << v.get_real();}
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
             void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
             void end_string_(const core::value &, bool) {output_stream.put('"');}

@@ -89,6 +89,20 @@ namespace cppdatalib
             cstring_t what_;
         };
 
+        /* The core value class for all of cppdatalib.
+         *
+         * To marshal and unmarshal from user-defined types, define the following two functions:
+         *
+         *     void from_cppdatalib(const cppdatalib::core::value &src);
+         *     void to_cppdatalib(cppdatalib::core::value &dst) const;
+         *
+         * `from_cppdatalib()` should assign the value in `src` to the specified variable, and `to_cppdatalib()` should
+         * serialize the value into `dst` (Note: dst will always be a null object when passed to `to_cppdatalib()`).
+         *
+         * Once these functions are defined, you can use the generic `operator=` in both directions; `value = user_type` or `user_type = value`
+         *
+         */
+
         class value
         {
             struct traversal_reference
@@ -256,6 +270,12 @@ namespace cppdatalib
             value(T v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
+            template<typename T>
+            value(T v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            {
+                assign(*this, v.to_cppdatalib());
+            }
+
             ~value()
             {
                 if ((type_ == array && arr_.size() > 0) ||
@@ -514,6 +534,13 @@ namespace cppdatalib
         };
 
         struct null_t : value {null_t() {}};
+
+        template<typename T>
+        inline T &operator=(T &dst, const value &src)
+        {
+            dst.from_cppdatalib(src);
+            return dst;
+        }
 
         // TODO: comparisons need to be non-recursive, iterative versions for stack overflow protection
 

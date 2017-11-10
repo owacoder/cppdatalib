@@ -1,9 +1,9 @@
 #ifndef CPPDATALIB_FP_CONVERT_H
 #define CPPDATALIB_FP_CONVERT_H
 
-#include <float.h>
-#include <math.h>
-#include <stdint.h>
+#include <cfloat>
+#include <cmath>
+#include <cstdint>
 
 namespace cppdatalib
 {

@@ -3,66 +3,45 @@
 
 #include "../core/core.h"
 
-// TODO: Refactor into stream_parser API
-
 namespace cppdatalib
 {
     namespace plain_text_property_list
     {
-        inline std::istream &read_string(std::istream &stream, core::stream_handler &writer)
+        class parser : public core::stream_parser
         {
-            static const std::string hex = "0123456789ABCDEF";
-
-            int c;
-            char buffer[core::buffer_size + core::max_utf8_code_sequence_size + 1];
-            char *write = buffer;
-
-            writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
-            while (c = stream.get(), c != '"' && c != EOF)
+        private:
+            std::istream &read_string(core::stream_handler &writer)
             {
-                if (c == '\\')
+                static const std::string hex = "0123456789ABCDEF";
+
+                int c;
+                char buffer[core::buffer_size + core::max_utf8_code_sequence_size + 1];
+                char *write = buffer;
+
+                writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+                while (c = input_stream.get(), c != '"' && c != EOF)
                 {
-                    c = stream.get();
-                    if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
-
-                    switch (c)
+                    if (c == '\\')
                     {
-                        case 'b': *write++ = ('\b'); break;
-                        case 'n': *write++ = ('\n'); break;
-                        case 'r': *write++ = ('\r'); break;
-                        case 't': *write++ = ('\t'); break;
-                        case 'U':
+                        c = input_stream.get();
+                        if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
+
+                        switch (c)
                         {
-                            uint32_t code = 0;
-                            for (int i = 0; i < 4; ++i)
-                            {
-                                c = stream.get();
-                                if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
-                                size_t pos = hex.find(toupper(c));
-                                if (pos == std::string::npos) throw core::error("Plain Text Property List - invalid character escape sequence");
-                                code = (code << 4) | pos;
-                            }
-
-                            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-                            std::string bytes = utf8.to_bytes(code);
-
-                            memcpy(write, bytes.c_str(), bytes.size());
-                            write += bytes.size();
-
-                            break;
-                        }
-                        default:
-                        {
-                            if (isdigit(c))
+                            case 'b': *write++ = ('\b'); break;
+                            case 'n': *write++ = ('\n'); break;
+                            case 'r': *write++ = ('\r'); break;
+                            case 't': *write++ = ('\t'); break;
+                            case 'U':
                             {
                                 uint32_t code = 0;
-                                stream.unget();
-                                for (int i = 0; i < 3; ++i)
+                                for (int i = 0; i < 4; ++i)
                                 {
-                                    c = stream.get();
+                                    c = input_stream.get();
                                     if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
-                                    if (!isdigit(c) || c == '8' || c == '9') throw core::error("Plain Text Property List - invalid character escape sequence");
-                                    code = (code << 3) | (c - '0');
+                                    size_t pos = hex.find(toupper(c));
+                                    if (pos == std::string::npos) throw core::error("Plain Text Property List - invalid character escape sequence");
+                                    code = (code << 4) | pos;
                                 }
 
                                 std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
@@ -70,180 +49,206 @@ namespace cppdatalib
 
                                 memcpy(write, bytes.c_str(), bytes.size());
                                 write += bytes.size();
-                            }
-                            else
-                                *write++ = c;
 
-                            break;
+                                break;
+                            }
+                            default:
+                            {
+                                if (isdigit(c))
+                                {
+                                    uint32_t code = 0;
+                                    input_stream.unget();
+                                    for (int i = 0; i < 3; ++i)
+                                    {
+                                        c = input_stream.get();
+                                        if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
+                                        if (!isdigit(c) || c == '8' || c == '9') throw core::error("Plain Text Property List - invalid character escape sequence");
+                                        code = (code << 3) | (c - '0');
+                                    }
+
+                                    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+                                    std::string bytes = utf8.to_bytes(code);
+
+                                    memcpy(write, bytes.c_str(), bytes.size());
+                                    write += bytes.size();
+                                }
+                                else
+                                    *write++ = c;
+
+                                break;
+                            }
                         }
                     }
-                }
-                else
-                    *write++ = c;
+                    else
+                        *write++ = c;
 
-                if (write - buffer >= core::buffer_size)
+                    if (write - buffer >= core::buffer_size)
+                    {
+                        *write = 0;
+                        writer.append_to_string(buffer);
+                        write = buffer;
+                    }
+                }
+
+                if (c == EOF)
+                    throw core::error("Plain Text Property List - unexpected end of string");
+
+                if (write != buffer)
                 {
                     *write = 0;
                     writer.append_to_string(buffer);
-                    write = buffer;
                 }
+                writer.end_string(core::string_t());
+                return input_stream;
             }
 
-            if (c == EOF)
-                throw core::error("Plain Text Property List - unexpected end of string");
+        public:
+            parser(std::istream &input) : core::stream_parser(input) {}
 
-            if (write != buffer)
+            core::stream_parser &convert(core::stream_handler &writer)
             {
-                *write = 0;
-                writer.append_to_string(buffer);
-            }
-            writer.end_string(core::string_t());
-            return stream;
-        }
+                const std::string hex = "0123456789ABCDEF";
+                bool delimiter_required = false;
+                char chr;
 
-        inline std::istream &convert(std::istream &stream, core::stream_handler &writer)
-        {
-            const std::string hex = "0123456789ABCDEF";
-            bool delimiter_required = false;
-            char chr;
+                writer.begin();
 
-            writer.begin();
-
-            while (stream >> std::skipws >> chr, stream.good() && !stream.eof())
-            {
-                if (writer.nesting_depth() == 0 && delimiter_required)
-                    break;
-
-                if (delimiter_required && !strchr(",=)}", chr))
-                    throw core::error("Plain Text Property List - expected ',' separating array or object entries");
-
-                switch (chr)
+                while (input_stream >> std::skipws >> chr, input_stream.good() && !input_stream.eof())
                 {
-                    case '<':
-                        stream >> chr;
-                        if (!stream) throw core::error("Plain Text Property List - expected '*' after '<' in value");
+                    if (writer.nesting_depth() == 0 && delimiter_required)
+                        break;
 
-                        if (chr != '*')
-                        {
-                            const core::value value_type(core::string_t(), core::blob);
-                            writer.begin_string(value_type, core::stream_handler::unknown_size);
+                    if (delimiter_required && !strchr(",=)}", chr))
+                        throw core::error("Plain Text Property List - expected ',' separating array or object entries");
 
-                            unsigned int t = 0;
-                            bool have_first_nibble = false;
+                    switch (chr)
+                    {
+                        case '<':
+                            input_stream >> chr;
+                            if (!input_stream) throw core::error("Plain Text Property List - expected '*' after '<' in value");
 
-                            while (stream && chr != '>')
+                            if (chr != '*')
                             {
-                                t <<= 4;
-                                size_t p = hex.find(toupper(static_cast<unsigned char>(chr)));
-                                if (p == std::string::npos) throw core::error("Plain Text Property List - expected hexadecimal-encoded binary data in value");
-                                t |= p;
+                                const core::value value_type(core::string_t(), core::blob);
+                                writer.begin_string(value_type, core::stream_handler::unknown_size);
 
-                                if (have_first_nibble)
-                                    writer.append_to_string(core::string_t(1, t));
+                                unsigned int t = 0;
+                                bool have_first_nibble = false;
 
-                                have_first_nibble = !have_first_nibble;
-                                stream >> chr;
+                                while (input_stream && chr != '>')
+                                {
+                                    t <<= 4;
+                                    size_t p = hex.find(toupper(static_cast<unsigned char>(chr)));
+                                    if (p == std::string::npos) throw core::error("Plain Text Property List - expected hexadecimal-encoded binary data in value");
+                                    t |= p;
+
+                                    if (have_first_nibble)
+                                        writer.append_to_string(core::string_t(1, t));
+
+                                    have_first_nibble = !have_first_nibble;
+                                    input_stream >> chr;
+                                }
+
+                                if (have_first_nibble) throw core::error("Plain Text Property List - unfinished byte in binary data");
+
+                                writer.end_string(value_type);
+                                break;
                             }
 
-                            if (have_first_nibble) throw core::error("Plain Text Property List - unfinished byte in binary data");
+                            input_stream >> chr;
+                            if (!input_stream || !strchr("BIRD", chr))
+                                throw core::error("Plain Text Property List - expected type specifier after '<*' in value");
 
-                            writer.end_string(value_type);
+                            if (chr == 'B')
+                            {
+                                input_stream >> chr;
+                                if (!input_stream || (chr != 'Y' && chr != 'N'))
+                                    throw core::error("Plain Text Property List - expected 'boolean' value after '<*B' in value");
+
+                                writer.write(chr == 'Y');
+                            }
+                            else if (chr == 'I')
+                            {
+                                core::int_t i;
+                                input_stream >> i;
+                                if (!input_stream)
+                                    throw core::error("Plain Text Property List - expected 'integer' value after '<*I' in value");
+
+                                writer.write(i);
+                            }
+                            else if (chr == 'R')
+                            {
+                                core::real_t r;
+                                input_stream >> r;
+                                if (!input_stream)
+                                    throw core::error("Plain Text Property List - expected 'real' value after '<*R' in value");
+
+                                writer.write(r);
+                            }
+                            else if (chr == 'D')
+                            {
+                                int c;
+                                const core::value value_type(core::string_t(), core::datetime);
+                                writer.begin_string(value_type, core::stream_handler::unknown_size);
+                                while (c = input_stream.get(), c != '>')
+                                {
+                                    if (c == EOF) throw core::error("Plain Text Property List - expected '>' after value");
+
+                                    writer.append_to_string(core::string_t(1, c));
+                                }
+                                input_stream.unget();
+                                writer.end_string(value_type);
+                            }
+
+                            input_stream >> chr;
+                            if (chr != '>') throw core::error("Plain Text Property List - expected '>' after value");
                             break;
-                        }
-
-                        stream >> chr;
-                        if (!stream || !strchr("BIRD", chr))
-                            throw core::error("Plain Text Property List - expected type specifier after '<*' in value");
-
-                        if (chr == 'B')
-                        {
-                            stream >> chr;
-                            if (!stream || (chr != 'Y' && chr != 'N'))
-                                throw core::error("Plain Text Property List - expected 'boolean' value after '<*B' in value");
-
-                            writer.write(chr == 'Y');
-                        }
-                        else if (chr == 'I')
-                        {
-                            core::int_t i;
-                            stream >> i;
-                            if (!stream)
-                                throw core::error("Plain Text Property List - expected 'integer' value after '<*I' in value");
-
-                            writer.write(i);
-                        }
-                        else if (chr == 'R')
-                        {
-                            core::real_t r;
-                            stream >> r;
-                            if (!stream)
-                                throw core::error("Plain Text Property List - expected 'real' value after '<*R' in value");
-
-                            writer.write(r);
-                        }
-                        else if (chr == 'D')
-                        {
-                            int c;
-                            const core::value value_type(core::string_t(), core::datetime);
-                            writer.begin_string(value_type, core::stream_handler::unknown_size);
-                            while (c = stream.get(), c != '>')
-                            {
-                                if (c == EOF) throw core::error("Plain Text Property List - expected '>' after value");
-
-                                writer.append_to_string(core::string_t(1, c));
-                            }
-                            stream.unget();
-                            writer.end_string(value_type);
-                        }
-
-                        stream >> chr;
-                        if (chr != '>') throw core::error("Plain Text Property List - expected '>' after value");
-                        break;
-                    case '"':
-                        read_string(stream, writer);
-                        delimiter_required = true;
-                        break;
-                    case ',':
-                        if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
-                            throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
-                        stream >> chr; stream.unget(); // Peek ahead
-                        if (!stream || chr == ',' || chr == ']' || chr == '}')
-                            throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
-                        delimiter_required = false;
-                        break;
-                    case '=':
-                        if (!writer.container_key_was_just_parsed())
-                            throw core::error("Plain Text Property List - invalid '=' does not separate a key and value pair");
-                        delimiter_required = false;
-                        break;
-                    case '(':
-                        writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
-                        delimiter_required = false;
-                        break;
-                    case ')':
-                        writer.end_array(core::array_t());
-                        delimiter_required = true;
-                        break;
-                    case '{':
-                        writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
-                        delimiter_required = false;
-                        break;
-                    case '}':
-                        writer.end_object(core::object_t());
-                        delimiter_required = true;
-                        break;
-                    default:
-                        throw core::error("Plain Text Property List - expected value");
-                        break;
+                        case '"':
+                            read_string(writer);
+                            delimiter_required = true;
+                            break;
+                        case ',':
+                            if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
+                                throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
+                            input_stream >> chr; input_stream.unget(); // Peek ahead
+                            if (!input_stream || chr == ',' || chr == ']' || chr == '}')
+                                throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
+                            delimiter_required = false;
+                            break;
+                        case '=':
+                            if (!writer.container_key_was_just_parsed())
+                                throw core::error("Plain Text Property List - invalid '=' does not separate a key and value pair");
+                            delimiter_required = false;
+                            break;
+                        case '(':
+                            writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                            delimiter_required = false;
+                            break;
+                        case ')':
+                            writer.end_array(core::array_t());
+                            delimiter_required = true;
+                            break;
+                        case '{':
+                            writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
+                            delimiter_required = false;
+                            break;
+                        case '}':
+                            writer.end_object(core::object_t());
+                            delimiter_required = true;
+                            break;
+                        default:
+                            throw core::error("Plain Text Property List - expected value");
+                            break;
+                    }
                 }
+
+                if (!delimiter_required)
+                    throw core::error("Plain Text Property List - expected value");
+
+                writer.end();
+                return *this;
             }
-
-            if (!delimiter_required)
-                throw core::error("Plain Text Property List - expected value");
-
-            writer.end();
-            return stream;
-        }
+        };
 
         namespace impl
         {
@@ -318,6 +323,8 @@ namespace cppdatalib
             stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
+            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+
             void begin_item_(const core::value &)
             {
                 if (container_key_was_just_parsed())
@@ -356,7 +363,7 @@ namespace cppdatalib
             void real_(const core::value &v)
             {
                 output_stream << "<*R"
-                              << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();
+                              << v.get_real();
                 output_stream.put('>');
             }
             void begin_string_(const core::value &v, core::int_t, bool)
@@ -426,7 +433,7 @@ namespace cppdatalib
             size_t indent() {return indent_width;}
 
         protected:
-            void begin_() {current_indent = 0;}
+            void begin_() {current_indent = 0; output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
@@ -471,7 +478,7 @@ namespace cppdatalib
             void real_(const core::value &v)
             {
                 output_stream << "<*R"
-                              << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();
+                              << v.get_real();
                 output_stream.put('>');
             }
             void begin_string_(const core::value &v, core::int_t, bool)

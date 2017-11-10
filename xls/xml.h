@@ -48,7 +48,7 @@ namespace cppdatalib
             table_writer(std::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
-            void begin_() {output_stream << "<Table>";}
+            void begin_() {output_stream << "<Table>"; output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
             void end_() {output_stream << "</Table>";}
 
             void begin_item_(const core::value &v)
@@ -95,7 +95,7 @@ namespace cppdatalib
             void bool_(const core::value &v) {output_stream << v.as_int();}
             void integer_(const core::value &v) {output_stream << v.get_int();}
             void uinteger_(const core::value &v) {output_stream << v.get_uint();}
-            void real_(const core::value &v) {output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();}
+            void real_(const core::value &v) {output_stream << v.get_real();}
             void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
 
             void begin_array_(const core::value &, core::int_t, bool)

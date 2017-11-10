@@ -87,19 +87,23 @@ namespace cppdatalib
 
             core::stream_parser &convert(core::stream_handler &writer)
             {
-                bool delimiter_required = false;
+                bool delimiter_required = false, get_char = true;
                 char chr;
 
                 writer.begin();
 
                 input_stream >> std::skipws;
-                while (input_stream >> chr, input_stream.good() && !input_stream.eof())
+                while (get_char? (input_stream >> chr, input_stream.good() && !input_stream.eof()): true)
                 {
-                    if (writer.nesting_depth() == 0 && delimiter_required)
-                        break;
+                    get_char = true;
 
-                    if (delimiter_required && !strchr(",:]}", chr))
-                        throw core::error("JSON - expected ',' separating array or object entries");
+                    if (delimiter_required)
+                    {
+                        if (writer.nesting_depth() == 0)
+                            break;
+                        else if (!strchr(",:]}", chr))
+                            throw core::error("JSON - expected ',' separating array or object entries");
+                    }
 
                     switch (chr)
                     {
@@ -125,7 +129,7 @@ namespace cppdatalib
                         case ',':
                             if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
                                 throw core::error("JSON - invalid ',' does not separate array or object entries");
-                            input_stream >> chr; input_stream.unget(); // Peek ahead
+                            input_stream >> chr; get_char = false; // Peek ahead
                             if (!input_stream || chr == ',' || chr == ']' || chr == '}')
                                 throw core::error("JSON - invalid ',' does not separate array or object entries");
                             delimiter_required = false;
@@ -234,6 +238,8 @@ namespace cppdatalib
             stream_writer(std::ostream &output) : stream_writer_base(output) {}
 
         protected:
+            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+
             void begin_item_(const core::value &)
             {
                 if (container_key_was_just_parsed())
@@ -259,7 +265,7 @@ namespace cppdatalib
             {
                 if (!std::isfinite(v.get_real()))
                     throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
-                output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();
+                output_stream << v.get_real();
             }
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
             void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
@@ -302,7 +308,7 @@ namespace cppdatalib
             size_t indent() {return indent_width;}
 
         protected:
-            void begin_() {current_indent = 0;}
+            void begin_() {current_indent = 0; output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
@@ -333,7 +339,7 @@ namespace cppdatalib
             {
                 if (!std::isfinite(v.get_real()))
                     throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
-                output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real();
+                output_stream << v.get_real();
             }
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
             void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}

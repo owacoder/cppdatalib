@@ -50,6 +50,8 @@ namespace cppdatalib
             stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
+            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
@@ -65,7 +67,7 @@ namespace cppdatalib
             void bool_(const core::value &v) {output_stream << "<value><boolean>" << v.as_int() << "</boolean></value>";}
             void integer_(const core::value &v) {output_stream << "<value><int>" << v.get_int() << "</int></value>";}
             void uinteger_(const core::value &v) {output_stream << "<value><int>" << v.get_uint() << "</int></value>";}
-            void real_(const core::value &v) {output_stream << "<value><double>" << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << "</double></value>";}
+            void real_(const core::value &v) {output_stream << "<value><double>" << v.get_real() << "</double></value>";}
             void begin_string_(const core::value &, core::int_t, bool is_key)
             {
                 if (is_key)
@@ -101,15 +103,24 @@ namespace cppdatalib
 
             void output_padding(size_t padding)
             {
-                while (padding-- > 0)
-                    output_stream << ' ';
+                while (padding > 0)
+                {
+                    char buffer[core::buffer_size];
+                    size_t size = std::min(sizeof(buffer)-1, padding);
+
+                    memset(buffer, ' ', size);
+                    buffer[size] = 0;
+
+                    output_stream.write(buffer, size);
+                    padding -= size;
+                }
             }
 
         public:
             pretty_stream_writer(std::ostream &output, size_t indent_width) : impl::stream_writer_base(output), indent_width(indent_width) {}
 
         protected:
-            void begin_() {current_indent = 0;}
+            void begin_() {current_indent = 0; output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
 
             void begin_key_(const core::value &v)
             {
@@ -162,7 +173,7 @@ namespace cppdatalib
             {
                 output_stream << "<value>\n"; output_padding(current_indent + indent_width);
                 output_stream << "<double>\n"; output_padding(current_indent + indent_width * 2);
-                output_stream << std::setprecision(CPPDATALIB_REAL_DIG) << v.get_real() << '\n'; output_padding(current_indent + indent_width);
+                output_stream << v.get_real() << '\n'; output_padding(current_indent + indent_width);
                 output_stream << "</double>\n"; output_padding(current_indent);
                 output_stream << "</value>";
             }
