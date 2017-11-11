@@ -41,7 +41,7 @@ cppdatalib supports streaming with a small memory footprint. Most conversions re
 ## Limitations
 
    - Internal operation of complex object keys is recursive (due to STL constraints) and deeply nested arrays or objects in complex keys may result in undefined behavior. Note that this limitation does not apply to array elements or object values, just object keys.
-   - Currently, comparison of `core::value` objects is recursive, and deeply nested arrays or objects in complex keys may result in undefined behavior.
+   - Currently, comparison of `core::value` objects is recursive, thus comparison of deeply nested arrays or objects may result in undefined behavior.
 
 ## Usage
 
