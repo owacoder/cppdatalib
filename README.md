@@ -10,15 +10,15 @@ cppdatalib offers implementations of several different serialization formats des
 cppdatalib is able to easily convert to and from a standard internal representation.
 Supported formats include
 
-   - JSON
-   - UBJSON
-   - Bencode
-   - plain text property lists
-   - CSV
-   - Binn (write-only)
+   - [JSON](https://json.org/)
+   - [UBJSON](http://ubjson.org/)
+   - [Bencode](https://en.wikipedia.org/wiki/Bencode)
+   - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
+   - [CSV](https://tools.ietf.org/html/rfc4180)
+   - [Binn](https://github.com/liteserver/binn/blob/master/spec.md) (write-only)
    - XML property lists (write-only)
-   - XML-RPC (write-only)
-   - XML-XLS (write-only)
+   - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
+   - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
 
 ### Filters
 
