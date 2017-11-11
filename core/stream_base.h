@@ -72,7 +72,7 @@ namespace cppdatalib
             void end()
             {
                 if (!nested_scopes.empty())
-                    throw error("cppdatalib::stream_handler - unexpected end of stream");
+                    throw error("cppdatalib::core::stream_handler - unexpected end of stream");
                 end_();
                 active_ = false;
             }
@@ -82,6 +82,31 @@ namespace cppdatalib
             virtual void end_() {}
 
         public:
+            // The following functions must be reimplemented to return true if the output format requires
+            // an element's size to be specified before the actual object.
+            // For example, the Netstring (https://en.wikipedia.org/wiki/Netstring)
+            // `3:abc` requires the size to be written before the string itself.
+            //
+            // When these functions are reimplemented, the parser MAY have to cache the value before providing
+            // it to the output handler
+            virtual bool requires_prefix_string_size() const {return false;}
+            virtual bool requires_prefix_array_size() const {return false;}
+            virtual bool requires_prefix_object_size() const {return false;}
+
+            // The following functions must be reimplemented to return true if the output format requires
+            // an element to be entirely specified before writing.
+            // For example, converting filters require that the entire element be processed before it can be converted.
+            //
+            // When these functions are reimplemented, the parser WILL have to cache the value before providing
+            // it to the output handler.
+            virtual bool requires_string_buffering() const {return false;}
+            virtual bool requires_array_buffering() const {return false;}
+            virtual bool requires_object_buffering() const {return false;}
+
+            // Nesting depth is 0 before a container is created, and updated afterward
+            // (increments after the begin_xxx() handler is called)
+            // Nesting depth is > 0 before a container is ended, and updated afterward
+            // (decrements after the end_xxx() handler is called)
             size_t nesting_depth() const {return nested_scopes.size();}
 
             type current_container() const
@@ -91,6 +116,8 @@ namespace cppdatalib
                 return nested_scopes.back().get_type();
             }
 
+            // Container size is updated after the item was handled
+            // (begins at 0 with no elements, the first element is handled, then it increments to 1)
             size_t current_container_size() const
             {
                 if (nested_scopes.empty())
@@ -105,7 +132,8 @@ namespace cppdatalib
                 return nested_scopes.back().key_was_parsed();
             }
 
-            // An API must call this when a scalar value is encountered.
+            // An API must call this when a scalar value is encountered,
+            // although it should operate correctly for any value.
             // Returns true if value was handled, false otherwise
             bool write(const value &v)
             {
@@ -129,12 +157,22 @@ namespace cppdatalib
                             end_string_(v, is_key);
                             break;
                         case array:
-                            begin_array_(v, 0, is_key);
-                            end_array_(v, is_key);
+                            if (v.size() == 0)
+                            {
+                                begin_array_(v, 0, is_key);
+                                end_array_(v, is_key);
+                            }
+                            else
+                                *this << v;
                             break;
                         case object:
-                            begin_object_(v, 0, is_key);
-                            end_object_(v, is_key);
+                            if (v.size() == 0)
+                            {
+                                begin_object_(v, 0, is_key);
+                                end_object_(v, is_key);
+                            }
+                            else
+                                *this << v;
                             break;
                         default:
                             begin_scalar_(v, is_key);
@@ -208,6 +246,7 @@ namespace cppdatalib
             virtual void real_(const core::value &v) {(void) v;}
 
             // Called when a scalar string is parsed
+            // If the length of v is equal to size, the entire string is provided
             virtual void begin_string_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void string_data_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
             virtual void end_string_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
@@ -215,6 +254,7 @@ namespace cppdatalib
         public:
             // An API must call these when a long string is parsed. The number of bytes is passed in size, if possible
             // size < 0 means unknown size
+            // If the length of v is equal to size, the entire string is provided
             void begin_string(const core::value &v, core::int_t size)
             {
                 if (!nested_scopes.empty() &&
@@ -236,7 +276,7 @@ namespace cppdatalib
             void append_to_string(const core::value &v)
             {
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
-                    throw error("cppdatalib::stream_handler - attempted to append to string that was never begun");
+                    throw error("cppdatalib::core::stream_handler - attempted to append to string that was never begun");
 
                 string_data_(v, nested_scopes.size() > 1 &&
                                  nested_scopes[nested_scopes.size() - 2].get_type() == object &&
@@ -246,7 +286,7 @@ namespace cppdatalib
             void end_string(const core::value &v)
             {
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
-                    throw error("cppdatalib::stream_handler - attempted to end string that was never begun");
+                    throw error("cppdatalib::core::stream_handler - attempted to end string that was never begun");
 
                 if ( nested_scopes.size() > 1 &&
                      nested_scopes[nested_scopes.size() - 2].get_type() == object &&
@@ -276,6 +316,7 @@ namespace cppdatalib
 
             // An API must call these when an array is parsed. The number of elements is passed in size, if possible
             // size < 0 means unknown size
+            // If the number of elements of v is equal to size, the entire array is provided
             void begin_array(const core::value &v, core::int_t size)
             {
                 if (!nested_scopes.empty() &&
@@ -296,7 +337,7 @@ namespace cppdatalib
             void end_array(const core::value &v)
             {
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != array)
-                    throw error("cppdatalib::stream_handler - attempted to end array that was never begun");
+                    throw error("cppdatalib::core::stream_handler - attempted to end array that was never begun");
 
                 if ( nested_scopes.size() > 1 &&
                      nested_scopes[nested_scopes.size() - 2].get_type() == object &&
@@ -326,6 +367,7 @@ namespace cppdatalib
 
             // An API must call these when an object is parsed. The number of key/value pairs is passed in size, if possible
             // size < 0 means unknown size
+            // If the number of elements of v is equal to size, the entire object is provided
             void begin_object(const core::value &v, core::int_t size)
             {
                 if (!nested_scopes.empty() &&
@@ -346,9 +388,9 @@ namespace cppdatalib
             void end_object(const core::value &v)
             {
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != object)
-                    throw error("cppdatalib::stream_handler - attempted to end object that was never begun");
+                    throw error("cppdatalib::core::stream_handler - attempted to end object that was never begun");
                 if (nested_scopes.back().key_was_parsed())
-                    throw error("cppdatalib::stream_handler - attempted to end object before final value was written");
+                    throw error("cppdatalib::core::stream_handler - attempted to end object before final value was written");
 
                 if ( nested_scopes.size() > 1 &&
                      nested_scopes[nested_scopes.size() - 2].get_type() == object &&
@@ -397,6 +439,19 @@ namespace cppdatalib
             stream_parser(std::istream &input) : input_stream(input) {}
             virtual ~stream_parser() {}
 
+            // The following functions should be reimplemented to return true if the parser ALWAYS provides the element
+            // size (for each respective type) in the begin_xxx() functions.
+            virtual bool provides_prefix_string_size() const {return false;}
+            virtual bool provides_prefix_array_size() const {return false;}
+            virtual bool provides_prefix_object_size() const {return false;}
+
+            // The following functions should be reimplemented to return true if the parser ALWAYS provides the entire
+            // (for each respective type) in the begin_xxx() and end_xxx() functions. (or uses the write() function exclusively,
+            // which requires the entire value anyway)
+            virtual bool provides_buffered_strings() const {return false;}
+            virtual bool provides_buffered_arrays() const {return false;}
+            virtual bool provides_buffered_objects() const {return false;}
+
             std::istream &stream() {return input_stream;}
 
             virtual stream_parser &convert(core::stream_handler &output) = 0;
@@ -405,6 +460,14 @@ namespace cppdatalib
         // Convert directly from parser to serializer
         stream_handler &operator<<(stream_handler &output, stream_parser &input)
         {
+            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
+                output.requires_array_buffering() > input.provides_buffered_arrays() ||
+                output.requires_object_buffering() > input.provides_buffered_objects() ||
+                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
+                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
+                output.requires_prefix_object_size() > input.provides_prefix_object_size())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+
             input.convert(output);
             return output;
         }
@@ -412,6 +475,14 @@ namespace cppdatalib
         // Convert directly from parser to serializer
         stream_parser &operator>>(stream_parser &input, stream_handler &output)
         {
+            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
+                output.requires_array_buffering() > input.provides_buffered_arrays() ||
+                output.requires_object_buffering() > input.provides_buffered_objects() ||
+                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
+                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
+                output.requires_prefix_object_size() > input.provides_prefix_object_size())
+                throw core::error("cppdatalib::stream_parser::operator>>() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+
             input.convert(output);
             return input;
         }

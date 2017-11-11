@@ -542,13 +542,14 @@ namespace cppdatalib
             }
         };
 
-        /*inline core::value from_plain_text_property_list(const std::string &property_list)
+        inline core::value from_plain_text_property_list(const std::string &property_list)
         {
             std::istringstream stream(property_list);
+            parser p(stream);
             core::value v;
-            stream >> v;
+            p >> v;
             return v;
-        }*/
+        }
 
         inline std::string to_plain_text_property_list(const core::value &v)
         {

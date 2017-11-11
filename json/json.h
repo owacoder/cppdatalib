@@ -253,8 +253,8 @@ namespace cppdatalib
                     output_stream.put(',');
 
                 (void) v;
-                //if (!v.is_string())
-                //    throw core::error("JSON - cannot write non-string key");
+                if (!v.is_string())
+                    throw core::error("JSON - cannot write non-string key");
             }
 
             void null_(const core::value &) {output_stream << "null";}

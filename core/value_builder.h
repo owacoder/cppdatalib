@@ -4,6 +4,8 @@
 #include "stream_base.h"
 #include <list>
 
+#include <cassert>
+
 namespace cppdatalib
 {
     namespace core
@@ -19,6 +21,16 @@ namespace cppdatalib
 
         public:
             value_builder(core::value &bind) : v(bind) {}
+            value_builder(const value_builder &builder)
+                : v(builder.v)
+            {
+                assert(("cppdatalib::core::value_builder(const value_builder &) - attempted to copy a value_builder while active" && !builder.active()));
+            }
+            value_builder(value_builder &&builder)
+                : v(builder.v)
+            {
+                assert(("cppdatalib::core::value_builder(value_builder &&) - attempted to move a value_builder while active" && !builder.active()));
+            }
 
             const core::value &value() const {return v;}
 
@@ -129,12 +141,15 @@ namespace cppdatalib
         // Convert directly from value to serializer
         stream_handler &operator<<(stream_handler &output, const value &input)
         {
+            const bool stream_ready = output.active();
             value::traverse_node_prefix_serialize prefix(output);
             value::traverse_node_postfix_serialize postfix(output);
 
-            output.begin();
+            if (!stream_ready)
+                output.begin();
             input.traverse(prefix, postfix);
-            output.end();
+            if (!stream_ready)
+                output.end();
 
             return output;
         }

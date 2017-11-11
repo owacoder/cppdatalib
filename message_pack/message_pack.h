@@ -190,6 +190,10 @@ namespace cppdatalib
         public:
             stream_writer(std::ostream &output) : stream_writer_base(output) {}
 
+            bool requires_prefix_array_size() const {return true;}
+            bool requires_prefix_object_size() const {return true;}
+            bool requires_prefix_string_size() const {return true;}
+
         protected:
             void null_(const core::value &) {output_stream.put(0xc0);}
             void bool_(const core::value &v) {output_stream.put(0xc2 + v.get_bool());}

@@ -194,6 +194,8 @@ namespace cppdatalib
         public:
             parser(std::istream &input) : core::stream_parser(input) {}
 
+            bool provides_prefix_string_size() const {return true;}
+
             core::stream_parser &convert(core::stream_handler &writer)
             {
                 struct container_data
@@ -507,6 +509,8 @@ namespace cppdatalib
         {
         public:
             stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
+
+            bool requires_prefix_string_size() const {return true;}
 
         protected:
             void begin_key_(const core::value &v)

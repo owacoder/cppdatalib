@@ -12,6 +12,8 @@ namespace cppdatalib
         public:
             parser(std::istream &input) : core::stream_parser(input) {}
 
+            bool provides_prefix_string_size() const {return true;}
+
             core::stream_parser &convert(core::stream_handler &writer)
             {
                 char buffer[core::buffer_size];
@@ -97,6 +99,8 @@ namespace cppdatalib
         {
         public:
             stream_writer(std::ostream &output) : core::stream_writer(output) {}
+
+            bool requires_prefix_string_size() const {return true;}
 
         protected:
             void begin_key_(const core::value &v)

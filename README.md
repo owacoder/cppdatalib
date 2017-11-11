@@ -1,6 +1,10 @@
 # cppdatalib
 
-Simple, header-only C++ data conversion library
+Simple, header-only, C++11 data conversion library
+
+## Features
+
+### Formats
 
 cppdatalib offers implementations of several different serialization formats designed for hierarchical data (and some that aren't).
 cppdatalib is able to easily convert to and from a standard internal representation.
@@ -16,7 +20,30 @@ Supported formats include
    - XML-RPC (write-only)
    - XML-XLS (write-only)
 
-### Usage
+### Filters
+
+cppdatalib offers a variety of filters that can be applied to stream handlers. These include the following:
+
+   - buffer_filter (Optionally buffers strings, arrays, and objects, or any combination of the same, or acts as a pass-through filter)
+   - automatic_buffer_filter (Automatically determines the correct settings for the underlying buffer_filter based on the output stream handler)
+   - tee_filter (Splits an input stream to two output stream handlers)
+   - duplicate_key_check_filter (Ensures the input stream only provides unique keys in objects. This filter supports complex keys, including nested objects)
+   - converter_filter (Converts from one internal type to another, for example, all integers to strings. This filter has built-in conversions)
+   - custom_converter_filter (Converts the specified internal type, using the user-specified converter function. This filter supports varying output types, including the same type as the input)
+   - generic_converter_filter (Sends all scalar values to a user-specified function for conversion. Arrays and objects cannot be converted with this filter)
+
+Filters can be assigned on top of other filters. How many filters are permitted is limited only by the runtime environment.
+
+### Large Data
+
+cppdatalib supports streaming with a small memory footprint. Most conversions require no buffering or minimal buffering. Also, there is no limit to the nesting depth of arrays or objects. This makes cppdatalib much more suitable for large datasets.
+
+## Limitations
+
+Internal operation of complex object keys is recursive (due to STL constraints) and deeply nested arrays or objects in complex keys may result in undefined behavior. Note that this limitation does not apply to array elements or object values, just object keys.
+Currently, comparison of `core::value` objects is recursive, and deeply nested arrays or objects in complex keys may result in undefined behavior.
+
+## Usage
 
 Using the library is simple. Everything is under the main namespace `cppdatalib`, and underneath is the `core` namespace and individual format namespaces (e.g. `json`).
 If you only need one format, use `using` statements to include its namespace into your scope. You can also include the `core` namespace, as long as you don't have conflicting identifiers.
@@ -147,7 +174,7 @@ int main() {
 }
 ```
 
-### Supported datatypes
+## Supported datatypes
 
 If a type is unsupported in a serialization format, the type is not converted to something recognizable by the format, but an error is thrown instead, describing the failure. However, if a subtype is not supported, the value is processed as if it had none (i.e. if a value is a `string`, with unsupported subtype `date`, the value is processed as a meaningless string and the subtype metadata is removed).
 

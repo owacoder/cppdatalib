@@ -270,8 +270,8 @@ namespace cppdatalib
             value(T v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
-            template<typename T>
-            value(T v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
+            value(const T &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
             {
                 assign(*this, v.to_cppdatalib());
             }
@@ -404,6 +404,14 @@ namespace cppdatalib
             array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_;}
             object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_;}
 
+            template<typename T>
+            operator T() const
+            {
+                T dst;
+                dst.from_cppdatalib(*this);
+                return dst;
+            }
+
         private:
             void shallow_clear()
             {
@@ -534,13 +542,6 @@ namespace cppdatalib
         };
 
         struct null_t : value {null_t() {}};
-
-        template<typename T>
-        inline T &operator=(T &dst, const value &src)
-        {
-            dst.from_cppdatalib(src);
-            return dst;
-        }
 
         // TODO: comparisons need to be non-recursive, iterative versions for stack overflow protection
 
