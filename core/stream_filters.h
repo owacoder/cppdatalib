@@ -331,9 +331,9 @@ namespace cppdatalib
         public:
             automatic_buffer_filter(core::stream_handler &output)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(
-                                    (output.requires_prefix_array_size()? buffer_arrays: 0) |
-                                    (output.requires_prefix_object_size()? buffer_objects: 0) |
-                                    (output.requires_prefix_string_size()? buffer_strings: 0)))
+                                    (output.requires_prefix_array_size() || output.requires_array_buffering()? buffer_arrays: 0) |
+                                    (output.requires_prefix_object_size() || output.requires_object_buffering()? buffer_objects: 0) |
+                                    (output.requires_prefix_string_size() || output.requires_string_buffering()? buffer_strings: 0)))
             {}
         };
 

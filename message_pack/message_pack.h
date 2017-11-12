@@ -3,10 +3,10 @@
 
 #include "../core/core.h"
 
+// TODO: Refactor into stream_parser API
+
 namespace cppdatalib
 {
-    // TODO: per stream, change single character writes to put() calls, and string writes to write() calls
-
     namespace message_pack
     {
         namespace impl
