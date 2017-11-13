@@ -180,19 +180,63 @@ namespace cppdatalib
                             delimiter_required = true;
                             break;
                         default:
-                            input_stream.unget();
                             if (isdigit(chr) || chr == '-')
                             {
-                                core::real_t r;
-                                input_stream >> r;
-                                if (!input_stream)
-                                    writer.write(core::null_t());
-                                else if (r == std::trunc(r) && r >= INT64_MIN && r <= INT64_MAX)
-                                    writer.write(static_cast<core::int_t>(r));
-                                else
-                                    writer.write(r);
+                                if (writer.current_container() == core::object && !writer.container_key_was_just_parsed()) // This is the key?
+                                    throw core::error("JSON - invalid number cannot be used as an object key");
 
+                                bool is_float = false;
+                                std::string buffer = std::string(1, chr);
+
+                                while (chr = input_stream.get(), chr != EOF && strchr("0123456789.eE+-", chr))
+                                {
+                                    buffer.push_back(chr);
+                                    is_float = chr == '.' || tolower(chr) == 'e';
+                                }
+                                get_char = chr == EOF; // This forces the loop to end if we're at EOF
                                 delimiter_required = true;
+
+                                if (!is_float)
+                                {
+                                    // Attempt to read as an integer
+                                    {
+                                        std::istringstream temp_stream(buffer);
+                                        core::int_t value;
+                                        temp_stream >> value;
+                                        if (!temp_stream.fail() && temp_stream.get() == EOF)
+                                        {
+                                            writer.write(value);
+                                            break; // break switch
+                                        }
+                                    }
+
+                                    // Attempt to read as an unsigned integer
+                                    {
+                                        std::istringstream temp_stream(buffer);
+                                        core::uint_t value;
+                                        temp_stream >> value;
+                                        if (!temp_stream.fail() && temp_stream.get() == EOF)
+                                        {
+                                            writer.write(value);
+                                            break; // break switch
+                                        }
+                                    }
+                                }
+
+                                // Attempt to read as a real
+                                {
+                                    std::istringstream temp_stream(buffer);
+                                    core::real_t value;
+                                    temp_stream >> value;
+                                    if (!temp_stream.fail() && temp_stream.get() == EOF)
+                                    {
+                                        writer.write(value);
+                                        break; // break switch
+                                    }
+                                }
+
+                                // Revert to bignum
+                                writer.write(core::value(buffer, core::bignum));
                             }
                             else
                                 throw core::error("JSON - expected value");
@@ -276,7 +320,6 @@ namespace cppdatalib
                 if (current_container_size() > 0)
                     output_stream.put(',');
 
-                (void) v;
                 if (!v.is_string())
                     throw core::error("JSON - cannot write non-string key");
             }
@@ -291,9 +334,9 @@ namespace cppdatalib
                     throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
                 output_stream << v.get_real();
             }
-            void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
+            void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
             void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
-            void end_string_(const core::value &, bool) {output_stream.put('"');}
+            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('[');}
             void end_array_(const core::value &, bool) {output_stream.put(']');}
@@ -365,9 +408,9 @@ namespace cppdatalib
                     throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
                 output_stream << v.get_real();
             }
-            void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
+            void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
             void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
-            void end_string_(const core::value &, bool) {output_stream.put('"');}
+            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
