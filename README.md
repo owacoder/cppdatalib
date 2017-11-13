@@ -15,7 +15,7 @@ Supported formats include
    - [Bencode](https://en.wikipedia.org/wiki/Bencode)
    - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
    - [CSV](https://tools.ietf.org/html/rfc4180)
-   - [Binn](https://github.com/liteserver/binn/blob/master/spec.md) (write-only)
+   - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
    - XML property lists (write-only)
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
@@ -183,20 +183,23 @@ If a format-defined limit is reached, such as an object key length limit, an err
 
    - JSON supports `null`, `bool`, `uint` and `int` and `real`, `string`, `array`, and `object`.<br/>
      Notes:
-       - `uint`s and `int`s are read as `real`s in the implementation, losing some precision.
-       - No subtypes are supported.
+       - `string` subtype `bignum` is fully supported, for both reading and writing.<br/>
+       - There is no limit to the magnitude of numbers supported. `int` is attempted first, then `uint`, then `real`, then `bignum`.
+       - Numerical metadata is lost when converting to and from JSON.
      
    - Bencode supports `uint`, `int`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`, `bool`, and `real`s are **not** supported.
        - integers are limited to two's complement 64-bit integers when reading.
        - No subtypes are supported.
+       - Numerical metadata is lost when converting to and from Bencode.
      
    - plain text property lists support `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`s are **not** supported.<br/>
        - integers are limited to two's complement 64-bit integers when reading.
        - `string` subtypes `date`, `time`, and `datetime` are supported.
+       - Numerical metadata is lost when converting to and from plain text property lists.
      
    - Binn supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
@@ -210,17 +213,20 @@ If a format-defined limit is reached, such as an object key length limit, an err
      Notes:
        - `null`s are **not** supported.
        - `string` subtypes `date`, `time`, and `datetime` are supported.
+       - Numerical metadata is lost when converting to XML property lists.
      
    - XML-RPC supports `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`s are **not** supported.
        - No subtypes are supported.
+       - Numerical metadata is lost when converting to XML-RPC.
      
    - CSV supports `null`, `uint`, `bool`, `int`, `real`, `string`, and `array`.<br/>
      Notes:
        - `object`s are **not** supported.
        - `uint` values are fully supported when reading.
        - No subtypes are supported.
+       - Numerical metadata is lost when converting to and from CSV.
      
    - UBJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.
      Notes:
@@ -231,6 +237,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
      Notes:
        - `object`s are **not** supported.
        - `string` subtypes `date`, `time`, and `datetime` are supported.
+       - Numerical metadata is lost when converting to and from XML-XLS.
 
    - MessagePack supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
        - `string` subtype `blob` is supported.
