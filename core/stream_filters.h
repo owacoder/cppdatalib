@@ -113,6 +113,19 @@ namespace cppdatalib
                                 default: value.set_null(); break;
                             }
                             break;
+                        case uinteger:
+                            switch (to)
+                            {
+                                case null: value.set_null(); break;
+                                case boolean: value.set_bool(value.get_uint() != 0); break;
+                                case integer: value.convert_to_int(); break;
+                                case real: value.set_real(value.get_uint()); break;
+                                case string: value.convert_to_string(); break;
+                                case array: value.set_array(array_t()); break;
+                                case object: value.set_object(object_t()); break;
+                                default: value.set_null(); break;
+                            }
+                            break;
                         case real:
                             switch (to)
                             {

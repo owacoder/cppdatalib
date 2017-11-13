@@ -102,6 +102,7 @@ namespace cppdatalib
         typedef std::vector<value> array_t;
         typedef std::map<value, value> object_t;
         typedef long subtype_t;
+        struct null_t {};
 
         struct error
         {
@@ -277,17 +278,18 @@ namespace cppdatalib
 
         public:
             value() : type_(null), subtype_(0) {}
+            value(null_t, subtype_t subtype = 0) : type_(null), subtype_(subtype) {}
             value(bool_t v, subtype_t subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
             value(int_t v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             value(uint_t v, subtype_t subtype = 0) : type_(uinteger), uint_(v), subtype_(subtype) {}
             value(real_t v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
             value(cstring_t v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
             value(const string_t &v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
-            value(string_t &&v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
+            value(string_t &&v, subtype_t subtype = 0) : type_(string), str_(std::move(v)), subtype_(subtype) {}
             value(const array_t &v, subtype_t subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
-            value(array_t &&v, subtype_t subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
+            value(array_t &&v, subtype_t subtype = 0) : type_(array), arr_(std::move(v)), subtype_(subtype) {}
             value(const object_t &v, subtype_t subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
-            value(object_t &&v, subtype_t subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
+            value(object_t &&v, subtype_t subtype = 0) : type_(object), obj_(std::move(v)), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = 0) : type_(uinteger), uint_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0>
@@ -492,6 +494,19 @@ namespace cppdatalib
                         }
                         break;
                     }
+                    case uinteger:
+                    {
+                        clear(new_type);
+                        switch (new_type)
+                        {
+                            case boolean: bool_ = uint_ != 0; break;
+                            case integer: int_ = uint_ <= INT64_MAX? uint_: 0; break;
+                            case real: real_ = uint_; break;
+                            case string: str_ = std::to_string(uint_); break;
+                            default: *this = default_value; break;
+                        }
+                        break;
+                    }
                     case real:
                     {
                         clear(new_type);
@@ -565,8 +580,6 @@ namespace cppdatalib
             subtype_t subtype_;
         };
 
-        struct null_t : value {null_t() {}};
-
         // TODO: comparisons need to be non-recursive, iterative versions for stack overflow protection
 
         inline bool operator<(const value &lhs, const value &rhs)
@@ -581,6 +594,7 @@ namespace cppdatalib
                 case null: return false;
                 case boolean: return lhs.get_bool() < rhs.get_bool();
                 case integer: return lhs.get_int() < rhs.get_int();
+                case uinteger: return lhs.get_uint() < rhs.get_uint();
                 case real: return lhs.get_real() < rhs.get_real();
                 case string: return lhs.get_string() < rhs.get_string();
                 case array: return lhs.get_array() < rhs.get_array();
@@ -592,13 +606,17 @@ namespace cppdatalib
         inline bool operator==(const value &lhs, const value &rhs)
         {
             if (lhs.get_type() != rhs.get_type())
+            {
+                std::cout << lhs.get_type() << " != " << rhs.get_type() << std::endl;
                 return false;
+            }
 
             switch (lhs.get_type())
             {
                 case null: return true;
                 case boolean: return lhs.get_bool() == rhs.get_bool();
                 case integer: return lhs.get_int() == rhs.get_int();
+                case uinteger: return lhs.get_uint() == rhs.get_uint();
                 case real: return lhs.get_real() == rhs.get_real() || (std::isnan(lhs.get_real()) && std::isnan(rhs.get_real()));
                 case string: return lhs.get_string() == rhs.get_string();
                 case array: return lhs.get_array() == rhs.get_array();

@@ -146,9 +146,10 @@ namespace cppdatalib
         {
             switch (src.get_type())
             {
-                case null: dst.set_null(); return dst;
+                case null: dst.set_null(src.get_subtype()); return dst;
                 case boolean: dst.set_bool(src.get_bool(), src.get_subtype()); return dst;
                 case integer: dst.set_int(src.get_int(), src.get_subtype()); return dst;
+                case uinteger: dst.set_uint(src.get_uint(), src.get_subtype()); return dst;
                 case real: dst.set_real(src.get_real(), src.get_subtype()); return dst;
                 case string: dst.set_string(src.get_string(), src.get_subtype()); return dst;
                 case array:
@@ -158,7 +159,7 @@ namespace cppdatalib
                     builder << src;
                     return dst;
                 }
-                default: dst.set_null(); return dst;
+                default: dst.set_null(src.get_subtype()); return dst;
             }
         }
 
