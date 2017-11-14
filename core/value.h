@@ -720,6 +720,7 @@ namespace cppdatalib
         template<typename T>
         core::value to_cppdatalib(T v)
         {
+            assert(!"cppdatalib::core::to_cppdatalib - cannot convert when called without a specialization");
             throw core::error("cppdatalib::core::to_cppdatalib - cannot convert when called without a specialization");
             (void) v;
         }
@@ -727,6 +728,7 @@ namespace cppdatalib
         template<typename T>
         T from_cppdatalib(const core::value &v)
         {
+            assert(!"cppdatalib::core::from_cppdatalib - cannot convert when called without a specialization");
             throw core::error("cppdatalib::core::from_cppdatalib - cannot convert when called without a specialization");
             (void) v;
         }
