@@ -158,6 +158,9 @@ namespace cppdatalib
                 bool traversed_key_already;
             };
 
+            // TODO: this traversal algorithm does not traverse object keys, since they are declared `const` inside
+            // the `std::map` definition. Using complex keys may overflow the stack when the destructor is called.
+            // Using simple scalar keys will not be an issue
             template<typename PrefixPredicate, typename PostfixPredicate>
             void traverse_and_edit(PrefixPredicate prefix, PostfixPredicate postfix)
             {
@@ -208,9 +211,6 @@ namespace cppdatalib
                 }
             }
 
-            // TODO: this traversal algorithm does not traverse object keys, since they are declared `const` inside
-            // the `std::map` definition. Using complex keys may overflow the stack when the destructor is called.
-            // Using simple scalar keys will not be an issue
             template<typename PrefixPredicate, typename PostfixPredicate>
             void traverse(PrefixPredicate prefix, PostfixPredicate postfix) const
             {
@@ -268,11 +268,125 @@ namespace cppdatalib
                 }
             }
 
+            template<typename PrefixPredicate, typename PostfixPredicate>
+            void parallel_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
+            {
+                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
+                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> other_references;
+                const value *p = this, *other_p = &other;
+
+                while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
+                {
+                    if (p != NULL || other_p != NULL)
+                    {
+                        prefix(p, other_p);
+
+                        if (p != NULL)
+                        {
+                            if (p->is_array())
+                            {
+                                references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                                if (!p->get_array().empty())
+                                    p = std::addressof(*references.top().array++);
+                                else
+                                    p = NULL;
+                            }
+                            else if (p->is_object())
+                            {
+                                references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                                if (!p->get_object().empty())
+                                    p = std::addressof(references.top().object->first);
+                                else
+                                    p = NULL;
+                            }
+                            else
+                            {
+                                references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                                p = NULL;
+                            }
+                        }
+
+                        if (other_p != NULL)
+                        {
+                            if (other_p->is_array())
+                            {
+                                other_references.push(const_traversal_reference(other_p, other_p->get_array().begin(), object_t::const_iterator(), false));
+                                if (!other_p->get_array().empty())
+                                    other_p = std::addressof(*other_references.top().array++);
+                                else
+                                    other_p = NULL;
+                            }
+                            else if (other_p->is_object())
+                            {
+                                other_references.push(const_traversal_reference(other_p, array_t::const_iterator(), other_p->get_object().begin(), true));
+                                if (!other_p->get_object().empty())
+                                    other_p = std::addressof(other_references.top().object->first);
+                                else
+                                    other_p = NULL;
+                            }
+                            else
+                            {
+                                other_references.push(const_traversal_reference(other_p, array_t::const_iterator(), object_t::const_iterator(), false));
+                                other_p = NULL;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        const value *peek = references.empty()? NULL: references.top().p;
+                        const value *other_peek = other_references.empty()? NULL: other_references.top().p;
+
+                        if (peek)
+                        {
+                            if (peek->is_array() && references.top().array != peek->get_array().end())
+                                p = std::addressof(*references.top().array++);
+                            else if (peek->is_object() && references.top().object != peek->get_object().end())
+                            {
+                                if (!references.top().traversed_key_already)
+                                    p = std::addressof(references.top().object->first);
+                                else
+                                    p = std::addressof((references.top().object++)->second);
+
+                                references.top().traversed_key_already = !references.top().traversed_key_already;
+                            }
+                        }
+
+                        if (other_peek)
+                        {
+                            if (other_peek->is_array() && other_references.top().array != other_peek->get_array().end())
+                                other_p = std::addressof(*other_references.top().array++);
+                            else if (other_peek->is_object() && other_references.top().object != other_peek->get_object().end())
+                            {
+                                if (!other_references.top().traversed_key_already)
+                                    other_p = std::addressof(other_references.top().object->first);
+                                else
+                                    other_p = std::addressof((other_references.top().object++)->second);
+
+                                other_references.top().traversed_key_already = !other_references.top().traversed_key_already;
+                            }
+                        }
+
+                        if (p == NULL && other_p == NULL)
+                        {
+                            if (peek != NULL) references.pop();
+                            if (other_peek != NULL) other_references.pop();
+                            postfix(peek, other_peek);
+                        }
+                    }
+                }
+            }
+
             static void traverse_node_null(value *) {}
             static void traverse_node_clear(value *arg) {arg->shallow_clear();}
             struct traverse_node_prefix_serialize;
             struct traverse_node_postfix_serialize;
 
+            struct traverse_compare_prefix;
+            struct traverse_equality_compare_prefix;
+            struct traverse_compare_postfix;
+
+            friend bool operator<(const value &lhs, const value &rhs);
+            friend bool operator==(const value &lhs, const value &rhs);
             friend stream_handler &operator<<(stream_handler &output, const value &input);
             static value &assign(value &dst, const value &src);
 
@@ -579,56 +693,6 @@ namespace cppdatalib
             object_t obj_;
             subtype_t subtype_;
         };
-
-        // TODO: comparisons need to be non-recursive, iterative versions for stack overflow protection
-
-        inline bool operator<(const value &lhs, const value &rhs)
-        {
-            if (lhs.get_type() < rhs.get_type())
-                return true;
-            else if (rhs.get_type() < lhs.get_type())
-                return false;
-
-            switch (lhs.get_type())
-            {
-                case null: return false;
-                case boolean: return lhs.get_bool() < rhs.get_bool();
-                case integer: return lhs.get_int() < rhs.get_int();
-                case uinteger: return lhs.get_uint() < rhs.get_uint();
-                case real: return lhs.get_real() < rhs.get_real();
-                case string: return lhs.get_string() < rhs.get_string();
-                case array: return lhs.get_array() < rhs.get_array();
-                case object: return lhs.get_object() < rhs.get_object();
-                default: return false;
-            }
-        }
-
-        inline bool operator==(const value &lhs, const value &rhs)
-        {
-            if (lhs.get_type() != rhs.get_type())
-            {
-                std::cout << lhs.get_type() << " != " << rhs.get_type() << std::endl;
-                return false;
-            }
-
-            switch (lhs.get_type())
-            {
-                case null: return true;
-                case boolean: return lhs.get_bool() == rhs.get_bool();
-                case integer: return lhs.get_int() == rhs.get_int();
-                case uinteger: return lhs.get_uint() == rhs.get_uint();
-                case real: return lhs.get_real() == rhs.get_real() || (std::isnan(lhs.get_real()) && std::isnan(rhs.get_real()));
-                case string: return lhs.get_string() == rhs.get_string();
-                case array: return lhs.get_array() == rhs.get_array();
-                case object: return lhs.get_object() == rhs.get_object();
-                default: return false;
-            }
-        }
-
-        inline bool operator!=(const value &lhs, const value &rhs)
-        {
-            return !(lhs == rhs);
-        }
     }
 }
 

@@ -544,6 +544,135 @@ namespace cppdatalib
         private:
             stream_handler &stream;
         };
+
+        struct value::traverse_compare_prefix
+        {
+        private:
+            int compare;
+
+        public:
+            traverse_compare_prefix() : compare(0) {}
+
+            int comparison() const {return compare;}
+
+            void operator()(const value *arg, const value *arg2)
+            {
+                if (!compare)
+                {
+                    if (arg == NULL && arg2 != NULL)
+                        compare = -1;
+                    else if (arg != NULL && arg2 == NULL)
+                        compare = 1;
+                    else if (arg != NULL && arg2 != NULL)
+                    {
+                        if (arg->get_type() < arg2->get_type())
+                            compare = -1;
+                        else if (arg->get_type() > arg2->get_type())
+                            compare = 1;
+                        else
+                        {
+                            if (arg->get_subtype() < arg2->get_subtype())
+                                compare = -1;
+                            else if (arg->get_subtype() > arg2->get_subtype())
+                                compare = 1;
+                            else
+                            {
+                                switch (arg->get_type())
+                                {
+                                    case boolean:
+                                        compare = -(arg->get_bool() < arg2->get_bool());
+                                        break;
+                                    case integer:
+                                        compare = -(arg->get_int() < arg2->get_int());
+                                        break;
+                                    case uinteger:
+                                        compare = -(arg->get_uint() < arg2->get_uint());
+                                        break;
+                                    case real:
+                                        compare = -(arg->get_real() < arg2->get_real());
+                                        break;
+                                    case string:
+                                        compare = -(arg->get_string() < arg2->get_string());
+                                        break;
+                                    case array:
+                                    case object:
+                                    case null:
+                                    default:
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        struct value::traverse_equality_compare_prefix
+        {
+        private:
+            bool equal;
+
+        public:
+            traverse_equality_compare_prefix() : equal(true) {}
+
+            bool comparison_equal() const {return equal;}
+
+            void operator()(const value *arg, const value *arg2)
+            {
+                if (equal)
+                {
+                    if (arg == NULL && arg2 != NULL)
+                        equal = false;
+                    else if (arg != NULL && arg2 == NULL)
+                        equal = false;
+                    else if (arg != NULL && arg2 != NULL)
+                    {
+                        if (arg->get_type() != arg2->get_type() ||
+                                arg->get_subtype() != arg2->get_subtype())
+                            equal = false;
+                        else
+                        {
+                            switch (arg->get_type())
+                            {
+                                case boolean:
+                                    equal = (arg->get_bool() == arg2->get_bool());
+                                    break;
+                                case integer:
+                                    equal = (arg->get_int() == arg2->get_int());
+                                    break;
+                                case uinteger:
+                                    equal = (arg->get_uint() == arg2->get_uint());
+                                    break;
+                                case real:
+                                    equal = (arg->get_real() == arg2->get_real());
+                                    break;
+                                case string:
+                                    equal = (arg->get_string() == arg2->get_string());
+                                    break;
+                                case array:
+                                    equal = (arg->get_array().size() == arg2->get_array().size());
+                                    break;
+                                case object:
+                                    equal = (arg->get_object().size() == arg2->get_object().size());
+                                    break;
+                                case null:
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        struct value::traverse_compare_postfix
+        {
+        public:
+            void operator()(const value *arg, const value *arg2)
+            {
+                (void) arg, (void) arg2;
+            }
+        };
     }
 }
 

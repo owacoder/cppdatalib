@@ -164,7 +164,7 @@ namespace cppdatalib
         }
 
         // Convert directly from value to serializer
-        stream_handler &operator<<(stream_handler &output, const value &input)
+        inline stream_handler &operator<<(stream_handler &output, const value &input)
         {
             const bool stream_ready = output.active();
             value::traverse_node_prefix_serialize prefix(output);
@@ -180,11 +180,48 @@ namespace cppdatalib
         }
 
         // Convert directly from parser to value
-        stream_parser &operator>>(stream_parser &input, value &output)
+        inline stream_parser &operator>>(stream_parser &input, value &output)
         {
             value_builder builder(output);
             input.convert(builder);
             return input;
+        }
+
+        inline bool operator<(const value &lhs, const value &rhs)
+        {
+            value::traverse_compare_prefix prefix;
+
+            if (lhs.is_array() || lhs.is_object() || rhs.is_array() || rhs.is_object())
+            {
+                value::traverse_compare_postfix postfix;
+
+                lhs.parallel_traverse(rhs, prefix, postfix);
+            }
+            else
+                prefix(&lhs, &rhs);
+
+            return prefix.comparison() < 0;
+        }
+
+        inline bool operator==(const value &lhs, const value &rhs)
+        {
+            value::traverse_equality_compare_prefix prefix;
+
+            if (lhs.is_array() || lhs.is_object() || rhs.is_array() || rhs.is_object())
+            {
+                value::traverse_compare_postfix postfix;
+
+                lhs.parallel_traverse(rhs, prefix, postfix);
+            }
+            else
+                prefix(&lhs, &rhs);
+
+            return prefix.comparison_equal();
+        }
+
+        inline bool operator!=(const value &lhs, const value &rhs)
+        {
+            return !(lhs == rhs);
         }
     }
 }
