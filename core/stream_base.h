@@ -515,12 +515,13 @@ namespace cppdatalib
         {
             traverse_node_prefix_serialize(stream_handler &handler) : stream(handler) {}
 
-            void operator()(const value *arg)
+            bool operator()(const value *arg)
             {
                 if (arg->is_array())
                     stream.begin_array(*arg, arg->size());
                 else if (arg->is_object())
                     stream.begin_object(*arg, arg->size());
+                return true;
             }
 
         private:
@@ -531,7 +532,7 @@ namespace cppdatalib
         {
             traverse_node_postfix_serialize(stream_handler &handler) : stream(handler) {}
 
-            void operator()(const value *arg)
+            bool operator()(const value *arg)
             {
                 if (arg->is_array())
                     stream.end_array(*arg);
@@ -539,6 +540,7 @@ namespace cppdatalib
                     stream.end_object(*arg);
                 else
                     stream.write(*arg);
+                return true;
             }
 
         private:
@@ -555,7 +557,7 @@ namespace cppdatalib
 
             int comparison() const {return compare;}
 
-            void operator()(const value *arg, const value *arg2)
+            bool operator()(const value *arg, const value *arg2)
             {
                 if (!compare)
                 {
@@ -604,6 +606,7 @@ namespace cppdatalib
                         }
                     }
                 }
+                return compare == 0;
             }
         };
 
@@ -617,7 +620,7 @@ namespace cppdatalib
 
             bool comparison_equal() const {return equal;}
 
-            void operator()(const value *arg, const value *arg2)
+            bool operator()(const value *arg, const value *arg2)
             {
                 if (equal)
                 {
@@ -662,15 +665,18 @@ namespace cppdatalib
                         }
                     }
                 }
+
+                return equal;
             }
         };
 
         struct value::traverse_compare_postfix
         {
         public:
-            void operator()(const value *arg, const value *arg2)
+            bool operator()(const value *arg, const value *arg2)
             {
                 (void) arg, (void) arg2;
+                return true;
             }
         };
     }

@@ -203,6 +203,22 @@ namespace cppdatalib
             return prefix.comparison() < 0;
         }
 
+        inline bool operator<=(const value &lhs, const value &rhs)
+        {
+            value::traverse_compare_prefix prefix;
+
+            if (lhs.is_array() || lhs.is_object() || rhs.is_array() || rhs.is_object())
+            {
+                value::traverse_compare_postfix postfix;
+
+                lhs.parallel_traverse(rhs, prefix, postfix);
+            }
+            else
+                prefix(&lhs, &rhs);
+
+            return prefix.comparison() <= 0;
+        }
+
         inline bool operator==(const value &lhs, const value &rhs)
         {
             value::traverse_equality_compare_prefix prefix;
@@ -222,6 +238,16 @@ namespace cppdatalib
         inline bool operator!=(const value &lhs, const value &rhs)
         {
             return !(lhs == rhs);
+        }
+
+        inline bool operator>(const value &lhs, const value &rhs)
+        {
+            return !(lhs <= rhs);
+        }
+
+        inline bool operator>=(const value &lhs, const value &rhs)
+        {
+            return !(lhs < rhs);
         }
     }
 }

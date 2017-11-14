@@ -25,13 +25,20 @@ Supported formats include
 
 cppdatalib offers a variety of filters that can be applied to stream handlers. These include the following:
 
-   - buffer_filter (Optionally buffers strings, arrays, and objects, or any combination of the same, or acts as a pass-through filter)
-   - automatic_buffer_filter (Automatically determines the correct settings for the underlying buffer_filter based on the output stream handler)
-   - tee_filter (Splits an input stream to two output stream handlers)
-   - duplicate_key_check_filter (Ensures the input stream only provides unique keys in objects. This filter supports complex keys, including nested objects)
-   - converter_filter (Converts from one internal type to another, for example, all integers to strings. This filter has built-in conversions)
-   - custom_converter_filter (Converts the specified internal type, using the user-specified converter function. This filter supports varying output types, including the same type as the input)
-   - generic_converter_filter (Sends all scalar values to a user-specified function for conversion. Arrays and objects cannot be converted with this filter)
+   - `buffer_filter`<br/>
+     Optionally buffers strings, arrays, and objects, or any combination of the same, or acts as a pass-through filter
+   - `automatic_buffer_filter`<br/>
+     Automatically determines the correct settings for the underlying buffer_filter based on the output stream handler
+   - `tee_filter`<br/>
+     Splits an input stream to two output stream handlers
+   - `duplicate_key_check_filter`<br/>
+     Ensures the input stream only provides unique keys in objects. This filter supports complex keys, including nested objects
+   - `converter_filter`<br/>
+     Converts from one internal type to another, for example, all integers to strings. This filter has built-in conversions
+   - `custom_converter_filter`<br/>
+     Converts the specified internal type, using the user-specified converter function. This filter supports varying output types, including the same type as the input
+   - `generic_converter_filter`<br/>
+     Sends all scalar values to a user-specified function for conversion. Arrays and objects cannot be converted with this filter
 
 Filters can be assigned on top of other filters. How many filters are permitted is limited only by the runtime environment.
 
@@ -42,7 +49,6 @@ cppdatalib supports streaming with a small memory footprint. Most conversions re
 ## Limitations
 
    - Internal operation of complex object keys is recursive (due to STL constraints) and deeply nested arrays or objects in complex keys may result in undefined behavior. Note that this limitation does not apply to array elements or object values, just object keys.
-   - Currently, comparison of `core::value` objects is recursive, thus comparison of deeply nested arrays or objects may result in undefined behavior.
 
 ## Usage
 

@@ -25,6 +25,7 @@
 #ifndef CPPDATALIB_VALUE_H
 #define CPPDATALIB_VALUE_H
 
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -77,7 +78,7 @@ namespace cppdatalib
             sexp, // Ordered collection of values, distinct from an array only by name
 
             // Objects
-            map, // A normal object with integral keys (they're still stored as strings, but SHOULD all be valid decimal integers)
+            map, // A normal object with integral keys
 
             user = 16
         };
@@ -113,6 +114,9 @@ namespace cppdatalib
         private:
             cstring_t what_;
         };
+
+        template<typename T> core::value to_cppdatalib(T v);
+        template<typename T> T from_cppdatalib(const core::value &v);
 
         /* The core value class for all of cppdatalib.
          *
@@ -171,7 +175,8 @@ namespace cppdatalib
                 {
                     if (p != NULL)
                     {
-                        prefix(p);
+                        if (!prefix(p))
+                            return;
 
                         if (p->is_array())
                         {
@@ -205,7 +210,8 @@ namespace cppdatalib
                         else
                         {
                             references.pop();
-                            postfix(peek);
+                            if (!postfix(peek))
+                                return;
                         }
                     }
                 }
@@ -221,7 +227,8 @@ namespace cppdatalib
                 {
                     if (p != NULL)
                     {
-                        prefix(p);
+                        if (!prefix(p))
+                            return;
 
                         if (p->is_array())
                         {
@@ -262,7 +269,8 @@ namespace cppdatalib
                         else
                         {
                             references.pop();
-                            postfix(peek);
+                            if (!postfix(peek))
+                                return;
                         }
                     }
                 }
@@ -279,7 +287,8 @@ namespace cppdatalib
                 {
                     if (p != NULL || other_p != NULL)
                     {
-                        prefix(p, other_p);
+                        if (!prefix(p, other_p))
+                            return;
 
                         if (p != NULL)
                         {
@@ -370,14 +379,17 @@ namespace cppdatalib
                         {
                             if (peek != NULL) references.pop();
                             if (other_peek != NULL) other_references.pop();
-                            postfix(peek, other_peek);
+                            if (!postfix(peek, other_peek))
+                                return;
                         }
                     }
                 }
             }
 
-            static void traverse_node_null(value *) {}
-            static void traverse_node_clear(value *arg) {arg->shallow_clear();}
+            // Functors should return true if processing should continue
+            static bool traverse_node_null(value *) {return true;}
+            static bool traverse_node_clear(value *arg) {arg->shallow_clear(); return true;}
+
             struct traverse_node_prefix_serialize;
             struct traverse_node_postfix_serialize;
 
@@ -386,6 +398,7 @@ namespace cppdatalib
             struct traverse_compare_postfix;
 
             friend bool operator<(const value &lhs, const value &rhs);
+            friend bool operator<=(const value &lhs, const value &rhs);
             friend bool operator==(const value &lhs, const value &rhs);
             friend stream_handler &operator<<(stream_handler &output, const value &input);
             static value &assign(value &dst, const value &src);
@@ -410,10 +423,16 @@ namespace cppdatalib
             value(T v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
+            template<typename T>
+            value(std::initializer_list<T> v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            {
+                for (auto element: v)
+                    push_back(element);
+            }
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
             value(const T &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
             {
-                assign(*this, v.to_cppdatalib());
+                assign(*this, to_cppdatalib(v));
             }
 
             ~value()
@@ -545,12 +564,7 @@ namespace cppdatalib
             object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_;}
 
             template<typename T>
-            operator T() const
-            {
-                T dst;
-                dst.from_cppdatalib(*this);
-                return dst;
-            }
+            operator T() const {return from_cppdatalib<T>(*this);}
 
         private:
             void shallow_clear()
@@ -693,6 +707,147 @@ namespace cppdatalib
             object_t obj_;
             subtype_t subtype_;
         };
+
+        namespace impl
+        {
+            template<typename T, typename U>
+            T zero_convert(T min, U val, T max)
+            {
+                return val < min || max < val? T(0): T(val);
+            }
+        }
+
+        template<typename T>
+        core::value to_cppdatalib(T v)
+        {
+            throw core::error("cppdatalib::core::to_cppdatalib - cannot convert when called without a specialization");
+            (void) v;
+        }
+
+        template<typename T>
+        T from_cppdatalib(const core::value &v)
+        {
+            throw core::error("cppdatalib::core::from_cppdatalib - cannot convert when called without a specialization");
+            (void) v;
+        }
+
+        template<> core::value to_cppdatalib(signed char v) {return v;}
+        template<> core::value to_cppdatalib(unsigned char v) {return v;}
+        template<> core::value to_cppdatalib(signed short v) {return v;}
+        template<> core::value to_cppdatalib(unsigned short v) {return v;}
+        template<> core::value to_cppdatalib(signed int v) {return v;}
+        template<> core::value to_cppdatalib(unsigned int v) {return v;}
+        template<> core::value to_cppdatalib(signed long v) {return v;}
+        template<> core::value to_cppdatalib(unsigned long v) {return v;}
+        template<> core::value to_cppdatalib(signed long long v) {return v;}
+        template<> core::value to_cppdatalib(unsigned long long v) {return v;}
+        template<> core::value to_cppdatalib(float v) {return core::real_t(v);}
+        template<> core::value to_cppdatalib(double v) {return v;}
+        template<> core::value to_cppdatalib(long double v) {return core::real_t(v);}
+        template<> core::value to_cppdatalib(char *v) {return v;}
+        template<> core::value to_cppdatalib(const char *v) {return v;}
+        template<> core::value to_cppdatalib(const std::string &v) {return v;}
+        template<typename T> core::value to_cppdatalib(std::initializer_list<T> v) {return v;}
+
+        template<typename T>
+        core::value to_cppdatalib(const std::vector<T> &v)
+        {
+            core::value result;
+            for (auto element: v)
+                result.push_back(element);
+            return result;
+        }
+
+        template<typename T, typename U>
+        core::value to_cppdatalib(const std::map<T, U> &v)
+        {
+            core::value result;
+            for (auto element: v)
+                result.member(element.first) = element.second;
+            return result;
+        }
+
+        template<> bool from_cppdatalib<bool>(const core::value &v) {return v.as_bool();}
+        template<> signed char from_cppdatalib<signed char>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<signed char>::min(),
+                                      v.as_int(),
+                                      std::numeric_limits<signed char>::max());
+        }
+        template<> unsigned char from_cppdatalib<unsigned char>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<unsigned char>::min(),
+                                      v.as_uint(),
+                                      std::numeric_limits<unsigned char>::max());
+        }
+        template<> signed short from_cppdatalib<signed short>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<signed short>::min(),
+                                      v.as_int(),
+                                      std::numeric_limits<signed short>::max());
+        }
+        template<> unsigned short from_cppdatalib<unsigned short>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<unsigned short>::min(),
+                                      v.as_uint(),
+                                      std::numeric_limits<unsigned short>::max());
+        }
+        template<> signed int from_cppdatalib<signed int>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<signed int>::min(),
+                                      v.as_int(),
+                                      std::numeric_limits<signed int>::max());
+        }
+        template<> unsigned int from_cppdatalib<unsigned int>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<unsigned int>::min(),
+                                      v.as_uint(),
+                                      std::numeric_limits<unsigned int>::max());
+        }
+        template<> signed long from_cppdatalib<signed long>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<signed long>::min(),
+                                      v.as_int(),
+                                      std::numeric_limits<signed long>::max());
+        }
+        template<> unsigned long from_cppdatalib<unsigned long>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<unsigned long>::min(),
+                                      v.as_uint(),
+                                      std::numeric_limits<unsigned long>::max());
+        }
+        template<> signed long long from_cppdatalib<signed long long>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<signed long long>::min(),
+                                      v.as_int(),
+                                      std::numeric_limits<signed long long>::max());
+        }
+        template<> unsigned long long from_cppdatalib<unsigned long long>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
+                                      v.as_uint(),
+                                      std::numeric_limits<unsigned long long>::max());
+        }
+
+        template<> float from_cppdatalib<float>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<float>::min(),
+                                      v.as_real(),
+                                      std::numeric_limits<float>::max());
+        }
+        template<> double from_cppdatalib<double>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<double>::min(),
+                                      v.as_real(),
+                                      std::numeric_limits<double>::max());
+        }
+        template<> long double from_cppdatalib<long double>(const core::value &v)
+        {
+            return impl::zero_convert(std::numeric_limits<long double>::min(),
+                                      v.as_real(),
+                                      std::numeric_limits<long double>::max());
+        }
+        template<> std::string from_cppdatalib<std::string>(const core::value &v) {return v.as_string();}
     }
 }
 
