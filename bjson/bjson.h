@@ -15,24 +15,8 @@ namespace cppdatalib
                 stream_writer_base(std::ostream &output) : core::stream_writer(output) {}
 
             protected:
-                std::ostream &write_size(std::ostream &stream, int initial_type, uint64_t size, bool subtract_header = false)
+                std::ostream &write_size(std::ostream &stream, int initial_type, uint64_t size)
                 {
-                    std::cout << "pre-subtract: " << size << std::endl;
-
-                    if (subtract_header)
-                    {
-                        size -= 1; // one byte for type specifier
-
-                        if (size >= 8ull + UINT32_MAX)
-                            size -= 8;
-                        else if (size >= 4ul + UINT16_MAX)
-                            size -= 4;
-                        else if (size >= 2 + UINT8_MAX)
-                            size -= 2;
-                        else
-                            size -= 1;
-                    }
-
                     if (size >= UINT32_MAX)
                         stream.put(initial_type + 3)
                                 .put(size & 0xff)
@@ -161,18 +145,21 @@ namespace cppdatalib
                                 {
                                     if (prefix)
                                     {
-                                        size.push(1); // one byte for type specifier
+                                        size.push(size.size() > 2); // one byte for type specifier
                                     }
                                     else
                                     {
-                                        if (size.top() >= UINT32_MAX)
-                                            size.top() += 8; // requires an eight-byte size specifier
-                                        else if (size.top() >= UINT16_MAX)
-                                            size.top() += 4; // requires a four-byte size specifier
-                                        else if (size.top() >= UINT8_MAX)
-                                            size.top() += 2; // requires a two-byte size specifier
-                                        else
-                                            size.top() += 1; // requires a one-byte size specifier
+                                        if (size.size() > 2)
+                                        {
+                                            if (size.top() >= UINT32_MAX)
+                                                size.top() += 8; // requires an eight-byte size specifier
+                                            else if (size.top() >= UINT16_MAX)
+                                                size.top() += 4; // requires a four-byte size specifier
+                                            else if (size.top() >= UINT8_MAX)
+                                                size.top() += 2; // requires a two-byte size specifier
+                                            else
+                                                size.top() += 1; // requires a one-byte size specifier
+                                        }
 
                                         size_t temp = size.top();
                                         size.pop();
@@ -185,18 +172,21 @@ namespace cppdatalib
                                 {
                                     if (prefix)
                                     {
-                                        size.push(1); // one byte for type specifier
+                                        size.push(size.size() > 2); // one byte for type specifier
                                     }
                                     else
                                     {
-                                        if (size.top() >= UINT32_MAX)
-                                            size.top() += 8; // requires an eight-byte size specifier
-                                        else if (size.top() >= UINT16_MAX)
-                                            size.top() += 4; // requires a four-byte size specifier
-                                        else if (size.top() >= UINT8_MAX)
-                                            size.top() += 2; // requires a two-byte size specifier
-                                        else
-                                            size.top() += 1; // requires a one-byte size specifier
+                                        if (size.size() > 2)
+                                        {
+                                            if (size.top() >= UINT32_MAX)
+                                                size.top() += 8; // requires an eight-byte size specifier
+                                            else if (size.top() >= UINT16_MAX)
+                                                size.top() += 4; // requires a four-byte size specifier
+                                            else if (size.top() >= UINT8_MAX)
+                                                size.top() += 2; // requires a two-byte size specifier
+                                            else
+                                                size.top() += 1; // requires a one-byte size specifier
+                                        }
 
                                         size_t temp = size.top();
                                         size.pop();
@@ -321,7 +311,7 @@ namespace cppdatalib
                 else if (v.size() != static_cast<size_t>(size))
                     throw core::error("BJSON - entire 'array' value must be buffered before writing");
 
-                write_size(output_stream, 32, get_size(v), true);
+                write_size(output_stream, 32, get_size(v));
             }
 
             void begin_object_(const core::value &v, core::int_t size, bool)
@@ -331,7 +321,7 @@ namespace cppdatalib
                 else if (v.size() != static_cast<size_t>(size))
                     throw core::error("BJSON - entire 'object' value must be buffered before writing");
 
-                write_size(output_stream, 36, get_size(v), true);
+                write_size(output_stream, 36, get_size(v));
             }
         };
 
