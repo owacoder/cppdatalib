@@ -20,11 +20,11 @@ Supported formats include
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
    - [MessagePack](https://msgpack.org/) (write-only)
+   - [BJSON](http://bjson.org/) (write-only)
 
 ### Planned formats
 
    - Transenc
-   - BJSON
    - CBOR
    - Netstrings
    - TSV
