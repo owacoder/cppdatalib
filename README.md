@@ -21,6 +21,14 @@ Supported formats include
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
    - [MessagePack](https://msgpack.org/) (write-only)
 
+### Planned formats
+
+   - Transenc
+   - BJSON
+   - CBOR
+   - Netstrings
+   - TSV
+
 ### Filters
 
 cppdatalib offers a variety of filters that can be applied to stream handlers. These include the following:
@@ -45,10 +53,6 @@ Filters can be assigned on top of other filters. How many filters are permitted 
 ### Large Data
 
 cppdatalib supports streaming with a small memory footprint. Most conversions require no buffering or minimal buffering. Also, there is no limit to the nesting depth of arrays or objects. This makes cppdatalib much more suitable for large datasets.
-
-## Limitations
-
-   - Internal operation of complex object keys is recursive (due to STL constraints) and deeply nested arrays or objects in complex keys may result in undefined behavior. Note that this limitation does not apply to array elements or object values, just object keys.
 
 ## Usage
 
@@ -102,11 +106,12 @@ int main() {
     ubjson::stream_writer writer(std::cout);  // UBJSON writer to standard output
     
     try {
-        json::convert(std::cin, writer);      // Convert from JSON on standard input to UBJSON on standard output
+        json::parser parser(std::cin);
+        parser >> writer;                     // Convert from JSON on standard input to UBJSON on standard output
                                               // Note that this DOES NOT READ the entire stream before writing!
                                               // The data is read and written at the same time
 
-        json::convert(std::cin, builder);     // Convert from JSON on standard input to internal representation in
+        parser >> builder;                    // Convert from JSON on standard input to internal representation in
                                               // `my_value`. Note that my_value is also accessible by using `builder.value()`
 
         core::convert(my_value, writer);      // Convert from internal representation to UBJSON on standard output
@@ -115,10 +120,11 @@ int main() {
     }
 
     try {
+        json::parser parser(std::cin);
         core::stream_filter<core::null, core::string> filter(writer);
                                               // Set up filter on UBJSON output that converts all `null` values to empty strings
 
-        json::convert(std::cin, filter);      // Convert from JSON on standard input to UBJSON on standard output, converting `null`s to empty strings
+        parser >> filter;                     // Convert from JSON on standard input to UBJSON on standard output, converting `null`s to empty strings
                                               // When using a filter, write to the filter, instead of the handler the filter is modifying
                                               // (i.e. don't write to `writer` here unless you don't want to employ the filter)
                                               // Note that this DOES NOT READ the entire stream before writing!
@@ -128,6 +134,7 @@ int main() {
     }
 
     try {
+        json::parser parser(std::cin);
         core::stream_filter<core::null, core::string> filter(writer);
                                               // Set up filter on UBJSON output that converts all `null` values to empty strings
 
@@ -139,8 +146,7 @@ int main() {
         core::generic_stream_filter<decltype(lambda)> generic_filter(filter, lambda);
                                               // Set up filter on top of previous filter that clears all strings beginning with lowercase 'a'
 
-        json::convert(std::cin, generic_filter);
-                                              // Convert from JSON on standard input to UBJSON on standard output,
+        parser >> generic_filter;             // Convert from JSON on standard input to UBJSON on standard output,
                                               // converting `null`s to empty strings, and clearing all strings beginning with 'a'
                                               // Again, note that this does not read the entire stream before writing
                                               // The data is read and written at the same time
@@ -149,14 +155,14 @@ int main() {
     }
 
     try {
+        json::parser parser(std::cin);
         core::stream_filter<core::boolean, core::integer> second_filter(writer);
                                               // Set up filter on UBJSON output that converts booleans to integers
 
         core::stream_filter<core::integer, core::real> first_filter(second_filter);
                                               // Set up filter on top of previous filter that converts all integers to reals
 
-        json::convert(std::cin, first_filter);
-                                              // Convert from JSON on standard input to UBJSON on standard output,
+        parser >> first_filter;               // Convert from JSON on standard input to UBJSON on standard output,
                                               // converting booleans to integers, and converting integers to reals
                                               // Note that order of filters is important. The last filter enabled will be the first to be called.
                                               // If the filter order was switched, all booleans and integers would become reals.
@@ -165,13 +171,13 @@ int main() {
     }
 
     try {
+        json::parser parser(std::cin);
         core::tee_filter tee(writer, builder);
                                               // Set up tee filter. Tee filters split the input to two handlers, which can be stream_filters or other tee_filters.
                                               // In this case, we'll parse the JSON input once, and output to UBJSON on standard output and build an internal
                                               // representation simultaneously.
 
-        json::convert(std::cin, first_filter);
-                                              // Convert from JSON on standard input to UBJSON on standard output,
+        parser >> tee_filter;                 // Convert from JSON on standard input to UBJSON on standard output,
                                               // as well as building internal representation in my_value
     } catch (core::error e) {
         std::cerr << e.what() << std::endl;   // Catch any errors that might have occured (syntax or logical)

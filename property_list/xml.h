@@ -97,13 +97,14 @@ namespace cppdatalib
                         case core::date:
                         case core::time:
                         case core::datetime: output_stream << "<date>"; break;
-                        case core::blob: output_stream << "<data>"; break;
+                        case core::blob:
+                        case core::clob: output_stream << "<data>"; break;
                         default: output_stream << "<string>"; break;
                     }
             }
             void string_data_(const core::value &v, bool)
             {
-                if (v.get_subtype() == core::blob)
+                if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
                     base64::write(output_stream, v.get_string());
                 else
                     write_string(output_stream, v.get_string());
@@ -118,7 +119,8 @@ namespace cppdatalib
                         case core::date:
                         case core::time:
                         case core::datetime: output_stream << "</date>"; break;
-                        case core::blob: output_stream << "</data>"; break;
+                        case core::blob:
+                        case core::clob: output_stream << "</data>"; break;
                         default: output_stream << "</string>"; break;
                     }
             }
@@ -204,7 +206,8 @@ namespace cppdatalib
                         case core::date:
                         case core::time:
                         case core::datetime: output_stream << "<date>"; break;
-                        case core::blob: output_stream << "<data>"; break;
+                        case core::blob:
+                        case core::clob: output_stream << "<data>"; break;
                         default: output_stream << "<string>"; break;
                     }
             }
@@ -213,7 +216,7 @@ namespace cppdatalib
                 if (current_container_size() == 0)
                     output_stream << '\n', output_padding(current_indent + indent_width);
 
-                if (v.get_subtype() == core::blob)
+                if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
                     base64::write(output_stream, v.get_string());
                 else
                     write_string(output_stream, v.get_string());
@@ -231,7 +234,8 @@ namespace cppdatalib
                         case core::date:
                         case core::time:
                         case core::datetime: output_stream << "</date>"; break;
-                        case core::blob: output_stream << "</data>"; break;
+                        case core::blob:
+                        case core::clob: output_stream << "</data>"; break;
                         default: output_stream << "</string>"; break;
                     }
             }

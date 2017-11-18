@@ -78,7 +78,11 @@ namespace cppdatalib
 
         public:
             stream_handler() : active_(false) {}
-            virtual ~stream_handler() {}
+            virtual ~stream_handler()
+            {
+                if (active())
+                    end();
+            }
 
             enum {
                 unknown_size = -1
@@ -88,13 +92,16 @@ namespace cppdatalib
 
             void begin()
             {
+                assert("cppdatalib::core::stream_handler - begin() called on active handler" && !active());
+
                 active_ = true;
-                while (!nested_scopes.empty())
-                    nested_scopes.pop_back();
+                nested_scopes = decltype(nested_scopes)();
                 begin_();
             }
             void end()
             {
+                assert("cppdatalib::core::stream_handler - end() called on inactive handler" && active());
+
                 if (!nested_scopes.empty())
                     throw error("cppdatalib::core::stream_handler - unexpected end of stream");
                 end_();
@@ -161,6 +168,8 @@ namespace cppdatalib
             // Returns true if value was handled, false otherwise
             bool write(const value &v)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 const bool is_key =
                        !nested_scopes.empty() &&
                         nested_scopes.back().type_ == object &&
@@ -281,6 +290,8 @@ namespace cppdatalib
             // If the length of v is equal to size, the entire string is provided
             void begin_string(const core::value &v, core::int_t size)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 if (!nested_scopes.empty() &&
                      nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
@@ -299,6 +310,8 @@ namespace cppdatalib
             // An API must call these when a long string is parsed. The number of bytes of this chunk is passed in size, if possible
             void append_to_string(const core::value &v)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::core::stream_handler - attempted to append to string that was never begun");
 
@@ -309,6 +322,8 @@ namespace cppdatalib
             }
             void end_string(const core::value &v)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::core::stream_handler - attempted to end string that was never begun");
 
@@ -343,6 +358,8 @@ namespace cppdatalib
             // If the number of elements of v is equal to size, the entire array is provided
             void begin_array(const core::value &v, core::int_t size)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 if (!nested_scopes.empty() &&
                      nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
@@ -360,6 +377,8 @@ namespace cppdatalib
             }
             void end_array(const core::value &v)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != array)
                     throw error("cppdatalib::core::stream_handler - attempted to end array that was never begun");
 
@@ -394,6 +413,8 @@ namespace cppdatalib
             // If the number of elements of v is equal to size, the entire object is provided
             void begin_object(const core::value &v, core::int_t size)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 if (!nested_scopes.empty() &&
                      nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
@@ -411,6 +432,8 @@ namespace cppdatalib
             }
             void end_object(const core::value &v)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 if (nested_scopes.empty() || nested_scopes.back().get_type() != object)
                     throw error("cppdatalib::core::stream_handler - attempted to end object that was never begun");
                 if (nested_scopes.back().key_was_parsed())

@@ -163,14 +163,15 @@ namespace cppdatalib
                                 case string: value.set_string(""); break;
                                 case object:
                                 {
-                                    object_t obj;
+                                    core::value obj;
+
                                     if (value.size() % 2 != 0)
                                         throw core::error("cppdatalib::core::stream_filter_converter - cannot convert 'array' to 'object' with odd number of elements");
 
                                     for (size_t i = 0; i < value.get_array().size(); i += 2)
-                                        obj[value[i]] = value[i+1];
+                                        obj.add_member(value[i]) = value[i+1];
 
-                                    value.set_object(obj);
+                                    value = obj;
                                     break;
                                 }
                                 default: value.set_null(); break;

@@ -101,7 +101,7 @@ namespace cppdatalib
         typedef const char *cstring_t;
         typedef std::string string_t;
         typedef std::vector<value> array_t;
-        typedef std::map<value, value> object_t;
+        typedef std::multimap<value, value> object_t;
         typedef long subtype_t;
         struct null_t {};
 
@@ -217,8 +217,28 @@ namespace cppdatalib
                 }
             }
 
+            // Functors should return true if processing should continue
+            static bool traverse_node_null(const value *) {return true;}
+            static bool traverse_node_mutable_clear(const value *arg) {arg->mutable_clear(); return true;}
+
+            struct traverse_node_prefix_serialize;
+            struct traverse_node_postfix_serialize;
+
+            struct traverse_compare_prefix;
+            struct traverse_equality_compare_prefix;
+            struct traverse_compare_postfix;
+
+            friend bool operator<(const value &lhs, const value &rhs);
+            friend bool operator<=(const value &lhs, const value &rhs);
+            friend bool operator==(const value &lhs, const value &rhs);
+            friend stream_handler &operator<<(stream_handler &output, const value &input);
+            static value &assign(value &dst, const value &src);
+
+        public:
+            // Predicates must be callables with argument type `const core::value *arg` and return value bool
+            // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate, typename PostfixPredicate>
-            void traverse(PrefixPredicate prefix, PostfixPredicate postfix) const
+            void traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
             {
                 std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
                 const value *p = this;
@@ -276,6 +296,192 @@ namespace cppdatalib
                 }
             }
 
+            // Predicates must be callables with argument types `const core::value *arg, bool prefix` and return value bool
+            // `prefix` is set to true if the current invocation is for the prefix handling of the specified element
+            // If return value is non-zero, processing continues, otherwise processing aborts immediately
+            template<typename Predicate>
+            void traverse(Predicate &predicate) const
+            {
+                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
+                const value *p = this;
+
+                while (!references.empty() || p != NULL)
+                {
+                    if (p != NULL)
+                    {
+                        if (!predicate(p, true))
+                            return;
+
+                        if (p->is_array())
+                        {
+                            references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                            if (!p->get_array().empty())
+                                p = std::addressof(*references.top().array++);
+                            else
+                                p = NULL;
+                        }
+                        else if (p->is_object())
+                        {
+                            references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                            if (!p->get_object().empty())
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = NULL;
+                        }
+                        else
+                        {
+                            references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                            p = NULL;
+                        }
+                    }
+                    else
+                    {
+                        const value *peek = references.top().p;
+                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                            p = std::addressof(*references.top().array++);
+                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                        {
+                            if (!references.top().traversed_key_already)
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = std::addressof((references.top().object++)->second);
+
+                            references.top().traversed_key_already = !references.top().traversed_key_already;
+                        }
+                        else
+                        {
+                            references.pop();
+                            if (!predicate(peek, false))
+                                return;
+                        }
+                    }
+                }
+            }
+
+            // Predicates must be callables with argument type `const core::value *arg` and return value bool
+            // If return value is non-zero, processing continues, otherwise processing aborts immediately
+            // NOTE: The predicate is only called for object values, not object keys. It's invoked for all other values.
+            template<typename PrefixPredicate, typename PostfixPredicate>
+            void value_traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
+            {
+                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
+                const value *p = this;
+
+                while (!references.empty() || p != NULL)
+                {
+                    if (p != NULL)
+                    {
+                        if (!prefix(p))
+                            return;
+
+                        if (p->is_array())
+                        {
+                            references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                            if (!p->get_array().empty())
+                                p = std::addressof(*references.top().array++);
+                            else
+                                p = NULL;
+                        }
+                        else if (p->is_object())
+                        {
+                            references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                            if (!p->get_object().empty())
+                                p = std::addressof((references.top().object++)->second);
+                            else
+                                p = NULL;
+                        }
+                        else
+                        {
+                            references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                            p = NULL;
+                        }
+                    }
+                    else
+                    {
+                        const value *peek = references.top().p;
+                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                            p = std::addressof(*references.top().array++);
+                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                            p = std::addressof((references.top().object++)->second);
+                        else
+                        {
+                            references.pop();
+                            if (!postfix(peek))
+                                return;
+                        }
+                    }
+                }
+            }
+
+            // Predicates must be callables with argument types `const core::value *arg, bool prefix` and return value bool
+            // `prefix` is set to true if the current invocation is for the prefix handling of the specified element
+            // If return value is non-zero, processing continues, otherwise processing aborts immediately
+            // NOTE: The predicate is only called for object values, not object keys. It's invoked for all other values.
+            template<typename Predicate>
+            void value_traverse(Predicate &predicate) const
+            {
+                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
+                const value *p = this;
+
+                while (!references.empty() || p != NULL)
+                {
+                    if (p != NULL)
+                    {
+                        if (!predicate(p, true))
+                            return;
+
+                        if (p->is_array())
+                        {
+                            references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                            if (!p->get_array().empty())
+                                p = std::addressof(*references.top().array++);
+                            else
+                                p = NULL;
+                        }
+                        else if (p->is_object())
+                        {
+                            references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                            if (!p->get_object().empty())
+                                p = std::addressof((references.top().object++)->second);
+                            else
+                                p = NULL;
+                        }
+                        else
+                        {
+                            references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                            p = NULL;
+                        }
+                    }
+                    else
+                    {
+                        const value *peek = references.top().p;
+                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                            p = std::addressof(*references.top().array++);
+                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                            p = std::addressof((references.top().object++)->second);
+                        else
+                        {
+                            references.pop();
+                            if (!predicate(peek, false))
+                                return;
+                        }
+                    }
+                }
+            }
+
+            // Predicates must be callables with argument type `const core::value *arg` and return value bool
+            // If return value is non-zero, processing continues, otherwise processing aborts immediately
+            template<typename PrefixPredicate>
+            void prefix_traverse(PrefixPredicate &prefix) {traverse(prefix, traverse_node_null);}
+
+            // Predicates must be callables with argument type `const core::value *arg` and return value bool
+            // If return value is non-zero, processing continues, otherwise processing aborts immediately
+            template<typename PostfixPredicate>
+            void postfix_traverse(PostfixPredicate &postfix) {traverse(traverse_node_null, postfix);}
+
+            // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2`
+            // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
+            // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate, typename PostfixPredicate>
             void parallel_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
             {
@@ -386,24 +592,6 @@ namespace cppdatalib
                 }
             }
 
-            // Functors should return true if processing should continue
-            static bool traverse_node_null(value *) {return true;}
-            static bool traverse_node_clear(value *arg) {arg->shallow_clear(); return true;}
-
-            struct traverse_node_prefix_serialize;
-            struct traverse_node_postfix_serialize;
-
-            struct traverse_compare_prefix;
-            struct traverse_equality_compare_prefix;
-            struct traverse_compare_postfix;
-
-            friend bool operator<(const value &lhs, const value &rhs);
-            friend bool operator<=(const value &lhs, const value &rhs);
-            friend bool operator==(const value &lhs, const value &rhs);
-            friend stream_handler &operator<<(stream_handler &output, const value &input);
-            static value &assign(value &dst, const value &src);
-
-        public:
             value() : type_(null), subtype_(0) {}
             value(null_t, subtype_t subtype = 0) : type_(null), subtype_(subtype) {}
             value(bool_t v, subtype_t subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
@@ -439,7 +627,7 @@ namespace cppdatalib
             {
                 if ((type_ == array && arr_.size() > 0) ||
                     (type_ == object && obj_.size() > 0))
-                    traverse_and_edit(traverse_node_null, traverse_node_clear);
+                    traverse(traverse_node_null, traverse_node_mutable_clear);
             }
 
             value(const value &other) : type_(null), subtype_(0) {assign(*this, other);}
@@ -499,15 +687,8 @@ namespace cppdatalib
             void set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ = v; subtype_ = subtype;}
             void set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ = v; subtype_ = subtype;}
 
-            value operator[](const string_t &key) const
-            {
-                auto it = obj_.find(key);
-                if (it != obj_.end())
-                    return it->second;
-                return value();
-            }
-            value &operator[](const string_t &key) {clear(object); return obj_[key];}
-            value &operator[](string_t &&key) {clear(object); return obj_[key];}
+            value operator[](const string_t &key) const {return member(key);}
+            value &operator[](const string_t &key) {return member(key);}
             value member(const value &key) const
             {
                 auto it = obj_.find(key);
@@ -515,8 +696,15 @@ namespace cppdatalib
                     return it->second;
                 return value();
             }
-            value &member(const value &key) {clear(object); return obj_[key];}
-            value &member(value &&key) {clear(object); return obj_[key];}
+            value &member(const value &key)
+            {
+                clear(object);
+                auto it = obj_.lower_bound(key);
+                if (it->first == key)
+                    return it->second;
+                it = obj_.insert(it, {key, null_t()});
+                return it->second;
+            }
             const value *member_ptr(const value &key) const
             {
                 auto it = obj_.find(key);
@@ -527,9 +715,23 @@ namespace cppdatalib
             bool_t is_member(cstring_t key) const {return obj_.find(key) != obj_.end();}
             bool_t is_member(const string_t &key) const {return obj_.find(key) != obj_.end();}
             bool_t is_member(const value &key) const {return obj_.find(key) != obj_.end();}
+            size_t member_count(cstring_t key) const {return obj_.count(key);}
+            size_t member_count(const string_t &key) const {return obj_.count(key);}
+            size_t member_count(const value &key) const {return obj_.count(key);}
             void erase_member(cstring_t key) {obj_.erase(key);}
             void erase_member(const string_t &key) {obj_.erase(key);}
             void erase_member(const value &key) {obj_.erase(key);}
+
+            value &add_member(const value &key)
+            {
+                clear(object);
+                return obj_.insert(decltype(obj_)::value_type(key, null_t()))->second;
+            }
+            value &add_member(const value &key, const value &val)
+            {
+                clear(object);
+                return obj_.insert(decltype(obj_)::value_type(key, val))->second;
+            }
 
             void push_back(const value &v) {clear(array); arr_.push_back(v);}
             void push_back(value &&v) {clear(array); arr_.push_back(v);}
@@ -567,6 +769,17 @@ namespace cppdatalib
             operator T() const {return from_cppdatalib<T>(*this);}
 
         private:
+            // WARNING: DO NOT CALL mutable_clear() anywhere but the destructor!
+            // It violates const-correctness for the sole purpose of allowing
+            // complex object keys to be destroyed iteratively, instead of recursively.
+            // (They're defined as `const` members in the std::map implementation)
+            void mutable_clear() const
+            {
+                arr_.clear();
+                obj_.clear();
+                type_ = null;
+            }
+
             void shallow_clear()
             {
                 str_.clear();
@@ -694,7 +907,7 @@ namespace cppdatalib
                 return *this;
             }
 
-            type type_;
+            mutable type type_; // Mutable to provide editable traversal access to const destructor
             union
             {
                 bool_t bool_;
@@ -703,8 +916,8 @@ namespace cppdatalib
                 real_t real_;
             };
             string_t str_;
-            array_t arr_;
-            object_t obj_;
+            mutable array_t arr_; // Mutable to provide editable traversal access to const destructor
+            mutable object_t obj_; // Mutable to provide editable traversal access to const destructor
             subtype_t subtype_;
         };
 
@@ -765,7 +978,16 @@ namespace cppdatalib
         {
             core::value result;
             for (auto element: v)
-                result.member(element.first) = element.second;
+                result.add_member(element.first) = element.second;
+            return result;
+        }
+
+        template<typename T, typename U>
+        core::value to_cppdatalib(const std::multimap<T, U> &v)
+        {
+            core::value result;
+            for (auto element: v)
+                result.add_member(element.first) = element.second;
             return result;
         }
 
@@ -831,24 +1053,10 @@ namespace cppdatalib
                                       std::numeric_limits<unsigned long long>::max());
         }
 
-        template<> float from_cppdatalib<float>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<float>::min(),
-                                      v.as_real(),
-                                      std::numeric_limits<float>::max());
-        }
-        template<> double from_cppdatalib<double>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<double>::min(),
-                                      v.as_real(),
-                                      std::numeric_limits<double>::max());
-        }
-        template<> long double from_cppdatalib<long double>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<long double>::min(),
-                                      v.as_real(),
-                                      std::numeric_limits<long double>::max());
-        }
+        template<> float from_cppdatalib<float>(const core::value &v) {return v.as_real();}
+        template<> double from_cppdatalib<double>(const core::value &v) {return v.as_real();}
+        template<> long double from_cppdatalib<long double>(const core::value &v) {return v.as_real();}
+
         template<> std::string from_cppdatalib<std::string>(const core::value &v) {return v.as_string();}
     }
 }

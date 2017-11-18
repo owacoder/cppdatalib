@@ -27,8 +27,6 @@
 
 #include "../core/core.h"
 
-// TODO: Refactor into stream_parser API
-
 namespace cppdatalib
 {
     namespace binn
@@ -454,125 +452,173 @@ namespace cppdatalib
 
                 size_t get_size(const core::value &v)
                 {
-                    switch (v.get_type())
+                    struct traverser
                     {
-                        case core::null:
-                        case core::boolean: return 1 + (v.get_subtype() >= core::user && v.get_subtype() > 15);
-                        case core::integer:
+                    private:
+                        std::stack<size_t, std::vector<size_t>> size;
+
+                    public:
+                        traverser() {size.push(0);}
+
+                        size_t get_size() const {return size.top();}
+
+                        bool operator()(const core::value *arg, bool prefix)
                         {
-                            size_t size = 1; // one byte for type specifier
-
-                            if (v.get_subtype() >= core::user && v.get_subtype() > 15)
-                                ++size; // type specifier requires another byte
-
-                            if (v.get_int() >= INT8_MIN && v.get_int() <= UINT8_MAX)
-                                size += 1;
-                            else if (v.get_int() >= INT16_MIN && v.get_int() <= UINT16_MAX)
-                                size += 2;
-                            else if (v.get_int() >= INT32_MIN && v.get_int() <= UINT32_MAX)
-                                size += 4;
-                            else
-                                size += 8;
-
-                            return size;
-                        }
-                        case core::uinteger:
-                        {
-                            size_t size = 1; // one byte for type specifier
-
-                            if (v.get_subtype() >= core::user && v.get_subtype() > 15)
-                                ++size; // type specifier requires another byte
-
-                            if (v.get_uint() <= UINT8_MAX)
-                                size += 1;
-                            else if (v.get_uint() <= UINT16_MAX)
-                                size += 2;
-                            else if (v.get_uint() <= UINT32_MAX)
-                                size += 4;
-                            else
-                                size += 8;
-
-                            return size;
-                        }
-                        case core::real:
-                        {
-                            size_t size = 5; // one byte for type specifier, minimum of four bytes for data
-
-                            // A user-specified subtype is not available for reals
-                            // (because when the data is read again, the IEEE-754 representation will be put into an integer instead of a real,
-                            // since there is nothing to show that the data should be read as a floating point number)
-                            // To prevent the loss of data, the subtype is discarded and the value stays the same
-
-                            if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real())) != v.get_real() && !std::isnan(v.get_real()))
-                                size += 4; // requires more than 32-bit float to losslessly encode
-
-                            return size;
-                        }
-                        case core::string:
-                        {
-                            size_t size = 3; // one byte for the type specifier, one for the minimum size specifier of one byte, one for trailing nul
-
-                            if (v.get_subtype() >= core::user && v.get_subtype() > 15)
-                                ++size; // type specifier requires another byte
-
-                            if (size + v.size() >= 128)
-                                size += 3; // requires a four-byte size specifier
-
-                            return size + v.get_string().size();
-                        }
-                        case core::array:
-                        {
-                            size_t size = 3; // one byte for the type specifier,
-                                             // one for the minimum size specifier of one byte,
-                                             // and one for the minimum count specifier of one byte
-
-                            if (v.get_subtype() >= core::user && v.get_subtype() > 15)
-                                ++size; // type specifier requires another byte
-
-                            if (v.size() >= 128)
-                                size += 3; // requires a four-byte count specifier
-
-                            for (auto it = v.get_array().begin(); it != v.get_array().end(); ++it)
-                                size += get_size(*it);
-
-                            if (size >= 128)
-                                size += 3; // requires a four-byte size specifier
-
-                            return size;
-                        }
-                        case core::object:
-                        {
-                            size_t size = 3; // one byte for the type specifier,
-                                             // one for the minimum size specifier of one byte,
-                                             // and one for the minimum count specifier of one byte
-
-                            // A user-specified subtype is not available for objects
-                            // (because when the data is read again, there is no way to determine the type of structure the container holds)
-                            // To prevent the loss of data, the subtype is discarded and the value stays the same
-
-                            if (v.size() >= 128)
-                                size += 3; // requires a four-byte count specifier
-
-                            if (v.get_subtype() == core::map)
+                            switch (arg->get_type())
                             {
-                                for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                                    size += 4 /* map ID */ + get_size(it->second) /* value size */;
-                            }
-                            else
-                            {
-                                for (auto it = v.get_object().begin(); it != v.get_object().end(); ++it)
-                                    size += 1 /* key size specifier */ + it->first.size() /* key size */ + get_size(it->second) /* value size */;
+                                case core::null:
+                                case core::boolean:
+                                    if (prefix)
+                                        size.top() += 1 + (arg->get_subtype() >= core::user && arg->get_subtype() > 15);
+                                    break;
+                                case core::integer:
+                                {
+                                    if (prefix)
+                                    {
+                                        size.top() += 1; // one byte for type specifier
+
+                                        if (arg->get_subtype() >= core::user && arg->get_subtype() > 15)
+                                            ++size.top(); // type specifier requires another byte
+
+                                        if (arg->get_int() >= INT8_MIN && arg->get_int() <= UINT8_MAX)
+                                            size.top() += 1;
+                                        else if (arg->get_int() >= INT16_MIN && arg->get_int() <= UINT16_MAX)
+                                            size.top() += 2;
+                                        else if (arg->get_int() >= INT32_MIN && arg->get_int() <= UINT32_MAX)
+                                            size.top() += 4;
+                                        else
+                                            size.top() += 8;
+                                    }
+
+                                    break;
+                                }
+                                case core::uinteger:
+                                {
+                                    if (prefix)
+                                    {
+                                        size.top() += 1; // one byte for type specifier
+
+                                        if (arg->get_subtype() >= core::user && arg->get_subtype() > 15)
+                                            ++size.top(); // type specifier requires another byte
+
+                                        if (arg->get_uint() <= UINT8_MAX)
+                                            size.top() += 1;
+                                        else if (arg->get_uint() <= UINT16_MAX)
+                                            size.top() += 2;
+                                        else if (arg->get_uint() <= UINT32_MAX)
+                                            size.top() += 4;
+                                        else
+                                            size.top() += 8;
+                                    }
+
+                                    break;
+                                }
+                                case core::real:
+                                {
+                                    if (prefix)
+                                    {
+                                        size.top() += 5; // one byte for type specifier, minimum of four bytes for data
+
+                                        // A user-specified subtype is not available for reals
+                                        // (because when the data is read again, the IEEE-754 representation will be put into an integer instead of a real,
+                                        // since there is nothing to show that the data should be read as a floating point number)
+                                        // To prevent the loss of data, the subtype is discarded and the value stays the same
+
+                                        if (core::float_from_ieee_754(core::float_to_ieee_754(arg->get_real())) != arg->get_real() && !std::isnan(arg->get_real()))
+                                            size.top() += 4; // requires more than 32-bit float to losslessly encode
+                                    }
+
+                                    break;
+                                }
+                                case core::string:
+                                {
+                                    if (prefix)
+                                    {
+                                        size.top() += 3; // one byte for the type specifier, one for the minimum size specifier of one byte, one for trailing nul
+
+                                        if (arg->get_subtype() >= core::user && arg->get_subtype() > 15)
+                                            ++size.top(); // type specifier requires another byte
+
+                                        if (size.top() + arg->size() >= 128)
+                                            size.top() += 3; // requires a four-byte size specifier
+
+                                        size.top() += arg->get_string().size();
+                                    }
+                                    break;
+                                }
+                                case core::array:
+                                {
+                                    if (prefix)
+                                    {
+                                        size.push(3); // one byte for the type specifier,
+                                                      // one for the minimum size specifier of one byte,
+                                                      // and one for the minimum count specifier of one byte
+
+                                        if (arg->get_subtype() >= core::user && arg->get_subtype() > 15)
+                                            ++size.top(); // type specifier requires another byte
+
+                                        if (arg->size() >= 128)
+                                            size.top() += 3; // requires a four-byte count specifier
+                                    }
+                                    else
+                                    {
+                                        if (size.top() >= 128)
+                                            size.top() += 3; // requires a four-byte size specifier
+
+                                        size_t temp = size.top();
+                                        size.pop();
+                                        size.top() += temp;
+                                    }
+
+                                    break;
+                                }
+                                case core::object:
+                                {
+                                    if (prefix)
+                                    {
+                                        size.push(3); // one byte for the type specifier,
+                                                      // one for the minimum size specifier of one byte,
+                                                      // and one for the minimum count specifier of one byte
+
+                                        // A user-specified subtype is not available for objects
+                                        // (because when the data is read again, there is no way to determine the type of structure the container holds)
+                                        // To prevent the loss of data, the subtype is discarded and the value stays the same
+
+                                        if (arg->size() >= 128)
+                                            size.top() += 3; // requires a four-byte count specifier
+
+                                        // Obtain sizes of keys (ignore values for now, since they'll be added in later invocations)
+                                        if (arg->get_subtype() == core::map)
+                                            size.top() += 4 * arg->get_object().size();
+                                        else
+                                        {
+                                            for (auto it = arg->get_object().begin(); it != arg->get_object().end(); ++it)
+                                                size.top() += 1 /* key size specifier */ + it->first.size() /* key size */;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (size.top() >= 128)
+                                            size.top() += 3; // requires a four-byte size specifier
+
+                                        size_t temp = size.top();
+                                        size.pop();
+                                        size.top() += temp;
+                                    }
+
+                                    break;
+                                }
                             }
 
-                            if (size >= 128)
-                                size += 3; // requires a four-byte size specifier
-
-                            return size;
+                            return true;
                         }
-                    }
+                    };
 
-                    // Control will never get here
-                    return 0;
+                    traverser t;
+
+                    v.value_traverse(t);
+
+                    return t.get_size();
                 }
             };
         }
@@ -749,14 +795,15 @@ namespace cppdatalib
                     case core::time: write_type(output_stream, string, time); break;
                     case core::datetime: write_type(output_stream, string, datetime); break;
                     case core::bignum: write_type(output_stream, string, decimal_str); break;
-                    case core::blob: write_type(output_stream, blob, blob_data); break;
+                    case core::blob:
+                    case core::clob: write_type(output_stream, blob, blob_data); break;
                     default: write_type(output_stream, string, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): text); break;
                 }
 
                 write_size(output_stream, size);
             }
             void string_data_(const core::value &v, bool) {output_stream.write(v.get_string().c_str(), v.get_string().size());}
-            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::blob && !is_key) output_stream.put(0);}
+            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::blob && v.get_subtype() != core::clob && !is_key) output_stream.put(0);}
 
             void begin_array_(const core::value &v, core::int_t size, bool)
             {

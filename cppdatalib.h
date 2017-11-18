@@ -29,6 +29,7 @@
 #include "json/json_pointer.h"
 #include "json/json.h"
 #include "bencode/bencode.h"
+#include "bjson/bjson.h"
 #include "property_list/plain_text.h"
 #include "property_list/xml.h"
 #include "rpc/xml.h"

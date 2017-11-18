@@ -77,6 +77,9 @@ namespace cppdatalib
             }
             void end_key_(const core::value &)
             {
+                if (references.empty())
+                    end(), begin();
+
                 references.pop();
             }
 
@@ -84,11 +87,14 @@ namespace cppdatalib
             // adds a member with the specified key, or simply assigns if not in a container
             void begin_scalar_(const core::value &v, bool is_key)
             {
+                if (references.empty())
+                    end(), begin();
+
                 if (!is_key && current_container() == array)
                     references.top()->push_back(v);
                 else if (!is_key && current_container() == object)
                 {
-                    references.top()->member(keys.top()) = v;
+                    references.top()->add_member(keys.top()) = v;
                     keys.pop();
                 }
                 else
@@ -97,13 +103,17 @@ namespace cppdatalib
 
             void string_data_(const core::value &v, bool)
             {
+                if (references.empty())
+                    end(), begin();
+
                 references.top()->get_string() += v.get_string();
             }
 
             // begin_container() operates similarly to begin_scalar_(), but pushes a reference to the container as well
-            void begin_container(const core::value &v, core::int_t size, bool is_key)
+            void begin_container(const core::value &v, core::int_t, bool is_key)
             {
-                (void) size;
+                if (references.empty())
+                    end(), begin();
 
                 if (!is_key && current_container() == array)
                 {
@@ -112,7 +122,7 @@ namespace cppdatalib
                 }
                 else if (!is_key && current_container() == object)
                 {
-                    references.push(&references.top()->member(keys.top()));
+                    references.push(&references.top()->add_member(keys.top()));
                     keys.pop();
                 }
 
@@ -130,6 +140,9 @@ namespace cppdatalib
             // end_container_() just removes a container from the stack, because nothing more needs to be done
             void end_container(bool is_key)
             {
+                if (references.empty())
+                    end(), begin();
+
                 if (!is_key)
                     references.pop();
             }

@@ -397,13 +397,14 @@ namespace cppdatalib
                     case core::date:
                     case core::time:
                     case core::datetime: output_stream << "<*D"; break;
-                    case core::blob: output_stream.put('<'); break;
+                    case core::blob:
+                    case core::clob: output_stream.put('<'); break;
                     default: output_stream.put('"'); break;
                 }
             }
             void string_data_(const core::value &v, bool)
             {
-                if (v.get_subtype() == core::blob)
+                if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
                     hex::write(output_stream, v.get_string());
                 else
                     write_string(output_stream, v.get_string());
@@ -415,7 +416,8 @@ namespace cppdatalib
                     case core::date:
                     case core::time:
                     case core::datetime:
-                    case core::blob: output_stream.put('>'); break;
+                    case core::blob:
+                    case core::clob: output_stream.put('>'); break;
                     default: output_stream.put('"'); break;
                 }
             }
@@ -512,13 +514,14 @@ namespace cppdatalib
                     case core::date:
                     case core::time:
                     case core::datetime: output_stream << "<*D"; break;
-                    case core::blob: output_stream.put('<'); break;
+                    case core::blob:
+                    case core::clob: output_stream.put('<'); break;
                     default: output_stream.put('"'); break;
                 }
             }
             void string_data_(const core::value &v, bool)
             {
-                if (v.get_subtype() == core::blob)
+                if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
                     hex::write(output_stream, v.get_string());
                 else
                     write_string(output_stream, v.get_string());
@@ -530,7 +533,8 @@ namespace cppdatalib
                     case core::date:
                     case core::time:
                     case core::datetime:
-                    case core::blob: output_stream.put('>'); break;
+                    case core::blob:
+                    case core::clob: output_stream.put('>'); break;
                     default: output_stream.put('"'); break;
                 }
             }
