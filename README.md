@@ -20,14 +20,13 @@ Supported formats include
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
    - [MessagePack](https://msgpack.org/) (write-only)
+   - [BJSON](http://bjson.org/) (write-only)
    - [Netstrings](https://en.wikipedia.org/wiki/Netstring) (write-only)
 
 ### Planned formats
 
    - Transenc
-   - BJSON
    - CBOR
-   - Netstrings
    - TSV
 
 ### Filters
@@ -216,7 +215,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
      
    - Binn supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
-       - `string` subtypes `date`, `time`, `datetime`, `bignum`, and `blob` are supported.
+       - `string` subtypes `date`, `time`, `datetime`, `bignum`, `blob`, and `clob` are supported.
        - `object` subtype `map` is supported.
        - Map keys are limited to signed 32-bit integers.
        - Object keys are limited to 255 characters or fewer.
@@ -253,5 +252,5 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - Numerical metadata is lost when converting to and from XML-XLS.
 
    - MessagePack supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
-       - `string` subtype `blob` is supported.
+       - `string` subtypes `blob` and `clob` are supported.
        - MessagePack timestamps are not currently supported.
