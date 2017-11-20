@@ -617,6 +617,24 @@ namespace cppdatalib
                 for (auto element: v)
                     push_back(element);
             }
+            template<typename T>
+            value(const std::vector<T> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            {
+                for (auto element: v)
+                    push_back(element);
+            }
+            template<typename T, typename U>
+            value(const std::map<T, U> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            {
+                for (auto element: v)
+                    add_member(element.first, element.second);
+            }
+            template<typename T, typename U>
+            value(const std::multimap<T, U> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            {
+                for (auto element: v)
+                    add_member(element.first, element.second);
+            }
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
             value(const T &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
             {
@@ -930,38 +948,22 @@ namespace cppdatalib
             }
         }
 
-        template<typename T>
-        core::value to_cppdatalib(T v)
-        {
-            assert(!"cppdatalib::core::to_cppdatalib - cannot convert when called without a specialization");
-            throw core::error("cppdatalib::core::to_cppdatalib - cannot convert when called without a specialization");
-            (void) v;
-        }
-
-        template<typename T>
-        T from_cppdatalib(const core::value &v)
-        {
-            assert(!"cppdatalib::core::from_cppdatalib - cannot convert when called without a specialization");
-            throw core::error("cppdatalib::core::from_cppdatalib - cannot convert when called without a specialization");
-            (void) v;
-        }
-
-        template<> core::value to_cppdatalib(signed char v) {return v;}
-        template<> core::value to_cppdatalib(unsigned char v) {return v;}
-        template<> core::value to_cppdatalib(signed short v) {return v;}
-        template<> core::value to_cppdatalib(unsigned short v) {return v;}
-        template<> core::value to_cppdatalib(signed int v) {return v;}
-        template<> core::value to_cppdatalib(unsigned int v) {return v;}
-        template<> core::value to_cppdatalib(signed long v) {return v;}
-        template<> core::value to_cppdatalib(unsigned long v) {return v;}
-        template<> core::value to_cppdatalib(signed long long v) {return v;}
-        template<> core::value to_cppdatalib(unsigned long long v) {return v;}
-        template<> core::value to_cppdatalib(float v) {return core::real_t(v);}
-        template<> core::value to_cppdatalib(double v) {return v;}
-        template<> core::value to_cppdatalib(long double v) {return core::real_t(v);}
-        template<> core::value to_cppdatalib(char *v) {return v;}
-        template<> core::value to_cppdatalib(const char *v) {return v;}
-        template<> core::value to_cppdatalib(const std::string &v) {return v;}
+        core::value to_cppdatalib(signed char v) {return v;}
+        core::value to_cppdatalib(unsigned char v) {return v;}
+        core::value to_cppdatalib(signed short v) {return v;}
+        core::value to_cppdatalib(unsigned short v) {return v;}
+        core::value to_cppdatalib(signed int v) {return v;}
+        core::value to_cppdatalib(unsigned int v) {return v;}
+        core::value to_cppdatalib(signed long v) {return v;}
+        core::value to_cppdatalib(unsigned long v) {return v;}
+        core::value to_cppdatalib(signed long long v) {return v;}
+        core::value to_cppdatalib(unsigned long long v) {return v;}
+        core::value to_cppdatalib(float v) {return core::real_t(v);}
+        core::value to_cppdatalib(double v) {return v;}
+        core::value to_cppdatalib(long double v) {return core::real_t(v);}
+        core::value to_cppdatalib(char *v) {return v;}
+        core::value to_cppdatalib(const char *v) {return v;}
+        core::value to_cppdatalib(const std::string &v) {return v;}
         template<typename T> core::value to_cppdatalib(std::initializer_list<T> v) {return v;}
 
         template<typename T>

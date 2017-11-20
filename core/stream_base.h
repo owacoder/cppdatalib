@@ -85,7 +85,7 @@ namespace cppdatalib
             }
 
             enum {
-                unknown_size = -1
+                unknown_size = -1 // No other negative value besides unknown_size should be used for the `size` parameters of handlers
             };
 
             bool active() const {return active_;}

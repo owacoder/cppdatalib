@@ -233,7 +233,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - No subtypes are supported.
        - Numerical metadata is lost when converting to XML-RPC.
      
-   - CSV supports `null`, `uint`, `bool`, `int`, `real`, `string`, and `array`.<br/>
+   - CSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:
        - `object`s are **not** supported.
        - `uint` values are fully supported when reading.
@@ -254,3 +254,12 @@ If a format-defined limit is reached, such as an object key length limit, an err
    - MessagePack supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
        - `string` subtypes `blob` and `clob` are supported.
        - MessagePack timestamps are not currently supported.
+
+   - BJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+       - `string` subtypes `blob` and `clob` are supported.
+       - Numerical metadata is lost when converting to and from BJSON.
+
+   - Netstrings supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
+     Notes:
+       - No subtypes are supported.
+       - Type information is lost when converting to Netstrings.
