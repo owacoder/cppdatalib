@@ -101,6 +101,7 @@ namespace cppdatalib
             void end()
             {
                 assert("cppdatalib::core::stream_handler - end() called on inactive handler" && active());
+                assert("cppdatalib::core::stream_handler - unexpected end of stream" && nested_scopes.empty());
 
                 if (!nested_scopes.empty())
                     throw error("cppdatalib::core::stream_handler - unexpected end of stream");
@@ -177,57 +178,52 @@ namespace cppdatalib
 
                 if (!write_(v, is_key))
                 {
-                    if (is_key)
-                        begin_key_(v);
+                    if (v.size() > 0 && (v.is_array() || v.is_object()))
+                        *this << v;
                     else
-                        begin_item_(v);
-
-                    switch (v.get_type())
                     {
-                        case string:
-                            begin_string_(v, v.size(), is_key);
-                            string_data_(v, is_key);
-                            end_string_(v, is_key);
-                            break;
-                        case array:
-                            if (v.size() == 0)
-                            {
+                        if (is_key)
+                            begin_key_(v);
+                        else
+                            begin_item_(v);
+
+                        switch (v.get_type())
+                        {
+                            case string:
+                                begin_string_(v, v.size(), is_key);
+                                string_data_(v, is_key);
+                                end_string_(v, is_key);
+                                break;
+                            case array:
                                 begin_array_(v, 0, is_key);
                                 end_array_(v, is_key);
-                            }
-                            else
-                                *this << v;
-                            break;
-                        case object:
-                            if (v.size() == 0)
-                            {
+                                break;
+                            case object:
                                 begin_object_(v, 0, is_key);
                                 end_object_(v, is_key);
-                            }
-                            else
-                                *this << v;
-                            break;
-                        default:
-                            begin_scalar_(v, is_key);
+                                break;
+                            default:
+                                begin_scalar_(v, is_key);
 
-                            switch (v.get_type())
-                            {
-                                case null: null_(v); break;
-                                case boolean: bool_(v); break;
-                                case integer: integer_(v); break;
-                                case uinteger: uinteger_(v); break;
-                                case real: real_(v); break;
-                                default: return false;
-                            }
+                                switch (v.get_type())
+                                {
+                                    case null: null_(v); break;
+                                    case boolean: bool_(v); break;
+                                    case integer: integer_(v); break;
+                                    case uinteger: uinteger_(v); break;
+                                    case real: real_(v); break;
+                                    default: return false;
+                                }
 
-                            end_scalar_(v, is_key);
-                            break;
+                                end_scalar_(v, is_key);
+                                break;
+                        }
+
+                        if (is_key)
+                            end_key_(v);
+                        else
+                            end_item_(v);
                     }
-
-                    if (is_key)
-                        end_key_(v);
-                    else
-                        end_item_(v);
                 }
 
                 if (!nested_scopes.empty())
