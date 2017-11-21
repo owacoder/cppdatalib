@@ -221,25 +221,29 @@ namespace cppdatalib
             core::value cache_val;
             core::value_builder cache;
 
-            buffer_filter_flags flags;
+            const buffer_filter_flags flags;
+            const size_t nesting_level;
 
             size_t ignore_nesting;
 
         public:
-            buffer_filter(core::stream_handler &output, buffer_filter_flags flags)
+            buffer_filter(core::stream_handler &output, buffer_filter_flags flags, size_t nesting_level = 0)
                 : stream_filter_base(output)
                 , cache(cache_val)
                 , flags(flags)
+                , nesting_level(nesting_level)
             {}
             buffer_filter(const buffer_filter &f)
                 : stream_filter_base(f.output)
                 , cache(cache_val)
                 , flags(f.flags)
+                , nesting_level(f.nesting_level)
             {}
             buffer_filter(buffer_filter &&f)
                 : stream_filter_base(f.output)
                 , cache(cache_val)
                 , flags(f.flags)
+                , nesting_level(f.nesting_level)
             {}
 
             bool requires_prefix_string_size() const {return flags & buffer_strings? false: stream_filter_base::requires_prefix_string_size();}
@@ -281,7 +285,7 @@ namespace cppdatalib
             {
                 if (ignore_nesting)
                     ++ignore_nesting;
-                else if (cache.active() || flags & buffer_arrays)
+                else if (cache.active() || (flags & buffer_arrays && nesting_level <= nesting_depth()))
                 {
                     if (size != unknown_size && size_t(size) == v.size())
                     {
@@ -319,7 +323,9 @@ namespace cppdatalib
 
             void begin_object_(const value &v, int_t size, bool is_key)
             {
-                if (cache.active() || flags & buffer_objects)
+                if (ignore_nesting)
+                    ++ignore_nesting;
+                else if (cache.active() || (flags & buffer_objects && nesting_level <= nesting_depth()))
                 {
                     if (size != unknown_size && size_t(size) == v.size())
                     {
@@ -359,7 +365,7 @@ namespace cppdatalib
             {
                 if (ignore_nesting)
                     ++ignore_nesting;
-                else if (cache.active() || flags & buffer_strings)
+                else if (cache.active() || (flags & buffer_strings && nesting_level <= nesting_depth()))
                 {
                     if (size != unknown_size && size_t(size) == v.size())
                     {
@@ -493,7 +499,7 @@ namespace cppdatalib
 
         public:
             table_to_array_of_maps_filter(core::stream_handler &output, const core::value &column_names, bool fail_on_missing_column = false)
-                : core::buffer_filter(output, buffer_arrays)
+                : core::buffer_filter(output, buffer_arrays, 1)
                 , column_names(column_names)
                 , fail_on_missing_column(fail_on_missing_column)
             {}
@@ -501,38 +507,60 @@ namespace cppdatalib
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
-                if (nesting_depth() > 0)
-                {
-                    buffer_filter::write_buffered_value_(v, is_key);
-                    return;
-                }
+                core::value map_;
 
-                core::value array_of_maps_;
-                const core::array_t &a = v.get_array();
-                for (auto it: a)
-                {
-                    core::value map_;
+                if ((v.get_type() == core::array && v.size() > column_names.get_array().size())
+                        || column_names.get_array().size() == 0) // Not enough column names to cover all attributes!!
+                    throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
 
-                    if ((it.get_type() == core::array && it.size() > column_names.get_array().size())
-                            || column_names.get_array().size() == 0) // Not enough column names to cover all attributes!!
-                        throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
+                if (v.get_type() == core::array)
+                    for (size_t i = 0; i < column_names.get_array().size(); ++i)
+                    {
+                        if (i >= v.size() && fail_on_missing_column)
+                            throw core::error("cppdatalib::core::table_to_array_of_maps_filter - missing column entry in table row");
+                        map_.add_member(column_names[i], i < v.size()? v[i]: core::value(core::null_t()));
+                    }
+                else
+                    map_.add_member(column_names[0], v);
 
-                    if (it.get_type() == core::array)
-                        for (size_t i = 0; i < column_names.get_array().size(); ++i)
-                        {
-                            if (i >= it.size() && fail_on_missing_column)
-                                throw core::error("cppdatalib::core::table_to_array_of_maps_filter - missing column entry in table row");
-                            map_.add_member(column_names[i], i < it.size()? it[i]: core::value(core::null_t()));
-                        }
-                    else
-                        map_.add_member(column_names[0], it);
-
-                    array_of_maps_.push_back(map_);
-                }
-
-                buffer_filter::write_buffered_value_(array_of_maps_, is_key);
+                buffer_filter::write_buffered_value_(map_, is_key);
             }
         };
+
+        /*class array_of_maps_to_table_filter : public core::buffer_filter
+        {
+            core::value column_names;
+            bool fail_on_missing_column;
+
+        public:
+            array_of_maps_to_table_filter(core::stream_handler &output, const core::value &column_names, bool fail_on_missing_column = false)
+                : core::buffer_filter(output, buffer_arrays, 1)
+                , column_names(column_names)
+                , fail_on_missing_column(fail_on_missing_column)
+            {}
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                core::value map_;
+
+                if ((v.get_type() == core::object && v.size() > column_names.get_array().size())
+                        || column_names.get_array().size() == 0) // Not enough column names to cover all attributes!!
+                    throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
+
+                if (v.get_type() == core::object)
+                    for (size_t i = 0; i < column_names.get_array().size(); ++i)
+                    {
+                        if (i >= v.size() && fail_on_missing_column)
+                            throw core::error("cppdatalib::core::table_to_array_of_maps_filter - missing column entry in table row");
+                        map_.add_member(column_names[i], i < v.size()? v[i]: core::value(core::null_t()));
+                    }
+                else
+                    map_.add_member(column_names[0], v);
+
+                buffer_filter::write_buffered_value_(map_, is_key);
+            }
+        };*/
 
         // TODO: duplicate_key_check_filter doesn't do much good as a separate filter unless core::value supports duplicate-key maps
         class duplicate_key_check_filter : public core::stream_filter_base
