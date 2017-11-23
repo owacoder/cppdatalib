@@ -534,7 +534,7 @@ namespace cppdatalib
         {
             traverse_node_prefix_serialize(stream_handler &handler) : stream(handler) {}
 
-            bool operator()(const value *arg)
+            bool operator()(const value *arg, value::traversal_ancestry_finder)
             {
                 if (arg->is_array())
                     stream.begin_array(*arg, arg->size());
@@ -551,7 +551,7 @@ namespace cppdatalib
         {
             traverse_node_postfix_serialize(stream_handler &handler) : stream(handler) {}
 
-            bool operator()(const value *arg)
+            bool operator()(const value *arg, value::traversal_ancestry_finder)
             {
                 if (arg->is_array())
                     stream.end_array(*arg);
@@ -566,17 +566,17 @@ namespace cppdatalib
             stream_handler &stream;
         };
 
-        struct value::traverse_compare_prefix
+        struct value::traverse_less_than_compare_prefix
         {
         private:
             int compare;
 
         public:
-            traverse_compare_prefix() : compare(0) {}
+            traverse_less_than_compare_prefix() : compare(0) {}
 
             int comparison() const {return compare;}
 
-            bool operator()(const value *arg, const value *arg2)
+            void run(const value *arg, const value *arg2)
             {
                 if (!compare)
                 {
@@ -625,6 +625,79 @@ namespace cppdatalib
                         }
                     }
                 }
+            }
+
+            bool operator()(const value *arg, const value *arg2, value::traversal_ancestry_finder, value::traversal_ancestry_finder)
+            {
+                run(arg, arg2);
+                return compare == 0;
+            }
+        };
+
+        struct value::traverse_compare_prefix
+        {
+        private:
+            int compare;
+
+        public:
+            traverse_compare_prefix() : compare(0) {}
+
+            int comparison() const {return compare;}
+
+            void run(const value *arg, const value *arg2)
+            {
+                if (!compare)
+                {
+                    if (arg == NULL && arg2 != NULL)
+                        compare = -1;
+                    else if (arg != NULL && arg2 == NULL)
+                        compare = 1;
+                    else if (arg != NULL && arg2 != NULL)
+                    {
+                        if (arg->get_type() < arg2->get_type())
+                            compare = -1;
+                        else if (arg->get_type() > arg2->get_type())
+                            compare = 1;
+                        else
+                        {
+                            if (arg->get_subtype() < arg2->get_subtype())
+                                compare = -1;
+                            else if (arg->get_subtype() > arg2->get_subtype())
+                                compare = 1;
+                            else
+                            {
+                                switch (arg->get_type())
+                                {
+                                    case boolean:
+                                        compare = (arg->get_bool() > arg2->get_bool()) - (arg->get_bool() < arg2->get_bool());
+                                        break;
+                                    case integer:
+                                        compare = (arg->get_int() > arg2->get_int()) - (arg->get_int() < arg2->get_int());
+                                        break;
+                                    case uinteger:
+                                        compare = (arg->get_uint() > arg2->get_uint()) - (arg->get_uint() < arg2->get_uint());
+                                        break;
+                                    case real:
+                                        compare = (arg->get_real() > arg2->get_real()) - (arg->get_real() < arg2->get_real());
+                                        break;
+                                    case string:
+                                        compare = (arg->get_string() > arg2->get_string()) - (arg->get_string() < arg2->get_string());
+                                        break;
+                                    case array:
+                                    case object:
+                                    case null:
+                                    default:
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            bool operator()(const value *arg, const value *arg2, value::traversal_ancestry_finder, value::traversal_ancestry_finder)
+            {
+                run(arg, arg2);
                 return compare == 0;
             }
         };
@@ -639,7 +712,7 @@ namespace cppdatalib
 
             bool comparison_equal() const {return equal;}
 
-            bool operator()(const value *arg, const value *arg2)
+            void run(const value *arg, const value *arg2)
             {
                 if (equal)
                 {
@@ -684,7 +757,11 @@ namespace cppdatalib
                         }
                     }
                 }
+            }
 
+            bool operator()(const value *arg, const value *arg2, value::traversal_ancestry_finder, value::traversal_ancestry_finder)
+            {
+                run(arg, arg2);
                 return equal;
             }
         };
@@ -692,9 +769,11 @@ namespace cppdatalib
         struct value::traverse_compare_postfix
         {
         public:
-            bool operator()(const value *arg, const value *arg2)
+            bool operator()(const value *,
+                            const value *,
+                            value::traversal_ancestry_finder,
+                            value::traversal_ancestry_finder)
             {
-                (void) arg, (void) arg2;
                 return true;
             }
         };

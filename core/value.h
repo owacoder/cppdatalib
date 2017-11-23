@@ -134,27 +134,27 @@ namespace cppdatalib
 
         class value
         {
+        public:
             struct traversal_reference
             {
-                traversal_reference(value *p, array_t::iterator a, object_t::iterator o)
-                    : p(p)
-                    , array(a)
-                    , object(o)
-                {}
-
-                value *p;
-                array_t::iterator array;
-                object_t::iterator object;
-            };
-
-            struct const_traversal_reference
-            {
-                const_traversal_reference(const value *p, array_t::const_iterator a, object_t::const_iterator o, bool traversed_key)
+                traversal_reference(const value *p, array_t::const_iterator a, object_t::const_iterator o, bool traversed_key)
                     : p(p)
                     , array(a)
                     , object(o)
                     , traversed_key_already(traversed_key)
                 {}
+
+                bool is_array() const {return array != array_t::const_iterator();}
+                size_t get_array_index() const {return is_array()? array - p->get_array().begin(): 0;}
+                const core::value *get_array_element() const {return is_array()? std::addressof(*array): NULL;}
+
+                bool is_object() const {return object != object_t::const_iterator();}
+                bool is_object_key() const {return is_object() && !traversed_key_already;}
+                const core::value *get_object_key() const {return is_object()? std::addressof(object->first): NULL;}
+                const core::value *get_object_value() const {return is_object()? std::addressof(object->second): NULL;}
+
+            private:
+                friend class value;
 
                 const value *p;
                 array_t::const_iterator array;
@@ -162,69 +162,18 @@ namespace cppdatalib
                 bool traversed_key_already;
             };
 
-            // TODO: this traversal algorithm does not traverse object keys, since they are declared `const` inside
-            // the `std::map` definition. Using complex keys may overflow the stack when the destructor is called.
-            // Using simple scalar keys will not be an issue
-            template<typename PrefixPredicate, typename PostfixPredicate>
-            void traverse_and_edit(PrefixPredicate prefix, PostfixPredicate postfix)
-            {
-                std::stack<traversal_reference, std::vector<traversal_reference>> references;
-                value *p = this;
+            struct traversal_ancestry_finder;
 
-                while (!references.empty() || p != NULL)
-                {
-                    if (p != NULL)
-                    {
-                        if (!prefix(p))
-                            return;
-
-                        if (p->is_array())
-                        {
-                            references.push(traversal_reference(p, p->get_array().begin(), object_t::iterator()));
-                            if (!p->get_array().empty())
-                                p = std::addressof(*references.top().array++);
-                            else
-                                p = NULL;
-                        }
-                        else if (p->is_object())
-                        {
-                            references.push(traversal_reference(p, array_t::iterator(), p->get_object().begin()));
-                            if (!p->get_object().empty())
-                                p = std::addressof((references.top().object++)->second);
-                            else
-                                p = NULL;
-                        }
-                        else
-                        {
-                            references.push(traversal_reference(p, array_t::iterator(), object_t::iterator()));
-                            p = NULL;
-                        }
-                    }
-                    else
-                    {
-                        value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array().end())
-                            p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object().end())
-                            p = std::addressof((references.top().object++)->second);
-                        else
-                        {
-                            references.pop();
-                            if (!postfix(peek))
-                                return;
-                        }
-                    }
-                }
-            }
-
+        private:
             // Functors should return true if processing should continue
-            static bool traverse_node_null(const value *) {return true;}
-            static bool traverse_node_mutable_clear(const value *arg) {arg->mutable_clear(); return true;}
+            static bool traverse_node_null(const value *, traversal_ancestry_finder) {return true;}
+            static bool traverse_node_mutable_clear(const value *arg, traversal_ancestry_finder) {arg->mutable_clear(); return true;}
 
             struct traverse_node_prefix_serialize;
             struct traverse_node_postfix_serialize;
 
             struct traverse_compare_prefix;
+            struct traverse_less_than_compare_prefix;
             struct traverse_equality_compare_prefix;
             struct traverse_compare_postfix;
 
@@ -235,24 +184,49 @@ namespace cppdatalib
             static value &assign(value &dst, const value &src);
 
         public:
-            // Predicates must be callables with argument type `const core::value *arg` and return value bool
+            struct traversal_ancestry_finder
+            {
+                typedef std::stack<traversal_reference, std::vector<traversal_reference>> container;
+
+                const container &c;
+
+            public:
+                traversal_ancestry_finder(const container &c) : c(c) {}
+
+                // First element is direct parent, last element is ancestry root
+                std::vector<traversal_reference> get_ancestry() const
+                {
+                    std::vector<traversal_reference> result;
+                    container temp = c;
+
+                    while (!temp.empty())
+                    {
+                        result.push_back(temp.top());
+                        temp.pop();
+                    }
+
+                    return result;
+                }
+            };
+
+            // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate, typename PostfixPredicate>
             void traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
             {
-                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
+                std::stack<traversal_reference, std::vector<traversal_reference>> references;
                 const value *p = this;
 
                 while (!references.empty() || p != NULL)
                 {
                     if (p != NULL)
                     {
-                        if (!prefix(p))
+                        if (!prefix(p, traversal_ancestry_finder(references)))
                             return;
 
                         if (p->is_array())
                         {
-                            references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                            references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
                             if (!p->get_array().empty())
                                 p = std::addressof(*references.top().array++);
                             else
@@ -260,7 +234,7 @@ namespace cppdatalib
                         }
                         else if (p->is_object())
                         {
-                            references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
                             if (!p->get_object().empty())
                                 p = std::addressof(references.top().object->first);
                             else
@@ -268,7 +242,7 @@ namespace cppdatalib
                         }
                         else
                         {
-                            references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                            references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
                             p = NULL;
                         }
                     }
@@ -289,32 +263,32 @@ namespace cppdatalib
                         else
                         {
                             references.pop();
-                            if (!postfix(peek))
+                            if (!postfix(peek, traversal_ancestry_finder(references)))
                                 return;
                         }
                     }
                 }
             }
 
-            // Predicates must be callables with argument types `const core::value *arg, bool prefix` and return value bool
+            // Predicates must be callables with argument types `const core::value *arg, core::value::traversal_ancestry_finder arg_finder, bool prefix` and return value bool
             // `prefix` is set to true if the current invocation is for the prefix handling of the specified element
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename Predicate>
             void traverse(Predicate &predicate) const
             {
-                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
+                std::stack<traversal_reference, std::vector<traversal_reference>> references;
                 const value *p = this;
 
                 while (!references.empty() || p != NULL)
                 {
                     if (p != NULL)
                     {
-                        if (!predicate(p, true))
+                        if (!predicate(p, traversal_ancestry_finder(references), true))
                             return;
 
                         if (p->is_array())
                         {
-                            references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                            references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
                             if (!p->get_array().empty())
                                 p = std::addressof(*references.top().array++);
                             else
@@ -322,7 +296,7 @@ namespace cppdatalib
                         }
                         else if (p->is_object())
                         {
-                            references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
                             if (!p->get_object().empty())
                                 p = std::addressof(references.top().object->first);
                             else
@@ -330,7 +304,7 @@ namespace cppdatalib
                         }
                         else
                         {
-                            references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                            references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
                             p = NULL;
                         }
                     }
@@ -351,32 +325,32 @@ namespace cppdatalib
                         else
                         {
                             references.pop();
-                            if (!predicate(peek, false))
+                            if (!predicate(peek, traversal_ancestry_finder(references), false))
                                 return;
                         }
                     }
                 }
             }
 
-            // Predicates must be callables with argument type `const core::value *arg` and return value bool
+            // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             // NOTE: The predicate is only called for object values, not object keys. It's invoked for all other values.
             template<typename PrefixPredicate, typename PostfixPredicate>
             void value_traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
             {
-                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
+                std::stack<traversal_reference, std::vector<traversal_reference>> references;
                 const value *p = this;
 
                 while (!references.empty() || p != NULL)
                 {
                     if (p != NULL)
                     {
-                        if (!prefix(p))
+                        if (!prefix(p, traversal_ancestry_finder(references)))
                             return;
 
                         if (p->is_array())
                         {
-                            references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                            references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
                             if (!p->get_array().empty())
                                 p = std::addressof(*references.top().array++);
                             else
@@ -384,7 +358,7 @@ namespace cppdatalib
                         }
                         else if (p->is_object())
                         {
-                            references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
                             if (!p->get_object().empty())
                                 p = std::addressof((references.top().object++)->second);
                             else
@@ -392,7 +366,7 @@ namespace cppdatalib
                         }
                         else
                         {
-                            references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                            references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
                             p = NULL;
                         }
                     }
@@ -406,33 +380,33 @@ namespace cppdatalib
                         else
                         {
                             references.pop();
-                            if (!postfix(peek))
+                            if (!postfix(peek, traversal_ancestry_finder(references)))
                                 return;
                         }
                     }
                 }
             }
 
-            // Predicates must be callables with argument types `const core::value *arg, bool prefix` and return value bool
+            // Predicates must be callables with argument types `const core::value *arg, core::value::traversal_ancestry_finder arg_finder, bool prefix` and return value bool
             // `prefix` is set to true if the current invocation is for the prefix handling of the specified element
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             // NOTE: The predicate is only called for object values, not object keys. It's invoked for all other values.
             template<typename Predicate>
             void value_traverse(Predicate &predicate) const
             {
-                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
+                std::stack<traversal_reference, std::vector<traversal_reference>> references;
                 const value *p = this;
 
                 while (!references.empty() || p != NULL)
                 {
                     if (p != NULL)
                     {
-                        if (!predicate(p, true))
+                        if (!predicate(p, traversal_ancestry_finder(references), true))
                             return;
 
                         if (p->is_array())
                         {
-                            references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                            references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
                             if (!p->get_array().empty())
                                 p = std::addressof(*references.top().array++);
                             else
@@ -440,7 +414,7 @@ namespace cppdatalib
                         }
                         else if (p->is_object())
                         {
-                            references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
                             if (!p->get_object().empty())
                                 p = std::addressof((references.top().object++)->second);
                             else
@@ -448,7 +422,7 @@ namespace cppdatalib
                         }
                         else
                         {
-                            references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                            references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
                             p = NULL;
                         }
                     }
@@ -462,45 +436,45 @@ namespace cppdatalib
                         else
                         {
                             references.pop();
-                            if (!predicate(peek, false))
+                            if (!predicate(peek, traversal_ancestry_finder(references), false))
                                 return;
                         }
                     }
                 }
             }
 
-            // Predicates must be callables with argument type `const core::value *arg` and return value bool
+            // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate>
             void prefix_traverse(PrefixPredicate &prefix) {traverse(prefix, traverse_node_null);}
 
-            // Predicates must be callables with argument type `const core::value *arg` and return value bool
+            // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PostfixPredicate>
             void postfix_traverse(PostfixPredicate &postfix) {traverse(traverse_node_null, postfix);}
 
-            // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2`
+            // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2, core::value::traversal_ancestry_finder arg_finder, core::value::traversal_ancestry_finder arg2_finder`
             // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate, typename PostfixPredicate>
             void parallel_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
             {
-                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> references;
-                std::stack<const_traversal_reference, std::vector<const_traversal_reference>> other_references;
+                std::stack<traversal_reference, std::vector<traversal_reference>> references;
+                std::stack<traversal_reference, std::vector<traversal_reference>> other_references;
                 const value *p = this, *other_p = &other;
 
                 while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
                 {
                     if (p != NULL || other_p != NULL)
                     {
-                        if (!prefix(p, other_p))
+                        if (!prefix(p, other_p, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
                             return;
 
                         if (p != NULL)
                         {
                             if (p->is_array())
                             {
-                                references.push(const_traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
+                                references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
                                 if (!p->get_array().empty())
                                     p = std::addressof(*references.top().array++);
                                 else
@@ -508,7 +482,7 @@ namespace cppdatalib
                             }
                             else if (p->is_object())
                             {
-                                references.push(const_traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
+                                references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
                                 if (!p->get_object().empty())
                                     p = std::addressof(references.top().object->first);
                                 else
@@ -516,7 +490,7 @@ namespace cppdatalib
                             }
                             else
                             {
-                                references.push(const_traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
+                                references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
                                 p = NULL;
                             }
                         }
@@ -525,7 +499,7 @@ namespace cppdatalib
                         {
                             if (other_p->is_array())
                             {
-                                other_references.push(const_traversal_reference(other_p, other_p->get_array().begin(), object_t::const_iterator(), false));
+                                other_references.push(traversal_reference(other_p, other_p->get_array().begin(), object_t::const_iterator(), false));
                                 if (!other_p->get_array().empty())
                                     other_p = std::addressof(*other_references.top().array++);
                                 else
@@ -533,7 +507,7 @@ namespace cppdatalib
                             }
                             else if (other_p->is_object())
                             {
-                                other_references.push(const_traversal_reference(other_p, array_t::const_iterator(), other_p->get_object().begin(), true));
+                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), other_p->get_object().begin(), true));
                                 if (!other_p->get_object().empty())
                                     other_p = std::addressof(other_references.top().object->first);
                                 else
@@ -541,7 +515,7 @@ namespace cppdatalib
                             }
                             else
                             {
-                                other_references.push(const_traversal_reference(other_p, array_t::const_iterator(), object_t::const_iterator(), false));
+                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), object_t::const_iterator(), false));
                                 other_p = NULL;
                             }
                         }
@@ -585,7 +559,7 @@ namespace cppdatalib
                         {
                             if (peek != NULL) references.pop();
                             if (other_peek != NULL) other_references.pop();
-                            if (!postfix(peek, other_peek))
+                            if (!postfix(peek, other_peek, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
                                 return;
                         }
                     }

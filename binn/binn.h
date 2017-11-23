@@ -462,7 +462,7 @@ namespace cppdatalib
 
                         size_t get_size() const {return size.top();}
 
-                        bool operator()(const core::value *arg, bool prefix)
+                        bool operator()(const core::value *arg, core::value::traversal_ancestry_finder, bool prefix)
                         {
                             switch (arg->get_type())
                             {

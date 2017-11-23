@@ -27,6 +27,7 @@
 
 #include "value_builder.h"
 #include <set> // For duplicate_key_check_filter
+#include <algorithm> // For sorting and specialty filters
 
 #include <cassert>
 
@@ -60,6 +61,48 @@ namespace cppdatalib
             bool requires_string_buffering() const {return output.requires_string_buffering();}
             bool requires_array_buffering() const {return output.requires_array_buffering();}
             bool requires_object_buffering() const {return output.requires_object_buffering();}
+
+        protected:
+            void begin_() {output.begin();}
+            void end_() {output.end();}
+
+            bool write_(const value &v, bool is_key)
+            {
+                (void) is_key;
+                output.write(v);
+                return true;
+            }
+
+            void begin_array_(const value &v, int_t size, bool)
+            {
+                output.begin_array(v, size);
+            }
+            void end_array_(const value &v, bool)
+            {
+                output.end_array(v);
+            }
+
+            void begin_object_(const value &v, int_t size, bool)
+            {
+                output.begin_object(v, size);
+            }
+            void end_object_(const value &v, bool)
+            {
+                output.end_object(v);
+            }
+
+            void begin_string_(const value &v, int_t size, bool)
+            {
+                output.begin_string(v, size);
+            }
+            void string_data_(const value &v, bool)
+            {
+                output.append_to_string(v);
+            }
+            void end_string_(const value &v, bool)
+            {
+                output.end_string(v);
+            }
         };
 
         namespace impl
@@ -442,8 +485,8 @@ namespace cppdatalib
             bool requires_object_buffering() const {return stream_filter_base::requires_object_buffering() || output2.requires_object_buffering();}
 
         protected:
-            void begin_() {output.begin(); output2.begin();}
-            void end_() {output.end(); output2.end();}
+            void begin_() {stream_filter_base::begin_(); output2.begin();}
+            void end_() {stream_filter_base::end_(); output2.end();}
 
             bool write_(const value &v, bool is_key)
             {
@@ -492,6 +535,226 @@ namespace cppdatalib
             }
         };
 
+        template<core::type measure, typename Viewer>
+        class view_filter : public core::buffer_filter
+        {
+            Viewer view;
+
+        public:
+            view_filter(core::stream_handler &output, Viewer v = Viewer())
+                : buffer_filter(output, static_cast<buffer_filter_flags>((measure == core::string? buffer_strings: 0) |
+                                                                         (measure == core::array? buffer_arrays: 0) |
+                                                                         (measure == core::object? buffer_objects: 0)))
+                , view(v)
+            {}
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                if (v.get_type() == measure)
+                    view(v);
+                buffer_filter::write_buffered_value_(v, is_key);
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                if (v.get_type() == measure)
+                    view(v);
+                return buffer_filter::write_(v, is_key);
+            }
+        };
+
+        template<core::type measure = core::real>
+        class range_filter : public core::buffer_filter
+        {
+            core::value max_, min_;
+            bool started;
+
+            void check(const value &v)
+            {
+                if (!started)
+                {
+                    max_ = min_ = v;
+                    started = true;
+                }
+                else if (v < min_)
+                    min_ = v;
+                else if (max_ < v)
+                    max_ = v;
+            }
+
+        public:
+            range_filter(core::stream_handler &output)
+                : buffer_filter(output, static_cast<buffer_filter_flags>((measure == core::string? buffer_strings: 0) |
+                                                                         (measure == core::array? buffer_arrays: 0) |
+                                                                         (measure == core::object? buffer_objects: 0)))
+            {}
+
+            const core::value &get_max() const {return max_;}
+            const core::value &get_min() const {return min_;}
+            core::value get_midpoint() const {return (core::real_t(max_) + core::real_t(min_)) / 2.0;}
+
+        protected:
+            void begin_()
+            {
+                buffer_filter::begin_();
+                started = false;
+            }
+
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                if (v.get_type() == measure)
+                    check(v);
+                buffer_filter::write_buffered_value_(v, is_key);
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                if (v.get_type() == measure)
+                    check(v);
+                return buffer_filter::write_(v, is_key);
+            }
+        };
+
+        enum mean_filter_flag
+        {
+            arithmetic_mean,
+            geometric_mean,
+            harmonic_mean
+        };
+
+        template<core::type measure = core::real>
+        class mean_filter : public core::stream_filter_base
+        {
+            size_t samples;
+            core::real_t sum, product, inverted_sum;
+
+        public:
+            mean_filter(core::stream_handler &output)
+                : stream_filter_base(output)
+            {}
+
+            core::real_t get_mean(mean_filter_flag mean_type) const
+            {
+                switch (mean_type)
+                {
+                    case arithmetic_mean: return sum / samples;
+                    case geometric_mean: return pow(product, 1.0 / samples);
+                    case harmonic_mean: return samples / inverted_sum;
+                    default: return NAN;
+                }
+            }
+
+            core::real_t get_arithmetic_mean() const {return get_mean(arithmetic_mean);}
+            core::real_t get_geometric_mean() const {return get_mean(geometric_mean);}
+            core::real_t get_harmonic_mean() const {return get_mean(harmonic_mean);}
+
+            size_t sample_size() const
+            {
+                return samples;
+            }
+
+        protected:
+            void begin_()
+            {
+                stream_filter_base::begin_();
+                samples = 0;
+                inverted_sum = sum = 0;
+                product = 1;
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                (void) is_key;
+                if (v.get_type() == measure)
+                {
+                    core::real_t value = v.as_real();
+
+                    ++samples;
+
+                    sum += value;
+                    product *= value;
+                    inverted_sum += 1.0 / value;
+                }
+                output.write(v);
+                return true;
+            }
+        };
+
+        template<core::type measure = core::real>
+        class dispersion_filter : public core::mean_filter<measure>
+        {
+            typedef core::mean_filter<measure> base;
+
+            core::value samples;
+
+        public:
+            dispersion_filter(core::stream_handler &output)
+                : base(output)
+            {}
+
+            core::real_t get_variance() const
+            {
+                core::real_t variance_ = 0.0;
+
+                for (auto sample: samples.get_array())
+                    variance_ += pow(sample.as_real() - base::get_arithmetic_mean(), 2.0);
+
+                return variance_ / base::sample_size();
+            }
+
+            core::real_t get_standard_deviation() const {return sqrt(get_variance());}
+
+        protected:
+            void begin_()
+            {
+                base::begin_();
+                samples.set_null();
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                base::write_(v, is_key);
+                if (v.get_type() == measure)
+                    samples.push_back(v.as_real());
+                return true;
+            }
+        };
+
+        enum sort_filter_flag
+        {
+            ascending_sort,
+            descending_sort
+        };
+
+        template<sort_filter_flag direction = ascending_sort>
+        class array_sort_filter : public core::buffer_filter
+        {
+        public:
+            array_sort_filter(core::stream_handler &output, size_t nesting_level = 0)
+                : core::buffer_filter(output, buffer_arrays, nesting_level)
+            {}
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                if (v.get_type() == core::array)
+                {
+                    core::value sorted;
+
+                    sorted = v;
+                    if (direction == ascending_sort)
+                        std::sort(sorted.get_array().begin(), sorted.get_array().end());
+                    else
+                        std::sort(sorted.get_array().rbegin(), sorted.get_array().rend());
+
+                    buffer_filter::write_buffered_value_(sorted, is_key);
+                }
+                else
+                    buffer_filter::write_buffered_value_(v, is_key);
+            }
+        };
+
         class table_to_array_of_maps_filter : public core::buffer_filter
         {
             core::value column_names;
@@ -527,42 +790,6 @@ namespace cppdatalib
             }
         };
 
-        /*class array_of_maps_to_table_filter : public core::buffer_filter
-        {
-            core::value column_names;
-            bool fail_on_missing_column;
-
-        public:
-            array_of_maps_to_table_filter(core::stream_handler &output, const core::value &column_names, bool fail_on_missing_column = false)
-                : core::buffer_filter(output, buffer_arrays, 1)
-                , column_names(column_names)
-                , fail_on_missing_column(fail_on_missing_column)
-            {}
-
-        protected:
-            void write_buffered_value_(const value &v, bool is_key)
-            {
-                core::value map_;
-
-                if ((v.get_type() == core::object && v.size() > column_names.get_array().size())
-                        || column_names.get_array().size() == 0) // Not enough column names to cover all attributes!!
-                    throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
-
-                if (v.get_type() == core::object)
-                    for (size_t i = 0; i < column_names.get_array().size(); ++i)
-                    {
-                        if (i >= v.size() && fail_on_missing_column)
-                            throw core::error("cppdatalib::core::table_to_array_of_maps_filter - missing column entry in table row");
-                        map_.add_member(column_names[i], i < v.size()? v[i]: core::value(core::null_t()));
-                    }
-                else
-                    map_.add_member(column_names[0], v);
-
-                buffer_filter::write_buffered_value_(map_, is_key);
-            }
-        };*/
-
-        // TODO: duplicate_key_check_filter doesn't do much good as a separate filter unless core::value supports duplicate-key maps
         class duplicate_key_check_filter : public core::stream_filter_base
         {
             class layer
@@ -601,8 +828,7 @@ namespace cppdatalib
             duplicate_key_check_filter(core::stream_handler &output) : stream_filter_base(output) {}
 
         protected:
-            void begin_() {output.begin(); layers.clear();}
-            void end_() {output.end();}
+            void begin_() {stream_filter_base::begin_(); layers.clear();}
 
             void begin_key_(const value &) {layers.back().begin();}
             void end_key_(const value &)

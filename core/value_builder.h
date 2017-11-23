@@ -202,7 +202,7 @@ namespace cppdatalib
 
         inline bool operator<(const value &lhs, const value &rhs)
         {
-            value::traverse_compare_prefix prefix;
+            value::traverse_less_than_compare_prefix prefix;
 
             if (lhs.is_array() || lhs.is_object() || rhs.is_array() || rhs.is_object())
             {
@@ -211,7 +211,7 @@ namespace cppdatalib
                 lhs.parallel_traverse(rhs, prefix, postfix);
             }
             else
-                prefix(&lhs, &rhs);
+                prefix.run(&lhs, &rhs);
 
             return prefix.comparison() < 0;
         }
@@ -227,7 +227,7 @@ namespace cppdatalib
                 lhs.parallel_traverse(rhs, prefix, postfix);
             }
             else
-                prefix(&lhs, &rhs);
+                prefix.run(&lhs, &rhs);
 
             return prefix.comparison() <= 0;
         }
@@ -243,7 +243,7 @@ namespace cppdatalib
                 lhs.parallel_traverse(rhs, prefix, postfix);
             }
             else
-                prefix(&lhs, &rhs);
+                prefix.run(&lhs, &rhs);
 
             return prefix.comparison_equal();
         }

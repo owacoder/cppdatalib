@@ -39,6 +39,18 @@ cppdatalib offers a variety of filters that can be applied to stream handlers. T
      Automatically determines the correct settings for the underlying buffer_filter based on the output stream handler
    - `tee_filter`<br/>
      Splits an input stream to two output stream handlers
+   - `view_filter`<br/>
+     Applies a view function to every element of the specified type. Essentially the same as `custom_converter_filter`, but can't edit the value and is more efficient.
+   - `range_filter`<br/>
+     Pass-through filter that computes the maximum and minimum values of the specified type, as well as the midpoint (only applicable for numeric values)
+   - `mean_filter`<br/>
+     Pass-through filter that computes the arithmetic, geometric, and harmonic means of numeric values
+   - `dispersal_filter`<br/>
+     Pass-through filter that computes the variance and standard deviation of numeric values (subclass of `mean_filter`, so both central tendency and dispersal can be calculated with this class)
+   - `array_sort_filter`<br/>
+     Sorts all arrays deeper than the specified nesting level (or all arrays, if 0 is specified), in either ascending or descending order
+   - `table_to_array_of_maps_filter`<br/>
+     Converts a table to an array of maps, using an external column-name list. Also supports converting single-dimension arrays to object-wrapped values with specified column key
    - `duplicate_key_check_filter`<br/>
      Ensures the input stream only provides unique keys in objects. This filter supports complex keys, including nested objects
    - `converter_filter`<br/>
