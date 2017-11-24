@@ -25,7 +25,7 @@
 #ifndef CPPDATALIB_JSON_POINTER_H
 #define CPPDATALIB_JSON_POINTER_H
 
-#include "../core/value.h"
+#include "../core/core.h"
 
 namespace cppdatalib
 {

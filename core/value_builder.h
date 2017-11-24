@@ -193,7 +193,7 @@ namespace cppdatalib
         }
 
         // Convert directly from parser to value
-        inline stream_parser &operator>>(stream_parser &input, value &output)
+        inline stream_input &operator>>(stream_input &input, value &output)
         {
             value_builder builder(output);
             input.convert(builder);

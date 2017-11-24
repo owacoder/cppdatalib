@@ -220,7 +220,7 @@ namespace cppdatalib
 
             bool provides_prefix_string_size() const {return true;}
 
-            core::stream_parser &convert(core::stream_handler &writer)
+            core::stream_input &convert(core::stream_handler &writer)
             {
                 struct container_data
                 {

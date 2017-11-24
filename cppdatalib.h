@@ -27,6 +27,7 @@
 
 #include "core/core.h"
 #include "json/json_pointer.h"
+#include "json/json_patch.h"
 #include "json/json.h"
 #include "bencode/bencode.h"
 #include "bjson/bjson.h"
@@ -39,5 +40,6 @@
 #include "xls/xml.h"
 #include "netstrings/netstrings.h"
 #include "message_pack/message_pack.h"
+#include "mariadb/mariadb.h"
 
 #endif // CPPDATALIB_H

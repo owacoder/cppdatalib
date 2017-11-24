@@ -109,7 +109,7 @@ namespace cppdatalib
         public:
             parser(std::istream &input) : core::stream_parser(input) {}
 
-            core::stream_parser &convert(core::stream_handler &writer)
+            core::stream_input &convert(core::stream_handler &writer)
             {
                 bool delimiter_required = false, get_char = true;
                 char chr;

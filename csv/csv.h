@@ -230,7 +230,7 @@ namespace cppdatalib
         public:
             parser(std::istream &input, options opts = convert_fields_by_deduction) : stream_parser(input), opts(opts) {}
 
-            core::stream_parser &convert(core::stream_handler &writer)
+            core::stream_input &convert(core::stream_handler &writer)
             {
                 const bool parse_as_strings = opts == convert_all_fields_as_strings;
                 int chr;

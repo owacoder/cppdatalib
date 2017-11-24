@@ -78,11 +78,7 @@ namespace cppdatalib
 
         public:
             stream_handler() : active_(false) {}
-            virtual ~stream_handler()
-            {
-                if (active())
-                    end();
-            }
+            virtual ~stream_handler() {}
 
             enum {
                 unknown_size = -1 // No other negative value besides unknown_size should be used for the `size` parameters of handlers
@@ -473,14 +469,10 @@ namespace cppdatalib
             std::vector<scope_data> nested_scopes; // Used as a stack, but not a stack so we can peek below the top
         };
 
-        class stream_parser
+        class stream_input
         {
-        protected:
-            std::istream &input_stream;
-
         public:
-            stream_parser(std::istream &input) : input_stream(input) {}
-            virtual ~stream_parser() {}
+            virtual ~stream_input() {}
 
             // The following functions should be reimplemented to return true if the parser ALWAYS provides the element
             // size (for each respective type) in the begin_xxx() functions.
@@ -495,13 +487,23 @@ namespace cppdatalib
             virtual bool provides_buffered_arrays() const {return false;}
             virtual bool provides_buffered_objects() const {return false;}
 
-            std::istream &stream() {return input_stream;}
+            virtual stream_input &convert(core::stream_handler &output) = 0;
+        };
 
-            virtual stream_parser &convert(core::stream_handler &output) = 0;
+        class stream_parser : public stream_input
+        {
+        protected:
+            std::istream &input_stream;
+
+        public:
+            stream_parser(std::istream &input) : input_stream(input) {}
+            virtual ~stream_parser() {}
+
+            std::istream &stream() {return input_stream;}
         };
 
         // Convert directly from parser to serializer
-        stream_handler &operator<<(stream_handler &output, stream_parser &input)
+        stream_handler &operator<<(stream_handler &output, stream_input &input)
         {
             if (output.requires_string_buffering() > input.provides_buffered_strings() ||
                 output.requires_array_buffering() > input.provides_buffered_arrays() ||
@@ -516,7 +518,7 @@ namespace cppdatalib
         }
 
         // Convert directly from parser to serializer
-        stream_parser &operator>>(stream_parser &input, stream_handler &output)
+        stream_input &operator>>(stream_input &input, stream_handler &output)
         {
             if (output.requires_string_buffering() > input.provides_buffered_strings() ||
                 output.requires_array_buffering() > input.provides_buffered_arrays() ||
@@ -524,7 +526,7 @@ namespace cppdatalib
                 output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
                 output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
                 output.requires_prefix_object_size() > input.provides_prefix_object_size())
-                throw core::error("cppdatalib::stream_parser::operator>>() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+                throw core::error("cppdatalib::stream_input::operator>>() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
 
             input.convert(output);
             return input;

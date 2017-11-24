@@ -137,18 +137,19 @@ namespace cppdatalib
         public:
             struct traversal_reference
             {
-                traversal_reference(const value *p, array_t::const_iterator a, object_t::const_iterator o, bool traversed_key)
+                traversal_reference(const value *p, array_t::const_iterator a, object_t::const_iterator o, bool traversed_key, bool frozen = false)
                     : p(p)
                     , array(a)
                     , object(o)
                     , traversed_key_already(traversed_key)
+                    , frozen(frozen)
                 {}
 
-                bool is_array() const {return array != array_t::const_iterator();}
+                bool is_array() const {return p && array != array_t::const_iterator() && array != p->get_array().end();}
                 size_t get_array_index() const {return is_array()? array - p->get_array().begin(): 0;}
                 const core::value *get_array_element() const {return is_array()? std::addressof(*array): NULL;}
 
-                bool is_object() const {return object != object_t::const_iterator();}
+                bool is_object() const {return p && object != object_t::const_iterator() && object != p->get_object().end();}
                 bool is_object_key() const {return is_object() && !traversed_key_already;}
                 const core::value *get_object_key() const {return is_object()? std::addressof(object->first): NULL;}
                 const core::value *get_object_value() const {return is_object()? std::addressof(object->second): NULL;}
@@ -160,6 +161,7 @@ namespace cppdatalib
                 array_t::const_iterator array;
                 object_t::const_iterator object;
                 bool traversed_key_already;
+                bool frozen;
             };
 
             struct traversal_ancestry_finder;
@@ -192,6 +194,8 @@ namespace cppdatalib
 
             public:
                 traversal_ancestry_finder(const container &c) : c(c) {}
+
+                size_t get_parent_count() const {return c.size();}
 
                 // First element is direct parent, last element is ancestry root
                 std::vector<traversal_reference> get_ancestry() const
@@ -562,6 +566,146 @@ namespace cppdatalib
                             if (!postfix(peek, other_peek, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
                                 return;
                         }
+                    }
+                }
+            }
+
+            // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2, core::value::traversal_ancestry_finder arg_finder, core::value::traversal_ancestry_finder arg2_finder`
+            // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
+            // If return value is non-zero, processing continues, otherwise processing aborts immediately
+            template<typename PrefixPredicate, typename PostfixPredicate>
+            void parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
+            {
+                std::stack<traversal_reference, std::vector<traversal_reference>> references;
+                std::stack<traversal_reference, std::vector<traversal_reference>> other_references;
+                const value *p = this, *other_p = &other;
+
+                while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
+                {
+                    if (p != NULL || other_p != NULL)
+                    {
+                        bool p_frozen = false, other_p_frozen = false;
+
+                        auto save_refs = references;
+                        auto save_other_refs = other_references;
+
+                        if (!save_refs.empty() && !save_refs.top().is_array() && !save_refs.top().is_object())
+                            save_refs.pop();
+
+                        if (!save_other_refs.empty() && !save_other_refs.top().is_array() && !save_other_refs.top().is_object())
+                            save_other_refs.pop();
+
+                        traversal_reference save_ref = save_refs.empty()? traversal_reference(NULL, array_t::const_iterator(), object_t::const_iterator(), false): save_refs.top();
+                        traversal_reference save_other_ref = save_other_refs.empty()? traversal_reference(NULL, array_t::const_iterator(), object_t::const_iterator(), false): save_other_refs.top();
+
+                        if (save_ref.is_object() && save_other_ref.is_object())
+                        {
+                            p_frozen = false;
+                            other_p_frozen = false;
+                            if (*save_ref.get_object_key() < *save_other_ref.get_object_key())
+                                other_p_frozen = true;
+                            else if (*save_other_ref.get_object_key() < *save_ref.get_object_key())
+                                p_frozen = true;
+                        }
+
+                        if (!prefix(p_frozen? NULL: p, other_p_frozen? NULL: other_p, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
+                            return;
+
+                        if (p != NULL)
+                        {
+                            if (p->is_array())
+                            {
+                                references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false, p_frozen));
+                                if (!p->get_array().empty() && !p_frozen)
+                                    p = std::addressof(*references.top().array++);
+                                else
+                                    p = NULL;
+                            }
+                            else if (p->is_object())
+                            {
+                                references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true, p_frozen));
+                                if (!p->get_object().empty() && !p_frozen)
+                                    p = std::addressof(references.top().object->first);
+                                else
+                                    p = NULL;
+                            }
+                            else
+                            {
+                                references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false, p_frozen));
+                                p = NULL;
+                            }
+                        }
+
+                        if (other_p != NULL)
+                        {
+                            if (other_p->is_array())
+                            {
+                                other_references.push(traversal_reference(other_p, other_p->get_array().begin(), object_t::const_iterator(), false, other_p_frozen));
+                                if (!other_p->get_array().empty() && !other_p_frozen)
+                                    other_p = std::addressof(*other_references.top().array++);
+                                else
+                                    other_p = NULL;
+                            }
+                            else if (other_p->is_object())
+                            {
+                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), other_p->get_object().begin(), true, other_p_frozen));
+                                if (!other_p->get_object().empty() && !other_p_frozen)
+                                    other_p = std::addressof(other_references.top().object->first);
+                                else
+                                    other_p = NULL;
+                            }
+                            else
+                            {
+                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), object_t::const_iterator(), false, other_p_frozen));
+                                other_p = NULL;
+                            }
+                        }
+                    }
+                    else // p and other_p are both NULL here
+                    {
+                        const value *peek = references.empty()? NULL: references.top().p;
+                        const value *other_peek = other_references.empty()? NULL: other_references.top().p;
+                        bool p_was_frozen = peek? references.top().frozen: false;
+                        bool other_p_was_frozen = peek? other_references.top().frozen: false;
+
+                        if (peek)
+                        {
+                            if (references.top().frozen)
+                                p = references.top().p;
+                            else if (peek->is_array() && references.top().array != peek->get_array().end())
+                                p = std::addressof(*references.top().array++);
+                            else if (peek->is_object() && references.top().object != peek->get_object().end())
+                            {
+                                if (!references.top().traversed_key_already)
+                                    p = std::addressof(references.top().object->first);
+                                else
+                                    p = std::addressof((references.top().object++)->second);
+
+                                references.top().traversed_key_already = !references.top().traversed_key_already;
+                            }
+                        }
+
+                        if (other_peek)
+                        {
+                            if (other_references.top().frozen)
+                                other_p = other_references.top().p;
+                            else if (other_peek->is_array() && other_references.top().array != other_peek->get_array().end())
+                                other_p = std::addressof(*other_references.top().array++);
+                            else if (other_peek->is_object() && other_references.top().object != other_peek->get_object().end())
+                            {
+                                if (!other_references.top().traversed_key_already)
+                                    other_p = std::addressof(other_references.top().object->first);
+                                else
+                                    other_p = std::addressof((other_references.top().object++)->second);
+
+                                other_references.top().traversed_key_already = !other_references.top().traversed_key_already;
+                            }
+                        }
+
+                        if (peek != NULL) references.pop();
+                        if (other_peek != NULL) other_references.pop();
+                        if (!postfix(p_was_frozen? NULL: peek, other_p_was_frozen? NULL: other_peek, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
+                            return;
                     }
                 }
             }
