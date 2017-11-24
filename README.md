@@ -16,6 +16,7 @@ Supported formats include
    - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
    - [CSV](https://tools.ietf.org/html/rfc4180)
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
+   - MySQL (read-only)
    - XML property lists (write-only)
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
