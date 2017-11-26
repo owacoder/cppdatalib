@@ -238,8 +238,6 @@ namespace cppdatalib
                 bool written = false;
                 int chr;
 
-                writer.begin();
-
                 while (!written || writer.nesting_depth() > 0)
                 {
                     if (containers.size() > 0)
@@ -410,7 +408,6 @@ namespace cppdatalib
                 else if (containers.size() > 0)
                     throw core::error("UBJSON - unexpected end of data");
 
-                writer.end();
                 return *this;
             }
         };

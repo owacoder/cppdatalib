@@ -86,23 +86,72 @@ namespace cppdatalib
         enum
         {
             max_utf8_code_sequence_size = 4,
+#ifdef CPPDATALIB_BUFFER_SIZE
+            buffer_size = CPPDATALIB_BUFFER_SIZE
+#else
             buffer_size = 65535
+#endif
         };
 
         class value;
         class value_builder;
         class stream_handler;
 
+#ifdef CPPDATALIB_BOOL_T
+        typedef CPPDATALIB_BOOL_T bool_t;
+#else
         typedef bool bool_t;
+#endif
+
+#ifdef CPPDATALIB_INT_T
+        typedef CPPDATALIB_INT_T int_t;
+#else
         typedef int64_t int_t;
+#endif
+
+#ifdef CPPDATALIB_UINT_T
+        typedef CPPDATALIB_UINT_T uint_t;
+#else
         typedef uint64_t uint_t;
+#endif
+
+#ifdef CPPDATALIB_REAL_T
+        typedef CPPDATALIB_REAL_T real_t;
+#else
         typedef double real_t;
 #define CPPDATALIB_REAL_DIG DBL_DIG
+#endif
+
+#ifdef CPPDATALIB_CSTRING_T
+        typedef CPPDATALIB_CSTRING_T cstring_t;
+#else
         typedef const char *cstring_t;
+#endif
+
+#ifdef CPPDATALIB_STRING_T
+        typedef CPPDATALIB_STRING_T string_t;
+#else
         typedef std::string string_t;
+#endif
+
+#ifdef CPPDATALIB_ARRAY_T
+        typedef CPPDATALIB_ARRAY_T array_t;
+#else
         typedef std::vector<value> array_t;
+#endif
+
+#ifdef CPPDATALIB_OBJECT_T
+        typedef CPPDATALIB_OBJECT_T object_t;
+#else
         typedef std::multimap<value, value> object_t;
+#endif
+
+#ifdef CPPDATALIB_SUBTYPE_T
+        typedef CPPDATALIB_SUBTYPE_T subtype_t;
+#else
         typedef long subtype_t;
+#endif
+
         struct null_t {};
 
         struct error
@@ -732,25 +781,25 @@ namespace cppdatalib
             template<typename T>
             value(std::initializer_list<T> v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
             {
-                for (auto element: v)
+                for (auto const &element: v)
                     push_back(element);
             }
             template<typename T>
             value(const std::vector<T> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
             {
-                for (auto element: v)
+                for (auto const &element: v)
                     push_back(element);
             }
             template<typename T, typename U>
             value(const std::map<T, U> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
             {
-                for (auto element: v)
+                for (auto const &element: v)
                     add_member(element.first, element.second);
             }
             template<typename T, typename U>
             value(const std::multimap<T, U> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
             {
-                for (auto element: v)
+                for (auto const &element: v)
                     add_member(element.first, element.second);
             }
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
@@ -1044,6 +1093,7 @@ namespace cppdatalib
             }
 
             mutable type type_; // Mutable to provide editable traversal access to const destructor
+#ifndef CPPDATALIB_NON_POD_LAYOUT
             union
             {
                 bool_t bool_;
@@ -1051,6 +1101,12 @@ namespace cppdatalib
                 uint_t uint_;
                 real_t real_;
             };
+#else
+            bool_t bool_;
+            int_t int_;
+            uint_t uint_;
+            real_t real_;
+#endif
             string_t str_;
             mutable array_t arr_; // Mutable to provide editable traversal access to const destructor
             mutable object_t obj_; // Mutable to provide editable traversal access to const destructor
@@ -1088,7 +1144,7 @@ namespace cppdatalib
         core::value to_cppdatalib(const std::vector<T> &v)
         {
             core::value result;
-            for (auto element: v)
+            for (auto const &element: v)
                 result.push_back(element);
             return result;
         }
@@ -1097,7 +1153,7 @@ namespace cppdatalib
         core::value to_cppdatalib(const std::map<T, U> &v)
         {
             core::value result;
-            for (auto element: v)
+            for (auto const &element: v)
                 result.add_member(element.first) = element.second;
             return result;
         }
@@ -1106,7 +1162,7 @@ namespace cppdatalib
         core::value to_cppdatalib(const std::multimap<T, U> &v)
         {
             core::value result;
-            for (auto element: v)
+            for (auto const &element: v)
                 result.add_member(element.first) = element.second;
             return result;
         }

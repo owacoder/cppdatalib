@@ -192,12 +192,28 @@ namespace cppdatalib
             return output;
         }
 
+        // Convert directly from value to serializer
+        inline const value &operator>>(const value &input, stream_handler &output)
+        {
+            output << input;
+            return input;
+        }
+
         // Convert directly from parser to value
         inline stream_input &operator>>(stream_input &input, value &output)
         {
             value_builder builder(output);
+            builder.begin();
             input.convert(builder);
+            builder.end();
             return input;
+        }
+
+        // Convert directly from parser to value
+        inline value &operator<<(value &output, stream_input &input)
+        {
+            input >> output;
+            return output;
         }
 
         inline bool operator<(const value &lhs, const value &rhs)

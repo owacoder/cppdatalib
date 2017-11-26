@@ -513,7 +513,14 @@ namespace cppdatalib
                 output.requires_prefix_object_size() > input.provides_prefix_object_size())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
 
+            const bool stream_ready = output.active();
+
+            if (!stream_ready)
+                output.begin();
             input.convert(output);
+            if (!stream_ready)
+                output.end();
+
             return output;
         }
 
@@ -528,7 +535,14 @@ namespace cppdatalib
                 output.requires_prefix_object_size() > input.provides_prefix_object_size())
                 throw core::error("cppdatalib::stream_input::operator>>() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
 
+            const bool stream_ready = output.active();
+
+            if (!stream_ready)
+                output.begin();
             input.convert(output);
+            if (!stream_ready)
+                output.end();
+
             return input;
         }
 

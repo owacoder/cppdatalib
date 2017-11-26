@@ -114,8 +114,6 @@ namespace cppdatalib
                 bool delimiter_required = false, get_char = true;
                 char chr;
 
-                writer.begin();
-
                 input_stream >> std::skipws;
                 while (get_char? (input_stream >> chr, input_stream.good() && !input_stream.eof()): true)
                 {
@@ -247,7 +245,6 @@ namespace cppdatalib
                 if (!delimiter_required)
                     throw core::error("JSON - expected value");
 
-                writer.end();
                 return *this;
             }
         };

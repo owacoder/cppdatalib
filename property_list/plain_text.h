@@ -135,8 +135,6 @@ namespace cppdatalib
                 bool delimiter_required = false;
                 char chr;
 
-                writer.begin();
-
                 while (input_stream >> std::skipws >> chr, input_stream.good() && !input_stream.eof())
                 {
                     if (writer.nesting_depth() == 0 && delimiter_required)
@@ -269,7 +267,6 @@ namespace cppdatalib
                 if (!delimiter_required)
                     throw core::error("Plain Text Property List - expected value");
 
-                writer.end();
                 return *this;
             }
         };

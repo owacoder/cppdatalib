@@ -237,7 +237,6 @@ namespace cppdatalib
                 bool comma_just_parsed = true;
                 bool newline_just_parsed = true;
 
-                writer.begin();
                 writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
 
                 while (chr = input_stream.get(), chr != EOF)
@@ -299,9 +298,8 @@ namespace cppdatalib
                     writer.end_array(core::array_t());
                 }
 
-
                 writer.end_array(core::array_t());
-                writer.end();
+
                 return *this;
             }
         };

@@ -16,6 +16,7 @@ Supported formats include
    - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
    - [CSV](https://tools.ietf.org/html/rfc4180)
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
+   - MySQL (read-only)
    - XML property lists (write-only)
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
@@ -199,6 +200,24 @@ int main() {
 }
 ```
 
+### Compile-time flags
+
+Below is a list of compile-time flags supported by cppdatalib (the flags don't need a value, they just need to be defined):
+
+   - `CPPDATALIB_NON_POD_LAYOUT` - Disables `union` layout of bool, int, uint, and real types. This WILL use more memory
+   - `CPPDATALIB_BOOL_T` - The underlying boolean type of the implementation. Should be able to store a true and false value. If a non-POD type, `CPPDATALIB_NON_POD_LAYOUT` should be defined. Defaults to `bool`
+   - `CPPDATALIB_INT_T` - The underlying integer type of the implementation. Should be able to store a signed integral value. If a non-POD type, `CPPDATALIB_NON_POD_LAYOUT` should be defined. Defaults to `int64_t`
+   - `CPPDATALIB_UINT_T` - The underlying unsigned integer type of the implementation. Should be able to store an unsigned integral value. If a non-POD type, `CPPDATALIB_NON_POD_LAYOUT` should be defined. Defaults to `uint64_t`
+   - `CPPDATALIB_REAL_T` - The underlying floating-point type of the implementation. Should be able to store at least an IEEE-754 value. If a non-POD type, `CPPDATALIB_NON_POD_LAYOUT` should be defined. Defaults to `double`
+   - `CPPDATALIB_CSTRING_T` - The underlying C-style string type of the implementation. Defaults to `const char *`
+   - `CPPDATALIB_STRING_T` - The underlying string type of the implementation. Defaults to `std::string`
+   - `CPPDATALIB_ARRAY_T` - The underlying array type of the implementation. Defaults to `std::vector<cppdatalib::core::value>`
+   - `CPPDATALIB_OBJECT_T` - The underlying object type of the implementation. Defaults to `std::multimap<cppdatalib::core::value, cppdatalib::core::value>`
+   - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `long`
+   - `CPPDATALIB_DISABLE_MARIADB` - Disables inclusion of the MySQL interface library. If defined, the MySQL headers must be available in the include path
+
+Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.
+
 ## Supported datatypes
 
 If a type is unsupported in a serialization format, the type is not converted to something recognizable by the format, but an error is thrown instead, describing the failure. However, if a subtype is not supported, the value is processed as if it had none (i.e. if a value is a `string`, with unsupported subtype `date`, the value is processed as a meaningless string and the subtype metadata is removed).
@@ -271,7 +290,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - `string` subtypes `blob` and `clob` are supported.
        - Numerical metadata is lost when converting to and from BJSON.
 
-   - Netstrings supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
+   - Netstrings supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
        - No subtypes are supported.
        - Type information is lost when converting to Netstrings.

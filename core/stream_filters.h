@@ -233,7 +233,7 @@ namespace cppdatalib
                                 {
                                     array_t arr;
 
-                                    for (auto it: value.get_object())
+                                    for (auto const &it: value.get_object())
                                     {
                                         arr.push_back(it.first);
                                         arr.push_back(it.second);
@@ -697,7 +697,7 @@ namespace cppdatalib
             {
                 core::real_t variance_ = 0.0;
 
-                for (auto sample: samples.get_array())
+                for (auto const &sample: samples.get_array())
                     variance_ += pow(sample.as_real() - base::get_arithmetic_mean(), 2.0);
 
                 return variance_ / base::sample_size();

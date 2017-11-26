@@ -129,8 +129,6 @@ namespace cppdatalib
                 int chr;
                 core::uint_t integer;
 
-                writer.begin();
-
                 while (!written || containers.size() > 0)
                 {
                     while (containers.size() > 0 && !writer.container_key_was_just_parsed() && containers.top().remaining_size == 0)
@@ -399,7 +397,6 @@ namespace cppdatalib
                 if (!written)
                     throw core::error("Bencode - expected value");
 
-                writer.end();
                 return *this;
             }
         };

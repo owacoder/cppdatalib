@@ -44,8 +44,6 @@ namespace cppdatalib
                 bool written = false;
                 int chr;
 
-                writer.begin();
-
                 while (chr = input_stream.peek(), chr != EOF)
                 {
                     written = true;
@@ -114,7 +112,6 @@ namespace cppdatalib
                 if (!written)
                     throw core::error("Bencode - expected value");
 
-                writer.end();
                 return *this;
             }
         };
