@@ -114,7 +114,7 @@ namespace cppdatalib
                             }
 
                             core::int_t array_index;
-                            std::istringstream stream(path_node);
+                            core::istring_wrapper_stream stream(path_node);
                             stream >> array_index;
                             if (stream.fail() || stream.get() != EOF || (path_node.front() == '0' && path_node != "0")) // Check whether there are leading zeroes
                             {
@@ -243,7 +243,7 @@ namespace cppdatalib
                             }
 
                             core::int_t array_index;
-                            std::istringstream stream(path_node);
+                            core::istring_wrapper_stream stream(path_node);
                             stream >> array_index;
                             if (stream.fail() || stream.get() != EOF || (path_node.front() == '0' && path_node != "0")) // Check whether there are leading zeroes
                             {

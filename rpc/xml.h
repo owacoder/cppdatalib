@@ -25,7 +25,7 @@
 #ifndef CPPDATALIB_XML_RPC_H
 #define CPPDATALIB_XML_RPC_H
 
-#include "../core/value_builder.h"
+#include "../core/core.h"
 
 namespace cppdatalib
 {
@@ -38,10 +38,10 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
 
             protected:
-                std::ostream &write_string(std::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, const std::string &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
@@ -71,10 +71,10 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
-            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {output_stream.precision(CPPDATALIB_REAL_DIG);}
 
             void begin_key_(const core::value &v)
             {
@@ -122,6 +122,7 @@ namespace cppdatalib
 
         class pretty_stream_writer : public impl::stream_writer_base
         {
+            std::unique_ptr<char []> buffer;
             size_t indent_width;
             size_t current_indent;
 
@@ -129,22 +130,24 @@ namespace cppdatalib
             {
                 while (padding > 0)
                 {
-                    char buffer[core::buffer_size];
-                    size_t size = std::min(sizeof(buffer)-1, padding);
+                    size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                    memset(buffer, ' ', size);
-                    buffer[size] = 0;
+                    memset(buffer.get(), ' ', size);
 
-                    output_stream.write(buffer, size);
+                    output_stream.write(buffer.get(), size);
                     padding -= size;
                 }
             }
 
         public:
-            pretty_stream_writer(std::ostream &output, size_t indent_width) : impl::stream_writer_base(output), indent_width(indent_width) {}
+            pretty_stream_writer(core::ostream &output, size_t indent_width)
+                : impl::stream_writer_base(output)
+                , buffer(new char [core::buffer_size])
+                , indent_width(indent_width)
+            {}
 
         protected:
-            void begin_() {current_indent = 0; output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {current_indent = 0; output_stream.precision(CPPDATALIB_REAL_DIG);}
 
             void begin_key_(const core::value &v)
             {
@@ -277,7 +280,7 @@ namespace cppdatalib
 
         inline std::string to_xml_rpc(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer writer(stream);
             writer << v;
             return stream.str();

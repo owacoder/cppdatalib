@@ -33,15 +33,16 @@ namespace cppdatalib
     {
         class parser : public core::stream_parser
         {
+            std::unique_ptr<char []> buffer;
+
         private:
             // Opening quote should already be read
-            std::istream &read_string(std::istream &stream, core::stream_handler &writer)
+            core::istream &read_string(core::istream &stream, core::stream_handler &writer)
             {
                 static const std::string hex = "0123456789ABCDEF";
 
                 int c;
-                char buffer[core::buffer_size + core::max_utf8_code_sequence_size + 1];
-                char *write = buffer;
+                char *write = buffer.get();
 
                 writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
                 while (c = stream.get(), c != '"' && c != EOF)
@@ -86,28 +87,31 @@ namespace cppdatalib
                     else
                         *write++ = c;
 
-                    if (write - buffer >= core::buffer_size)
+                    if (write - buffer.get() >= core::buffer_size)
                     {
                         *write = 0;
-                        writer.append_to_string(buffer);
-                        write = buffer;
+                        writer.append_to_string(buffer.get());
+                        write = buffer.get();
                     }
                 }
 
                 if (c == EOF)
                     throw core::error("JSON - unexpected end of string");
 
-                if (write != buffer)
+                if (write != buffer.get())
                 {
                     *write = 0;
-                    writer.append_to_string(buffer);
+                    writer.append_to_string(buffer.get());
                 }
                 writer.end_string(core::string_t());
                 return stream;
             }
 
         public:
-            parser(std::istream &input) : core::stream_parser(input) {}
+            parser(core::istream &input)
+                : core::stream_parser(input)
+                , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
+            {}
 
             core::stream_input &convert(core::stream_handler &writer)
             {
@@ -115,7 +119,7 @@ namespace cppdatalib
                 char chr;
 
                 input_stream >> std::skipws;
-                while (get_char? (input_stream >> chr, input_stream.good() && !input_stream.eof()): true)
+                while (get_char? (input_stream >> chr, input_stream.good()): true)
                 {
                     get_char = true;
 
@@ -198,7 +202,7 @@ namespace cppdatalib
                                 {
                                     // Attempt to read as an integer
                                     {
-                                        std::istringstream temp_stream(buffer);
+                                        core::istring_wrapper_stream temp_stream(buffer);
                                         core::int_t value;
                                         temp_stream >> value;
                                         if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -210,7 +214,7 @@ namespace cppdatalib
 
                                     // Attempt to read as an unsigned integer
                                     {
-                                        std::istringstream temp_stream(buffer);
+                                        core::istring_wrapper_stream temp_stream(buffer);
                                         core::uint_t value;
                                         temp_stream >> value;
                                         if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -223,7 +227,7 @@ namespace cppdatalib
 
                                 // Attempt to read as a real
                                 {
-                                    std::istringstream temp_stream(buffer);
+                                    core::istring_wrapper_stream temp_stream(buffer);
                                     core::real_t value;
                                     temp_stream >> value;
                                     if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -254,41 +258,38 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
 
             protected:
-                std::ostream &write_string(std::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, const std::string &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
-                        int c = str[i] & 0xff;
+                        int c = str[i];
 
-                        if (c == '"' || c == '\\')
+                        switch (c)
                         {
-                            stream.put('\\');
-                            stream.put(c);
-                        }
-                        else
-                        {
-                            switch (c)
-                            {
-                                case '"':
-                                case '\\':
-                                    stream.put('\\');
+                            case '"':
+                            case '\\':
+                                stream.put('\\');
+                                stream.put(c);
+                                break;
+                            default:
+                                if (iscntrl(c))
+                                {
+                                    switch (c)
+                                    {
+                                        case '\b': stream.write("\\b", 2); break;
+                                        case '\f': stream.write("\\f", 2); break;
+                                        case '\n': stream.write("\\n", 2); break;
+                                        case '\r': stream.write("\\r", 2); break;
+                                        case '\t': stream.write("\\t", 2); break;
+                                        default: hex::write(stream.write("\\u00", 4), c); break;
+                                    }
+                                }
+                                else
                                     stream.put(c);
-                                    break;
-                                case '\b': stream.write("\\b", 2); break;
-                                case '\f': stream.write("\\f", 2); break;
-                                case '\n': stream.write("\\n", 2); break;
-                                case '\r': stream.write("\\r", 2); break;
-                                case '\t': stream.write("\\t", 2); break;
-                                default:
-                                    if (iscntrl(c))
-                                        hex::write(stream.write("\\u00", 4), c);
-                                    else
-                                        stream.put(str[i]);
-                                    break;
-                            }
+                                break;
                         }
                     }
 
@@ -300,10 +301,10 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : stream_writer_base(output) {}
+            stream_writer(core::ostream &output) : stream_writer_base(output) {}
 
         protected:
-            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {output_stream.precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
@@ -344,6 +345,7 @@ namespace cppdatalib
 
         class pretty_stream_writer : public impl::stream_writer_base
         {
+            std::unique_ptr<char []> buffer;
             size_t indent_width;
             size_t current_indent;
 
@@ -351,20 +353,19 @@ namespace cppdatalib
             {
                 while (padding > 0)
                 {
-                    char buffer[core::buffer_size];
-                    size_t size = std::min(sizeof(buffer)-1, padding);
+                    size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                    memset(buffer, ' ', size);
-                    buffer[size] = 0;
+                    memset(buffer.get(), ' ', size);
 
-                    output_stream.write(buffer, size);
+                    output_stream.write(buffer.get(), size);
                     padding -= size;
                 }
             }
 
         public:
-            pretty_stream_writer(std::ostream &output, size_t indent_width)
+            pretty_stream_writer(core::ostream &output, size_t indent_width)
                 : stream_writer_base(output)
+                , buffer(new char [core::buffer_size])
                 , indent_width(indent_width)
                 , current_indent(0)
             {}
@@ -372,7 +373,7 @@ namespace cppdatalib
             size_t indent() {return indent_width;}
 
         protected:
-            void begin_() {current_indent = 0; output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {current_indent = 0; output_stream.precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
@@ -442,7 +443,7 @@ namespace cppdatalib
 
         inline core::value from_json(const std::string &json)
         {
-            std::istringstream stream(json);
+            core::istring_wrapper_stream stream(json);
             parser reader(stream);
             core::value v;
             reader >> v;
@@ -451,7 +452,7 @@ namespace cppdatalib
 
         inline std::string to_json(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer writer(stream);
             writer << v;
             return stream.str();
@@ -459,7 +460,7 @@ namespace cppdatalib
 
         inline std::string to_pretty_json(const core::value &v, size_t indent_width)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             pretty_stream_writer writer(stream, indent_width);
             writer << v;
             return stream.str();

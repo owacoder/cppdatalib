@@ -35,6 +35,8 @@ namespace cppdatalib
     {
         class parser : public core::stream_parser
         {
+            std::unique_ptr<char []> buffer;
+
         private:
             inline char size_specifier(core::int_t min, core::int_t max)
             {
@@ -50,7 +52,7 @@ namespace cppdatalib
                     return 'L';
             }
 
-            inline std::istream &read_int(core::int_t &i, char specifier)
+            inline core::istream &read_int(core::int_t &i, char specifier)
             {
                 uint64_t temp;
                 bool negative = false;
@@ -117,7 +119,7 @@ namespace cppdatalib
                 return input_stream;
             }
 
-            inline std::istream &read_float(char specifier, core::stream_handler &writer)
+            inline core::istream &read_float(char specifier, core::stream_handler &writer)
             {
                 core::real_t r;
                 uint64_t temp;
@@ -158,9 +160,8 @@ namespace cppdatalib
                 return input_stream;
             }
 
-            inline std::istream &read_string(char specifier, core::stream_handler &writer)
+            inline core::istream &read_string(char specifier, core::stream_handler &writer)
             {
-                char buffer[core::buffer_size];
                 int c = input_stream.get();
 
                 if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
@@ -182,10 +183,10 @@ namespace cppdatalib
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                        input_stream.read(buffer, buffer_size);
+                        input_stream.read(buffer.get(), buffer_size);
                         if (input_stream.fail())
                             throw core::error("UBJSON - expected high-precision number value after type specifier");
-                        writer.append_to_string(core::string_t(buffer, buffer_size));
+                        writer.append_to_string(core::string_t(buffer.get(), buffer_size));
                         size -= buffer_size;
                     }
                     writer.end_string(core::value(core::string_t(), core::bignum));
@@ -201,10 +202,10 @@ namespace cppdatalib
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                        input_stream.read(buffer, buffer_size);
+                        input_stream.read(buffer.get(), buffer_size);
                         if (input_stream.fail())
                             throw core::error("UBJSON - expected string value after type specifier");
-                        writer.append_to_string(core::string_t(buffer, buffer_size));
+                        writer.append_to_string(core::string_t(buffer.get(), buffer_size));
                         size -= buffer_size;
                     }
                     writer.end_string(core::string_t());
@@ -216,7 +217,10 @@ namespace cppdatalib
             }
 
         public:
-            parser(std::istream &input) : core::stream_parser(input) {}
+            parser(core::istream &input)
+                : core::stream_parser(input)
+                , buffer(new char [core::buffer_size])
+            {}
 
             bool provides_prefix_string_size() const {return true;}
 
@@ -417,10 +421,10 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
 
             protected:
-                std::ostream &write_int(std::ostream &stream, core::int_t i, bool add_specifier, char force_specifier = 0)
+                core::ostream &write_int(core::ostream &stream, core::int_t i, bool add_specifier, char force_specifier = 0)
                 {
                     const std::string specifiers = "UiIlL";
                     size_t force_bits = specifiers.find(force_specifier);
@@ -488,7 +492,7 @@ namespace cppdatalib
                     return stream;
                 }
 
-                std::ostream &write_float(std::ostream &stream, core::real_t f, bool add_specifier, char force_specifier = 0)
+                core::ostream &write_float(core::ostream &stream, core::real_t f, bool add_specifier, char force_specifier = 0)
                 {
                     const std::string specifiers = "dD";
                     size_t force_bits = specifiers.find(force_specifier);
@@ -529,7 +533,7 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream &output) : impl::stream_writer_base(output) {}
 
             bool requires_prefix_string_size() const {return true;}
 
@@ -570,7 +574,7 @@ namespace cppdatalib
 
         inline core::value from_ubjson(const std::string &ubjson)
         {
-            std::istringstream stream(ubjson);
+            core::istring_wrapper_stream stream(ubjson);
             parser reader(stream);
             core::value v;
             reader >> v;
@@ -579,7 +583,7 @@ namespace cppdatalib
 
         inline std::string to_ubjson(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer writer(stream);
             writer << v;
             return stream.str();

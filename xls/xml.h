@@ -25,7 +25,7 @@
 #ifndef CPPDATALIB_XML_XLS_H
 #define CPPDATALIB_XML_XLS_H
 
-#include "../core/value_builder.h"
+#include "../core/core.h"
 
 namespace cppdatalib
 {
@@ -36,10 +36,10 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
 
             protected:
-                std::ostream &write_string(std::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, const std::string &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
@@ -69,10 +69,10 @@ namespace cppdatalib
         class table_writer : public impl::stream_writer_base
         {
         public:
-            table_writer(std::ostream &output) : impl::stream_writer_base(output) {}
+            table_writer(core::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
-            void begin_() {output_stream << "<Table>"; output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {output_stream << "<Table>"; output_stream.precision(CPPDATALIB_REAL_DIG);}
             void end_() {output_stream << "</Table>";}
 
             void begin_item_(const core::value &v)
@@ -135,7 +135,7 @@ namespace cppdatalib
             std::string worksheet_name;
 
         public:
-            worksheet_writer(std::ostream &output, const std::string &worksheet_name) : table_writer(output), worksheet_name(worksheet_name) {}
+            worksheet_writer(core::ostream &output, const std::string &worksheet_name) : table_writer(output), worksheet_name(worksheet_name) {}
 
         protected:
             void begin_()
@@ -160,7 +160,7 @@ namespace cppdatalib
         class workbook_writer : public worksheet_writer
         {
         public:
-            workbook_writer(std::ostream &output, const std::string &worksheet_name) : worksheet_writer(output, worksheet_name) {}
+            workbook_writer(core::ostream &output, const std::string &worksheet_name) : worksheet_writer(output, worksheet_name) {}
 
         protected:
             void begin_()
@@ -187,7 +187,7 @@ namespace cppdatalib
         class document_writer : public workbook_writer
         {
         public:
-            document_writer(std::ostream &output, const std::string &worksheet_name) : workbook_writer(output, worksheet_name) {}
+            document_writer(core::ostream &output, const std::string &worksheet_name) : workbook_writer(output, worksheet_name) {}
 
         protected:
             void begin_()
@@ -201,7 +201,7 @@ namespace cppdatalib
 
         inline std::string to_xml_xls_table(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             table_writer writer(stream);
             writer << v;
             return stream.str();
@@ -209,7 +209,7 @@ namespace cppdatalib
 
         inline std::string to_xml_xls_worksheet(const core::value &v, const std::string &worksheet_name)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             worksheet_writer writer(stream, worksheet_name);
             writer << v;
             return stream.str();
@@ -217,7 +217,7 @@ namespace cppdatalib
 
         inline std::string to_xml_xls_workbook(const core::value &v, const std::string &worksheet_name)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             workbook_writer writer(stream, worksheet_name);
             writer << v;
             return stream.str();
@@ -225,7 +225,7 @@ namespace cppdatalib
 
         inline std::string to_xml_xls_document(const core::value &v, const std::string &worksheet_name)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             document_writer writer(stream, worksheet_name);
             writer << v;
             return stream.str();

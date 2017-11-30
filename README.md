@@ -215,6 +215,9 @@ Below is a list of compile-time flags supported by cppdatalib (the flags don't n
    - `CPPDATALIB_OBJECT_T` - The underlying object type of the implementation. Defaults to `std::multimap<cppdatalib::core::value, cppdatalib::core::value>`
    - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `long`
    - `CPPDATALIB_DISABLE_MARIADB` - Disables inclusion of the MySQL interface library. If defined, the MySQL headers must be available in the include path
+   - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but if enabled, can result in better performance. Use at your own risk
+   - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to a trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
+   - `CPPDATALIB_DISABLE_FAST_IO_GCOUNT` - Disables calculation of `gcount()` in the fast input classes. This removes the `gcount()` function altogether. This flag only has an effect if `CPPDATALIB_ENABLE_FAST_INPUT` is defined
 
 Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.
 

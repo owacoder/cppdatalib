@@ -77,7 +77,7 @@ namespace cppdatalib
                 {
                     // Attempt to read as an integer
                     {
-                        std::istringstream temp_stream(buffer);
+                        core::istring_wrapper_stream temp_stream(buffer);
                         core::int_t value;
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -89,7 +89,7 @@ namespace cppdatalib
 
                     // Attempt to read as an unsigned integer
                     {
-                        std::istringstream temp_stream(buffer);
+                        core::istring_wrapper_stream temp_stream(buffer);
                         core::uint_t value;
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -101,7 +101,7 @@ namespace cppdatalib
 
                     // Attempt to read as a real
                     {
-                        std::istringstream temp_stream(buffer);
+                        core::istring_wrapper_stream temp_stream(buffer);
                         core::real_t value;
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -116,7 +116,7 @@ namespace cppdatalib
                 }
             }
 
-            std::istream &read_string(core::stream_handler &writer, bool parse_as_strings)
+            core::istream &read_string(core::stream_handler &writer, bool parse_as_strings)
             {
                 int chr;
                 std::string buffer;
@@ -165,7 +165,7 @@ namespace cppdatalib
             }
 
             // Expects that the leading quote has already been parsed out of the input_stream
-            std::istream &read_quoted_string(core::stream_handler &writer, bool parse_as_strings)
+            core::istream &read_quoted_string(core::stream_handler &writer, bool parse_as_strings)
             {
                 int chr;
                 std::string buffer;
@@ -228,7 +228,7 @@ namespace cppdatalib
             options opts;
 
         public:
-            parser(std::istream &input, options opts = convert_fields_by_deduction) : stream_parser(input), opts(opts) {}
+            parser(core::istream &input, options opts = convert_fields_by_deduction) : stream_parser(input), opts(opts) {}
 
             core::stream_input &convert(core::stream_handler &writer)
             {
@@ -309,10 +309,10 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
 
             protected:
-                std::ostream &write_string(std::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, const std::string &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
@@ -334,10 +334,10 @@ namespace cppdatalib
             char separator;
 
         public:
-            row_writer(std::ostream &output, char separator = ',') : stream_writer_base(output), separator(separator) {}
+            row_writer(core::ostream &output, char separator = ',') : stream_writer_base(output), separator(separator) {}
 
         protected:
-            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {output_stream.precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
@@ -362,10 +362,10 @@ namespace cppdatalib
             char separator;
 
         public:
-            stream_writer(std::ostream &output, char separator = ',') : stream_writer_base(output), separator(separator) {}
+            stream_writer(core::ostream &output, char separator = ',') : stream_writer_base(output), separator(separator) {}
 
         protected:
-            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {output_stream.precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
@@ -396,7 +396,7 @@ namespace cppdatalib
 
         inline core::value from_csv_table(const std::string &csv, parser::options opts = parser::convert_fields_by_deduction)
         {
-            std::istringstream stream(csv);
+            core::istring_wrapper_stream stream(csv);
             parser reader(stream, opts);
             core::value v;
             reader >> v;
@@ -405,7 +405,7 @@ namespace cppdatalib
 
         inline std::string to_csv_row(const core::value &v, char separator = ',')
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             row_writer writer(stream, separator);
             writer << v;
             return stream.str();
@@ -413,7 +413,7 @@ namespace cppdatalib
 
         inline std::string to_csv_table(const core::value &v, char separator = ',')
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer writer(stream, separator);
             writer << v;
             return stream.str();

@@ -34,13 +34,13 @@ namespace cppdatalib
         class parser : public core::stream_parser
         {
         public:
-            parser(std::istream &input) : core::stream_parser(input) {}
+            parser(core::istream &input) : core::stream_parser(input) {}
 
             bool provides_prefix_string_size() const {return true;}
 
             core::stream_input &convert(core::stream_handler &writer)
             {
-                char buffer[core::buffer_size];
+                std::unique_ptr<char []> buffer(new char [core::buffer_size]);
                 bool written = false;
                 int chr;
 
@@ -92,10 +92,10 @@ namespace cppdatalib
                                 while (size > 0)
                                 {
                                     core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                                    input_stream.read(buffer, buffer_size);
+                                    input_stream.read(buffer.get(), buffer_size);
                                     if (input_stream.fail())
                                         throw core::error("Bencode - unexpected end of string");
-                                    writer.append_to_string(core::string_t(buffer, buffer_size));
+                                    writer.append_to_string(core::string_t(buffer.get(), buffer_size));
                                     size -= buffer_size;
                                 }
                                 writer.end_string(core::string_t());
@@ -119,7 +119,7 @@ namespace cppdatalib
         class stream_writer : public core::stream_handler, public core::stream_writer
         {
         public:
-            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+            stream_writer(core::ostream &output) : core::stream_writer(output) {}
 
             bool requires_prefix_string_size() const {return true;}
 
@@ -163,7 +163,7 @@ namespace cppdatalib
 
         inline core::value from_bencode(const std::string &bencode)
         {
-            std::istringstream stream(bencode);
+            core::istring_wrapper_stream stream(bencode);
             parser p(stream);
             core::value v;
             p >> v;
@@ -172,7 +172,7 @@ namespace cppdatalib
 
         inline std::string to_bencode(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer w(stream);
             w << v;
             return stream.str();

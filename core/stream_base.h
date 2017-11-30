@@ -26,12 +26,14 @@
 #define CPPDATALIB_STREAM_BASE_H
 
 #include "value.h"
+#include "istream.h"
+#include "ostream.h"
 
 namespace cppdatalib
 {
     namespace core
     {
-        inline bool stream_starts_with(std::istream &stream, const char *str)
+        inline bool stream_starts_with(core::istream &stream, const char *str)
         {
             int c;
             while (*str)
@@ -45,13 +47,13 @@ namespace cppdatalib
         class stream_writer
         {
         protected:
-            std::ostream &output_stream;
+            core::ostream &output_stream;
 
         public:
-            stream_writer(std::ostream &stream) : output_stream(stream) {}
+            stream_writer(core::ostream &stream) : output_stream(stream) {}
             virtual ~stream_writer() {}
 
-            std::ostream &stream() {return output_stream;}
+            core::ostream &stream() {return output_stream;}
         };
 
         class stream_handler
@@ -75,9 +77,10 @@ namespace cppdatalib
             };
 
             bool active_;
+            bool is_key_;
 
         public:
-            stream_handler() : active_(false) {}
+            stream_handler() : active_(false), is_key_(false) {}
             virtual ~stream_handler() {}
 
             enum {
@@ -92,15 +95,18 @@ namespace cppdatalib
 
                 active_ = true;
                 nested_scopes = decltype(nested_scopes)();
+                nested_scopes.push_back(scope_data(null));
+                is_key_ = false;
                 begin_();
             }
             void end()
             {
                 assert("cppdatalib::core::stream_handler - end() called on inactive handler" && active());
-                assert("cppdatalib::core::stream_handler - unexpected end of stream" && nested_scopes.empty());
+                assert("cppdatalib::core::stream_handler - unexpected end of stream" && nested_scopes.size() == 1);
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.size() != 1)
                     throw error("cppdatalib::core::stream_handler - unexpected end of stream");
+
                 end_();
                 active_ = false;
             }
@@ -135,12 +141,10 @@ namespace cppdatalib
             // (increments after the begin_xxx() handler is called)
             // Nesting depth is > 0 before a container is ended, and updated afterward
             // (decrements after the end_xxx() handler is called)
-            size_t nesting_depth() const {return nested_scopes.size();}
+            size_t nesting_depth() const {return nested_scopes.size() - 1;}
 
             type current_container() const
             {
-                if (nested_scopes.empty())
-                    return null;
                 return nested_scopes.back().get_type();
             }
 
@@ -148,15 +152,11 @@ namespace cppdatalib
             // (begins at 0 with no elements, the first element is handled, then it increments to 1)
             size_t current_container_size() const
             {
-                if (nested_scopes.empty())
-                    return 0;
                 return nested_scopes.back().items_parsed();
             }
 
             bool container_key_was_just_parsed() const
             {
-                if (nested_scopes.empty())
-                    return false;
                 return nested_scopes.back().key_was_parsed();
             }
 
@@ -168,13 +168,12 @@ namespace cppdatalib
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
                 const bool is_key =
-                       !nested_scopes.empty() &&
                         nested_scopes.back().type_ == object &&
-                       !nested_scopes.back().key_was_parsed();
+                        !nested_scopes.back().key_was_parsed();
 
                 if (!write_(v, is_key))
                 {
-                    if (v.size() > 0 && (v.is_array() || v.is_object()))
+                    if ((v.is_array() || v.is_object()) && v.size() > 0)
                         *this << v;
                     else
                     {
@@ -222,16 +221,13 @@ namespace cppdatalib
                     }
                 }
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.back().get_type() == object)
                 {
-                    if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += !is_key;
-                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
+                    nested_scopes.back().items_ += !is_key;
+                    nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                 }
+                else if (nested_scopes.size() > 1)
+                    ++nested_scopes.back().items_;
 
                 return true;
             }
@@ -284,44 +280,42 @@ namespace cppdatalib
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if (!nested_scopes.empty() &&
-                     nested_scopes.back().type_ == object &&
+                if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
-                    begin_string_(v, size, true);
+                    begin_string_(v, size, is_key_ = true);
                 }
                 else
                 {
                     begin_item_(v);
-                    begin_string_(v, size, false);
+                    begin_string_(v, size, is_key_ = false);
                 }
 
                 nested_scopes.push_back(string);
             }
-            // An API must call these when a long string is parsed. The number of bytes of this chunk is passed in size, if possible
             void append_to_string(const core::value &v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::core::stream_handler - attempted to append to string that was never begun");
+#endif
 
-                string_data_(v, nested_scopes.size() > 1 &&
-                                 nested_scopes[nested_scopes.size() - 2].get_type() == object &&
-                                !nested_scopes[nested_scopes.size() - 2].key_was_parsed());
+                string_data_(v, is_key_);
                 nested_scopes.back().items_ += v.get_string().size();
             }
             void end_string(const core::value &v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::core::stream_handler - attempted to end string that was never begun");
+#endif
 
-                if ( nested_scopes.size() > 1 &&
-                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
-                    !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
+                if (is_key_)
                 {
                     end_string_(v, true);
                     end_key_(v);
@@ -333,16 +327,13 @@ namespace cppdatalib
                 }
                 nested_scopes.pop_back();
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.back().get_type() == object)
                 {
-                    if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
-                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
+                    nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                    nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                 }
+                else if (nested_scopes.size() > 1)
+                    ++nested_scopes.back().items_;
             }
 
             // An API must call these when an array is parsed. The number of elements is passed in size, if possible
@@ -352,8 +343,7 @@ namespace cppdatalib
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if (!nested_scopes.empty() &&
-                     nested_scopes.back().type_ == object &&
+                if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
@@ -371,11 +361,12 @@ namespace cppdatalib
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if (nested_scopes.empty() || nested_scopes.back().get_type() != array)
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != array)
                     throw error("cppdatalib::core::stream_handler - attempted to end array that was never begun");
+#endif
 
-                if ( nested_scopes.size() > 1 &&
-                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
+                if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
                     !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
                 {
                     end_array_(v, true);
@@ -388,16 +379,13 @@ namespace cppdatalib
                 }
                 nested_scopes.pop_back();
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.back().get_type() == object)
                 {
-                    if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
-                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
+                    nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                    nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                 }
+                else if (nested_scopes.size() > 1)
+                    ++nested_scopes.back().items_;
             }
 
             // An API must call these when an object is parsed. The number of key/value pairs is passed in size, if possible
@@ -407,8 +395,7 @@ namespace cppdatalib
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if (!nested_scopes.empty() &&
-                     nested_scopes.back().type_ == object &&
+                if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
@@ -426,13 +413,14 @@ namespace cppdatalib
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if (nested_scopes.empty() || nested_scopes.back().get_type() != object)
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != object)
                     throw error("cppdatalib::core::stream_handler - attempted to end object that was never begun");
-                if (nested_scopes.back().key_was_parsed())
+                else if (nested_scopes.back().key_was_parsed())
                     throw error("cppdatalib::core::stream_handler - attempted to end object before final value was written");
+#endif
 
-                if ( nested_scopes.size() > 1 &&
-                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
+                if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
                     !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
                 {
                     end_object_(v, true);
@@ -445,16 +433,13 @@ namespace cppdatalib
                 }
                 nested_scopes.pop_back();
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.back().get_type() == object)
                 {
-                    if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
-                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
+                    nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                    nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                 }
+                else if (nested_scopes.size() > 1)
+                    ++nested_scopes.back().items_;
             }
 
         protected:
@@ -493,13 +478,13 @@ namespace cppdatalib
         class stream_parser : public stream_input
         {
         protected:
-            std::istream &input_stream;
+            core::istream &input_stream;
 
         public:
-            stream_parser(std::istream &input) : input_stream(input) {}
+            stream_parser(core::istream &input) : input_stream(input) {}
             virtual ~stream_parser() {}
 
-            std::istream &stream() {return input_stream;}
+            core::istream &stream() {return input_stream;}
         };
 
         // Convert directly from parser to serializer

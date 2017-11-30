@@ -38,7 +38,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &output) : core::stream_writer(output) {}
+                stream_writer_base(core::ostream &output) : core::stream_writer(output) {}
 
             protected:
                 size_t get_size(const core::value &v)
@@ -139,7 +139,7 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream &output) : impl::stream_writer_base(output) {}
 
             bool requires_prefix_string_size() const {return true;}
             bool requires_array_buffering() const {return true;}
@@ -221,7 +221,7 @@ namespace cppdatalib
 
         inline std::string to_netstrings(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer w(stream);
             w << v;
             return stream.str();

@@ -25,14 +25,13 @@
 #ifndef CPPDATALIB_BASE64_H
 #define CPPDATALIB_BASE64_H
 
-#include <iostream>
-#include <sstream>
+#include "ostream.h"
 
 namespace cppdatalib
 {
     namespace base64
     {
-        inline std::ostream &write(std::ostream &stream, const std::string &str)
+        inline core::ostream &write(core::ostream &stream, const std::string &str)
         {
             const char alpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
             uint32_t temp;
@@ -70,7 +69,7 @@ namespace cppdatalib
 
         inline std::string encode(const std::string &str)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             write(stream, str);
             return stream.str();
         }

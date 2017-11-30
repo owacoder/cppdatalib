@@ -78,7 +78,7 @@ namespace cppdatalib
 
         class parser : public core::stream_parser
         {
-            uint32_t read_size(std::istream &input)
+            uint32_t read_size(core::istream &input)
             {
                 uint32_t size = 0;
                 int chr = input.get();
@@ -103,7 +103,7 @@ namespace cppdatalib
             }
 
         public:
-            parser(std::istream &input) : core::stream_parser(input) {}
+            parser(core::istream &input) : core::stream_parser(input) {}
 
             bool provides_prefix_string_size() const {return true;}
             bool provides_prefix_object_size() const {return true;}
@@ -124,7 +124,7 @@ namespace cppdatalib
 
                 std::stack<container_data, std::vector<container_data>> containers;
 
-                char buffer[core::buffer_size];
+                std::unique_ptr<char []> buffer(new char [core::buffer_size]);
                 bool written = false;
                 int chr;
                 core::uint_t integer;
@@ -323,11 +323,11 @@ namespace cppdatalib
                             while (size > 0)
                             {
                                 core::int_t buffer_size = std::min(uint32_t(core::buffer_size), size);
-                                input_stream.read(buffer, buffer_size);
+                                input_stream.read(buffer.get(), buffer_size);
                                 if (input_stream.fail())
                                     throw core::error("Binn - unexpected end of string");
                                 // Set string in string_type to preserve the subtype
-                                string_type.set_string(core::string_t(buffer, buffer_size));
+                                string_type.set_string(core::string_t(buffer.get(), buffer_size));
                                 writer.append_to_string(string_type);
                                 size -= buffer_size;
                             }
@@ -354,11 +354,11 @@ namespace cppdatalib
                             while (size > 0)
                             {
                                 core::int_t buffer_size = std::min(uint32_t(core::buffer_size), size);
-                                input_stream.read(buffer, buffer_size);
+                                input_stream.read(buffer.get(), buffer_size);
                                 if (input_stream.fail())
                                     throw core::error("Binn - unexpected end of string");
                                 // Set string in string_type to preserve the subtype
-                                string_type.set_string(core::string_t(buffer, buffer_size));
+                                string_type.set_string(core::string_t(buffer.get(), buffer_size));
                                 writer.append_to_string(string_type);
                                 size -= buffer_size;
                             }
@@ -406,10 +406,10 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &output) : core::stream_writer(output) {}
+                stream_writer_base(core::ostream &output) : core::stream_writer(output) {}
 
             protected:
-                std::ostream &write_type(std::ostream &stream, unsigned int type, unsigned int subtype, int *written = NULL)
+                core::ostream &write_type(core::ostream &stream, unsigned int type, unsigned int subtype, int *written = NULL)
                 {
                     char c;
 
@@ -430,7 +430,7 @@ namespace cppdatalib
                     return stream.put(c);
                 }
 
-                std::ostream &write_size(std::ostream &stream, uint64_t size, int *written = NULL)
+                core::ostream &write_size(core::ostream &stream, uint64_t size, int *written = NULL)
                 {
                     if (size > INT32_MAX)
                         throw core::error("Binn - size is greater than 2 GB, cannot write element");
@@ -625,7 +625,7 @@ namespace cppdatalib
             std::stack<core::subtype_t, std::vector<core::subtype_t>> object_types;
 
         public:
-            stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream &output) : impl::stream_writer_base(output) {}
 
             bool requires_prefix_string_size() const {return true;}
             bool requires_array_buffering() const {return true;}
@@ -832,7 +832,7 @@ namespace cppdatalib
 
         inline core::value from_binn(const std::string &bencode)
         {
-            std::istringstream stream(bencode);
+            core::istring_wrapper_stream stream(bencode);
             parser p(stream);
             core::value v;
             p >> v;
@@ -841,7 +841,7 @@ namespace cppdatalib
 
         inline std::string to_binn(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer w(stream);
             w << v;
             return stream.str();

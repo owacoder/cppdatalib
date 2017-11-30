@@ -30,6 +30,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
 #include <stack>
 #include <cmath>
@@ -40,6 +41,7 @@
 #include <locale>
 #include <cfloat>
 #include <limits>
+#include <algorithm>
 
 namespace cppdatalib
 {
@@ -81,16 +83,6 @@ namespace cppdatalib
             map, // A normal object with integral keys
 
             user = 16
-        };
-
-        enum
-        {
-            max_utf8_code_sequence_size = 4,
-#ifdef CPPDATALIB_BUFFER_SIZE
-            buffer_size = CPPDATALIB_BUFFER_SIZE
-#else
-            buffer_size = 65535
-#endif
         };
 
         class value;
@@ -140,8 +132,145 @@ namespace cppdatalib
         typedef std::vector<value> array_t;
 #endif
 
+// TODO: FAST_IO_OBJECT is not fast at all. Fix?
+//#define CPPDATALIB_FAST_IO_OBJECT
+
 #ifdef CPPDATALIB_OBJECT_T
         typedef CPPDATALIB_OBJECT_T object_t;
+#elif defined(CPPDATALIB_FAST_IO_OBJECT)
+        template<typename K, typename V>
+        class fast_object
+        {
+        public:
+            typedef K key_type;
+            typedef V mapped_type;
+            typedef std::pair<K, V> value_type;
+            typedef value_type &reference;
+            typedef const value_type &const_reference;
+            typedef value_type *pointer;
+            typedef const value_type *const_pointer;
+            typedef typename std::list<value_type>::iterator iterator;
+            typedef typename std::list<value_type>::const_iterator const_iterator;
+            typedef typename std::list<value_type>::reverse_iterator reverse_iterator;
+            typedef typename std::list<value_type>::const_reverse_iterator const_reverse_iterator;
+            typedef typename std::list<value_type>::difference_type difference_type;
+            typedef typename std::list<value_type>::size_type size_type;
+            typedef std::less<value> key_compare;
+            struct value_compare
+            {
+                bool operator()(const value_type &l, const value_type &r) const
+                {
+                    return l.first < r.first;
+                }
+
+                bool operator()(const value_type &l, const key_type &r) const
+                {
+                    return l.first < r;
+                }
+
+                bool operator()(const key_type &l, const value_type &r) const
+                {
+                    return l < r.first;
+                }
+            };
+
+            key_compare key_comp() const {return key_compare();}
+            value_compare value_comp() const {return value_compare();}
+
+            iterator begin() {return d_.begin();}
+            const_iterator begin() const {return d_.begin();}
+            iterator end() {return d_.end();}
+            const_iterator end() const {return d_.end();}
+
+            reverse_iterator rbegin() {return d_.rbegin();}
+            const_reverse_iterator rbegin() const {return d_.rbegin();}
+            reverse_iterator rend() {return d_.rend();}
+            const_reverse_iterator rend() const {return d_.rend();}
+
+            const_iterator cbegin() const {return d_.cbegin();}
+            const_iterator cend() const {return d_.cend();}
+            const_reverse_iterator crbegin() const {return d_.crbegin();}
+            const_reverse_iterator crend() const {return d_.crend();}
+
+            bool empty() const {return d_.empty();}
+            size_type size() const {return d_.size();}
+            size_type max_size() const {return d_.max_size();}
+
+            iterator insert(const value_type &val)
+            {
+                return d_.insert(upper_bound(val.first), val);
+            }
+            template<typename P> iterator insert(P &&val)
+            {
+                return d_.insert(upper_bound(val.first), val);
+            }
+
+            // TODO: accelerate placement insert (use hint)
+            iterator insert(const_iterator insert, const value_type &val)
+            {
+                (void) insert;
+                return this->insert(val);
+            }
+            template<typename P> iterator insert(const_iterator insert, P &&val)
+            {
+                (void) insert;
+                return this->insert(val);
+            }
+
+            size_type count(const key_type &k) const
+            {
+                size_type n = 0;
+                const_iterator it = find(k);
+                while (it != end() && it->first == k)
+                    ++n, ++it;
+                return n;
+            }
+
+            void clear() {d_.clear();}
+
+            iterator find(const key_type &k)
+            {
+                auto it = std::lower_bound(d_.begin(), d_.end(), k, value_compare());
+                if (it == end() || k < it->first)
+                    return end();
+                return it;
+            }
+
+            const_iterator find(const key_type &k) const
+            {
+                auto it = std::lower_bound(d_.cbegin(), d_.cend(), k, value_compare());
+                if (it == end() || k < it->first)
+                    return end();
+                return it;
+            }
+
+            iterator lower_bound(const key_type &k) {return std::lower_bound(d_.begin(), d_.end(), k, value_compare());}
+            const_iterator lower_bound(const key_type &k) const {return std::lower_bound(d_.begin(), d_.end(), k, value_compare());}
+            iterator upper_bound(const key_type &k) {return std::upper_bound(d_.begin(), d_.end(), k, value_compare());}
+            const_iterator upper_bound(const key_type &k) const {return std::upper_bound(d_.begin(), d_.end(), k, value_compare());}
+
+            iterator erase(const_iterator position) {return d_.erase(position);}
+            size_type erase(const key_type &k)
+            {
+                size_type n = 0;
+                iterator first = find(k);
+                iterator last = first;
+
+                while (last != end() && last->first == k)
+                    ++last, ++n;
+
+                if (first != last)
+                    d_.erase(first, last);
+
+                return n;
+            }
+            iterator erase(const_iterator first, const_iterator last) {return d_.erase(first, last);}
+
+        private:
+            std::list<value_type> d_;
+        };
+
+        typedef fast_object<value, value> object_t;
 #else
         typedef std::multimap<value, value> object_t;
 #endif
@@ -153,16 +282,6 @@ namespace cppdatalib
 #endif
 
         struct null_t {};
-
-        struct error
-        {
-            error(cstring_t reason) : what_(reason) {}
-
-            cstring_t what() const {return what_;}
-
-        private:
-            cstring_t what_;
-        };
 
         template<typename T> core::value to_cppdatalib(T v);
         template<typename T> T from_cppdatalib(const core::value &v);
@@ -912,7 +1031,17 @@ namespace cppdatalib
                 clear(object);
                 return obj_.insert(decltype(obj_)::value_type(key, null_t()))->second;
             }
+            value &add_member(value &&key)
+            {
+                clear(object);
+                return obj_.insert(decltype(obj_)::value_type(key, null_t()))->second;
+            }
             value &add_member(const value &key, const value &val)
+            {
+                clear(object);
+                return obj_.insert(decltype(obj_)::value_type(key, val))->second;
+            }
+            value &add_member(value &&key, value &&val)
             {
                 clear(object);
                 return obj_.insert(decltype(obj_)::value_type(key, val))->second;

@@ -38,10 +38,10 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
 
             protected:
-                std::ostream &write_int(std::ostream &stream, core::uint_t i)
+                core::ostream &write_int(core::ostream &stream, core::uint_t i)
                 {
                     if (i <= UINT8_MAX / 2)
                         return stream.put(i);
@@ -67,7 +67,7 @@ namespace cppdatalib
                                 .put(i & 0xff);
                 }
 
-                std::ostream &write_int(std::ostream &stream, core::int_t i)
+                core::ostream &write_int(core::ostream &stream, core::int_t i)
                 {
                     if (i >= 0)
                     {
@@ -134,7 +134,7 @@ namespace cppdatalib
                     }
                 }
 
-                std::ostream &write_float(std::ostream &stream, core::real_t f)
+                core::ostream &write_float(core::ostream &stream, core::real_t f)
                 {
                     if (core::float_from_ieee_754(core::float_to_ieee_754(f)) == f || std::isnan(f))
                     {
@@ -162,7 +162,7 @@ namespace cppdatalib
                     }
                 }
 
-                std::ostream &write_string_size(std::ostream &stream, size_t str_size, core::subtype_t subtype)
+                core::ostream &write_string_size(core::ostream &stream, size_t str_size, core::subtype_t subtype)
                 {
                     // Binary string?
                     if (subtype == core::blob || subtype == core::clob)
@@ -212,7 +212,7 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : stream_writer_base(output) {}
+            stream_writer(core::ostream &output) : stream_writer_base(output) {}
 
             bool requires_prefix_array_size() const {return true;}
             bool requires_prefix_object_size() const {return true;}
@@ -272,7 +272,7 @@ namespace cppdatalib
 
         inline std::string to_message_pack(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer writer(stream);
             writer << v;
             return stream.str();

@@ -92,7 +92,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler
             {
             protected:
-                std::ostream &write_string(std::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, const std::string &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {

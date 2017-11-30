@@ -33,14 +33,15 @@ namespace cppdatalib
     {
         class parser : public core::stream_parser
         {
+            std::unique_ptr<char []> buffer;
+
         private:
-            std::istream &read_string(core::stream_handler &writer)
+            core::istream &read_string(core::stream_handler &writer)
             {
                 static const std::string hex = "0123456789ABCDEF";
 
                 int c;
-                char buffer[core::buffer_size + core::max_utf8_code_sequence_size + 1];
-                char *write = buffer;
+                char *write = buffer.get();
 
                 writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
                 while (c = input_stream.get(), c != '"' && c != EOF)
@@ -106,28 +107,31 @@ namespace cppdatalib
                     else
                         *write++ = c;
 
-                    if (write - buffer >= core::buffer_size)
+                    if (write - buffer.get() >= core::buffer_size)
                     {
                         *write = 0;
-                        writer.append_to_string(buffer);
-                        write = buffer;
+                        writer.append_to_string(buffer.get());
+                        write = buffer.get();
                     }
                 }
 
                 if (c == EOF)
                     throw core::error("Plain Text Property List - unexpected end of string");
 
-                if (write != buffer)
+                if (write != buffer.get())
                 {
                     *write = 0;
-                    writer.append_to_string(buffer);
+                    writer.append_to_string(buffer.get());
                 }
                 writer.end_string(core::string_t());
                 return input_stream;
             }
 
         public:
-            parser(std::istream &input) : core::stream_parser(input) {}
+            parser(core::istream &input)
+                : core::stream_parser(input)
+                , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
+            {}
 
             core::stream_input &convert(core::stream_handler &writer)
             {
@@ -276,10 +280,10 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
 
             protected:
-                std::ostream &write_string(std::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, const std::string &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
@@ -341,10 +345,10 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(std::ostream &output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream &output) : impl::stream_writer_base(output) {}
 
         protected:
-            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {output_stream.precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
@@ -428,6 +432,7 @@ namespace cppdatalib
 
         class pretty_stream_writer : public impl::stream_writer_base
         {
+            std::unique_ptr<char []> buffer;
             size_t indent_width;
             size_t current_indent;
 
@@ -435,20 +440,19 @@ namespace cppdatalib
             {
                 while (padding > 0)
                 {
-                    char buffer[core::buffer_size];
-                    size_t size = std::min(sizeof(buffer)-1, padding);
+                    size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                    memset(buffer, ' ', size);
-                    buffer[size] = 0;
+                    memset(buffer.get(), ' ', size);
 
-                    output_stream.write(buffer, size);
+                    output_stream.write(buffer.get(), size);
                     padding -= size;
                 }
             }
 
         public:
-            pretty_stream_writer(std::ostream &output, size_t indent_width)
+            pretty_stream_writer(core::ostream &output, size_t indent_width)
                 : impl::stream_writer_base(output)
+                , buffer(new char [core::buffer_size])
                 , indent_width(indent_width)
                 , current_indent(0)
             {}
@@ -456,7 +460,7 @@ namespace cppdatalib
             size_t indent() {return indent_width;}
 
         protected:
-            void begin_() {current_indent = 0; output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {current_indent = 0; output_stream.precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
@@ -569,7 +573,7 @@ namespace cppdatalib
 
         inline core::value from_plain_text_property_list(const std::string &property_list)
         {
-            std::istringstream stream(property_list);
+            core::istring_wrapper_stream stream(property_list);
             parser p(stream);
             core::value v;
             p >> v;
@@ -578,7 +582,7 @@ namespace cppdatalib
 
         inline std::string to_plain_text_property_list(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer writer(stream);
             writer << v;
             return stream.str();
@@ -586,7 +590,7 @@ namespace cppdatalib
 
         inline std::string to_pretty_plain_text_property_list(const core::value &v, size_t indent_width)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             pretty_stream_writer writer(stream, indent_width);
             writer << v;
             return stream.str();
