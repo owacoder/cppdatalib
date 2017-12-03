@@ -25,7 +25,7 @@
 #ifndef CPPDATALIB_MARIADB_H
 #define CPPDATALIB_MARIADB_H
 
-#ifndef CPPDATALIB_DISABLE_MARIADB
+#ifdef CPPDATALIB_ENABLE_MARIADB
 
 #include "../core/core.h"
 #include <mysql/mysql.h>
