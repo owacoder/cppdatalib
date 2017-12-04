@@ -784,7 +784,7 @@ namespace cppdatalib
                         map_.add_member(column_names[i], i < v.size()? v[i]: core::value(core::null_t()));
                     }
                 else
-                    map_.add_member(column_names[0], v);
+                    map_.add_member(column_names.element(0), v);
 
                 buffer_filter::write_buffered_value_(map_, is_key);
             }

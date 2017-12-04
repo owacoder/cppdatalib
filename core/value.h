@@ -991,6 +991,8 @@ namespace cppdatalib
             void set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ = v; subtype_ = subtype;}
             void set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ = v; subtype_ = subtype;}
 
+            value operator[](cstring_t key) const {return member(key);}
+            value &operator[](cstring_t key) {return member(key);}
             value operator[](const string_t &key) const {return member(key);}
             value &operator[](const string_t &key) {return member(key);}
             value member(const value &key) const
@@ -1049,8 +1051,10 @@ namespace cppdatalib
 
             void push_back(const value &v) {clear(array); arr_.push_back(v);}
             void push_back(value &&v) {clear(array); arr_.push_back(v);}
-            const value &operator[](size_t pos) const {return arr_[pos];}
-            value &operator[](size_t pos) {return arr_[pos];}
+            const value &operator[](size_t pos) const {return element(pos);}
+            value &operator[](size_t pos) {return element(pos);}
+            const value &element(size_t pos) const {return arr_[pos];}
+            value &element(size_t pos) {return arr_[pos];}
             void erase_element(int_t pos) {arr_.erase(arr_.begin() + pos);}
 
             // The following are convenience conversion functions
