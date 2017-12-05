@@ -69,7 +69,7 @@ namespace cppdatalib
                                 {
                                     if (prefix)
                                     {
-                                        std::ostringstream stream;
+                                        core::ostringstream stream;
                                         stream << arg->get_int();
                                         stream << stream.str().size();
                                         size.top() += 2 + stream.str().size();
@@ -80,7 +80,7 @@ namespace cppdatalib
                                 {
                                     if (prefix)
                                     {
-                                        std::ostringstream stream;
+                                        core::ostringstream stream;
                                         stream << arg->get_uint();
                                         stream << stream.str().size();
                                         size.top() += 2 + stream.str().size();
@@ -91,8 +91,8 @@ namespace cppdatalib
                                 {
                                     if (prefix)
                                     {
-                                        std::ostringstream stream;
-                                        stream << std::setprecision(CPPDATALIB_REAL_DIG);
+                                        core::ostringstream stream;
+                                        stream.precision(CPPDATALIB_REAL_DIG);
                                         stream << arg->get_real();
                                         stream << stream.str().size();
                                         size.top() += 2 + stream.str().size();
@@ -151,35 +151,35 @@ namespace cppdatalib
 
             void integer_(const core::value &v)
             {
-                std::stringstream stream;
+                core::ostringstream stream;
 
                 stream << v.get_int();
                 output_stream << stream.str().size();
                 output_stream.put(':');
-                output_stream << stream.rdbuf();
+                output_stream << stream.str();
                 output_stream.put(',');
             }
 
             void uinteger_(const core::value &v)
             {
-                std::stringstream stream;
+                core::ostringstream stream;
 
                 stream << v.get_uint();
                 output_stream << stream.str().size();
                 output_stream.put(':');
-                output_stream << stream.rdbuf();
+                output_stream << stream.str();
                 output_stream.put(',');
             }
 
             void real_(const core::value &v)
             {
-                std::stringstream stream;
+                core::ostringstream stream;
 
-                stream << std::setprecision(CPPDATALIB_REAL_DIG);
+                stream.precision(CPPDATALIB_REAL_DIG);
                 stream << v.get_real();
                 output_stream << stream.str().size();
                 output_stream.put(':');
-                output_stream << stream.rdbuf();
+                output_stream << stream.str();
                 output_stream.put(',');
             }
 

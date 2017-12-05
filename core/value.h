@@ -880,23 +880,23 @@ namespace cppdatalib
 
             value() : type_(null), subtype_(0) {}
             value(null_t, subtype_t subtype = 0) : type_(null), subtype_(subtype) {}
-            value(bool_t v, subtype_t subtype = 0) : type_(boolean), bool_(v), subtype_(subtype) {}
-            value(int_t v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
-            value(uint_t v, subtype_t subtype = 0) : type_(uinteger), uint_(v), subtype_(subtype) {}
-            value(real_t v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
-            value(cstring_t v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
-            value(const string_t &v, subtype_t subtype = 0) : type_(string), str_(v), subtype_(subtype) {}
-            value(string_t &&v, subtype_t subtype = 0) : type_(string), str_(std::move(v)), subtype_(subtype) {}
-            value(const array_t &v, subtype_t subtype = 0) : type_(array), arr_(v), subtype_(subtype) {}
-            value(array_t &&v, subtype_t subtype = 0) : type_(array), arr_(std::move(v)), subtype_(subtype) {}
-            value(const object_t &v, subtype_t subtype = 0) : type_(object), obj_(v), subtype_(subtype) {}
-            value(object_t &&v, subtype_t subtype = 0) : type_(object), obj_(std::move(v)), subtype_(subtype) {}
+            value(bool_t v, subtype_t subtype = 0) : type_(boolean), subtype_(subtype), bool_(v) {}
+            value(int_t v, subtype_t subtype = 0) : type_(integer), subtype_(subtype), int_(v) {}
+            value(uint_t v, subtype_t subtype = 0) : type_(uinteger), subtype_(subtype), uint_(v) {}
+            value(real_t v, subtype_t subtype = 0) : type_(real), subtype_(subtype), real_(v) {}
+            value(cstring_t v, subtype_t subtype = 0) : type_(string), subtype_(subtype), str_(v) {}
+            value(const string_t &v, subtype_t subtype = 0) : type_(string), subtype_(subtype), str_(v) {}
+            value(string_t &&v, subtype_t subtype = 0) : type_(string), subtype_(subtype), str_(std::move(v)) {}
+            value(const array_t &v, subtype_t subtype = 0) : type_(array), subtype_(subtype), arr_(v) {}
+            value(array_t &&v, subtype_t subtype = 0) : type_(array), subtype_(subtype), arr_(std::move(v)) {}
+            value(const object_t &v, subtype_t subtype = 0) : type_(object), subtype_(subtype), obj_(v) {}
+            value(object_t &&v, subtype_t subtype = 0) : type_(object), subtype_(subtype), obj_(std::move(v)) {}
             template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = 0) : type_(uinteger), uint_(v), subtype_(subtype) {}
+            value(T v, subtype_t subtype = 0) : type_(uinteger), subtype_(subtype), uint_(v) {}
             template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = 0) : type_(integer), int_(v), subtype_(subtype) {}
+            value(T v, subtype_t subtype = 0) : type_(integer), subtype_(subtype), int_(v) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = 0) : type_(real), real_(v), subtype_(subtype) {}
+            value(T v, subtype_t subtype = 0) : type_(real), subtype_(subtype), real_(v) {}
             template<typename T>
             value(std::initializer_list<T> v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
             {
@@ -1226,6 +1226,7 @@ namespace cppdatalib
             }
 
             mutable type type_; // Mutable to provide editable traversal access to const destructor
+            subtype_t subtype_;
 #ifndef CPPDATALIB_NON_POD_LAYOUT
             union
             {
@@ -1243,7 +1244,6 @@ namespace cppdatalib
             string_t str_;
             mutable array_t arr_; // Mutable to provide editable traversal access to const destructor
             mutable object_t obj_; // Mutable to provide editable traversal access to const destructor
-            subtype_t subtype_;
         };
 
         namespace impl

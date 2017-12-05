@@ -54,6 +54,13 @@ namespace cppdatalib
             return stream;
         }
 
+        inline std::string debug_encode(const std::string &str)
+        {
+            core::ostringstream stream;
+            debug_write(stream, str);
+            return stream.str();
+        }
+
         inline core::ostream &write(core::ostream &stream, unsigned char c)
         {
             const char alpha[] = "0123456789ABCDEF";
