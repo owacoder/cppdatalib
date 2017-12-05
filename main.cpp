@@ -15,7 +15,7 @@ struct TestData : public std::vector<std::pair<F, S>>
 
 // `tests` is a vector of test cases. The test cases will be normal (first item in tuple is parameter, second is result)
 // ResultCode is a functor that should return the actual test result (whether valid or not)
-template<typename F, typename S, typename ResultCode, typename Compare = std::not_equal_to>
+template<typename F, typename S, typename ResultCode, typename Compare = std::not_equal_to<S>>
 bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, Compare compare = Compare(), bool bail_early = true)
 {
     std::cout << "Testing " << name << "... " << std::flush;
@@ -37,7 +37,7 @@ bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, Comp
 
 // `tests` is a vector of test cases. The test cases will be reversed (first item in tuple is result, second is parameter)
 // ResultCode is a functor that should return the actual test result (whether valid or not)
-template<typename F, typename S, typename ResultCode, typename Compare = std::not_equal_to>
+template<typename F, typename S, typename ResultCode, typename Compare = std::not_equal_to<S>>
 bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actual, Compare compare = Compare(), bool bail_early = true)
 {
     std::cout << "Testing " << name << "... " << std::flush;
@@ -60,7 +60,7 @@ bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actua
 // `tests` is the maximum of a range, 0 -> tests, each element of which is passed to the test code
 // ExpectedCode is a functor that should return the expected, valid, test result
 // ResultCode is a functor that should return the actual test result (whether valid or not)
-template<uintmax_t, typename ExpectedOutput, typename ResultCode, typename Compare = std::not_equal_to>
+template<uintmax_t, typename ExpectedOutput, typename ResultCode, typename Compare>
 bool TestRange(const char *name, uintmax_t tests, ExpectedOutput expected, ResultCode actual, Compare compare = Compare(), bool bail_early = true)
 {
     std::cout << "Testing " << name << "... " << std::flush;
@@ -83,7 +83,7 @@ bool TestRange(const char *name, uintmax_t tests, ExpectedOutput expected, Resul
 // `tests` is the maximum of a range, 0 -> tests, each element of which is passed to the test code
 // ExpectedCode is a functor that should return the expected, valid, test result
 // ResultCode is a functor that should return the actual test result (whether valid or not)
-template<typename ExpectedCode, typename ResultCode, typename Compare = std::not_equal_to>
+template<typename ExpectedCode, typename ResultCode, typename Compare>
 bool TestRangeAndShowProgress(const char *name, uintmax_t tests, ExpectedCode expected, ResultCode actual, Compare compare = Compare(), bool bail_early = true)
 {
     std::cout << "Testing " << name << "... " << std::flush;
@@ -143,8 +143,8 @@ int main()
     Test("debug_hex_encode", debug_hex_encode_tests, [](const auto &test){return hex::debug_encode(test);});
     Test("hex_encode", hex_encode_tests, [](const auto &test){return hex::encode(test);});
     TestRangeAndShowProgress("float_ieee754 conversions", UINT32_MAX, core::float_cast_from_ieee_754,
-                             core::float_from_ieee_754);
+                             core::float_from_ieee_754, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
     TestRangeAndShowProgress("double_ieee754 conversions", UINT32_MAX, core::double_cast_from_ieee_754,
-                             core::double_from_ieee_754);
+                             core::double_from_ieee_754, std::not_equal_to<double>());
     return 0;
 }
