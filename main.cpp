@@ -138,13 +138,11 @@ TestData<std::string> base64_encode_tests = {
 
 int main()
 {
-    Test("base64_encode", base64_encode_tests, [](const auto &test){return base64::encode(test);});
-    ReverseTest("base64_decode", base64_encode_tests, [](const auto &test){return base64::decode(test);});
-    Test("debug_hex_encode", debug_hex_encode_tests, [](const auto &test){return hex::debug_encode(test);});
-    Test("hex_encode", hex_encode_tests, [](const auto &test){return hex::encode(test);});
+    Test("base64_encode", base64_encode_tests, base64::encode);
+    ReverseTest("base64_decode", base64_encode_tests, base64::decode);
+    Test("debug_hex_encode", debug_hex_encode_tests, hex::debug_encode);
+    Test("hex_encode", hex_encode_tests, hex::encode);
     TestRangeAndShowProgress("float_ieee754 conversions", UINT32_MAX, core::float_cast_from_ieee_754,
                              core::float_from_ieee_754, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
-    TestRangeAndShowProgress("double_ieee754 conversions", UINT32_MAX, core::double_cast_from_ieee_754,
-                             core::double_from_ieee_754, std::not_equal_to<double>());
     return 0;
 }
