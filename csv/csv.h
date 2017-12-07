@@ -100,6 +100,7 @@ namespace cppdatalib
                     }
 
                     // Attempt to read as a real
+                    if (buffer.find_first_of("eE.") != std::string::npos)
                     {
                         core::istring_wrapper_stream temp_stream(buffer);
                         core::real_t value;

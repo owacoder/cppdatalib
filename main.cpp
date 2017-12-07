@@ -1,6 +1,6 @@
 #include <iostream>
 
-#define CPPDATALIB_FAST_IO
+//#define CPPDATALIB_FAST_IO
 #define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
 #include "cppdatalib.h"
@@ -107,9 +107,10 @@ struct TestData : public std::vector<std::pair<F, S>>
 // `tests` is a vector of test cases. The test cases will be normal (first item in tuple is parameter, second is result)
 // ResultCode is a functor that should return the actual test result (whether valid or not)
 template<typename F, typename S, typename ResultCode, typename Compare = std::not_equal_to<S>>
-bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, Compare compare = Compare(), bool bail_early = true)
+bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, bool bail_early = true, Compare compare = Compare())
 {
     vt100 vt;
+    size_t failed = 0;
     std::cout << "Testing " << name << "... " << std::flush;
 
     for (const auto &test: tests)
@@ -123,20 +124,32 @@ bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, Comp
             std::cout << vt.black;
             if (bail_early)
                 return false;
+            ++failed;
         }
 
-    std::cout << vt.green;
-    std::cout << "done." << std::endl;
-    std::cout << vt.black;
-    return true;
+    if (!failed)
+    {
+        std::cout << vt.green;
+        std::cout << "done." << std::endl;
+        std::cout << vt.black;
+    }
+    else
+    {
+        std::cout << vt.red;
+        std::cout << "Test done. (" << failed << " failed out of " << tests.size() << ")" << std::endl;
+        std::cout << vt.black;
+    }
+
+    return failed;
 }
 
 // `tests` is a vector of test cases. The test cases will be reversed (first item in tuple is result, second is parameter)
 // ResultCode is a functor that should return the actual test result (whether valid or not)
 template<typename F, typename S, typename ResultCode, typename Compare = std::not_equal_to<S>>
-bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actual, Compare compare = Compare(), bool bail_early = true)
+bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actual, bool bail_early = true, Compare compare = Compare())
 {
     vt100 vt;
+    uintmax_t failed = 0;
     std::cout << "Testing " << name << "... " << std::flush;
 
     for (const auto &test: tests)
@@ -150,21 +163,33 @@ bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actua
             std::cout << vt.black;
             if (bail_early)
                 return false;
+            ++failed;
         }
 
-    std::cout << vt.green;
-    std::cout << "done." << std::endl;
-    std::cout << vt.black;
-    return true;
+    if (!failed)
+    {
+        std::cout << vt.green;
+        std::cout << "done." << std::endl;
+        std::cout << vt.black;
+    }
+    else
+    {
+        std::cout << vt.red;
+        std::cout << "Test done. (" << failed << " failed out of " << tests.size() << ")" << std::endl;
+        std::cout << vt.black;
+    }
+
+    return failed;
 }
 
 // `tests` is the maximum of a range, 0 -> tests, each element of which is passed to the test code
 // ExpectedCode is a functor that should return the expected, valid, test result
 // ResultCode is a functor that should return the actual test result (whether valid or not)
 template<uintmax_t, typename ExpectedOutput, typename ResultCode, typename Compare>
-bool TestRange(const char *name, uintmax_t tests, ExpectedOutput expected, ResultCode actual, Compare compare = Compare(), bool bail_early = true)
+bool TestRange(const char *name, uintmax_t tests, ExpectedOutput expected, ResultCode actual, bool bail_early = true, Compare compare = Compare())
 {
     vt100 vt;
+    uintmax_t failed = 0;
     std::cout << "Testing " << name << "... " << std::flush;
 
     for (uintmax_t test = 0; test < tests; ++test)
@@ -178,21 +203,33 @@ bool TestRange(const char *name, uintmax_t tests, ExpectedOutput expected, Resul
             std::cout << vt.black;
             if (bail_early)
                 return false;
+            ++failed;
         }
 
-    std::cout << vt.green;
-    std::cout << "done." << std::endl;
-    std::cout << vt.black;
-    return true;
+    if (!failed)
+    {
+        std::cout << vt.green;
+        std::cout << "done." << std::endl;
+        std::cout << vt.black;
+    }
+    else
+    {
+        std::cout << vt.red;
+        std::cout << "Test done. (" << failed << " failed out of " << tests << ")" << std::endl;
+        std::cout << vt.black;
+    }
+
+    return failed;
 }
 
 // `tests` is the maximum of a range, 0 -> tests, each element of which is passed to the test code
 // ExpectedCode is a functor that should return the expected, valid, test result
 // ResultCode is a functor that should return the actual test result (whether valid or not)
 template<typename ExpectedCode, typename ResultCode, typename Compare>
-bool TestRangeAndShowProgress(const char *name, uintmax_t tests, ExpectedCode expected, ResultCode actual, Compare compare = Compare(), bool bail_early = true)
+bool TestRangeAndShowProgress(const char *name, uintmax_t tests, ExpectedCode expected, ResultCode actual, bool bail_early = true, Compare compare = Compare())
 {
     vt100 vt;
+    uintmax_t failed = 0;
     std::cout << "Testing " << name << "... " << vt.yellow << "0%" << std::flush;
     std::cout << vt.black;
     size_t percent = 0;
@@ -210,6 +247,7 @@ bool TestRangeAndShowProgress(const char *name, uintmax_t tests, ExpectedCode ex
             std::cout << vt.black;
             if (bail_early)
                 return false;
+            ++failed;
         }
 
         if (test * 100 / tests > percent)
@@ -221,10 +259,20 @@ bool TestRangeAndShowProgress(const char *name, uintmax_t tests, ExpectedCode ex
         }
     }
 
-    std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
-    std::cout << "Testing " << name << "... " << vt.green << "done." << std::endl;
-    std::cout << vt.black;
-    return true;
+    if (!failed)
+    {
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << "Testing " << name << "... " << vt.green << "done." << std::endl;
+        std::cout << vt.black;
+    }
+    else
+    {
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << "Testing " << name << "... " << vt.red << "done. (" << failed << " failed out of " << tests << ")" << std::endl;
+        std::cout << vt.black;
+    }
+
+    return failed;
 }
 
 TestData<std::string> debug_hex_encode_tests = {
@@ -251,6 +299,23 @@ TestData<std::string> base64_encode_tests = {
     {"", ""}
 };
 
+TestData<std::string> json_tests = {
+    {"{}", "{}"},
+    {"[]", "[]"},
+    {"null", "null"},
+    {"0", "0"},
+    {"-123", "-123"},
+    {"7655555", "7655555"},
+    {"76555556666666666", "76555556666666666"},
+    {"-76555556666666666021", "-76555556666666666021"},
+    {"true", "true"},
+    {"false", "false"},
+    {"0.5", "0.5"},
+    {"5.0e-1", "0.5"},
+    {"{\"key\":\"value\",\"key2\":null}", "{\"key\":\"value\",\"key2\":null}"},
+    {"[null,true,false,-5]", "[null,true,false,-5]"}
+};
+
 int main()
 {
     vt100 vt;
@@ -259,11 +324,14 @@ int main()
     ReverseTest("base64_decode", base64_encode_tests, base64::decode);
     Test("debug_hex_encode", debug_hex_encode_tests, hex::debug_encode);
     Test("hex_encode", hex_encode_tests, hex::encode);
+#if 0
     TestRangeAndShowProgress("float_from_ieee_754", UINT32_MAX, core::float_cast_from_ieee_754,
-                             core::float_from_ieee_754, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
+                             core::float_from_ieee_754, true, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
     TestRangeAndShowProgress("float_to_ieee_754", UINT32_MAX, [](const auto &f){return f;},
-                             [](const auto &f){return core::float_to_ieee_754(core::float_cast_from_ieee_754(f));},
-                             [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
+                             [](const auto &f){return core::float_to_ieee_754(core::float_cast_from_ieee_754(f));}, true,
+                             [](const auto &f, const auto &s){return f != s && !isnan(core::float_from_ieee_754(f)) && !isnan(core::float_from_ieee_754(s));});
+#endif
+    Test("JSON", json_tests, [](const auto &test){return json::to_json(json::from_json(test));}, false);
     std::cout << vt.attr_reset;
     return 0;
 }

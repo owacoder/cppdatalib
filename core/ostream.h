@@ -342,11 +342,7 @@ namespace cppdatalib
             {}
 
         protected:
-            void write_(const char *c, size_t n)
-            {
-                while (n-- > 0)
-                    stream_->sputc(*c++);
-            }
+            void write_(const char *c, size_t n) {stream_->sputn(c, n);}
             void putc_(char c) {stream_->sputc(c);}
             void flush_() {stream_->pubsync();}
         };

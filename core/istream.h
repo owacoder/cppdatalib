@@ -327,14 +327,14 @@ namespace cppdatalib
                             if (negative)
                             {
                                 if (std::numeric_limits<T>::min() / 10 + (c - '0') > i)
-                                    out_of_range = true, i = std::numeric_limits<T>::min();
+                                    out_of_range = true, i = std::numeric_limits<T>::min(), flags_ |= fail_bit;
                                 else
                                     i = (i * 10) - (c - '0');
                             }
                             else
                             {
                                 if (std::numeric_limits<T>::max() / 10 - (c - '0') < i)
-                                    out_of_range = true, i = std::numeric_limits<T>::max();
+                                    out_of_range = true, i = std::numeric_limits<T>::max(), flags_ |= fail_bit;
                                 else
                                     i = (i * 10) + (c - '0');
                             }
@@ -343,7 +343,7 @@ namespace cppdatalib
                     }
 
                     if (c == EOF)
-                        flags_ = eof_bit;
+                        flags_ |= eof_bit;
                     else
                         ungetc_();
 
@@ -396,7 +396,7 @@ namespace cppdatalib
                         if (!out_of_range)
                         {
                             if (std::numeric_limits<T>::max() / 10 - (c - '0') < i)
-                                out_of_range = true, i = std::numeric_limits<T>::max();
+                                out_of_range = true, i = std::numeric_limits<T>::max(), flags_ |= fail_bit;
                             else
                                 i = (i * 10) + (c - '0');
                         }
@@ -404,7 +404,7 @@ namespace cppdatalib
                     }
 
                     if (c == EOF)
-                        flags_ = eof_bit;
+                        flags_ |= eof_bit;
                     else
                         ungetc_();
 
