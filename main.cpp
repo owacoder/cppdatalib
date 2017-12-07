@@ -311,9 +311,22 @@ TestData<std::string> json_tests = {
     {"true", "true"},
     {"false", "false"},
     {"0.5", "0.5"},
-    {"5.0e-1", "0.5"},
+    {"-5.0e-1", "-0.5"},
     {"{\"key\":\"value\",\"key2\":null}", "{\"key\":\"value\",\"key2\":null}"},
-    {"[null,true,false,-5,\"\"]", "[null,true,false,-5,\"\"]"}
+    {"[null,true,false,-5,\"\"]", "[null,true,false,-5,\"\"]"},
+    {"\"Hello World!\"", "\"Hello World!\""}
+};
+
+TestData<std::string> bencode_tests = {
+    {"de", "de"},
+    {"le", "le"},
+    {"i0e", "i0e"},
+    {"i-123e", "i-123e"},
+    {"i7655555e", "i7655555e"},
+    {"i76555556666666666e", "i76555556666666666e"},
+    {"17:76555556666666666", "17:76555556666666666"},
+    {"d3:key5:value4:key2i0ee", "d3:key5:value4:key2i0ee"},
+    {"li0e4:true5:falsei-5e0:e", "li0e4:true5:falsei-5e0:e"}
 };
 
 int main()
@@ -332,6 +345,7 @@ int main()
                              [](const auto &f, const auto &s){return f != s && !isnan(core::float_from_ieee_754(f)) && !isnan(core::float_from_ieee_754(s));});
 #endif
     Test("JSON", json_tests, [](const auto &test){return json::to_json(json::from_json(test));}, false);
+    Test("Bencode", bencode_tests, [](const auto &test){return bencode::to_bencode(bencode::from_bencode(test));}, false);
     std::cout << vt.attr_reset;
     return 0;
 }
