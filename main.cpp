@@ -313,7 +313,7 @@ TestData<std::string> json_tests = {
     {"0.5", "0.5"},
     {"5.0e-1", "0.5"},
     {"{\"key\":\"value\",\"key2\":null}", "{\"key\":\"value\",\"key2\":null}"},
-    {"[null,true,false,-5]", "[null,true,false,-5]"}
+    {"[null,true,false,-5,\"\"]", "[null,true,false,-5,\"\"]"}
 };
 
 int main()
