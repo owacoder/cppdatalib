@@ -113,12 +113,12 @@ namespace cppdatalib
             {
                 struct container_data
                 {
-                    container_data(subtype container_type, uint32_t remaining_size)
-                        : container_type(container_type)
+                    container_data(core::subtype_t sub_type, uint32_t remaining_size)
+                        : sub_type(sub_type)
                         , remaining_size(remaining_size)
                     {}
 
-                    subtype container_type;
+                    core::subtype_t sub_type;
                     uint32_t remaining_size;
                 };
 
@@ -134,9 +134,9 @@ namespace cppdatalib
                     while (containers.size() > 0 && !writer.container_key_was_just_parsed() && containers.top().remaining_size == 0)
                     {
                         if (writer.current_container() == core::array)
-                            writer.end_array(core::value(core::array_t(), containers.top().container_type));
+                            writer.end_array(core::value(core::array_t(), containers.top().sub_type));
                         else if (writer.current_container() == core::object)
-                            writer.end_object(core::value(core::object_t(), containers.top().container_type));
+                            writer.end_object(core::value(core::object_t(), containers.top().sub_type));
                         containers.pop();
                     }
 
@@ -148,7 +148,7 @@ namespace cppdatalib
                         if (writer.current_container() == core::object && !writer.container_key_was_just_parsed())
                         {
                             // Parse keys here
-                            if (containers.top().container_type == map) // Integer keys
+                            if (containers.top().sub_type == core::map) // Integer keys
                             {
                                 // Read 4-byte signed integer key
                                 integer = 0;
@@ -208,7 +208,7 @@ namespace cppdatalib
                                 case null: writer.write(core::null_t()); break;
                                 case yes: writer.write(true); break;
                                 case no: writer.write(false); break;
-                                default: writer.write(core::value(core::null_t(), element_subtype)); break;
+                                default: writer.write(core::value(core::null_t(), core::user + element_subtype)); break;
                             }
                             break;
                         case byte: // Int8, UInt8
@@ -227,7 +227,7 @@ namespace cppdatalib
                                     break;
                                 }
                                 case uint8: writer.write(core::uint_t(chr)); break;
-                                default: writer.write(core::value(core::uint_t(chr), element_subtype)); break;
+                                default: writer.write(core::value(core::uint_t(chr), core::user + element_subtype)); break;
                             }
                             break;
                         case word: // Int16, UInt16
@@ -251,7 +251,7 @@ namespace cppdatalib
                                     break;
                                 }
                                 case uint16: writer.write(integer); break;
-                                default: writer.write(core::value(integer, element_subtype)); break;
+                                default: writer.write(core::value(integer, core::user + element_subtype)); break;
                             }
                             break;
                         case dword: // Int32, UInt32
@@ -276,7 +276,7 @@ namespace cppdatalib
                                 }
                                 case uint32: writer.write(integer); break;
                                 case single_float: writer.write(static_cast<core::real_t>(core::float_from_ieee_754(integer))); break;
-                                default: writer.write(core::value(integer, element_subtype)); break;
+                                default: writer.write(core::value(integer, core::user + element_subtype)); break;
                             }
                             break;
                         case qword: // Int64, UInt64
@@ -301,7 +301,7 @@ namespace cppdatalib
                                 }
                                 case uint64: writer.write(integer); break;
                                 case double_float: writer.write(core::double_from_ieee_754(integer)); break;
-                                default: writer.write(core::value(integer, element_subtype)); break;
+                                default: writer.write(core::value(integer, core::user + element_subtype)); break;
                             }
                             break;
                         case string:
@@ -316,13 +316,13 @@ namespace cppdatalib
                                 case date: string_type.set_subtype(core::date); break;
                                 case time: string_type.set_subtype(core::time); break;
                                 case decimal_str: string_type.set_subtype(core::bignum); break;
-                                default: string_type.set_subtype(element_subtype); break;
+                                default: string_type.set_subtype(core::user + element_subtype); break;
                             }
 
                             writer.begin_string(string_type, size);
                             while (size > 0)
                             {
-                                core::int_t buffer_size = std::min(uint32_t(core::buffer_size), size);
+                                core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
                                 input_stream.read(buffer.get(), buffer_size);
                                 if (input_stream.fail())
                                     throw core::error("Binn - unexpected end of string");
@@ -347,13 +347,13 @@ namespace cppdatalib
                             switch (element_subtype)
                             {
                                 case blob_data: string_type.set_subtype(core::blob); break;
-                                default: string_type.set_subtype(element_subtype); break;
+                                default: string_type.set_subtype(core::user + element_subtype); break;
                             }
 
                             writer.begin_string(string_type, size);
                             while (size > 0)
                             {
-                                core::int_t buffer_size = std::min(uint32_t(core::buffer_size), size);
+                                core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
                                 input_stream.read(buffer.get(), buffer_size);
                                 if (input_stream.fail())
                                     throw core::error("Binn - unexpected end of string");
@@ -369,6 +369,7 @@ namespace cppdatalib
                         }
                         case container:
                         {
+                            core::subtype_t sub_type = core::normal;
                             read_size(input_stream); // Read size and discard
                             uint32_t count = read_size(input_stream); // Then read element count
 
@@ -376,17 +377,17 @@ namespace cppdatalib
 
                             switch (element_subtype)
                             {
-                                case map: container.set_object(core::object_t(), core::map); break;
+                                case map: container.set_object(core::object_t(), sub_type = core::map); break;
                                 case object: container.set_object(core::object_t()); break;
                                 case list: container.set_array(core::array_t()); break;
-                                default: container.set_array(core::array_t(), element_subtype); break;
+                                default: container.set_array(core::array_t(), sub_type = core::user + element_subtype); break;
                             }
 
                             if (container.is_object())
                                 writer.begin_object(container, count);
                             else
                                 writer.begin_array(container, count);
-                            containers.push(container_data(static_cast<subtype>(element_subtype), count));
+                            containers.push(container_data(sub_type, count));
                             break;
                         }
                     }
@@ -395,7 +396,7 @@ namespace cppdatalib
                 }
 
                 if (!written)
-                    throw core::error("Bencode - expected value");
+                    throw core::error("Binn - expected value");
 
                 return *this;
             }
@@ -686,20 +687,20 @@ namespace cppdatalib
                     }
 
                     if (v.get_int() >= INT8_MIN && v.get_int() <= INT8_MAX)
-                        write_type(output_stream, byte, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): int8)
+                        write_type(output_stream, byte, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int8)
                                 .put(out);
                     else if (v.get_int() >= INT16_MIN && v.get_int() <= INT16_MAX)
-                        write_type(output_stream, word, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): int16)
+                        write_type(output_stream, word, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int16)
                                 .put(out >> 8)
                                 .put(out & 0xff);
                     else if (v.get_int() >= INT32_MIN && v.get_int() <= INT32_MAX)
-                        write_type(output_stream, dword, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): int32)
+                        write_type(output_stream, dword, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int32)
                                 .put(out >> 24)
                                 .put((out >> 16) & 0xff)
                                 .put((out >> 8) & 0xff)
                                 .put(out & 0xff);
                     else
-                        write_type(output_stream, qword, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): int64)
+                        write_type(output_stream, qword, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int64)
                                 .put(out >> 56)
                                 .put((out >> 48) & 0xff)
                                 .put((out >> 40) & 0xff)
@@ -714,20 +715,20 @@ namespace cppdatalib
                     uint64_t out = v.get_uint();
 
                     if (v.get_uint() <= UINT8_MAX)
-                        write_type(output_stream, byte, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): uint8)
+                        write_type(output_stream, byte, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint8)
                                 .put(out);
                     else if (v.get_uint() <= UINT16_MAX)
-                        write_type(output_stream, word, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): uint16)
+                        write_type(output_stream, word, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint16)
                                 .put(out >> 8)
                                 .put(out & 0xff);
                     else if (v.get_uint() <= UINT32_MAX)
-                        write_type(output_stream, dword, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): uint32)
+                        write_type(output_stream, dword, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint32)
                                 .put(out >> 24)
                                 .put((out >> 16) & 0xff)
                                 .put((out >> 8) & 0xff)
                                 .put(out & 0xff);
                     else
-                        write_type(output_stream, qword, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): uint64)
+                        write_type(output_stream, qword, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint64)
                                 .put(out >> 56)
                                 .put((out >> 48) & 0xff)
                                 .put((out >> 40) & 0xff)
@@ -739,8 +740,8 @@ namespace cppdatalib
                 }
             }
 
-            void null_(const core::value &v) {write_type(output_stream, nobytes, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): null);}
-            void bool_(const core::value &v) {write_type(output_stream, nobytes, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): v.get_bool()? yes: no);}
+            void null_(const core::value &v) {write_type(output_stream, nobytes, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) null);}
+            void bool_(const core::value &v) {write_type(output_stream, nobytes, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) v.get_bool()? yes: no);}
 
             /* Integers and UIntegers are handled in begin_scalar_() */
 
@@ -794,7 +795,7 @@ namespace cppdatalib
                     case core::bignum: write_type(output_stream, string, decimal_str); break;
                     case core::blob:
                     case core::clob: write_type(output_stream, blob, blob_data); break;
-                    default: write_type(output_stream, string, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): text); break;
+                    default: write_type(output_stream, string, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) text); break;
                 }
 
                 write_size(output_stream, size);
@@ -809,7 +810,7 @@ namespace cppdatalib
                 else if (v.size() != static_cast<size_t>(size))
                     throw core::error("Binn - entire 'array' value must be buffered before writing");
 
-                write_type(output_stream, container, v.get_subtype() >= core::user? static_cast<subtype>(v.get_subtype()): list);
+                write_type(output_stream, container, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) list);
                 write_size(output_stream, get_size(v));
                 write_size(output_stream, size);
             }

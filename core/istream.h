@@ -608,6 +608,208 @@ namespace cppdatalib
         typedef std::istream istream;
         typedef std::istringstream istringstream;
 #endif
+
+        template<typename T>
+        core::istream &read_uint8(core::istream &strm, T &val)
+        {
+            int chr = strm.get();
+            if (chr != EOF)
+                val = chr;
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_int8(core::istream &strm, T &val)
+        {
+            uint8_t chr;
+            if (read_uint8(strm, chr))
+            {
+                if (chr < 0x80)
+                    val = chr;
+                else
+                    val = -T((~unsigned(chr) + 1) & 0xff);
+            }
+
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_uint16_be(core::istream &strm, T &val)
+        {
+            char buf[2];
+            strm.read(buf, 2);
+            if (strm)
+                val = (uint16_t(uint8_t(buf[0])) << 8) | uint8_t(buf[1]);
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_uint16_le(core::istream &strm, T &val)
+        {
+            char buf[2];
+            strm.read(buf, 2);
+            if (strm)
+                val = (uint16_t(uint8_t(buf[1])) << 8) | uint8_t(buf[0]);
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_int16_be(core::istream &strm, T &val)
+        {
+            uint16_t temp;
+            if (read_uint16_be(strm, temp))
+            {
+                if (temp < 0x8000)
+                    val = temp;
+                else if (temp == 0x8000)
+                    val = INT16_MIN;
+                else
+                    val = -T((~unsigned(temp) + 1) & 0xffff);
+            }
+
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_int16_le(core::istream &strm, T &val)
+        {
+            uint16_t temp;
+            if (read_uint16_le(strm, temp))
+            {
+                if (temp < 0x8000)
+                    val = temp;
+                else if (temp == 0x8000)
+                    val = INT16_MIN;
+                else
+                    val = -T((~unsigned(temp) + 1) & 0xffff);
+            }
+
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_uint32_be(core::istream &strm, T &val)
+        {
+            char buf[4];
+            strm.read(buf, 4);
+            if (strm)
+            {
+                val = 0;
+                for (size_t i = 0; i < 4; ++i)
+                    val = (val << 8) | uint8_t(buf[i]);
+            }
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_uint32_le(core::istream &strm, T &val)
+        {
+            char buf[4];
+            strm.read(buf, 4);
+            if (strm)
+            {
+                val = 0;
+                for (size_t i = 0; i < 4; ++i)
+                    val |= uint32_t(uint8_t(buf[i])) << 8*i;
+            }
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_int32_be(core::istream &strm, T &val)
+        {
+            uint32_t temp;
+            if (read_uint32_be(strm, temp))
+            {
+                if (temp < 0x80000000)
+                    val = temp;
+                else if (temp == 0x80000000)
+                    val = INT32_MIN;
+                else
+                    val = -T((~(unsigned long) temp + 1) & 0xffffffff);
+            }
+
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_int32_le(core::istream &strm, T &val)
+        {
+            uint32_t temp;
+            if (read_uint32_le(strm, temp))
+            {
+                if (temp < 0x80000000)
+                    val = temp;
+                else if (temp == 0x80000000)
+                    val = INT32_MIN;
+                else
+                    val = -T((~(unsigned long) temp + 1) & 0xffffffff);
+            }
+
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_uint64_be(core::istream &strm, T &val)
+        {
+            char buf[8];
+            strm.read(buf, 8);
+            if (strm)
+            {
+                val = 0;
+                for (size_t i = 0; i < 8; ++i)
+                    val = (val << 8) | uint8_t(buf[i]);
+            }
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_uint64_le(core::istream &strm, T &val)
+        {
+            char buf[8];
+            strm.read(buf, 8);
+            if (strm)
+            {
+                val = 0;
+                for (size_t i = 0; i < 8; ++i)
+                    val |= uint64_t(uint8_t(buf[i])) << 8*i;
+            }
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_int64_be(core::istream &strm, T &val)
+        {
+            uint64_t temp;
+            if (read_uint64_be(strm, temp))
+            {
+                if (temp < 0x8000000000000000)
+                    val = temp;
+                else if (temp == 0x8000000000000000)
+                    val = INT64_MIN;
+                else
+                    val = -T((~(unsigned long long) temp + 1) & 0xffffffffffffffff);
+            }
+
+            return strm;
+        }
+
+        template<typename T>
+        core::istream &read_int64_le(core::istream &strm, T &val)
+        {
+            uint64_t temp;
+            if (read_uint64_le(strm, temp))
+            {
+                if (temp < 0x8000000000000000)
+                    val = temp;
+                else if (temp == 0x8000000000000000)
+                    val = INT64_MIN;
+                else
+                    val = -T((~(unsigned long long) temp + 1) & 0xffffffffffffffff);
+            }
+
+            return strm;
+        }
     }
 }
 

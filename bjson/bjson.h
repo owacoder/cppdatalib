@@ -17,31 +17,38 @@ namespace cppdatalib
             protected:
                 core::ostream &write_size(core::ostream &stream, int initial_type, uint64_t size)
                 {
-                    if (size >= UINT32_MAX)
-                        stream.put(initial_type + 3)
-                                .put(size & 0xff)
-                                .put((size >> 8) & 0xff)
-                                .put((size >> 16) & 0xff)
-                                .put((size >> 24) & 0xff)
-                                .put((size >> 32) & 0xff)
-                                .put((size >> 40) & 0xff)
-                                .put((size >> 48) & 0xff)
-                                .put(size >> 56);
-                    else if (size >= UINT16_MAX)
-                        stream.put(initial_type + 2)
-                                .put(size & 0xff)
-                                .put((size >> 8) & 0xff)
-                                .put((size >> 16) & 0xff)
-                                .put(size >> 24);
-                    else if (size >= UINT8_MAX)
-                        stream.put(initial_type + 1)
-                                .put(size & 0xff)
-                                .put(size >> 8);
-                    else
-                        stream.put(initial_type)
-                                .put(size);
+                    char buffer[9]; // 8 + 1 byte type specifier
+                    size_t buffer_size = 0;
 
-                    return stream;
+                    if (size >= UINT32_MAX)
+                    {
+                        buffer[0] = initial_type + 3;
+                        for (size_t i = 0; i < 8; ++i)
+                            buffer[i+1] = (size >> (8*i)) & 0xff;
+                        buffer_size = 9;
+                    }
+                    else if (size >= UINT16_MAX)
+                    {
+                        buffer[0] = initial_type + 2;
+                        for (size_t i = 0; i < 4; ++i)
+                            buffer[i+1] = (size >> (8*i)) & 0xff;
+                        buffer_size = 5;
+                    }
+                    else if (size >= UINT8_MAX)
+                    {
+                        buffer[0] = initial_type + 1;
+                        buffer[1] = size >> 8;
+                        buffer[2] = size & 0xff;
+                        buffer_size = 3;
+                    }
+                    else
+                    {
+                        buffer[0] = initial_type;
+                        buffer[1] = size;
+                        buffer_size = 2;
+                    }
+
+                    return stream.write(buffer, buffer_size);
                 }
 
                 size_t get_size(const core::value &v)

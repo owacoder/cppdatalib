@@ -16,11 +16,11 @@ Supported formats include
    - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
    - [CSV](https://tools.ietf.org/html/rfc4180)
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
-   - MySQL (read-only)
+   - [MessagePack](https://msgpack.org/)
+   - MySQL (database/table retrieval and writing)
    - XML property lists (write-only)
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
-   - [MessagePack](https://msgpack.org/) (write-only)
    - [BJSON](http://bjson.org/) (write-only)
    - [Netstrings](https://en.wikipedia.org/wiki/Netstring) (write-only)
 
@@ -216,7 +216,7 @@ Below is a list of compile-time flags supported by cppdatalib (the flags don't n
    - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `long`
    - `CPPDATALIB_ENABLE_MARIADB` - Enables inclusion of the MySQL interface library. If defined, the MySQL headers must be available in the include path
    - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but if enabled, can result in better performance. Use at your own risk
-   - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to a trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
+   - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
    - `CPPDATALIB_DISABLE_FAST_IO_GCOUNT` - Disables calculation of `gcount()` in the fast input classes. This removes the `gcount()` function altogether. This flag only has an effect if `CPPDATALIB_ENABLE_FAST_INPUT` is defined
 
 Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.

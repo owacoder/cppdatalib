@@ -33,6 +33,282 @@ namespace cppdatalib
 {
     namespace message_pack
     {
+        class parser : public core::stream_parser
+        {
+            uint32_t read_size(core::istream &input)
+            {
+                uint32_t size = 0;
+                int chr = input.get();
+                if (chr == EOF)
+                    throw core::error("Binn - expected size specifier");
+
+                size = chr;
+                if (chr >> 7) // If topmost bit is set, the size is specified in 4 bytes, not 1. The topmost bit is not included in the size
+                {
+                    size &= 0x7f;
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        chr = input.get();
+                        if (chr == EOF)
+                            throw core::error("Binn - expected size specifier");
+                        size <<= 8;
+                        size |= chr;
+                    }
+                }
+
+                return size;
+            }
+
+        public:
+            parser(core::istream &input) : core::stream_parser(input) {}
+
+            bool provides_prefix_string_size() const {return true;}
+            bool provides_prefix_object_size() const {return true;}
+            bool provides_prefix_array_size() const {return true;}
+
+            core::stream_input &convert(core::stream_handler &writer)
+            {
+                struct container_data
+                {
+                    container_data(core::subtype_t sub_type, uint32_t remaining_size)
+                        : sub_type(sub_type)
+                        , remaining_size(remaining_size)
+                    {}
+
+                    core::subtype_t sub_type;
+                    uint32_t remaining_size;
+                };
+
+                std::stack<container_data, std::vector<container_data>> containers;
+
+                std::unique_ptr<char []> buffer(new char [core::buffer_size]);
+                bool written = false;
+                int chr;
+
+                while (!written || containers.size() > 0)
+                {
+                    while (containers.size() > 0 && !writer.container_key_was_just_parsed() && containers.top().remaining_size == 0)
+                    {
+                        if (writer.current_container() == core::array)
+                            writer.end_array(core::value(core::array_t(), containers.top().sub_type));
+                        else if (writer.current_container() == core::object)
+                            writer.end_object(core::value(core::object_t(), containers.top().sub_type));
+                        containers.pop();
+                    }
+
+                    if (containers.size() > 0)
+                    {
+                        if (containers.top().remaining_size > 0 &&
+                                (writer.current_container() != core::object || writer.container_key_was_just_parsed()))
+                            --containers.top().remaining_size;
+                    }
+                    else if (written)
+                        break;
+
+                    chr = input_stream.get();
+                    if (chr == EOF)
+                        throw core::error("MessagePack - expected type specifier");
+
+                    if (chr < 0x80) // Positive fixint
+                        writer.write(core::int_t(chr));
+                    else if (chr < 0x90) // Fixmap
+                    {
+                        chr &= 0xf;
+                        writer.begin_object(core::object_t(), chr);
+                        containers.push(container_data(core::normal, chr));
+                    }
+                    else if (chr < 0xa0) // Fixarray
+                    {
+                        chr &= 0xf;
+                        writer.begin_array(core::array_t(), chr);
+                        containers.push(container_data(core::normal, chr));
+                    }
+                    else if (chr < 0xc0) // Fixstr
+                    {
+                        char buf[32]; // Maximum of 32-byte string
+                        chr &= 0x1f;
+
+                        input_stream.read(buf, chr);
+                        if (input_stream.fail())
+                            throw core::error("MessagePack - unexpected end of string");
+
+                        writer.write(core::string_t(buf, chr));
+                    }
+                    else if (chr >= 0xe0) // Negative fixint
+                        writer.write(-core::int_t((~unsigned(chr) + 1) & 0xff));
+                    else switch (chr)
+                    {
+                        // Null
+                        case 0xc0: writer.write(core::null_t()); break;
+                        // Boolean false
+                        case 0xc2: writer.write(false); break;
+                        // Boolean true
+                        case 0xc3: writer.write(true); break;
+                        // Binary
+                        case 0xc4:
+                        case 0xc5:
+                        case 0xc6:
+                        {
+                            uint32_t size;
+                            core::value string_type = "";
+
+                            if ((chr == 0xc4 && !core::read_uint8(input_stream, size)) ||
+                                (chr == 0xc5 && !core::read_uint16_be(input_stream, size)) ||
+                                (chr == 0xc6 && !core::read_uint32_be(input_stream, size)))
+                                throw core::error("MessagePack - expected 'binary data' length");
+
+                            string_type.set_subtype(core::blob);
+                            writer.begin_string(string_type, size);
+                            while (size > 0)
+                            {
+                                core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
+                                input_stream.read(buffer.get(), buffer_size);
+                                if (input_stream.fail())
+                                    throw core::error("MessagePack - unexpected end of string");
+                                // Set string in string_type to preserve the subtype
+                                string_type.set_string(core::string_t(buffer.get(), buffer_size));
+                                writer.append_to_string(string_type);
+                                size -= buffer_size;
+                            }
+                            string_type.set_string("");
+                            writer.end_string(string_type);
+                            break;
+                        }
+                        // Extensions
+                        case 0xc7:
+                        case 0xc8:
+                        case 0xc9:
+                        {
+                            // TODO
+                            break;
+                        }
+                        // Single-precision floating point
+                        case 0xca:
+                        {
+                            uint32_t flt;
+                            if (!core::read_uint32_be(input_stream, flt))
+                                throw core::error("MessagePack - expected 'float' value");
+                            writer.write(core::float_from_ieee_754(flt));
+                            break;
+                        }
+                        // Double-precision floating point
+                        case 0xcb:
+                        {
+                            uint64_t flt;
+                            if (!core::read_uint64_be(input_stream, flt))
+                                throw core::error("MessagePack - expected 'float' value");
+                            writer.write(core::double_from_ieee_754(flt));
+                            break;
+                        }
+                        // Unsigned integers
+                        case 0xcc:
+                        case 0xcd:
+                        case 0xce:
+                        case 0xcf:
+                        {
+                            core::uint_t val;
+                            if ((chr == 0xcc && !core::read_uint8(input_stream, val)) ||
+                                (chr == 0xcd && !core::read_uint16_be(input_stream, val)) ||
+                                (chr == 0xce && !core::read_uint32_be(input_stream, val)) ||
+                                (chr == 0xcf && !core::read_uint64_be(input_stream, val)))
+                                throw core::error("MessagePack - expected 'uinteger'");
+                            writer.write(val);
+                            break;
+                        }
+                        // Signed integers
+                        case 0xd0:
+                        case 0xd1:
+                        case 0xd2:
+                        case 0xd3:
+                        {
+                            core::int_t val;
+                            if ((chr == 0xd0 && !core::read_int8(input_stream, val)) ||
+                                (chr == 0xd1 && !core::read_int16_be(input_stream, val)) ||
+                                (chr == 0xd2 && !core::read_int32_be(input_stream, val)) ||
+                                (chr == 0xd3 && !core::read_int64_be(input_stream, val)))
+                                throw core::error("MessagePack - expected 'integer'");
+                            writer.write(val);
+                            break;
+                        }
+                        // Fixext
+                        case 0xd4:
+                        case 0xd5:
+                        case 0xd6:
+                        case 0xd7:
+                        case 0xd8:
+                        {
+                            // TODO
+                            break;
+                        }
+                        // UTF-8 Strings
+                        case 0xd9:
+                        case 0xda:
+                        case 0xdb:
+                        {
+                            uint32_t size;
+                            core::value string_type = "";
+
+                            if ((chr == 0xd9 && !core::read_uint8(input_stream, size)) ||
+                                (chr == 0xda && !core::read_uint16_be(input_stream, size)) ||
+                                (chr == 0xdb && !core::read_uint32_be(input_stream, size)))
+                                throw core::error("MessagePack - expected 'binary data' length");
+
+                            writer.begin_string(string_type, size);
+                            while (size > 0)
+                            {
+                                core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
+                                input_stream.read(buffer.get(), buffer_size);
+                                if (input_stream.fail())
+                                    throw core::error("MessagePack - unexpected end of string");
+                                // Set string in string_type to preserve the subtype
+                                string_type.set_string(core::string_t(buffer.get(), buffer_size));
+                                writer.append_to_string(string_type);
+                                size -= buffer_size;
+                            }
+                            string_type.set_string("");
+                            writer.end_string(string_type);
+                            break;
+                        }
+                        // Arrays
+                        case 0xdc:
+                        case 0xdd:
+                        {
+                            uint32_t size;
+
+                            if ((chr == 0xdc && !core::read_uint16_be(input_stream, size)) ||
+                                (chr == 0xdd && !core::read_uint32_be(input_stream, size)))
+                                throw core::error("MessagePack - expected 'array' length");
+
+                            writer.begin_array(core::array_t(), size);
+                            containers.push(container_data(core::normal, size));
+                            break;
+                        }
+                        // Maps
+                        case 0xde:
+                        case 0xdf:
+                        {
+                            uint32_t size;
+
+                            if ((chr == 0xde && !core::read_uint16_be(input_stream, size)) ||
+                                (chr == 0xdf && !core::read_uint32_be(input_stream, size)))
+                                throw core::error("MessagePack - expected 'object' length");
+
+                            writer.begin_object(core::object_t(), size);
+                            containers.push(container_data(core::normal, size));
+                            break;
+                        }
+                    }
+
+                    written = true;
+                }
+
+                if (!written)
+                    throw core::error("MessagePack - expected value");
+
+                return *this;
+            }
+        };
+
         namespace impl
         {
             class stream_writer_base : public core::stream_handler, public core::stream_writer
@@ -269,6 +545,15 @@ namespace cppdatalib
                     throw core::error("MessagePack - 'object' value is too long");
             }
         };
+
+        inline core::value from_message_pack(const std::string &str)
+        {
+            core::istring_wrapper_stream stream(str);
+            parser p(stream);
+            core::value v;
+            p >> v;
+            return v;
+        }
 
         inline std::string to_message_pack(const core::value &v)
         {

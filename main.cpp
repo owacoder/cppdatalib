@@ -1,6 +1,6 @@
 #include <iostream>
 
-//#define CPPDATALIB_FAST_IO
+#define CPPDATALIB_FAST_IO
 #define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
 #include "cppdatalib.h"
@@ -121,8 +121,10 @@ bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, bool
     {
         if (compare(test.second, actual(test.first)))
         {
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << "Testing " << name << "... " << std::flush;
             std::cout << vt.red;
-            std::cout << "FAILED!\n";
+            std::cout << "Test " << (current+1) << " FAILED!\n";
             std::cout << "\tInput: " << test.first << "\n";
             std::cout << "\tExpected output: " << test.second << "\n";
             std::cout << "\tActual output: " << actual(test.first) << std::endl;
@@ -175,8 +177,10 @@ bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actua
     {
         if (compare(test.first, actual(test.second)))
         {
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << "Testing " << name << "... " << std::flush;
             std::cout << vt.red;
-            std::cout << "FAILED!\n";
+            std::cout << "Test " << (current+1) << " FAILED!\n";
             std::cout << "\tInput: " << test.second << "\n";
             std::cout << "\tExpected output: " << test.first << "\n";
             std::cout << "\tActual output: " << actual(test.second) << std::endl;
@@ -231,7 +235,8 @@ bool TestRange(const char *name, uintmax_t tests, ExpectedCode expected, ResultC
         {
             std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
             std::cout << "Testing " << name << "... " << std::flush;
-            std::cout << vt.red << "FAILED!\n";
+            std::cout << vt.red;
+            std::cout << "Test " << (test+1) << " FAILED!\n";
             std::cout << "\tInput: " << test << "\n";
             std::cout << "\tExpected output: " << expected(test) << "\n";
             std::cout << "\tActual output: " << actual(test) << std::endl;
@@ -320,6 +325,29 @@ TestData<std::string> bencode_tests = {
     {"li0e4:true5:falsei-5e0:e", "li0e4:true5:falsei-5e0:e"}
 };
 
+struct hex_string : public std::string
+{
+    using std::string::string;
+};
+
+std::ostream &operator<<(std::ostream &ostr, const hex_string &str)
+{
+    core::ostd_streambuf_wrapper wrap(ostr.rdbuf());
+    hex::debug_write(wrap, str);
+    return ostr;
+}
+
+TestData<hex_string> message_pack_tests = {
+    {"\x80", "\x80"},
+    {"\x90", "\x90"},
+    {"\x01", "\x01"},
+    {"\xff", "\xff"},
+    {"\xd0\x85", "\xd0\x85"},
+    {"\xcc\x85", "\xcc\x85"},
+    {"\x81\x01\x01", "\x81\x01\x01"},
+    {"\x92\x01\x01", "\x92\x01\x01"}
+};
+
 int main()
 {
     vt100 vt;
@@ -328,7 +356,7 @@ int main()
     ReverseTest("base64_decode", base64_encode_tests, base64::decode);
     Test("debug_hex_encode", debug_hex_encode_tests, hex::debug_encode);
     Test("hex_encode", hex_encode_tests, hex::encode);
-#if 1
+#if 0
     TestRange("float_from_ieee_754", UINT32_MAX, core::float_cast_from_ieee_754,
               core::float_from_ieee_754, true, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
     TestRange("float_to_ieee_754", UINT32_MAX, [](const auto &f){return f;},
@@ -337,6 +365,7 @@ int main()
 #endif
     Test("JSON", json_tests, [](const auto &test){return json::to_json(json::from_json(test));}, false);
     Test("Bencode", bencode_tests, [](const auto &test){return bencode::to_bencode(bencode::from_bencode(test));}, false);
+    Test("MessagePack", message_pack_tests, [](const auto &test){return hex_string(message_pack::to_message_pack(message_pack::from_message_pack(test)));}, false);
     std::cout << vt.attr_reset;
     return 0;
 }

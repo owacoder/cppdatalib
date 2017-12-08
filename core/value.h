@@ -61,28 +61,28 @@ namespace cppdatalib
 
         enum subtype
         {
-            normal,
+            normal = -1,
 
             // Integers
-            timestamp, // Number of seconds since the epoch, Jan 1, 1970
+            timestamp = -2, // Number of seconds since the epoch, Jan 1, 1970
 
             // Strings
-            blob, // A chunk of binary data
-            clob, // A chunk of binary data, that should be interpreted as text
-            symbol, // A symbolic atom, or identifier
-            datetime, // A datetime structure, with unspecified format
-            date, // A date structure, with unspecified format
-            time, // A time structure, with unspecified format
-            bignum, // A high-precision, decimal-encoded, number
+            blob = -3, // A chunk of binary data
+            clob = -4, // A chunk of binary data, that should be interpreted as text
+            symbol = -5, // A symbolic atom, or identifier
+            datetime = -6, // A datetime structure, with unspecified format
+            date = -7, // A date structure, with unspecified format
+            time = -8, // A time structure, with unspecified format
+            bignum = -9, // A high-precision, decimal-encoded, number
 
             // Arrays
-            regexp, // A regular expression definition containing two string elements, the first is the definition, the second is the options list
-            sexp, // Ordered collection of values, distinct from an array only by name
+            regexp = -10, // A regular expression definition containing two string elements, the first is the definition, the second is the options list
+            sexp = -11, // Ordered collection of values, distinct from an array only by name
 
             // Objects
-            map, // A normal object with integral keys
+            map = -12, // A normal object with integral keys
 
-            user = 16
+            user = 0
         };
 
         class value;
@@ -878,51 +878,51 @@ namespace cppdatalib
                 }
             }
 
-            value() : type_(null), subtype_(0) {}
-            value(null_t, subtype_t subtype = 0) : type_(null), subtype_(subtype) {}
-            value(bool_t v, subtype_t subtype = 0) : type_(boolean), subtype_(subtype), bool_(v) {}
-            value(int_t v, subtype_t subtype = 0) : type_(integer), subtype_(subtype), int_(v) {}
-            value(uint_t v, subtype_t subtype = 0) : type_(uinteger), subtype_(subtype), uint_(v) {}
-            value(real_t v, subtype_t subtype = 0) : type_(real), subtype_(subtype), real_(v) {}
-            value(cstring_t v, subtype_t subtype = 0) : type_(string), subtype_(subtype), str_(v) {}
-            value(const string_t &v, subtype_t subtype = 0) : type_(string), subtype_(subtype), str_(v) {}
-            value(string_t &&v, subtype_t subtype = 0) : type_(string), subtype_(subtype), str_(std::move(v)) {}
-            value(const array_t &v, subtype_t subtype = 0) : type_(array), subtype_(subtype), arr_(v) {}
-            value(array_t &&v, subtype_t subtype = 0) : type_(array), subtype_(subtype), arr_(std::move(v)) {}
-            value(const object_t &v, subtype_t subtype = 0) : type_(object), subtype_(subtype), obj_(v) {}
-            value(object_t &&v, subtype_t subtype = 0) : type_(object), subtype_(subtype), obj_(std::move(v)) {}
-            template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = 0) : type_(uinteger), subtype_(subtype), uint_(v) {}
-            template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = 0) : type_(integer), subtype_(subtype), int_(v) {}
+            value() : type_(null), subtype_(core::normal) {}
+            value(null_t, subtype_t subtype = core::normal) : type_(null), subtype_(subtype) {}
+            value(bool_t v, subtype_t subtype = core::normal) : type_(boolean), subtype_(subtype), bool_(v) {}
+            value(int_t v, subtype_t subtype = core::normal) : type_(integer), subtype_(subtype), int_(v) {}
+            value(uint_t v, subtype_t subtype = core::normal) : type_(uinteger), subtype_(subtype), uint_(v) {}
+            value(real_t v, subtype_t subtype = core::normal) : type_(real), subtype_(subtype), real_(v) {}
+            value(cstring_t v, subtype_t subtype = core::normal) : type_(string), subtype_(subtype), str_(v) {}
+            value(const string_t &v, subtype_t subtype = core::normal) : type_(string), subtype_(subtype), str_(v) {}
+            value(string_t &&v, subtype_t subtype = core::normal) : type_(string), subtype_(subtype), str_(std::move(v)) {}
+            value(const array_t &v, subtype_t subtype = core::normal) : type_(array), subtype_(subtype), arr_(v) {}
+            value(array_t &&v, subtype_t subtype = core::normal) : type_(array), subtype_(subtype), arr_(std::move(v)) {}
+            value(const object_t &v, subtype_t subtype = core::normal) : type_(object), subtype_(subtype), obj_(v) {}
+            value(object_t &&v, subtype_t subtype = core::normal) : type_(object), subtype_(subtype), obj_(std::move(v)) {}
+            template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+            value(T v, subtype_t subtype = core::normal) : type_(uinteger), subtype_(subtype), uint_(v) {}
+            template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+            value(T v, subtype_t subtype = core::normal) : type_(integer), subtype_(subtype), int_(v) {}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = 0) : type_(real), subtype_(subtype), real_(v) {}
+            value(T v, subtype_t subtype = core::normal) : type_(real), subtype_(subtype), real_(v) {}
             template<typename T>
-            value(std::initializer_list<T> v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            value(std::initializer_list<T> v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 for (auto const &element: v)
                     push_back(element);
             }
             template<typename T>
-            value(const std::vector<T> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            value(const std::vector<T> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 for (auto const &element: v)
                     push_back(element);
             }
             template<typename T, typename U>
-            value(const std::map<T, U> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            value(const std::map<T, U> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 for (auto const &element: v)
                     add_member(element.first, element.second);
             }
             template<typename T, typename U>
-            value(const std::multimap<T, U> &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            value(const std::multimap<T, U> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 for (auto const &element: v)
                     add_member(element.first, element.second);
             }
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
-            value(const T &v, subtype_t subtype = 0) : type_(null), subtype_(subtype)
+            value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 assign(*this, to_cppdatalib(v));
             }
