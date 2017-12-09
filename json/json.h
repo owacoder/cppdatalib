@@ -116,7 +116,7 @@ namespace cppdatalib
             core::stream_input &convert(core::stream_handler &writer)
             {
                 bool delimiter_required = false, get_char = true;
-                char chr;
+                int chr;
 
                 input_stream >> std::skipws;
                 while (get_char? (input_stream >> chr, input_stream.good()): true)
