@@ -932,6 +932,7 @@ namespace cppdatalib
                 if ((type_ == array && arr_.size() > 0) ||
                     (type_ == object && obj_.size() > 0))
                     traverse(traverse_node_null, traverse_node_mutable_clear);
+                deinit();
             }
 
             value(const value &other) : type_(null), subtype_(core::normal) {assign(*this, other);}
@@ -1365,8 +1366,6 @@ namespace cppdatalib
                 return *this;
             }
 
-            mutable type type_; // Mutable to provide editable traversal access to const destructor
-            subtype_t subtype_;
             union
             {
                 bool_t bool_;
@@ -1377,6 +1376,8 @@ namespace cppdatalib
                 mutable array_t arr_; // Mutable to provide editable traversal access to const destructor
                 mutable object_t obj_; // Mutable to provide editable traversal access to const destructor
             };
+            mutable type type_; // Mutable to provide editable traversal access to const destructor
+            subtype_t subtype_;
         };
 
         namespace impl
