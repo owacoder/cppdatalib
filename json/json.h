@@ -190,7 +190,6 @@ namespace cppdatalib
                                 bool is_float = false;
                                 std::string buffer = std::string(1, chr);
 
-                                // TODO: chr should be an int here
                                 int c;
                                 while (c = input_stream.get(), c != EOF && strchr("0123456789.eE+-", c))
                                 {
