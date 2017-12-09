@@ -286,10 +286,13 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - Numerical metadata is lost when converting to and from XML-XLS.
 
    - MessagePack supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - MessagePack extensions are not currently supported.
        - `string` subtypes `blob` and `clob` are supported.
        - MessagePack timestamps are not currently supported.
 
    - BJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
        - `string` subtypes `blob` and `clob` are supported.
        - Numerical metadata is lost when converting to and from BJSON.
 
