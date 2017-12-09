@@ -345,7 +345,7 @@ struct hex_string : public std::string
 
 std::ostream &operator<<(std::ostream &ostr, const hex_string &str)
 {
-    core::ostd_streambuf_wrapper wrap(ostr.rdbuf());
+    core::ostream_handle wrap(ostr);
     hex::debug_write(wrap, str);
     return ostr;
 }
@@ -360,6 +360,25 @@ TestData<hex_string> message_pack_tests = {
     {"\x81\x01\x01", "\x81\x01\x01"},
     {"\x92\x01\x01", "\x92\x01\x01"}
 };
+
+int readme_simple_test()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    core::value my_value;                   // Global cross-format value class
+
+    try {
+        json::parser p(std::cin);
+        json::stream_writer w(std::cout);
+        p >> my_value;                      // Read in to core::value from STDIN as JSON
+        w << my_value;                      // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
 
 int main()
 {

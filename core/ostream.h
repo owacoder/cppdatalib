@@ -14,8 +14,6 @@ namespace cppdatalib
 {
     namespace core
     {
-#define CPPDATALIB_ENABLE_FAST_IO
-
 #ifdef CPPDATALIB_ENABLE_FAST_IO
         // TODO: doesn't support any formatting whatsoever!
         class ostream
@@ -345,9 +343,41 @@ namespace cppdatalib
             void putc_(char c) {stream_->sputc(c);}
             void flush_() {stream_->pubsync();}
         };
+
+        class ostream_handle
+        {
+            std::ostream *std_;
+            std::shared_ptr<ostd_streambuf_wrapper> d_;
+
+            ostream *predef_;
+
+        public:
+            ostream_handle(core::ostream &stream) : std_(NULL), d_(NULL), predef_(&stream) {}
+            ostream_handle(std::ostream &stream) : std_(&stream), d_(NULL), predef_(NULL)
+            {
+                d_ = std::make_shared<ostd_streambuf_wrapper>(stream.rdbuf());
+            }
+
+            operator core::ostream &() {return predef_? *predef_: *d_;}
+
+            // std_stream() returns NULL if not created from a standard stream
+            std::ostream *std_stream() {return std_;}
+        };
 #else
-        typedef core::ostream ostream;
+        typedef std::ostream ostream;
         typedef std::ostringstream ostringstream;
+
+        class ostream_handle
+        {
+            ostream *d_;
+
+        public:
+            ostream_handle(core::ostream &stream) : d_(&stream) {}
+
+            operator core::ostream &() {return *d_;}
+
+            std::ostream *std_stream() {return d_;}
+        };
 #endif
     }
 }

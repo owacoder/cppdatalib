@@ -46,14 +46,15 @@ namespace cppdatalib
 
         class stream_writer
         {
-        protected:
-            core::ostream &output_stream;
+            core::ostream_handle handle;
 
         public:
-            stream_writer(core::ostream &stream) : output_stream(stream) {}
+            stream_writer(core::ostream_handle &output) : handle(output) {}
             virtual ~stream_writer() {}
 
-            core::ostream &stream() {return output_stream;}
+            core::ostream &stream() {return handle;}
+            // May return NULL! See core::ostream_handle::std_stream() for details.
+            std::ostream *std_stream() {return handle.std_stream();}
         };
 
         class stream_handler
@@ -477,14 +478,15 @@ namespace cppdatalib
 
         class stream_parser : public stream_input
         {
-        protected:
-            core::istream &input_stream;
+            core::istream_handle handle;
 
         public:
-            stream_parser(core::istream &input) : input_stream(input) {}
+            stream_parser(core::istream_handle &input) : handle(input) {}
             virtual ~stream_parser() {}
 
-            core::istream &stream() {return input_stream;}
+            core::istream &stream() {return handle;}
+            // May return NULL! See core::istream_handle::std_stream() for details.
+            std::istream *std_stream() {return handle.std_stream();}
         };
 
         // Convert directly from parser to serializer

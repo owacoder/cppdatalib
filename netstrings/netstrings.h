@@ -38,7 +38,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(core::ostream &output) : core::stream_writer(output) {}
+                stream_writer_base(core::ostream_handle &output) : core::stream_writer(output) {}
 
             protected:
                 size_t get_size(const core::value &v)
@@ -139,48 +139,48 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(core::ostream &output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
             bool requires_prefix_string_size() const {return true;}
             bool requires_array_buffering() const {return true;}
             bool requires_object_buffering() const {return true;}
 
         protected:
-            void null_(const core::value &) {output_stream.write("0:,", 3);}
-            void bool_(const core::value &v) {v.get_bool_unchecked()? output_stream.write("4:true,", 7): output_stream.write("5:false,", 8);}
+            void null_(const core::value &) {stream().write("0:,", 3);}
+            void bool_(const core::value &v) {v.get_bool_unchecked()? stream().write("4:true,", 7): stream().write("5:false,", 8);}
 
             void integer_(const core::value &v)
             {
-                core::ostringstream stream;
+                core::ostringstream strm;
 
-                stream << v.get_int_unchecked();
-                output_stream << stream.str().size();
-                output_stream.put(':');
-                output_stream << stream.str();
-                output_stream.put(',');
+                strm << v.get_int_unchecked();
+                stream() << strm.str().size();
+                stream().put(':');
+                stream() << strm.str();
+                stream().put(',');
             }
 
             void uinteger_(const core::value &v)
             {
-                core::ostringstream stream;
+                core::ostringstream strm;
 
-                stream << v.get_uint_unchecked();
-                output_stream << stream.str().size();
-                output_stream.put(':');
-                output_stream << stream.str();
-                output_stream.put(',');
+                strm << v.get_uint_unchecked();
+                stream() << strm.str().size();
+                stream().put(':');
+                stream() << strm.str();
+                stream().put(',');
             }
 
             void real_(const core::value &v)
             {
-                core::ostringstream stream;
+                core::ostringstream strm;
 
-                stream.precision(CPPDATALIB_REAL_DIG);
-                stream << v.get_real_unchecked();
-                output_stream << stream.str().size();
-                output_stream.put(':');
-                output_stream << stream.str();
-                output_stream.put(',');
+                strm.precision(CPPDATALIB_REAL_DIG);
+                strm << v.get_real_unchecked();
+                stream() << strm.str().size();
+                stream().put(':');
+                stream() << strm.str();
+                stream().put(',');
             }
 
             void begin_string_(const core::value &, core::int_t size, bool)
@@ -188,11 +188,11 @@ namespace cppdatalib
                 if (size == unknown_size)
                     throw core::error("Netstrings - 'string' value does not have size specified");
 
-                output_stream << size;
-                output_stream.put(':');
+                stream() << size;
+                stream().put(':');
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
-            void end_string_(const core::value &, bool) {output_stream.put(',');}
+            void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
+            void end_string_(const core::value &, bool) {stream().put(',');}
 
             void begin_array_(const core::value &v, core::int_t size, bool)
             {
@@ -201,10 +201,10 @@ namespace cppdatalib
                 else if (v.size() != static_cast<size_t>(size))
                     throw core::error("Netstrings - entire 'array' value must be buffered before writing");
 
-                output_stream << get_size(v);
-                output_stream.put(':');
+                stream() << get_size(v);
+                stream().put(':');
             }
-            void end_array_(const core::value &, bool) {output_stream.put(',');}
+            void end_array_(const core::value &, bool) {stream().put(',');}
 
             void begin_object_(const core::value &v, core::int_t size, bool)
             {
@@ -213,10 +213,10 @@ namespace cppdatalib
                 else if (v.size() != static_cast<size_t>(size))
                     throw core::error("Netstrings - entire 'object' value must be buffered before writing");
 
-                output_stream << get_size(v);
-                output_stream.put(':');
+                stream() << get_size(v);
+                stream().put(':');
             }
-            void end_object_(const core::value &, bool) {output_stream.put(',');}
+            void end_object_(const core::value &, bool) {stream().put(',');}
         };
 
         inline std::string to_netstrings(const core::value &v)

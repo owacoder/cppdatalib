@@ -44,11 +44,11 @@ namespace cppdatalib
                 char *write = buffer.get();
 
                 writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
-                while (c = input_stream.get(), c != '"' && c != EOF)
+                while (c = stream().get(), c != '"' && c != EOF)
                 {
                     if (c == '\\')
                     {
-                        c = input_stream.get();
+                        c = stream().get();
                         if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
 
                         switch (c)
@@ -62,7 +62,7 @@ namespace cppdatalib
                                 uint32_t code = 0;
                                 for (int i = 0; i < 4; ++i)
                                 {
-                                    c = input_stream.get();
+                                    c = stream().get();
                                     if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
                                     size_t pos = hex.find(toupper(c));
                                     if (pos == std::string::npos) throw core::error("Plain Text Property List - invalid character escape sequence");
@@ -82,10 +82,10 @@ namespace cppdatalib
                                 if (isdigit(c))
                                 {
                                     uint32_t code = 0;
-                                    input_stream.unget();
+                                    stream().unget();
                                     for (int i = 0; i < 3; ++i)
                                     {
-                                        c = input_stream.get();
+                                        c = stream().get();
                                         if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
                                         if (!isdigit(c) || c == '8' || c == '9') throw core::error("Plain Text Property List - invalid character escape sequence");
                                         code = (code << 3) | (c - '0');
@@ -124,11 +124,11 @@ namespace cppdatalib
                     writer.append_to_string(buffer.get());
                 }
                 writer.end_string(core::string_t());
-                return input_stream;
+                return stream();
             }
 
         public:
-            parser(core::istream &input)
+            parser(core::istream_handle input)
                 : core::stream_parser(input)
                 , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
             {}
@@ -139,7 +139,7 @@ namespace cppdatalib
                 bool delimiter_required = false;
                 char chr;
 
-                while (input_stream >> std::skipws >> chr, input_stream.good() && !input_stream.eof())
+                while (stream() >> std::skipws >> chr, stream().good() && !stream().eof())
                 {
                     if (writer.nesting_depth() == 0 && delimiter_required)
                         break;
@@ -150,8 +150,8 @@ namespace cppdatalib
                     switch (chr)
                     {
                         case '<':
-                            input_stream >> chr;
-                            if (!input_stream) throw core::error("Plain Text Property List - expected '*' after '<' in value");
+                            stream() >> chr;
+                            if (!stream()) throw core::error("Plain Text Property List - expected '*' after '<' in value");
 
                             if (chr != '*')
                             {
@@ -161,7 +161,7 @@ namespace cppdatalib
                                 unsigned int t = 0;
                                 bool have_first_nibble = false;
 
-                                while (input_stream && chr != '>')
+                                while (stream() && chr != '>')
                                 {
                                     t <<= 4;
                                     size_t p = hex.find(toupper(static_cast<unsigned char>(chr)));
@@ -172,7 +172,7 @@ namespace cppdatalib
                                         writer.append_to_string(core::string_t(1, t));
 
                                     have_first_nibble = !have_first_nibble;
-                                    input_stream >> chr;
+                                    stream() >> chr;
                                 }
 
                                 if (have_first_nibble) throw core::error("Plain Text Property List - unfinished byte in binary data");
@@ -181,14 +181,14 @@ namespace cppdatalib
                                 break;
                             }
 
-                            input_stream >> chr;
-                            if (!input_stream || !strchr("BIRD", chr))
+                            stream() >> chr;
+                            if (!stream() || !strchr("BIRD", chr))
                                 throw core::error("Plain Text Property List - expected type specifier after '<*' in value");
 
                             if (chr == 'B')
                             {
-                                input_stream >> chr;
-                                if (!input_stream || (chr != 'Y' && chr != 'N'))
+                                stream() >> chr;
+                                if (!stream() || (chr != 'Y' && chr != 'N'))
                                     throw core::error("Plain Text Property List - expected 'boolean' value after '<*B' in value");
 
                                 writer.write(chr == 'Y');
@@ -196,8 +196,8 @@ namespace cppdatalib
                             else if (chr == 'I')
                             {
                                 core::int_t i;
-                                input_stream >> i;
-                                if (!input_stream)
+                                stream() >> i;
+                                if (!stream())
                                     throw core::error("Plain Text Property List - expected 'integer' value after '<*I' in value");
 
                                 writer.write(i);
@@ -205,8 +205,8 @@ namespace cppdatalib
                             else if (chr == 'R')
                             {
                                 core::real_t r;
-                                input_stream >> r;
-                                if (!input_stream)
+                                stream() >> r;
+                                if (!stream())
                                     throw core::error("Plain Text Property List - expected 'real' value after '<*R' in value");
 
                                 writer.write(r);
@@ -216,17 +216,17 @@ namespace cppdatalib
                                 int c;
                                 const core::value value_type(core::string_t(), core::datetime);
                                 writer.begin_string(value_type, core::stream_handler::unknown_size);
-                                while (c = input_stream.get(), c != '>')
+                                while (c = stream().get(), c != '>')
                                 {
                                     if (c == EOF) throw core::error("Plain Text Property List - expected '>' after value");
 
                                     writer.append_to_string(core::string_t(1, c));
                                 }
-                                input_stream.unget();
+                                stream().unget();
                                 writer.end_string(value_type);
                             }
 
-                            input_stream >> chr;
+                            stream() >> chr;
                             if (chr != '>') throw core::error("Plain Text Property List - expected '>' after value");
                             break;
                         case '"':
@@ -236,8 +236,8 @@ namespace cppdatalib
                         case ',':
                             if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
                                 throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
-                            input_stream >> chr; input_stream.unget(); // Peek ahead
-                            if (!input_stream || chr == ',' || chr == ']' || chr == '}')
+                            stream() >> chr; stream().unget(); // Peek ahead
+                            if (!stream() || chr == ',' || chr == ']' || chr == '}')
                                 throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
                             delimiter_required = false;
                             break;
@@ -270,6 +270,8 @@ namespace cppdatalib
 
                 if (!delimiter_required)
                     throw core::error("Plain Text Property List - expected value");
+                else if (writer.nesting_depth())
+                    throw core::error("Plain Text Property List - unexpected end of stream");
 
                 return *this;
             }
@@ -280,7 +282,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
             protected:
                 core::ostream &write_string(core::ostream &stream, const std::string &str)
@@ -345,22 +347,22 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(core::ostream &output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
         protected:
-            void begin_() {output_stream.precision(CPPDATALIB_REAL_DIG);}
+            void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
                 if (container_key_was_just_parsed())
-                    output_stream.put('=');
+                    stream().put('=');
                 else if (current_container_size() > 0)
-                    output_stream.put(',');
+                    stream().put(',');
             }
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
-                    output_stream.put(',');
+                    stream().put(',');
 
                 if (!v.is_string())
                     throw core::error("Plain Text Property List - cannot write non-string key");
@@ -369,27 +371,27 @@ namespace cppdatalib
             void null_(const core::value &) {throw core::error("Plain Text Property List - 'null' value not allowed in output");}
             void bool_(const core::value &v)
             {
-                output_stream << "<*B";
-                output_stream.put(v.get_bool_unchecked()? 'Y': 'N');
-                output_stream.put('>');
+                stream() << "<*B";
+                stream().put(v.get_bool_unchecked()? 'Y': 'N');
+                stream().put('>');
             }
             void integer_(const core::value &v)
             {
-                output_stream << "<*I"
+                stream() << "<*I"
                               << v.get_int_unchecked();
-                output_stream.put('>');
+                stream().put('>');
             }
             void uinteger_(const core::value &v)
             {
-                output_stream << "<*I"
+                stream() << "<*I"
                               << v.get_uint_unchecked();
-                output_stream.put('>');
+                stream().put('>');
             }
             void real_(const core::value &v)
             {
-                output_stream << "<*R"
+                stream() << "<*R"
                               << v.get_real_unchecked();
-                output_stream.put('>');
+                stream().put('>');
             }
             void begin_string_(const core::value &v, core::int_t, bool)
             {
@@ -397,18 +399,18 @@ namespace cppdatalib
                 {
                     case core::date:
                     case core::time:
-                    case core::datetime: output_stream << "<*D"; break;
+                    case core::datetime: stream() << "<*D"; break;
                     case core::blob:
-                    case core::clob: output_stream.put('<'); break;
-                    default: output_stream.put('"'); break;
+                    case core::clob: stream().put('<'); break;
+                    default: stream().put('"'); break;
                 }
             }
             void string_data_(const core::value &v, bool)
             {
                 if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
-                    hex::write(output_stream, v.get_string_unchecked());
+                    hex::write(stream(), v.get_string_unchecked());
                 else
-                    write_string(output_stream, v.get_string_unchecked());
+                    write_string(stream(), v.get_string_unchecked());
             }
             void end_string_(const core::value &v, bool)
             {
@@ -418,16 +420,16 @@ namespace cppdatalib
                     case core::time:
                     case core::datetime:
                     case core::blob:
-                    case core::clob: output_stream.put('>'); break;
-                    default: output_stream.put('"'); break;
+                    case core::clob: stream().put('>'); break;
+                    default: stream().put('"'); break;
                 }
             }
 
-            void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('(');}
-            void end_array_(const core::value &, bool) {output_stream.put(')');}
+            void begin_array_(const core::value &, core::int_t, bool) {stream().put('(');}
+            void end_array_(const core::value &, bool) {stream().put(')');}
 
-            void begin_object_(const core::value &, core::int_t, bool) {output_stream.put('{');}
-            void end_object_(const core::value &, bool) {output_stream.put('}');}
+            void begin_object_(const core::value &, core::int_t, bool) {stream().put('{');}
+            void end_object_(const core::value &, bool) {stream().put('}');}
         };
 
         class pretty_stream_writer : public impl::stream_writer_base
@@ -444,13 +446,13 @@ namespace cppdatalib
 
                     memset(buffer.get(), ' ', size);
 
-                    output_stream.write(buffer.get(), size);
+                    stream().write(buffer.get(), size);
                     padding -= size;
                 }
             }
 
         public:
-            pretty_stream_writer(core::ostream &output, size_t indent_width)
+            pretty_stream_writer(core::ostream_handle output, size_t indent_width)
                 : impl::stream_writer_base(output)
                 , buffer(new char [core::buffer_size])
                 , indent_width(indent_width)
@@ -460,24 +462,24 @@ namespace cppdatalib
             size_t indent() {return indent_width;}
 
         protected:
-            void begin_() {current_indent = 0; output_stream.precision(CPPDATALIB_REAL_DIG);}
+            void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
                 if (container_key_was_just_parsed())
-                    output_stream << " = ";
+                    stream() << " = ";
                 else if (current_container_size() > 0)
-                    output_stream.put(',');
+                    stream().put(',');
 
                 if (current_container() == core::array)
-                    output_stream.put('\n'), output_padding(current_indent);
+                    stream().put('\n'), output_padding(current_indent);
             }
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
-                    output_stream.put(',');
+                    stream().put(',');
 
-                output_stream.put('\n'), output_padding(current_indent);
+                stream().put('\n'), output_padding(current_indent);
 
                 if (!v.is_string())
                     throw core::error("Plain Text Property List - cannot write non-string key");
@@ -486,27 +488,27 @@ namespace cppdatalib
             void null_(const core::value &) {throw core::error("Plain Text Property List - 'null' value not allowed in output");}
             void bool_(const core::value &v)
             {
-                output_stream << "<*B";
-                output_stream.put(v.get_bool_unchecked()? 'Y': 'N');
-                output_stream.put('>');
+                stream() << "<*B";
+                stream().put(v.get_bool_unchecked()? 'Y': 'N');
+                stream().put('>');
             }
             void integer_(const core::value &v)
             {
-                output_stream << "<*I"
+                stream() << "<*I"
                               << v.get_int_unchecked();
-                output_stream.put('>');
+                stream().put('>');
             }
             void uinteger_(const core::value &v)
             {
-                output_stream << "<*I"
+                stream() << "<*I"
                               << v.get_uint_unchecked();
-                output_stream.put('>');
+                stream().put('>');
             }
             void real_(const core::value &v)
             {
-                output_stream << "<*R"
+                stream() << "<*R"
                               << v.get_real_unchecked();
-                output_stream.put('>');
+                stream().put('>');
             }
             void begin_string_(const core::value &v, core::int_t, bool)
             {
@@ -514,18 +516,18 @@ namespace cppdatalib
                 {
                     case core::date:
                     case core::time:
-                    case core::datetime: output_stream << "<*D"; break;
+                    case core::datetime: stream() << "<*D"; break;
                     case core::blob:
-                    case core::clob: output_stream.put('<'); break;
-                    default: output_stream.put('"'); break;
+                    case core::clob: stream().put('<'); break;
+                    default: stream().put('"'); break;
                 }
             }
             void string_data_(const core::value &v, bool)
             {
                 if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
-                    hex::write(output_stream, v.get_string_unchecked());
+                    hex::write(stream(), v.get_string_unchecked());
                 else
-                    write_string(output_stream, v.get_string_unchecked());
+                    write_string(stream(), v.get_string_unchecked());
             }
             void end_string_(const core::value &v, bool)
             {
@@ -535,14 +537,14 @@ namespace cppdatalib
                     case core::time:
                     case core::datetime:
                     case core::blob:
-                    case core::clob: output_stream.put('>'); break;
-                    default: output_stream.put('"'); break;
+                    case core::clob: stream().put('>'); break;
+                    default: stream().put('"'); break;
                 }
             }
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
-                output_stream.put('(');
+                stream().put('(');
                 current_indent += indent_width;
             }
             void end_array_(const core::value &, bool)
@@ -550,14 +552,14 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream.put('\n'), output_padding(current_indent);
+                    stream().put('\n'), output_padding(current_indent);
 
-                output_stream.put(')');
+                stream().put(')');
             }
 
             void begin_object_(const core::value &, core::int_t, bool)
             {
-                output_stream.put('{');
+                stream().put('{');
                 current_indent += indent_width;
             }
             void end_object_(const core::value &, bool)
@@ -565,15 +567,14 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream.put('\n'), output_padding(current_indent);
+                    stream().put('\n'), output_padding(current_indent);
 
-                output_stream.put('}');
+                stream().put('}');
             }
         };
 
-        inline core::value from_plain_text_property_list(const std::string &property_list)
+        inline core::value from_plain_text_property_list(core::istream_handle stream)
         {
-            core::istring_wrapper_stream stream(property_list);
             parser p(stream);
             core::value v;
             p >> v;

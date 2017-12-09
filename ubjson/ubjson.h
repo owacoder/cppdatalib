@@ -56,7 +56,7 @@ namespace cppdatalib
             {
                 uint64_t temp;
                 bool negative = false;
-                int c = input_stream.get();
+                int c = stream().get();
 
                 if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
                 temp = c & 0xff;
@@ -72,7 +72,7 @@ namespace cppdatalib
                     case 'I': // Signed word
                         negative = c >> 7;
 
-                        c = input_stream.get();
+                        c = stream().get();
                         if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
 
                         temp = (temp << 8) | (c & 0xff);
@@ -83,7 +83,7 @@ namespace cppdatalib
 
                         for (int i = 0; i < 3; ++i)
                         {
-                            c = input_stream.get();
+                            c = stream().get();
                             if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
 
                             temp = (temp << 8) | (c & 0xff);
@@ -95,7 +95,7 @@ namespace cppdatalib
 
                         for (int i = 0; i < 7; ++i)
                         {
-                            c = input_stream.get();
+                            c = stream().get();
                             if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
 
                             temp = (temp << 8) | (c & 0xff);
@@ -116,14 +116,14 @@ namespace cppdatalib
                 else
                     i = temp;
 
-                return input_stream;
+                return stream();
             }
 
             inline core::istream &read_float(char specifier, core::stream_handler &writer)
             {
                 core::real_t r;
                 uint64_t temp;
-                int c = input_stream.get();
+                int c = stream().get();
 
                 if (c == EOF) throw core::error("UBJSON - expected floating-point value after type specifier");
                 temp = c & 0xff;
@@ -132,7 +132,7 @@ namespace cppdatalib
                 {
                     for (int i = 0; i < 3; ++i)
                     {
-                        c = input_stream.get();
+                        c = stream().get();
                         if (c == EOF) throw core::error("UBJSON - expected floating-point value after type specifier");
 
                         temp = (temp << 8) | (c & 0xff);
@@ -142,7 +142,7 @@ namespace cppdatalib
                 {
                     for (int i = 0; i < 7; ++i)
                     {
-                        c = input_stream.get();
+                        c = stream().get();
                         if (c == EOF) throw core::error("UBJSON - expected floating-point value after type specifier");
 
                         temp = (temp << 8) | (c & 0xff);
@@ -157,12 +157,12 @@ namespace cppdatalib
                     r = core::double_from_ieee_754(temp);
 
                 writer.write(r);
-                return input_stream;
+                return stream();
             }
 
             inline core::istream &read_string(char specifier, core::stream_handler &writer)
             {
-                int c = input_stream.get();
+                int c = stream().get();
 
                 if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
 
@@ -183,8 +183,8 @@ namespace cppdatalib
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                        input_stream.read(buffer.get(), buffer_size);
-                        if (input_stream.fail())
+                        stream().read(buffer.get(), buffer_size);
+                        if (stream().fail())
                             throw core::error("UBJSON - expected high-precision number value after type specifier");
                         writer.append_to_string(core::string_t(buffer.get(), buffer_size));
                         size -= buffer_size;
@@ -202,8 +202,8 @@ namespace cppdatalib
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                        input_stream.read(buffer.get(), buffer_size);
-                        if (input_stream.fail())
+                        stream().read(buffer.get(), buffer_size);
+                        if (stream().fail())
                             throw core::error("UBJSON - expected string value after type specifier");
                         writer.append_to_string(core::string_t(buffer.get(), buffer_size));
                         size -= buffer_size;
@@ -213,11 +213,11 @@ namespace cppdatalib
                 else
                     throw core::error("UBJSON - invalid string specifier found in input");
 
-                return input_stream;
+                return stream();
             }
 
         public:
-            parser(core::istream &input)
+            parser(core::istream_handle input)
                 : core::stream_parser(input)
                 , buffer(new char [core::buffer_size])
             {}
@@ -250,7 +250,7 @@ namespace cppdatalib
                             chr = containers.top().content_type;
                         else
                         {
-                            chr = input_stream.get();
+                            chr = stream().get();
                             if (chr == EOF) break;
                         }
 
@@ -260,14 +260,14 @@ namespace cppdatalib
                         {
                             // Parse key here, remap read character to 'N' (the no-op instruction)
                             if (!containers.top().content_type)
-                                input_stream.unget();
+                                stream().unget();
                             read_string('S', writer);
                             chr = 'N';
                         }
                     }
                     else
                     {
-                        chr = input_stream.get();
+                        chr = stream().get();
                         if (chr == EOF) break;
                     }
 
@@ -310,21 +310,21 @@ namespace cppdatalib
                             int type = 0;
                             core::int_t size = -1;
 
-                            chr = input_stream.get();
+                            chr = stream().get();
                             if (chr == EOF) throw core::error("UBJSON - expected array value after '['");
 
                             if (chr == '$') // Type specified
                             {
-                                chr = input_stream.get();
+                                chr = stream().get();
                                 if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
                                 type = chr;
-                                chr = input_stream.get();
+                                chr = stream().get();
                                 if (chr == EOF) throw core::error("UBJSON - unexpected end of array");
                             }
 
                             if (chr == '#') // Count specified
                             {
-                                chr = input_stream.get();
+                                chr = stream().get();
                                 if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
 
                                 read_int(size, chr);
@@ -335,7 +335,7 @@ namespace cppdatalib
                             if (type != 0 && size < 0)
                                 throw core::error("UBJSON - array element type specified but number of elements is not specified");
                             else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
-                                input_stream.unget();
+                                stream().unget();
 
                             writer.begin_array(core::array_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
                             containers.push(container_data(type, size));
@@ -354,21 +354,21 @@ namespace cppdatalib
                             int type = 0;
                             core::int_t size = -1;
 
-                            chr = input_stream.get();
+                            chr = stream().get();
                             if (chr == EOF) throw core::error("UBJSON - expected object value after '{'");
 
                             if (chr == '$') // Type specified
                             {
-                                chr = input_stream.get();
+                                chr = stream().get();
                                 if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
                                 type = chr;
-                                chr = input_stream.get();
+                                chr = stream().get();
                                 if (chr == EOF) throw core::error("UBJSON - unexpected end of object");
                             }
 
                             if (chr == '#') // Count specified
                             {
-                                chr = input_stream.get();
+                                chr = stream().get();
                                 if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
 
                                 read_int(size, chr);
@@ -379,7 +379,7 @@ namespace cppdatalib
                             if (type != 0 && size < 0)
                                 throw core::error("UBJSON - object element type specified but number of elements is not specified");
                             else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
-                                input_stream.unget();
+                                stream().unget();
 
                             writer.begin_object(core::object_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
                             containers.push(container_data(type, size));
@@ -421,7 +421,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
             protected:
                 core::ostream &write_int(core::ostream &stream, core::int_t i, bool add_specifier, char force_specifier = 0)
@@ -533,7 +533,7 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(core::ostream &output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
             bool requires_prefix_string_size() const {return true;}
 
@@ -544,37 +544,36 @@ namespace cppdatalib
                     throw core::error("UBJSON - cannot write non-string key");
             }
 
-            void null_(const core::value &) {output_stream.put('Z');}
-            void bool_(const core::value &v) {output_stream.put(v.get_bool_unchecked()? 'T': 'F');}
-            void integer_(const core::value &v) {write_int(output_stream, v.get_int_unchecked(), true);}
+            void null_(const core::value &) {stream().put('Z');}
+            void bool_(const core::value &v) {stream().put(v.get_bool_unchecked()? 'T': 'F');}
+            void integer_(const core::value &v) {write_int(stream(), v.get_int_unchecked(), true);}
             void uinteger_(const core::value &v)
             {
                 if (v.get_uint_unchecked() > std::numeric_limits<core::int_t>::max())
                     throw core::error("UBJSON - 'integer' value is out of range of output format");
-                write_int(output_stream, v.get_uint_unchecked(), true);
+                write_int(stream(), v.get_uint_unchecked(), true);
             }
-            void real_(const core::value &v) {write_float(output_stream, v.get_real_unchecked(), true);}
+            void real_(const core::value &v) {write_float(stream(), v.get_real_unchecked(), true);}
             void begin_string_(const core::value &v, core::int_t size, bool is_key)
             {
                 if (size == unknown_size)
                     throw core::error("UBJSON - 'string' value does not have size specified");
 
                 if (!is_key)
-                    output_stream.put(v.get_subtype() == core::bignum? 'H': 'S');
-                write_int(output_stream, size, true);
+                    stream().put(v.get_subtype() == core::bignum? 'H': 'S');
+                write_int(stream(), size, true);
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().data(), v.get_string_unchecked().size());}
+            void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().data(), v.get_string_unchecked().size());}
 
-            void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('[');}
-            void end_array_(const core::value &, bool) {output_stream.put(']');}
+            void begin_array_(const core::value &, core::int_t, bool) {stream().put('[');}
+            void end_array_(const core::value &, bool) {stream().put(']');}
 
-            void begin_object_(const core::value &, core::int_t, bool) {output_stream.put('{');}
-            void end_object_(const core::value &, bool) {output_stream.put('}');}
+            void begin_object_(const core::value &, core::int_t, bool) {stream().put('{');}
+            void end_object_(const core::value &, bool) {stream().put('}');}
         };
 
-        inline core::value from_ubjson(const std::string &ubjson)
+        inline core::value from_ubjson(core::istream_handle stream)
         {
-            core::istring_wrapper_stream stream(ubjson);
             parser reader(stream);
             core::value v;
             reader >> v;

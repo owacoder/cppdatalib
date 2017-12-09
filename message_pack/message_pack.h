@@ -60,7 +60,7 @@ namespace cppdatalib
             }
 
         public:
-            parser(core::istream &input) : core::stream_parser(input) {}
+            parser(core::istream_handle input) : core::stream_parser(input) {}
 
             bool provides_prefix_string_size() const {return true;}
             bool provides_prefix_object_size() const {return true;}
@@ -105,7 +105,7 @@ namespace cppdatalib
                     else if (written)
                         break;
 
-                    chr = input_stream.get();
+                    chr = stream().get();
                     if (chr == EOF)
                         throw core::error("MessagePack - expected type specifier");
 
@@ -128,8 +128,8 @@ namespace cppdatalib
                         char buf[32]; // Maximum of 32-byte string
                         chr &= 0x1f;
 
-                        input_stream.read(buf, chr);
-                        if (input_stream.fail())
+                        stream().read(buf, chr);
+                        if (stream().fail())
                             throw core::error("MessagePack - unexpected end of string");
 
                         writer.write(core::string_t(buf, chr));
@@ -152,9 +152,9 @@ namespace cppdatalib
                             uint32_t size;
                             core::value string_type = "";
 
-                            if ((chr == 0xc4 && !core::read_uint8(input_stream, size)) ||
-                                (chr == 0xc5 && !core::read_uint16_be(input_stream, size)) ||
-                                (chr == 0xc6 && !core::read_uint32_be(input_stream, size)))
+                            if ((chr == 0xc4 && !core::read_uint8(stream(), size)) ||
+                                (chr == 0xc5 && !core::read_uint16_be(stream(), size)) ||
+                                (chr == 0xc6 && !core::read_uint32_be(stream(), size)))
                                 throw core::error("MessagePack - expected 'binary data' length");
 
                             string_type.set_subtype(core::blob);
@@ -162,8 +162,8 @@ namespace cppdatalib
                             while (size > 0)
                             {
                                 core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
-                                input_stream.read(buffer.get(), buffer_size);
-                                if (input_stream.fail())
+                                stream().read(buffer.get(), buffer_size);
+                                if (stream().fail())
                                     throw core::error("MessagePack - unexpected end of string");
                                 // Set string in string_type to preserve the subtype
                                 string_type.set_string(core::string_t(buffer.get(), buffer_size));
@@ -186,7 +186,7 @@ namespace cppdatalib
                         case 0xca:
                         {
                             uint32_t flt;
-                            if (!core::read_uint32_be(input_stream, flt))
+                            if (!core::read_uint32_be(stream(), flt))
                                 throw core::error("MessagePack - expected 'float' value");
                             writer.write(core::float_from_ieee_754(flt));
                             break;
@@ -195,7 +195,7 @@ namespace cppdatalib
                         case 0xcb:
                         {
                             uint64_t flt;
-                            if (!core::read_uint64_be(input_stream, flt))
+                            if (!core::read_uint64_be(stream(), flt))
                                 throw core::error("MessagePack - expected 'float' value");
                             writer.write(core::double_from_ieee_754(flt));
                             break;
@@ -207,10 +207,10 @@ namespace cppdatalib
                         case 0xcf:
                         {
                             core::uint_t val;
-                            if ((chr == 0xcc && !core::read_uint8(input_stream, val)) ||
-                                (chr == 0xcd && !core::read_uint16_be(input_stream, val)) ||
-                                (chr == 0xce && !core::read_uint32_be(input_stream, val)) ||
-                                (chr == 0xcf && !core::read_uint64_be(input_stream, val)))
+                            if ((chr == 0xcc && !core::read_uint8(stream(), val)) ||
+                                (chr == 0xcd && !core::read_uint16_be(stream(), val)) ||
+                                (chr == 0xce && !core::read_uint32_be(stream(), val)) ||
+                                (chr == 0xcf && !core::read_uint64_be(stream(), val)))
                                 throw core::error("MessagePack - expected 'uinteger'");
                             writer.write(val);
                             break;
@@ -222,10 +222,10 @@ namespace cppdatalib
                         case 0xd3:
                         {
                             core::int_t val;
-                            if ((chr == 0xd0 && !core::read_int8(input_stream, val)) ||
-                                (chr == 0xd1 && !core::read_int16_be(input_stream, val)) ||
-                                (chr == 0xd2 && !core::read_int32_be(input_stream, val)) ||
-                                (chr == 0xd3 && !core::read_int64_be(input_stream, val)))
+                            if ((chr == 0xd0 && !core::read_int8(stream(), val)) ||
+                                (chr == 0xd1 && !core::read_int16_be(stream(), val)) ||
+                                (chr == 0xd2 && !core::read_int32_be(stream(), val)) ||
+                                (chr == 0xd3 && !core::read_int64_be(stream(), val)))
                                 throw core::error("MessagePack - expected 'integer'");
                             writer.write(val);
                             break;
@@ -248,17 +248,17 @@ namespace cppdatalib
                             uint32_t size;
                             core::value string_type = "";
 
-                            if ((chr == 0xd9 && !core::read_uint8(input_stream, size)) ||
-                                (chr == 0xda && !core::read_uint16_be(input_stream, size)) ||
-                                (chr == 0xdb && !core::read_uint32_be(input_stream, size)))
+                            if ((chr == 0xd9 && !core::read_uint8(stream(), size)) ||
+                                (chr == 0xda && !core::read_uint16_be(stream(), size)) ||
+                                (chr == 0xdb && !core::read_uint32_be(stream(), size)))
                                 throw core::error("MessagePack - expected 'binary data' length");
 
                             writer.begin_string(string_type, size);
                             while (size > 0)
                             {
                                 core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
-                                input_stream.read(buffer.get(), buffer_size);
-                                if (input_stream.fail())
+                                stream().read(buffer.get(), buffer_size);
+                                if (stream().fail())
                                     throw core::error("MessagePack - unexpected end of string");
                                 // Set string in string_type to preserve the subtype
                                 string_type.set_string(core::string_t(buffer.get(), buffer_size));
@@ -275,8 +275,8 @@ namespace cppdatalib
                         {
                             uint32_t size;
 
-                            if ((chr == 0xdc && !core::read_uint16_be(input_stream, size)) ||
-                                (chr == 0xdd && !core::read_uint32_be(input_stream, size)))
+                            if ((chr == 0xdc && !core::read_uint16_be(stream(), size)) ||
+                                (chr == 0xdd && !core::read_uint32_be(stream(), size)))
                                 throw core::error("MessagePack - expected 'array' length");
 
                             writer.begin_array(core::array_t(), size);
@@ -289,8 +289,8 @@ namespace cppdatalib
                         {
                             uint32_t size;
 
-                            if ((chr == 0xde && !core::read_uint16_be(input_stream, size)) ||
-                                (chr == 0xdf && !core::read_uint32_be(input_stream, size)))
+                            if ((chr == 0xde && !core::read_uint16_be(stream(), size)) ||
+                                (chr == 0xdf && !core::read_uint32_be(stream(), size)))
                                 throw core::error("MessagePack - expected 'object' length");
 
                             writer.begin_object(core::object_t(), size);
@@ -314,7 +314,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
             protected:
                 core::ostream &write_int(core::ostream &stream, core::uint_t i)
@@ -488,37 +488,37 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(core::ostream &output) : stream_writer_base(output) {}
+            stream_writer(core::ostream_handle output) : stream_writer_base(output) {}
 
             bool requires_prefix_array_size() const {return true;}
             bool requires_prefix_object_size() const {return true;}
             bool requires_prefix_string_size() const {return true;}
 
         protected:
-            void null_(const core::value &) {output_stream.put(0xc0);}
-            void bool_(const core::value &v) {output_stream.put(0xc2 + v.get_bool_unchecked());}
-            void integer_(const core::value &v) {write_int(output_stream, v.get_int_unchecked());}
-            void uinteger_(const core::value &v) {write_int(output_stream, v.get_uint_unchecked());}
-            void real_(const core::value &v) {write_float(output_stream, v.get_real_unchecked());}
+            void null_(const core::value &) {stream().put(0xc0);}
+            void bool_(const core::value &v) {stream().put(0xc2 + v.get_bool_unchecked());}
+            void integer_(const core::value &v) {write_int(stream(), v.get_int_unchecked());}
+            void uinteger_(const core::value &v) {write_int(stream(), v.get_uint_unchecked());}
+            void real_(const core::value &v) {write_float(stream(), v.get_real_unchecked());}
             void begin_string_(const core::value &v, core::int_t size, bool)
             {
                 if (size == unknown_size)
                     throw core::error("MessagePack - 'string' value does not have size specified");
 
-                write_string_size(output_stream, size, v.get_subtype());
+                write_string_size(stream(), size, v.get_subtype());
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
+            void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
 
             void begin_array_(const core::value &, core::int_t size, bool)
             {
                 if (size == unknown_size)
                     throw core::error("MessagePack - 'array' value does not have size specified");
                 else if (size <= 15)
-                    output_stream.put(0x90 + size);
+                    stream().put(0x90 + size);
                 else if (size <= UINT16_MAX)
-                    output_stream.put(0xdc).put(size >> 8).put(size & 0xff);
+                    stream().put(0xdc).put(size >> 8).put(size & 0xff);
                 else if (size <= UINT32_MAX)
-                    output_stream.put(0xdd)
+                    stream().put(0xdd)
                             .put(size >> 24)
                             .put((size >> 16) & 0xff)
                             .put((size >> 8) & 0xff)
@@ -532,11 +532,11 @@ namespace cppdatalib
                 if (size == unknown_size)
                     throw core::error("MessagePack - 'object' value does not have size specified");
                 else if (size <= 15)
-                    output_stream.put(0x80 + size);
+                    stream().put(0x80 + size);
                 else if (size <= UINT16_MAX)
-                    output_stream.put(0xde).put(size >> 8).put(size & 0xff);
+                    stream().put(0xde).put(size >> 8).put(size & 0xff);
                 else if (size <= UINT32_MAX)
-                    output_stream.put(0xdf)
+                    stream().put(0xdf)
                             .put(size >> 24)
                             .put((size >> 16) & 0xff)
                             .put((size >> 8) & 0xff)
@@ -546,9 +546,8 @@ namespace cppdatalib
             }
         };
 
-        inline core::value from_message_pack(const std::string &str)
+        inline core::value from_message_pack(core::istream_handle stream)
         {
-            core::istring_wrapper_stream stream(str);
             parser p(stream);
             core::value v;
             p >> v;

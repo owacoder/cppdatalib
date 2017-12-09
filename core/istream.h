@@ -11,8 +11,6 @@ namespace cppdatalib
 {
     namespace core
     {
-#define CPPDATALIB_ENABLE_FAST_IO
-
 #ifdef CPPDATALIB_ENABLE_FAST_IO
         class istream
         {
@@ -604,9 +602,67 @@ namespace cppdatalib
             }
         };
 
+        class istream_handle
+        {
+            std::istream *std_;
+            std::shared_ptr<istream> d_;
+
+            istream *predef_;
+
+        public:
+            istream_handle(core::istream &stream) : std_(NULL), d_(NULL), predef_(&stream) {}
+            istream_handle(std::istream &stream) : std_(&stream), d_(NULL), predef_(NULL)
+            {
+                d_ = std::make_shared<istd_streambuf_wrapper>(stream.rdbuf());
+            }
+            istream_handle(const char *string) : std_(NULL), d_(NULL)
+            {
+                d_ = std::make_shared<istringstream>(string);
+            }
+            istream_handle(const char *string, size_t len) : std_(NULL), d_(NULL)
+            {
+                d_ = std::make_shared<istringstream>(std::string(string, len));
+            }
+            istream_handle(const std::string &string) : std_(NULL), d_(NULL), predef_(NULL)
+            {
+                d_ = std::make_shared<istring_wrapper_stream>(string);
+            }
+
+            operator core::istream &() {return predef_? *predef_: *d_;}
+
+            // std_stream() returns NULL if not created from a standard stream
+            std::istream *std_stream() {return std_;}
+        };
 #else
         typedef std::istream istream;
         typedef std::istringstream istringstream;
+        typedef std::istringstream istring_wrapper_stream;
+
+        class istream_handle
+        {
+            core::istream *std_;
+            std::shared_ptr<istream> d_;
+
+        public:
+            istream_handle(core::istream &stream) : std_(&stream), d_(NULL) {}
+            istream_handle(const char *string) : std_(NULL), d_(NULL)
+            {
+                d_ = std::make_shared<istringstream>(string);
+            }
+            istream_handle(const char *string, size_t len) : std_(NULL), d_(NULL)
+            {
+                d_ = std::make_shared<istringstream>(std::string(string, len));
+            }
+            istream_handle(const std::string &string) : std_(NULL), d_(NULL)
+            {
+                d_ = std::make_shared<istringstream>(string);
+            }
+
+            operator core::istream &() {return std_? *std_: *d_;}
+
+            // std_stream() returns NULL if not created from a standard stream
+            std::istream *std_stream() {return std_;}
+        };
 #endif
 
         template<typename T>

@@ -70,7 +70,7 @@ cppdatalib supports streaming with a small memory footprint. Most conversions re
 ## Usage
 
 Using the library is simple. Everything is under the main namespace `cppdatalib`, and underneath is the `core` namespace and individual format namespaces (e.g. `json`).
-If you only need one format, use `using` statements to include its namespace into your scope.
+It is recommended to use `using` statements to pull in format namespaces.
 
 For example, the following program attempts to read a JSON structure from STDIN, and output it to STDOUT:
 
@@ -80,12 +80,14 @@ For example, the following program attempts to read a JSON structure from STDIN,
 int main() {
     using namespace cppdatalib;             // Parent namespace
     using namespace json;                   // Format namespace
-    
-    core::value my_value;
-    
+
+    core::value my_value;                   // Global cross-format value class
+
     try {
-        std::cin >> my_value;               // Read in to core::value as JSON
-        std::cout << my_value;              // Write core::value out as JSON
+        json::parser p(std::cin);           // Initialize parser
+        json::stream_writer w(std::cout);   // Initialize writer
+        p >> my_value;                      // Read in to core::value as JSON
+        w << my_value;                      // Write core::value out as JSON
     } catch (core::error e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }

@@ -12,7 +12,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(core::ostream &output) : core::stream_writer(output) {}
+                stream_writer_base(core::ostream_handle output) : core::stream_writer(output) {}
 
             protected:
                 core::ostream &write_size(core::ostream &stream, int initial_type, uint64_t size)
@@ -227,23 +227,23 @@ namespace cppdatalib
             bool requires_object_buffering() const {return true;}
 
         protected:
-            void null_(const core::value &) {output_stream.put(0);}
-            void bool_(const core::value &v) {output_stream.put(24 + v.get_bool_unchecked());}
+            void null_(const core::value &) {stream().put(0);}
+            void bool_(const core::value &v) {stream().put(24 + v.get_bool_unchecked());}
 
             void integer_(const core::value &v)
             {
                 if (v.get_int_unchecked() < 0)
                 {
-                    write_size(output_stream, 8, -v.get_int_unchecked());
+                    write_size(stream(), 8, -v.get_int_unchecked());
                 }
                 else if (v.get_int_unchecked() <= 1)
                 {
-                    output_stream.put(26 + v.get_uint_unchecked()); // Shortcut 0 and 1
+                    stream().put(26 + v.get_uint_unchecked()); // Shortcut 0 and 1
                     return;
                 }
                 else /* positive integer */
                 {
-                    write_size(output_stream, 4, v.get_int_unchecked());
+                    write_size(stream(), 4, v.get_int_unchecked());
                 }
             }
 
@@ -251,11 +251,11 @@ namespace cppdatalib
             {
                 if (v.get_uint_unchecked() <= 1)
                 {
-                    output_stream.put(26 + v.get_uint_unchecked()); // Shortcut 0 and 1
+                    stream().put(26 + v.get_uint_unchecked()); // Shortcut 0 and 1
                     return;
                 }
 
-                write_size(output_stream, 4, v.get_uint_unchecked());
+                write_size(stream(), 4, v.get_uint_unchecked());
             }
 
             void real_(const core::value &v)
@@ -265,7 +265,7 @@ namespace cppdatalib
                 if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real_unchecked())) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
                 {
                     out = core::float_to_ieee_754(v.get_real_unchecked());
-                    output_stream.put(14)
+                    stream().put(14)
                             .put(out & 0xff)
                             .put((out >> 8) & 0xff)
                             .put((out >> 16) & 0xff)
@@ -274,7 +274,7 @@ namespace cppdatalib
                 else
                 {
                     out = core::double_to_ieee_754(v.get_real_unchecked());
-                    output_stream.put(15)
+                    stream().put(15)
                             .put(out & 0xff)
                             .put((out >> 8) & 0xff)
                             .put((out >> 16) & 0xff)
@@ -294,7 +294,7 @@ namespace cppdatalib
                     throw core::error("BJSON - 'string' value does not have size specified");
                 else if (size == 0 && v.get_subtype() != core::blob && v.get_subtype() != core::clob)
                 {
-                    output_stream.put(2); // Empty string type
+                    stream().put(2); // Empty string type
                     return;
                 }
 
@@ -307,9 +307,9 @@ namespace cppdatalib
                     default: break;
                 }
 
-                write_size(output_stream, initial_type, size);
+                write_size(stream(), initial_type, size);
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
+            void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
 
             void begin_array_(const core::value &v, core::int_t size, bool)
             {
@@ -318,7 +318,7 @@ namespace cppdatalib
                 else if (v.size() != static_cast<size_t>(size))
                     throw core::error("BJSON - entire 'array' value must be buffered before writing");
 
-                write_size(output_stream, 32, get_size(v));
+                write_size(stream(), 32, get_size(v));
             }
 
             void begin_object_(const core::value &v, core::int_t size, bool)
@@ -328,7 +328,7 @@ namespace cppdatalib
                 else if (v.size() != static_cast<size_t>(size))
                     throw core::error("BJSON - entire 'object' value must be buffered before writing");
 
-                write_size(output_stream, 36, get_size(v));
+                write_size(stream(), 36, get_size(v));
             }
         };
 

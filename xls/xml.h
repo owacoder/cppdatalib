@@ -36,7 +36,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
             protected:
                 core::ostream &write_string(core::ostream &stream, const std::string &str)
@@ -69,11 +69,11 @@ namespace cppdatalib
         class table_writer : public impl::stream_writer_base
         {
         public:
-            table_writer(core::ostream &output) : impl::stream_writer_base(output) {}
+            table_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
         protected:
-            void begin_() {output_stream << "<Table>"; output_stream.precision(CPPDATALIB_REAL_DIG);}
-            void end_() {output_stream << "</Table>";}
+            void begin_() {stream() << "<Table>"; stream().precision(CPPDATALIB_REAL_DIG);}
+            void end_() {stream() << "</Table>";}
 
             void begin_item_(const core::value &v)
             {
@@ -97,30 +97,30 @@ namespace cppdatalib
                     case core::array:
                         if (nesting_depth() == 0)
                             break; // No need to do anything for the top-level array
-                        output_stream << "<Row>";
+                        stream() << "<Row>";
                         break;
                     default: break;
                 }
 
                 if (type)
-                    output_stream << "<Cell><Data ss:Type=\"" << type << "\">";
+                    stream() << "<Cell><Data ss:Type=\"" << type << "\">";
             }
             void end_item_(const core::value &v)
             {
                 if (v.is_array())
                 {
                     if (nesting_depth() > 1)
-                        output_stream << "</Row>";
+                        stream() << "</Row>";
                 }
                 else
-                    output_stream << "</Data></Cell>";
+                    stream() << "</Data></Cell>";
             }
 
-            void bool_(const core::value &v) {output_stream << v.as_int();}
-            void integer_(const core::value &v) {output_stream << v.get_int_unchecked();}
-            void uinteger_(const core::value &v) {output_stream << v.get_uint_unchecked();}
-            void real_(const core::value &v) {output_stream << v.get_real_unchecked();}
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
+            void bool_(const core::value &v) {stream() << v.as_int();}
+            void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
+            void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
+            void real_(const core::value &v) {stream() << v.get_real_unchecked();}
+            void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
@@ -143,9 +143,9 @@ namespace cppdatalib
                 if (worksheet_name.find_first_of("\\/?*[]") != std::string::npos)
                     throw core::error("XML XLS - Invalid worksheet name cannot contain any of '\\/?*[]'");
 
-                output_stream << "<Worksheet ss:Name=\"";
-                write_string(output_stream, worksheet_name);
-                output_stream << "\">";
+                stream() << "<Worksheet ss:Name=\"";
+                write_string(stream(), worksheet_name);
+                stream() << "\">";
 
                 table_writer::begin_();
             }
@@ -153,7 +153,7 @@ namespace cppdatalib
             {
                 table_writer::end_();
 
-                output_stream << "</Worksheet>";
+                stream() << "</Worksheet>";
             }
         };
 
@@ -165,7 +165,7 @@ namespace cppdatalib
         protected:
             void begin_()
             {
-                output_stream << "<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\""
+                stream() << "<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\""
                               << " xmlns:c=\"urn:schemas-microsoft-com:office:component:spreadsheet\""
                               << " xmlns:html=\"http://www.w3.org/TR/REC-html40\""
                               << " xmlns:o=\"urn:schemas-microsoft-com:office:office\""
@@ -180,7 +180,7 @@ namespace cppdatalib
             {
                 worksheet_writer::end_();
 
-                output_stream << "</Workbook>";
+                stream() << "</Workbook>";
             }
         };
 
@@ -192,7 +192,7 @@ namespace cppdatalib
         protected:
             void begin_()
             {
-                output_stream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"
+                stream() << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"
                               << "<?mso-application progid=\"Excel.Sheet\"?>";
 
                 workbook_writer::begin_();

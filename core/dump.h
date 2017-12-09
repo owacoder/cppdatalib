@@ -14,7 +14,7 @@ namespace cppdatalib
                 class stream_writer_base : public core::stream_handler, public core::stream_writer
                 {
                 public:
-                    stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
+                    stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
                 protected:
                     core::ostream &write_string(core::ostream &stream, const std::string &str)
@@ -104,13 +104,13 @@ namespace cppdatalib
 
                         memset(buffer.get(), ' ', size);
 
-                        output_stream.write(buffer.get(), size);
+                        stream().write(buffer.get(), size);
                         padding -= size;
                     }
                 }
 
             public:
-                stream_writer(core::ostream &output, size_t indent_width)
+                stream_writer(core::ostream_handle output, size_t indent_width)
                     : stream_writer_base(output)
                     , buffer(new char [core::buffer_size])
                     , indent_width(indent_width)
@@ -120,50 +120,50 @@ namespace cppdatalib
                 size_t indent() {return indent_width;}
 
             protected:
-                void begin_() {current_indent = 0; output_stream.precision(CPPDATALIB_REAL_DIG); output_stream << "=== CORE DUMP ===\n";}
-                void end_() {output_stream << "\n=== END CORE DUMP ===\n";}
+                void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG); stream() << "=== CORE DUMP ===\n";}
+                void end_() {stream() << "\n=== END CORE DUMP ===\n";}
 
                 void begin_item_(const core::value &v)
                 {
                     if (container_key_was_just_parsed())
-                        output_stream << " = ";
+                        stream() << " = ";
                     else if (current_container_size() > 0)
-                        output_stream.put(',');
+                        stream().put(',');
 
                     if (current_container() == core::array)
-                        output_stream.put('\n'), output_padding(current_indent);
+                        stream().put('\n'), output_padding(current_indent);
 
-                    write_type(output_stream, v.get_type());
-                    write_subtype(output_stream, v.get_subtype());
+                    write_type(stream(), v.get_type());
+                    write_subtype(stream(), v.get_subtype());
                 }
                 void begin_key_(const core::value &v)
                 {
                     if (current_container_size() > 0)
-                        output_stream.put(',');
+                        stream().put(',');
 
-                    output_stream.put('\n'), output_padding(current_indent);
+                    stream().put('\n'), output_padding(current_indent);
 
-                    write_type(output_stream, v.get_type());
-                    write_subtype(output_stream, v.get_subtype());
+                    write_type(stream(), v.get_type());
+                    write_subtype(stream(), v.get_subtype());
                 }
 
-                void null_(const core::value &) {output_stream << "null";}
-                void bool_(const core::value &v) {output_stream << (v.get_bool_unchecked()? "true": "false");}
-                void integer_(const core::value &v) {output_stream << v.get_int_unchecked();}
-                void uinteger_(const core::value &v) {output_stream << v.get_uint_unchecked();}
+                void null_(const core::value &) {stream() << "null";}
+                void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
+                void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
+                void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
                 void real_(const core::value &v)
                 {
                     if (!std::isfinite(v.get_real_unchecked()))
                         throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
-                    output_stream << v.get_real_unchecked();
+                    stream() << v.get_real_unchecked();
                 }
-                void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
-                void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
-                void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
+                void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
+                void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+                void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
 
                 void begin_array_(const core::value &, core::int_t, bool)
                 {
-                    output_stream.put('[');
+                    stream().put('[');
                     current_indent += indent_width;
                 }
                 void end_array_(const core::value &, bool)
@@ -171,14 +171,14 @@ namespace cppdatalib
                     current_indent -= indent_width;
 
                     if (current_container_size() > 0)
-                        output_stream.put('\n'), output_padding(current_indent);
+                        stream().put('\n'), output_padding(current_indent);
 
-                    output_stream.put(']');
+                    stream().put(']');
                 }
 
                 void begin_object_(const core::value &, core::int_t, bool)
                 {
-                    output_stream.put('{');
+                    stream().put('{');
                     current_indent += indent_width;
                 }
                 void end_object_(const core::value &, bool)
@@ -186,16 +186,16 @@ namespace cppdatalib
                     current_indent -= indent_width;
 
                     if (current_container_size() > 0)
-                        output_stream.put('\n'), output_padding(current_indent);
+                        stream().put('\n'), output_padding(current_indent);
 
-                    output_stream.put('}');
+                    stream().put('}');
                 }
             };
         }
 
         std::ostream &operator<<(std::ostream &o, const value &v)
         {
-            ostd_streambuf_wrapper wrap(o.rdbuf());
+            core::ostream_handle wrap(o);
             dump::stream_writer writer(wrap, 2);
             writer << v;
             return o;

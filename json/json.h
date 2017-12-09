@@ -108,7 +108,7 @@ namespace cppdatalib
             }
 
         public:
-            parser(core::istream &input)
+            parser(core::istream_handle input)
                 : core::stream_parser(input)
                 , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
             {}
@@ -118,8 +118,8 @@ namespace cppdatalib
                 bool delimiter_required = false, get_char = true;
                 char chr;
 
-                input_stream >> std::skipws;
-                while (get_char? (input_stream >> chr, input_stream.good()): true)
+                stream() >> std::skipws;
+                while (get_char? (stream() >> chr, stream().good()): true)
                 {
                     get_char = true;
 
@@ -134,29 +134,29 @@ namespace cppdatalib
                     switch (chr)
                     {
                         case 'n':
-                            if (!core::stream_starts_with(input_stream, "ull")) throw core::error("JSON - expected 'null' value");
+                            if (!core::stream_starts_with(stream(), "ull")) throw core::error("JSON - expected 'null' value");
                             writer.write(core::null_t());
                             delimiter_required = true;
                             break;
                         case 't':
-                            if (!core::stream_starts_with(input_stream, "rue")) throw core::error("JSON - expected 'true' value");
+                            if (!core::stream_starts_with(stream(), "rue")) throw core::error("JSON - expected 'true' value");
                             writer.write(true);
                             delimiter_required = true;
                             break;
                         case 'f':
-                            if (!core::stream_starts_with(input_stream, "alse")) throw core::error("JSON - expected 'false' value");
+                            if (!core::stream_starts_with(stream(), "alse")) throw core::error("JSON - expected 'false' value");
                             writer.write(false);
                             delimiter_required = true;
                             break;
                         case '"':
-                            read_string(input_stream, writer);
+                            read_string(stream(), writer);
                             delimiter_required = true;
                             break;
                         case ',':
                             if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
                                 throw core::error("JSON - invalid ',' does not separate array or object entries");
-                            input_stream >> chr; get_char = false; // Peek ahead
-                            if (!input_stream || chr == ',' || chr == ']' || chr == '}')
+                            stream() >> chr; get_char = false; // Peek ahead
+                            if (!stream() || chr == ',' || chr == ']' || chr == '}')
                                 throw core::error("JSON - invalid ',' does not separate array or object entries");
                             delimiter_required = false;
                             break;
@@ -191,7 +191,7 @@ namespace cppdatalib
                                 std::string buffer = std::string(1, chr);
 
                                 int c;
-                                while (c = input_stream.get(), c != EOF && strchr("0123456789.eE+-", c))
+                                while (c = stream().get(), c != EOF && strchr("0123456789.eE+-", c))
                                 {
                                     buffer.push_back(c);
                                     is_float = c == '.' || tolower(c) == 'e';
@@ -252,6 +252,8 @@ namespace cppdatalib
 
                 if (!delimiter_required)
                     throw core::error("JSON - expected value");
+                else if (writer.nesting_depth())
+                    throw core::error("JSON - unexpected end of stream");
 
                 return *this;
             }
@@ -262,7 +264,7 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(core::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
             protected:
                 core::ostream &write_string(core::ostream &stream, const std::string &str)
@@ -305,46 +307,46 @@ namespace cppdatalib
         class stream_writer : public impl::stream_writer_base
         {
         public:
-            stream_writer(core::ostream &output) : stream_writer_base(output) {}
+            stream_writer(core::ostream_handle output) : stream_writer_base(output) {}
 
         protected:
-            void begin_() {output_stream.precision(CPPDATALIB_REAL_DIG);}
+            void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
                 if (container_key_was_just_parsed())
-                    output_stream.put(':');
+                    stream().put(':');
                 else if (current_container_size() > 0)
-                    output_stream.put(',');
+                    stream().put(',');
             }
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
-                    output_stream.put(',');
+                    stream().put(',');
 
                 if (!v.is_string())
                     throw core::error("JSON - cannot write non-string key");
             }
 
-            void null_(const core::value &) {output_stream << "null";}
-            void bool_(const core::value &v) {output_stream << (v.get_bool_unchecked()? "true": "false");}
-            void integer_(const core::value &v) {output_stream << v.get_int_unchecked();}
-            void uinteger_(const core::value &v) {output_stream << v.get_uint_unchecked();}
+            void null_(const core::value &) {stream() << "null";}
+            void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
+            void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
+            void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v)
             {
                 if (!std::isfinite(v.get_real_unchecked()))
                     throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
-                output_stream << v.get_real_unchecked();
+                stream() << v.get_real_unchecked();
             }
-            void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
-            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
+            void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
+            void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
 
-            void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('[');}
-            void end_array_(const core::value &, bool) {output_stream.put(']');}
+            void begin_array_(const core::value &, core::int_t, bool) {stream().put('[');}
+            void end_array_(const core::value &, bool) {stream().put(']');}
 
-            void begin_object_(const core::value &, core::int_t, bool) {output_stream.put('{');}
-            void end_object_(const core::value &, bool) {output_stream.put('}');}
+            void begin_object_(const core::value &, core::int_t, bool) {stream().put('{');}
+            void end_object_(const core::value &, bool) {stream().put('}');}
         };
 
         class pretty_stream_writer : public impl::stream_writer_base
@@ -361,13 +363,13 @@ namespace cppdatalib
 
                     memset(buffer.get(), ' ', size);
 
-                    output_stream.write(buffer.get(), size);
+                    stream().write(buffer.get(), size);
                     padding -= size;
                 }
             }
 
         public:
-            pretty_stream_writer(core::ostream &output, size_t indent_width)
+            pretty_stream_writer(core::ostream_handle output, size_t indent_width)
                 : stream_writer_base(output)
                 , buffer(new char [core::buffer_size])
                 , indent_width(indent_width)
@@ -377,46 +379,46 @@ namespace cppdatalib
             size_t indent() {return indent_width;}
 
         protected:
-            void begin_() {current_indent = 0; output_stream.precision(CPPDATALIB_REAL_DIG);}
+            void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
                 if (container_key_was_just_parsed())
-                    output_stream << ": ";
+                    stream() << ": ";
                 else if (current_container_size() > 0)
-                    output_stream.put(',');
+                    stream().put(',');
 
                 if (current_container() == core::array)
-                    output_stream.put('\n'), output_padding(current_indent);
+                    stream().put('\n'), output_padding(current_indent);
             }
             void begin_key_(const core::value &v)
             {
                 if (current_container_size() > 0)
-                    output_stream.put(',');
+                    stream().put(',');
 
-                output_stream.put('\n'), output_padding(current_indent);
+                stream().put('\n'), output_padding(current_indent);
 
                 if (!v.is_string())
                     throw core::error("JSON - cannot write non-string key");
             }
 
-            void null_(const core::value &) {output_stream << "null";}
-            void bool_(const core::value &v) {output_stream << (v.get_bool_unchecked()? "true": "false");}
-            void integer_(const core::value &v) {output_stream << v.get_int_unchecked();}
-            void uinteger_(const core::value &v) {output_stream << v.get_uint_unchecked();}
+            void null_(const core::value &) {stream() << "null";}
+            void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
+            void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
+            void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v)
             {
                 if (!std::isfinite(v.get_real_unchecked()))
                     throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
-                output_stream << v.get_real_unchecked();
+                stream() << v.get_real_unchecked();
             }
-            void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
-            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
+            void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
+            void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
-                output_stream.put('[');
+                stream().put('[');
                 current_indent += indent_width;
             }
             void end_array_(const core::value &, bool)
@@ -424,14 +426,14 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream.put('\n'), output_padding(current_indent);
+                    stream().put('\n'), output_padding(current_indent);
 
-                output_stream.put(']');
+                stream().put(']');
             }
 
             void begin_object_(const core::value &, core::int_t, bool)
             {
-                output_stream.put('{');
+                stream().put('{');
                 current_indent += indent_width;
             }
             void end_object_(const core::value &, bool)
@@ -439,15 +441,14 @@ namespace cppdatalib
                 current_indent -= indent_width;
 
                 if (current_container_size() > 0)
-                    output_stream.put('\n'), output_padding(current_indent);
+                    stream().put('\n'), output_padding(current_indent);
 
-                output_stream.put('}');
+                stream().put('}');
             }
         };
 
-        inline core::value from_json(const std::string &json)
+        inline core::value from_json(core::istream_handle stream)
         {
-            core::istring_wrapper_stream stream(json);
             parser reader(stream);
             core::value v;
             reader >> v;
