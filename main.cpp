@@ -379,9 +379,16 @@ int main()
               [](const auto &f){return core::float_to_ieee_754(core::float_cast_from_ieee_754(f));}, true,
               [](const auto &f, const auto &s){return f != s && !isnan(core::float_from_ieee_754(f)) && !isnan(core::float_from_ieee_754(s));});
 #endif
-    Test("JSON", json_tests, [](const auto &test){return json::to_json(json::from_json(test));}, false);
-    Test("Bencode", bencode_tests, [](const auto &test){return bencode::to_bencode(bencode::from_bencode(test));}, false);
-    Test("MessagePack", message_pack_tests, [](const auto &test){return hex_string(message_pack::to_message_pack(message_pack::from_message_pack(test)));}, false);
+    try
+    {
+        Test("JSON", json_tests, [](const auto &test){return json::to_json(json::from_json(test));}, false);
+        Test("Bencode", bencode_tests, [](const auto &test){return bencode::to_bencode(bencode::from_bencode(test));}, false);
+        Test("MessagePack", message_pack_tests, [](const auto &test){return hex_string(message_pack::to_message_pack(message_pack::from_message_pack(test)));}, false);
+    }
+    catch (core::error e)
+    {
+        std::cout << e.what() << std::endl;
+    }
     std::cout << vt.attr_reset;
     return 0;
 }

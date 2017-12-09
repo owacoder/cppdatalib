@@ -116,7 +116,7 @@ namespace cppdatalib
             core::stream_input &convert(core::stream_handler &writer)
             {
                 bool delimiter_required = false, get_char = true;
-                int chr;
+                char chr;
 
                 input_stream >> std::skipws;
                 while (get_char? (input_stream >> chr, input_stream.good()): true)
@@ -190,13 +190,16 @@ namespace cppdatalib
                                 bool is_float = false;
                                 std::string buffer = std::string(1, chr);
 
-                                while (chr = input_stream.get(), chr != EOF && strchr("0123456789.eE+-", chr))
+                                // TODO: chr should be an int here
+                                int c;
+                                while (c = input_stream.get(), c != EOF && strchr("0123456789.eE+-", c))
                                 {
-                                    buffer.push_back(chr);
-                                    is_float = chr == '.' || tolower(chr) == 'e';
+                                    buffer.push_back(c);
+                                    is_float = c == '.' || tolower(c) == 'e';
                                 }
-                                get_char = chr == EOF; // This forces the loop to end if we're at EOF
+                                get_char = false;
                                 delimiter_required = true;
+                                chr = c;
 
                                 if (!is_float)
                                 {
