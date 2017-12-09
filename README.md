@@ -70,7 +70,7 @@ cppdatalib supports streaming with a small memory footprint. Most conversions re
 ## Usage
 
 Using the library is simple. Everything is under the main namespace `cppdatalib`, and underneath is the `core` namespace and individual format namespaces (e.g. `json`).
-If you only need one format, use `using` statements to include its namespace into your scope. You can also include the `core` namespace, as long as you don't have conflicting identifiers.
+If you only need one format, use `using` statements to include its namespace into your scope.
 
 For example, the following program attempts to read a JSON structure from STDIN, and output it to STDOUT:
 
@@ -202,20 +202,19 @@ int main() {
 
 ### Compile-time flags
 
-Below is a list of compile-time flags supported by cppdatalib (the flags don't need a value, they just need to be defined):
+Below is a list of compile-time flags supported by cppdatalib:
 
-   - `CPPDATALIB_NON_POD_LAYOUT` - Disables `union` layout of bool, int, uint, and real types. This WILL use more memory
-   - `CPPDATALIB_BOOL_T` - The underlying boolean type of the implementation. Should be able to store a true and false value. If a non-POD type, `CPPDATALIB_NON_POD_LAYOUT` should be defined. Defaults to `bool`
-   - `CPPDATALIB_INT_T` - The underlying integer type of the implementation. Should be able to store a signed integral value. If a non-POD type, `CPPDATALIB_NON_POD_LAYOUT` should be defined. Defaults to `int64_t`
-   - `CPPDATALIB_UINT_T` - The underlying unsigned integer type of the implementation. Should be able to store an unsigned integral value. If a non-POD type, `CPPDATALIB_NON_POD_LAYOUT` should be defined. Defaults to `uint64_t`
-   - `CPPDATALIB_REAL_T` - The underlying floating-point type of the implementation. Should be able to store at least an IEEE-754 value. If a non-POD type, `CPPDATALIB_NON_POD_LAYOUT` should be defined. Defaults to `double`
+   - `CPPDATALIB_BOOL_T` - The underlying boolean type of the implementation. Should be able to store a true and false value. Defaults to `bool`
+   - `CPPDATALIB_INT_T` - The underlying integer type of the implementation. Should be able to store a signed integral value. Defaults to `int64_t`
+   - `CPPDATALIB_UINT_T` - The underlying unsigned integer type of the implementation. Should be able to store an unsigned integral value. Defaults to `uint64_t`
+   - `CPPDATALIB_REAL_T` - The underlying floating-point type of the implementation. Should be able to store at least an IEEE-754 value. Defaults to `double`
    - `CPPDATALIB_CSTRING_T` - The underlying C-style string type of the implementation. Defaults to `const char *`
    - `CPPDATALIB_STRING_T` - The underlying string type of the implementation. Defaults to `std::string`
    - `CPPDATALIB_ARRAY_T` - The underlying array type of the implementation. Defaults to `std::vector<cppdatalib::core::value>`
    - `CPPDATALIB_OBJECT_T` - The underlying object type of the implementation. Defaults to `std::multimap<cppdatalib::core::value, cppdatalib::core::value>`
-   - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `long`
+   - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `int16_t`
    - `CPPDATALIB_ENABLE_MYSQL` - Enables inclusion of the MySQL interface library. If defined, the MySQL headers must be available in the include path
-   - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but if enabled, can result in better performance. Use at your own risk
+   - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If write checks are disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but can result in better performance. Use at your own risk
    - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
    - `CPPDATALIB_DISABLE_FAST_IO_GCOUNT` - Disables calculation of `gcount()` in the fast input classes. This removes the `gcount()` function altogether. This flag only has an effect if `CPPDATALIB_ENABLE_FAST_INPUT` is defined
 
