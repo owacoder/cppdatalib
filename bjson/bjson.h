@@ -78,13 +78,13 @@ namespace cppdatalib
                                     {
                                         size.top() += 1; // one byte for type specifier
 
-                                        if (arg->get_int() == 0 || arg->get_int() == 1)
+                                        if (arg->get_int_unchecked() == 0 || arg->get_int_unchecked() == 1)
                                             ; // do nothing
-                                        else if (arg->get_int() >= -core::int_t(UINT8_MAX) && arg->get_int() <= UINT8_MAX)
+                                        else if (arg->get_int_unchecked() >= -core::int_t(UINT8_MAX) && arg->get_int_unchecked() <= UINT8_MAX)
                                             size.top() += 1;
-                                        else if (arg->get_int() >= -core::int_t(UINT16_MAX) && arg->get_int() <= UINT16_MAX)
+                                        else if (arg->get_int_unchecked() >= -core::int_t(UINT16_MAX) && arg->get_int_unchecked() <= UINT16_MAX)
                                             size.top() += 2;
-                                        else if (arg->get_int() >= -core::int_t(UINT32_MAX) && arg->get_int() <= UINT32_MAX)
+                                        else if (arg->get_int_unchecked() >= -core::int_t(UINT32_MAX) && arg->get_int_unchecked() <= UINT32_MAX)
                                             size.top() += 4;
                                         else
                                             size.top() += 8;
@@ -98,13 +98,13 @@ namespace cppdatalib
                                     {
                                         size.top() += 1; // one byte for type specifier
 
-                                        if (arg->get_uint() == 0 || arg->get_uint() == 1)
+                                        if (arg->get_uint_unchecked() == 0 || arg->get_uint_unchecked() == 1)
                                             ; // do nothing
-                                        else if (arg->get_uint() <= UINT8_MAX)
+                                        else if (arg->get_uint_unchecked() <= UINT8_MAX)
                                             size.top() += 1;
-                                        else if (arg->get_uint() <= UINT16_MAX)
+                                        else if (arg->get_uint_unchecked() <= UINT16_MAX)
                                             size.top() += 2;
-                                        else if (arg->get_uint() <= UINT32_MAX)
+                                        else if (arg->get_uint_unchecked() <= UINT32_MAX)
                                             size.top() += 4;
                                         else
                                             size.top() += 8;
@@ -123,7 +123,7 @@ namespace cppdatalib
                                         // since there is nothing to show that the data should be read as a floating point number)
                                         // To prevent the loss of data, the subtype is discarded and the value stays the same
 
-                                        if (core::float_from_ieee_754(core::float_to_ieee_754(arg->get_real())) != arg->get_real() && !std::isnan(arg->get_real()))
+                                        if (core::float_from_ieee_754(core::float_to_ieee_754(arg->get_real_unchecked())) != arg->get_real_unchecked() && !std::isnan(arg->get_real_unchecked()))
                                             size.top() += 4; // requires more than 32-bit float to losslessly encode
                                     }
 
@@ -144,7 +144,7 @@ namespace cppdatalib
                                         else if (arg->size() > 0 && arg->get_subtype() != core::blob && arg->get_subtype() != core::clob)
                                             size.top() += 1; // requires a one-byte size specifier
 
-                                        size.top() += arg->get_string().size();
+                                        size.top() += arg->string_size();
                                     }
                                     break;
                                 }
@@ -228,43 +228,43 @@ namespace cppdatalib
 
         protected:
             void null_(const core::value &) {output_stream.put(0);}
-            void bool_(const core::value &v) {output_stream.put(24 + v.get_bool());}
+            void bool_(const core::value &v) {output_stream.put(24 + v.get_bool_unchecked());}
 
             void integer_(const core::value &v)
             {
-                if (v.get_int() < 0)
+                if (v.get_int_unchecked() < 0)
                 {
-                    write_size(output_stream, 8, -v.get_int());
+                    write_size(output_stream, 8, -v.get_int_unchecked());
                 }
-                else if (v.get_int() <= 1)
+                else if (v.get_int_unchecked() <= 1)
                 {
-                    output_stream.put(26 + v.get_uint()); // Shortcut 0 and 1
+                    output_stream.put(26 + v.get_uint_unchecked()); // Shortcut 0 and 1
                     return;
                 }
                 else /* positive integer */
                 {
-                    write_size(output_stream, 4, v.get_int());
+                    write_size(output_stream, 4, v.get_int_unchecked());
                 }
             }
 
             void uinteger_(const core::value &v)
             {
-                if (v.get_uint() <= 1)
+                if (v.get_uint_unchecked() <= 1)
                 {
-                    output_stream.put(26 + v.get_uint()); // Shortcut 0 and 1
+                    output_stream.put(26 + v.get_uint_unchecked()); // Shortcut 0 and 1
                     return;
                 }
 
-                write_size(output_stream, 4, v.get_uint());
+                write_size(output_stream, 4, v.get_uint_unchecked());
             }
 
             void real_(const core::value &v)
             {
                 uint64_t out;
 
-                if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real())) == v.get_real() || std::isnan(v.get_real()))
+                if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real_unchecked())) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
                 {
-                    out = core::float_to_ieee_754(v.get_real());
+                    out = core::float_to_ieee_754(v.get_real_unchecked());
                     output_stream.put(14)
                             .put(out & 0xff)
                             .put((out >> 8) & 0xff)
@@ -273,7 +273,7 @@ namespace cppdatalib
                 }
                 else
                 {
-                    out = core::double_to_ieee_754(v.get_real());
+                    out = core::double_to_ieee_754(v.get_real_unchecked());
                     output_stream.put(15)
                             .put(out & 0xff)
                             .put((out >> 8) & 0xff)
@@ -309,7 +309,7 @@ namespace cppdatalib
 
                 write_size(output_stream, initial_type, size);
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string().c_str(), v.get_string().size());}
+            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
 
             void begin_array_(const core::value &v, core::int_t size, bool)
             {

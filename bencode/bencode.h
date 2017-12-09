@@ -135,13 +135,13 @@ namespace cppdatalib
             void integer_(const core::value &v)
             {
                 output_stream.put('i');
-                output_stream << v.get_int();
+                output_stream << v.get_int_unchecked();
                 output_stream.put('e');
             }
             void uinteger_(const core::value &v)
             {
                 output_stream.put('i');
-                output_stream << v.get_uint();
+                output_stream << v.get_uint_unchecked();
                 output_stream.put('e');
             }
             void real_(const core::value &) {throw core::error("Bencode - 'real' value not allowed in output");}
@@ -152,7 +152,7 @@ namespace cppdatalib
                 output_stream << size;
                 output_stream.put(':');
             }
-            void string_data_(const core::value &v, bool) {output_stream << v.get_string();}
+            void string_data_(const core::value &v, bool) {output_stream << v.get_string_unchecked();}
 
             void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('l');}
             void end_array_(const core::value &, bool) {output_stream.put('e');}

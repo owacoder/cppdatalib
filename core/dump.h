@@ -148,17 +148,17 @@ namespace cppdatalib
                 }
 
                 void null_(const core::value &) {output_stream << "null";}
-                void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
-                void integer_(const core::value &v) {output_stream << v.get_int();}
-                void uinteger_(const core::value &v) {output_stream << v.get_uint();}
+                void bool_(const core::value &v) {output_stream << (v.get_bool_unchecked()? "true": "false");}
+                void integer_(const core::value &v) {output_stream << v.get_int_unchecked();}
+                void uinteger_(const core::value &v) {output_stream << v.get_uint_unchecked();}
                 void real_(const core::value &v)
                 {
-                    if (!std::isfinite(v.get_real()))
+                    if (!std::isfinite(v.get_real_unchecked()))
                         throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
-                    output_stream << v.get_real();
+                    output_stream << v.get_real_unchecked();
                 }
                 void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
-                void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
+                void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
                 void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) output_stream.put('"');}
 
                 void begin_array_(const core::value &, core::int_t, bool)

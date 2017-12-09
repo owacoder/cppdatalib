@@ -47,7 +47,7 @@ namespace cppdatalib
 {
     namespace core
     {
-        enum type
+        enum type : int8_t
         {
             null,
             boolean,
@@ -278,7 +278,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_SUBTYPE_T
         typedef CPPDATALIB_SUBTYPE_T subtype_t;
 #else
-        typedef long subtype_t;
+        typedef int16_t subtype_t;
 #endif
 
         struct null_t {};
@@ -313,11 +313,11 @@ namespace cppdatalib
                     , frozen(frozen)
                 {}
 
-                bool is_array() const {return p && array != array_t::const_iterator() && array != p->get_array().end();}
-                size_t get_array_index() const {return is_array()? array - p->get_array().begin(): 0;}
+                bool is_array() const {return p && p->is_array() && array != array_t::const_iterator() && array != p->get_array_unchecked().end();}
+                size_t get_array_index() const {return is_array()? array - p->get_array_unchecked().begin(): 0;}
                 const core::value *get_array_element() const {return is_array()? std::addressof(*array): NULL;}
 
-                bool is_object() const {return p && object != object_t::const_iterator() && object != p->get_object().end();}
+                bool is_object() const {return p && p->is_object() && object != object_t::const_iterator() && object != p->get_object_unchecked().end();}
                 bool is_object_key() const {return is_object() && !traversed_key_already;}
                 const core::value *get_object_key() const {return is_object()? std::addressof(object->first): NULL;}
                 const core::value *get_object_value() const {return is_object()? std::addressof(object->second): NULL;}
@@ -398,16 +398,16 @@ namespace cppdatalib
 
                         if (p->is_array())
                         {
-                            references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
-                            if (!p->get_array().empty())
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
+                            if (!p->get_array_unchecked().empty())
                                 p = std::addressof(*references.top().array++);
                             else
                                 p = NULL;
                         }
                         else if (p->is_object())
                         {
-                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
-                            if (!p->get_object().empty())
+                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
+                            if (!p->get_object_unchecked().empty())
                                 p = std::addressof(references.top().object->first);
                             else
                                 p = NULL;
@@ -421,9 +421,9 @@ namespace cppdatalib
                     else
                     {
                         const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
                             p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
                         {
                             if (!references.top().traversed_key_already)
                                 p = std::addressof(references.top().object->first);
@@ -460,16 +460,16 @@ namespace cppdatalib
 
                         if (p->is_array())
                         {
-                            references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
-                            if (!p->get_array().empty())
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
+                            if (!p->get_array_unchecked().empty())
                                 p = std::addressof(*references.top().array++);
                             else
                                 p = NULL;
                         }
                         else if (p->is_object())
                         {
-                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
-                            if (!p->get_object().empty())
+                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
+                            if (!p->get_object_unchecked().empty())
                                 p = std::addressof(references.top().object->first);
                             else
                                 p = NULL;
@@ -483,9 +483,9 @@ namespace cppdatalib
                     else
                     {
                         const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
                             p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
                         {
                             if (!references.top().traversed_key_already)
                                 p = std::addressof(references.top().object->first);
@@ -522,16 +522,16 @@ namespace cppdatalib
 
                         if (p->is_array())
                         {
-                            references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
-                            if (!p->get_array().empty())
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
+                            if (!p->get_array_unchecked().empty())
                                 p = std::addressof(*references.top().array++);
                             else
                                 p = NULL;
                         }
                         else if (p->is_object())
                         {
-                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
-                            if (!p->get_object().empty())
+                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
+                            if (!p->get_object_unchecked().empty())
                                 p = std::addressof((references.top().object++)->second);
                             else
                                 p = NULL;
@@ -545,9 +545,9 @@ namespace cppdatalib
                     else
                     {
                         const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
                             p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
                             p = std::addressof((references.top().object++)->second);
                         else
                         {
@@ -578,16 +578,16 @@ namespace cppdatalib
 
                         if (p->is_array())
                         {
-                            references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
-                            if (!p->get_array().empty())
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
+                            if (!p->get_array_unchecked().empty())
                                 p = std::addressof(*references.top().array++);
                             else
                                 p = NULL;
                         }
                         else if (p->is_object())
                         {
-                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
-                            if (!p->get_object().empty())
+                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
+                            if (!p->get_object_unchecked().empty())
                                 p = std::addressof((references.top().object++)->second);
                             else
                                 p = NULL;
@@ -601,9 +601,9 @@ namespace cppdatalib
                     else
                     {
                         const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array().end())
+                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
                             p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object().end())
+                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
                             p = std::addressof((references.top().object++)->second);
                         else
                         {
@@ -646,16 +646,16 @@ namespace cppdatalib
                         {
                             if (p->is_array())
                             {
-                                references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false));
-                                if (!p->get_array().empty())
+                                references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
+                                if (!p->get_array_unchecked().empty())
                                     p = std::addressof(*references.top().array++);
                                 else
                                     p = NULL;
                             }
                             else if (p->is_object())
                             {
-                                references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true));
-                                if (!p->get_object().empty())
+                                references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
+                                if (!p->get_object_unchecked().empty())
                                     p = std::addressof(references.top().object->first);
                                 else
                                     p = NULL;
@@ -671,16 +671,16 @@ namespace cppdatalib
                         {
                             if (other_p->is_array())
                             {
-                                other_references.push(traversal_reference(other_p, other_p->get_array().begin(), object_t::const_iterator(), false));
-                                if (!other_p->get_array().empty())
+                                other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin(), object_t::const_iterator(), false));
+                                if (!other_p->get_array_unchecked().empty())
                                     other_p = std::addressof(*other_references.top().array++);
                                 else
                                     other_p = NULL;
                             }
                             else if (other_p->is_object())
                             {
-                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), other_p->get_object().begin(), true));
-                                if (!other_p->get_object().empty())
+                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), other_p->get_object_unchecked().begin(), true));
+                                if (!other_p->get_object_unchecked().empty())
                                     other_p = std::addressof(other_references.top().object->first);
                                 else
                                     other_p = NULL;
@@ -699,9 +699,9 @@ namespace cppdatalib
 
                         if (peek)
                         {
-                            if (peek->is_array() && references.top().array != peek->get_array().end())
+                            if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
                                 p = std::addressof(*references.top().array++);
-                            else if (peek->is_object() && references.top().object != peek->get_object().end())
+                            else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
                             {
                                 if (!references.top().traversed_key_already)
                                     p = std::addressof(references.top().object->first);
@@ -714,9 +714,9 @@ namespace cppdatalib
 
                         if (other_peek)
                         {
-                            if (other_peek->is_array() && other_references.top().array != other_peek->get_array().end())
+                            if (other_peek->is_array() && other_references.top().array != other_peek->get_array_unchecked().end())
                                 other_p = std::addressof(*other_references.top().array++);
-                            else if (other_peek->is_object() && other_references.top().object != other_peek->get_object().end())
+                            else if (other_peek->is_object() && other_references.top().object != other_peek->get_object_unchecked().end())
                             {
                                 if (!other_references.top().traversed_key_already)
                                     other_p = std::addressof(other_references.top().object->first);
@@ -783,16 +783,16 @@ namespace cppdatalib
                         {
                             if (p->is_array())
                             {
-                                references.push(traversal_reference(p, p->get_array().begin(), object_t::const_iterator(), false, p_frozen));
-                                if (!p->get_array().empty() && !p_frozen)
+                                references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false, p_frozen));
+                                if (!p->get_array_unchecked().empty() && !p_frozen)
                                     p = std::addressof(*references.top().array++);
                                 else
                                     p = NULL;
                             }
                             else if (p->is_object())
                             {
-                                references.push(traversal_reference(p, array_t::const_iterator(), p->get_object().begin(), true, p_frozen));
-                                if (!p->get_object().empty() && !p_frozen)
+                                references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true, p_frozen));
+                                if (!p->get_object_unchecked().empty() && !p_frozen)
                                     p = std::addressof(references.top().object->first);
                                 else
                                     p = NULL;
@@ -808,16 +808,16 @@ namespace cppdatalib
                         {
                             if (other_p->is_array())
                             {
-                                other_references.push(traversal_reference(other_p, other_p->get_array().begin(), object_t::const_iterator(), false, other_p_frozen));
-                                if (!other_p->get_array().empty() && !other_p_frozen)
+                                other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin(), object_t::const_iterator(), false, other_p_frozen));
+                                if (!other_p->get_array_unchecked().empty() && !other_p_frozen)
                                     other_p = std::addressof(*other_references.top().array++);
                                 else
                                     other_p = NULL;
                             }
                             else if (other_p->is_object())
                             {
-                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), other_p->get_object().begin(), true, other_p_frozen));
-                                if (!other_p->get_object().empty() && !other_p_frozen)
+                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), other_p->get_object_unchecked().begin(), true, other_p_frozen));
+                                if (!other_p->get_object_unchecked().empty() && !other_p_frozen)
                                     other_p = std::addressof(other_references.top().object->first);
                                 else
                                     other_p = NULL;
@@ -840,9 +840,9 @@ namespace cppdatalib
                         {
                             if (references.top().frozen)
                                 p = references.top().p;
-                            else if (peek->is_array() && references.top().array != peek->get_array().end())
+                            else if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
                                 p = std::addressof(*references.top().array++);
-                            else if (peek->is_object() && references.top().object != peek->get_object().end())
+                            else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
                             {
                                 if (!references.top().traversed_key_already)
                                     p = std::addressof(references.top().object->first);
@@ -857,9 +857,9 @@ namespace cppdatalib
                         {
                             if (other_references.top().frozen)
                                 other_p = other_references.top().p;
-                            else if (other_peek->is_array() && other_references.top().array != other_peek->get_array().end())
+                            else if (other_peek->is_array() && other_references.top().array != other_peek->get_array_unchecked().end())
                                 other_p = std::addressof(*other_references.top().array++);
-                            else if (other_peek->is_object() && other_references.top().object != other_peek->get_object().end())
+                            else if (other_peek->is_object() && other_references.top().object != other_peek->get_object_unchecked().end())
                             {
                                 if (!other_references.top().traversed_key_already)
                                     other_p = std::addressof(other_references.top().object->first);
@@ -880,23 +880,23 @@ namespace cppdatalib
 
             value() : type_(null), subtype_(core::normal) {}
             value(null_t, subtype_t subtype = core::normal) : type_(null), subtype_(subtype) {}
-            value(bool_t v, subtype_t subtype = core::normal) : type_(boolean), subtype_(subtype), bool_(v) {}
-            value(int_t v, subtype_t subtype = core::normal) : type_(integer), subtype_(subtype), int_(v) {}
-            value(uint_t v, subtype_t subtype = core::normal) : type_(uinteger), subtype_(subtype), uint_(v) {}
-            value(real_t v, subtype_t subtype = core::normal) : type_(real), subtype_(subtype), real_(v) {}
-            value(cstring_t v, subtype_t subtype = core::normal) : type_(string), subtype_(subtype), str_(v) {}
-            value(const string_t &v, subtype_t subtype = core::normal) : type_(string), subtype_(subtype), str_(v) {}
-            value(string_t &&v, subtype_t subtype = core::normal) : type_(string), subtype_(subtype), str_(std::move(v)) {}
-            value(const array_t &v, subtype_t subtype = core::normal) : type_(array), subtype_(subtype), arr_(v) {}
-            value(array_t &&v, subtype_t subtype = core::normal) : type_(array), subtype_(subtype), arr_(std::move(v)) {}
-            value(const object_t &v, subtype_t subtype = core::normal) : type_(object), subtype_(subtype), obj_(v) {}
-            value(object_t &&v, subtype_t subtype = core::normal) : type_(object), subtype_(subtype), obj_(std::move(v)) {}
+            value(bool_t v, subtype_t subtype = core::normal) {bool_init(subtype, v);}
+            value(int_t v, subtype_t subtype = core::normal) {int_init(subtype, v);}
+            value(uint_t v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
+            value(real_t v, subtype_t subtype = core::normal) {real_init(subtype, v);}
+            value(cstring_t v, subtype_t subtype = core::normal) {string_init(subtype, v);}
+            value(const string_t &v, subtype_t subtype = core::normal) {string_init(subtype, v);}
+            value(string_t &&v, subtype_t subtype = core::normal) {string_init(subtype, std::move(v));}
+            value(const array_t &v, subtype_t subtype = core::normal) {array_init(subtype, v);}
+            value(array_t &&v, subtype_t subtype = core::normal) {array_init(subtype, std::move(v));}
+            value(const object_t &v, subtype_t subtype = core::normal) {object_init(subtype, v);}
+            value(object_t &&v, subtype_t subtype = core::normal) {object_init(subtype, std::move(v));}
             template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = core::normal) : type_(uinteger), subtype_(subtype), uint_(v) {}
+            value(T v, subtype_t subtype = core::normal) {int_init(subtype, v);}
             template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = core::normal) : type_(integer), subtype_(subtype), int_(v) {}
+            value(T v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = core::normal) : type_(real), subtype_(subtype), real_(v) {}
+            value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
             template<typename T>
             value(std::initializer_list<T> v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
@@ -934,16 +934,51 @@ namespace cppdatalib
                     traverse(traverse_node_null, traverse_node_mutable_clear);
             }
 
-            value(const value &other) : type_(null), subtype_(0) {assign(*this, other);}
-            value(value &&other) = default;
+            value(const value &other) : type_(null), subtype_(core::normal) {assign(*this, other);}
+            value(value &&other)
+            {
+                switch (other.type_)
+                {
+                    case boolean: new (&bool_) bool_t(std::move(other.bool_)); break;
+                    case integer: new (&int_) int_t(std::move(other.int_)); break;
+                    case uinteger: new (&uint_) bool_t(std::move(other.uint_)); break;
+                    case real: new (&real_) real_t(std::move(other.real_)); break;
+                    case string: new (&str_) string_t(std::move(other.str_)); break;
+                    case array: new (&arr_) array_t(std::move(other.arr_)); break;
+                    case object: new (&obj_) object_t(std::move(other.obj_)); break;
+                    default: break;
+                }
+                type_ = other.type_;
+                subtype_ = other.subtype_;
+            }
             value &operator=(const value &other) {return assign(*this, other);}
+            value &operator=(value &&other)
+            {
+                clear(other.type_);
+                switch (other.type_)
+                {
+                    case boolean: bool_ = std::move(other.bool_); break;
+                    case integer: int_ = std::move(other.int_); break;
+                    case uinteger: uint_ = std::move(other.uint_); break;
+                    case real: real_ = std::move(other.real_); break;
+                    case string: str_ = std::move(other.str_); break;
+                    case array: arr_ = std::move(other.arr_); break;
+                    case object: obj_ = std::move(other.obj_); break;
+                    default: break;
+                }
+                subtype_ = other.subtype_;
+                return *this;
+            }
 
             subtype_t get_subtype() const {return subtype_;}
             subtype_t &get_subtype() {return subtype_;}
             void set_subtype(subtype_t _type) {subtype_ = _type;}
 
             type get_type() const {return type_;}
-            size_t size() const {return type_ == array? arr_.size(): type_ == object? obj_.size(): type_ == string? str_.size(): 0;}
+            size_t size() const {return is_array()? arr_.size(): is_object()? obj_.size(): is_string()? str_.size(): 0;}
+            size_t array_size() const {return is_array()? arr_.size(): 0;}
+            size_t object_size() const {return is_object()? obj_.size(): 0;}
+            size_t string_size() const {return is_string()? str_.size(): 0;}
 
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
@@ -954,22 +989,22 @@ namespace cppdatalib
             bool_t is_array() const {return type_ == array;}
             bool_t is_object() const {return type_ == object;}
 
-            bool_t get_bool() const {return bool_;}
-            int_t get_int() const {return int_;}
-            uint_t get_uint() const {return uint_;}
-            real_t get_real() const {return real_;}
-            cstring_t get_cstring() const {return str_.c_str();}
-            const string_t &get_string() const {return str_;}
-            const array_t &get_array() const {return arr_;}
-            const object_t &get_object() const {return obj_;}
+            // The following seven functions exhibit UNDEFINED BEHAVIOR if the value is not the requested type
+            bool_t get_bool_unchecked() const {return bool_;}
+            int_t get_int_unchecked() const {return int_;}
+            uint_t get_uint_unchecked() const {return uint_;}
+            real_t get_real_unchecked() const {return real_;}
+            const string_t &get_string_unchecked() const {return str_;}
+            const array_t &get_array_unchecked() const {return arr_;}
+            const object_t &get_object_unchecked() const {return obj_;}
 
-            bool_t &get_bool() {clear(boolean); return bool_;}
-            int_t &get_int() {clear(integer); return int_;}
-            uint_t &get_uint() {clear(uinteger); return uint_;}
-            real_t &get_real() {clear(real); return real_;}
-            string_t &get_string() {clear(string); return str_;}
-            array_t &get_array() {clear(array); return arr_;}
-            object_t &get_object() {clear(object); return obj_;}
+            bool_t &get_bool_ref() {clear(boolean); return bool_;}
+            int_t &get_int_ref() {clear(integer); return int_;}
+            uint_t &get_uint_ref() {clear(uinteger); return uint_;}
+            real_t &get_real_ref() {clear(real); return real_;}
+            string_t &get_string_ref() {clear(string); return str_;}
+            array_t &get_array_ref() {clear(array); return arr_;}
+            object_t &get_object_ref() {clear(object); return obj_;}
 
             void set_null() {clear(null);}
             void set_bool(bool_t v) {clear(boolean); bool_ = v;}
@@ -997,9 +1032,12 @@ namespace cppdatalib
             value &operator[](const string_t &key) {return member(key);}
             value member(const value &key) const
             {
-                auto it = obj_.find(key);
-                if (it != obj_.end())
-                    return it->second;
+                if (is_object())
+                {
+                    auto it = obj_.find(key);
+                    if (it != obj_.end())
+                        return it->second;
+                }
                 return value();
             }
             value &member(const value &key)
@@ -1013,20 +1051,23 @@ namespace cppdatalib
             }
             const value *member_ptr(const value &key) const
             {
-                auto it = obj_.find(key);
-                if (it != obj_.end())
-                    return std::addressof(it->second);
+                if (is_object())
+                {
+                    auto it = obj_.find(key);
+                    if (it != obj_.end())
+                        return std::addressof(it->second);
+                }
                 return NULL;
             }
-            bool_t is_member(cstring_t key) const {return obj_.find(key) != obj_.end();}
-            bool_t is_member(const string_t &key) const {return obj_.find(key) != obj_.end();}
-            bool_t is_member(const value &key) const {return obj_.find(key) != obj_.end();}
-            size_t member_count(cstring_t key) const {return obj_.count(key);}
-            size_t member_count(const string_t &key) const {return obj_.count(key);}
-            size_t member_count(const value &key) const {return obj_.count(key);}
-            void erase_member(cstring_t key) {obj_.erase(key);}
-            void erase_member(const string_t &key) {obj_.erase(key);}
-            void erase_member(const value &key) {obj_.erase(key);}
+            bool_t is_member(cstring_t key) const {return is_object() && obj_.find(key) != obj_.end();}
+            bool_t is_member(const string_t &key) const {return is_object() && obj_.find(key) != obj_.end();}
+            bool_t is_member(const value &key) const {return is_object() && obj_.find(key) != obj_.end();}
+            size_t member_count(cstring_t key) const {return is_object()? obj_.count(key): 0;}
+            size_t member_count(const string_t &key) const {return is_object()? obj_.count(key): 0;}
+            size_t member_count(const value &key) const {return is_object()? obj_.count(key): 0;}
+            void erase_member(cstring_t key) {if (is_object()) obj_.erase(key);}
+            void erase_member(const string_t &key) {if (is_object()) obj_.erase(key);}
+            void erase_member(const value &key) {if (is_object()) obj_.erase(key);}
 
             value &add_member(const value &key)
             {
@@ -1051,21 +1092,27 @@ namespace cppdatalib
 
             void push_back(const value &v) {clear(array); arr_.push_back(v);}
             void push_back(value &&v) {clear(array); arr_.push_back(v);}
-            const value &operator[](size_t pos) const {return element(pos);}
+            value operator[](size_t pos) const {return element(pos);}
             value &operator[](size_t pos) {return element(pos);}
-            const value &element(size_t pos) const {return arr_[pos];}
-            value &element(size_t pos) {return arr_[pos];}
-            void erase_element(int_t pos) {arr_.erase(arr_.begin() + pos);}
+            value element(size_t pos) const {return is_array() && pos < arr_.size()? arr_[pos]: value();}
+            value &element(size_t pos)
+            {
+                clear(array);
+                if (arr_.size() <= pos)
+                    arr_.insert(arr_.end(), pos - arr_.size() + 1, core::null_t());
+                return arr_[pos];
+            }
+            void erase_element(int_t pos) {if (is_array()) arr_.erase(arr_.begin() + pos);}
 
             // The following are convenience conversion functions
-            bool_t get_bool(bool_t default_) const {return is_bool()? bool_: default_;}
-            int_t get_int(int_t default_) const {return is_int()? int_: default_;}
-            uint_t get_uint(uint_t default_) const {return is_uint()? uint_: default_;}
-            real_t get_real(real_t default_) const {return is_real()? real_: default_;}
-            cstring_t get_string(cstring_t default_) const {return is_string()? str_.c_str(): default_;}
-            string_t get_string(const string_t &default_) const {return is_string()? str_: default_;}
-            array_t get_array(const array_t &default_) const {return is_array()? arr_: default_;}
-            object_t get_object(const object_t &default_) const {return is_object()? obj_: default_;}
+            bool_t get_bool(bool_t default_ = false) const {return is_bool()? bool_: default_;}
+            int_t get_int(int_t default_ = 0) const {return is_int()? int_: default_;}
+            uint_t get_uint(uint_t default_ = 0) const {return is_uint()? uint_: default_;}
+            real_t get_real(real_t default_ = 0.0) const {return is_real()? real_: default_;}
+            cstring_t get_cstring(cstring_t default_ = "") const {return is_string()? str_.c_str(): default_;}
+            string_t get_string(const string_t &default_ = string_t()) const {return is_string()? str_: default_;}
+            array_t get_array(const array_t &default_ = array_t()) const {return is_array()? arr_: default_;}
+            object_t get_object(const object_t &default_ = object_t()) const {return is_object()? obj_: default_;}
 
             bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, default_).bool_;}
             int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, default_).int_;}
@@ -1093,29 +1140,119 @@ namespace cppdatalib
             // (They're defined as `const` members in the std::map implementation)
             void mutable_clear() const
             {
-                arr_.clear();
-                obj_.clear();
+                switch (type_)
+                {
+                    case boolean: bool_.~bool_t(); break;
+                    case integer: int_.~int_t(); break;
+                    case uinteger: uint_.~uint_t(); break;
+                    case real: real_.~real_t(); break;
+                    case string: str_.~string_t(); break;
+                    case array: arr_.~array_t(); break;
+                    case object: obj_.~object_t(); break;
+                    default: break;
+                }
                 type_ = null;
             }
 
-            void shallow_clear()
-            {
-                str_.clear();
-                arr_.clear();
-                obj_.clear();
-                type_ = null;
-            }
+            void shallow_clear() {deinit();}
 
             void clear(type new_type)
             {
                 if (type_ == new_type)
                     return;
 
-                str_.clear(); str_.shrink_to_fit();
-                arr_.clear(); arr_.shrink_to_fit();
-                obj_.clear();
+                deinit();
+                init(new_type, normal);
+            }
+
+            void init(type new_type, subtype_t new_subtype)
+            {
+                switch (new_type)
+                {
+                    case boolean: new (&bool_) bool_t(); break;
+                    case integer: new (&int_) int_t(); break;
+                    case uinteger: new (&uint_) uint_t(); break;
+                    case real: new (&real_) real_t(); break;
+                    case string: new (&str_) string_t(); break;
+                    case array: new (&arr_) array_t(); break;
+                    case object: new (&obj_) object_t(); break;
+                    default: break;
+                }
                 type_ = new_type;
-                subtype_ = 0;
+                subtype_ = new_subtype;
+            }
+
+            template<typename... Args>
+            void bool_init(subtype_t new_subtype, Args... args)
+            {
+                new (&bool_) bool_t(args...);
+                type_ = boolean;
+                subtype_ = new_subtype;
+            }
+
+            template<typename... Args>
+            void int_init(subtype_t new_subtype, Args... args)
+            {
+                new (&int_) int_t(args...);
+                type_ = integer;
+                subtype_ = new_subtype;
+            }
+
+            template<typename... Args>
+            void uint_init(subtype_t new_subtype, Args... args)
+            {
+                new (&uint_) uint_t(args...);
+                type_ = uinteger;
+                subtype_ = new_subtype;
+            }
+
+            template<typename... Args>
+            void real_init(subtype_t new_subtype, Args... args)
+            {
+                new (&real_) real_t(args...);
+                type_ = real;
+                subtype_ = new_subtype;
+            }
+
+            template<typename... Args>
+            void string_init(subtype_t new_subtype, Args... args)
+            {
+                new (&str_) string_t(args...);
+                type_ = string;
+                subtype_ = new_subtype;
+            }
+
+            template<typename... Args>
+            void array_init(subtype_t new_subtype, Args... args)
+            {
+                new (&arr_) array_t(args...);
+                type_ = array;
+                subtype_ = new_subtype;
+            }
+
+            template<typename... Args>
+            void object_init(subtype_t new_subtype, Args... args)
+            {
+                new (&obj_) object_t(args...);
+                type_ = object;
+                subtype_ = new_subtype;
+            }
+
+            void deinit()
+            {
+                switch (type_)
+                {
+                    case boolean: bool_.~bool_t(); break;
+                    case integer: int_.~int_t(); break;
+                    case uinteger: uint_.~uint_t(); break;
+                    case real: real_.~real_t(); break;
+                    case string: str_.~string_t(); break;
+                    case array: arr_.~array_t(); break;
+                    case object: obj_.~object_t(); break;
+                    default: break;
+                }
+                type_ = null;
+                subtype_ = normal;
             }
 
             // TODO: ensure that all conversions are generic enough (for example, string -> bool doesn't just need to be "true")
@@ -1132,10 +1269,10 @@ namespace cppdatalib
                         clear(new_type);
                         switch (new_type)
                         {
-                            case integer: int_ = bool_; break;
-                            case uinteger: uint_ = bool_; break;
-                            case real: real_ = bool_; break;
-                            case string: str_ = bool_? "true": "false"; break;
+                            case integer: set_int((bool) bool_); break;
+                            case uinteger: set_uint((bool) bool_); break;
+                            case real: set_real((bool) bool_); break;
+                            case string: set_string((bool) bool_? "true": "false"); break;
                             default: *this = default_value; break;
                         }
                         break;
@@ -1145,10 +1282,10 @@ namespace cppdatalib
                         clear(new_type);
                         switch (new_type)
                         {
-                            case boolean: bool_ = int_ != 0; break;
-                            case uinteger: uint_ = int_ > 0? int_: 0; break;
-                            case real: real_ = int_; break;
-                            case string: str_ = std::to_string(int_); break;
+                            case boolean: set_bool(int_ != 0); break;
+                            case uinteger: set_uint(int_ > 0? int_: 0); break;
+                            case real: set_real(int_); break;
+                            case string: set_string(std::to_string(int_)); break;
                             default: *this = default_value; break;
                         }
                         break;
@@ -1158,10 +1295,10 @@ namespace cppdatalib
                         clear(new_type);
                         switch (new_type)
                         {
-                            case boolean: bool_ = uint_ != 0; break;
-                            case integer: int_ = uint_ <= INT64_MAX? uint_: 0; break;
-                            case real: real_ = uint_; break;
-                            case string: str_ = std::to_string(uint_); break;
+                            case boolean: set_bool(uint_ != 0); break;
+                            case integer: set_int(uint_ <= INT64_MAX? uint_: 0); break;
+                            case real: set_real(uint_); break;
+                            case string: set_string(std::to_string(uint_)); break;
                             default: *this = default_value; break;
                         }
                         break;
@@ -1171,14 +1308,14 @@ namespace cppdatalib
                         clear(new_type);
                         switch (new_type)
                         {
-                            case boolean: bool_ = real_ != 0.0; break;
-                            case integer: int_ = (real_ >= INT64_MIN && real_ <= INT64_MAX)? trunc(real_): 0; break;
-                            case uinteger: uint_ = (real_ >= 0 && real_ <= UINT64_MAX)? trunc(real_): 0; break;
+                            case boolean: set_bool(real_ != 0.0); break;
+                            case integer: set_int((real_ >= INT64_MIN && real_ <= INT64_MAX)? trunc(real_): 0); break;
+                            case uinteger: set_uint((real_ >= 0 && real_ <= UINT64_MAX)? trunc(real_): 0); break;
                             case string:
                             {
                                 std::ostringstream str;
                                 str << std::setprecision(CPPDATALIB_REAL_DIG) << real_;
-                                str_ = str.str();
+                                set_string(str.str());
                                 break;
                             }
                             default: *this = default_value; break;
@@ -1189,10 +1326,11 @@ namespace cppdatalib
                     {
                         switch (new_type)
                         {
-                            case boolean: bool_ = str_ == "true"; break;
+                            case boolean: set_bool(str_ == "true"); break;
                             case integer:
                             {
                                 std::istringstream str(str_);
+                                clear(integer);
                                 str >> int_;
                                 if (!str)
                                     int_ = 0;
@@ -1201,6 +1339,7 @@ namespace cppdatalib
                             case uinteger:
                             {
                                 std::istringstream str(str_);
+                                clear(uinteger);
                                 str >> uint_;
                                 if (!str)
                                     uint_ = 0;
@@ -1209,6 +1348,7 @@ namespace cppdatalib
                             case real:
                             {
                                 std::istringstream str(str_);
+                                clear(real);
                                 str >> real_;
                                 if (!str)
                                     real_ = 0.0;
@@ -1227,23 +1367,16 @@ namespace cppdatalib
 
             mutable type type_; // Mutable to provide editable traversal access to const destructor
             subtype_t subtype_;
-#ifndef CPPDATALIB_NON_POD_LAYOUT
             union
             {
                 bool_t bool_;
                 int_t int_;
                 uint_t uint_;
                 real_t real_;
+                string_t str_;
+                mutable array_t arr_; // Mutable to provide editable traversal access to const destructor
+                mutable object_t obj_; // Mutable to provide editable traversal access to const destructor
             };
-#else
-            bool_t bool_;
-            int_t int_;
-            uint_t uint_;
-            real_t real_;
-#endif
-            string_t str_;
-            mutable array_t arr_; // Mutable to provide editable traversal access to const destructor
-            mutable object_t obj_; // Mutable to provide editable traversal access to const destructor
         };
 
         namespace impl

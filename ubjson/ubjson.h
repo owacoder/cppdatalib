@@ -545,15 +545,15 @@ namespace cppdatalib
             }
 
             void null_(const core::value &) {output_stream.put('Z');}
-            void bool_(const core::value &v) {output_stream.put(v.get_bool()? 'T': 'F');}
-            void integer_(const core::value &v) {write_int(output_stream, v.get_int(), true);}
+            void bool_(const core::value &v) {output_stream.put(v.get_bool_unchecked()? 'T': 'F');}
+            void integer_(const core::value &v) {write_int(output_stream, v.get_int_unchecked(), true);}
             void uinteger_(const core::value &v)
             {
-                if (v.get_uint() > std::numeric_limits<core::int_t>::max())
+                if (v.get_uint_unchecked() > std::numeric_limits<core::int_t>::max())
                     throw core::error("UBJSON - 'integer' value is out of range of output format");
-                write_int(output_stream, v.get_uint(), true);
+                write_int(output_stream, v.get_uint_unchecked(), true);
             }
-            void real_(const core::value &v) {write_float(output_stream, v.get_real(), true);}
+            void real_(const core::value &v) {write_float(output_stream, v.get_real_unchecked(), true);}
             void begin_string_(const core::value &v, core::int_t size, bool is_key)
             {
                 if (size == unknown_size)
@@ -563,7 +563,7 @@ namespace cppdatalib
                     output_stream.put(v.get_subtype() == core::bignum? 'H': 'S');
                 write_int(output_stream, size, true);
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string().data(), v.get_string().size());}
+            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().data(), v.get_string_unchecked().size());}
 
             void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('[');}
             void end_array_(const core::value &, bool) {output_stream.put(']');}

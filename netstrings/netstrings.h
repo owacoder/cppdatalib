@@ -63,14 +63,14 @@ namespace cppdatalib
                                     break;
                                 case core::boolean:
                                     if (prefix)
-                                        size.top() += 7 + arg->get_bool(); // "4:true," or "5:false,"
+                                        size.top() += 7 + arg->get_bool_unchecked(); // "4:true," or "5:false,"
                                     break;
                                 case core::integer:
                                 {
                                     if (prefix)
                                     {
                                         core::ostringstream stream;
-                                        stream << arg->get_int();
+                                        stream << arg->get_int_unchecked();
                                         stream << stream.str().size();
                                         size.top() += 2 + stream.str().size();
                                     }
@@ -81,7 +81,7 @@ namespace cppdatalib
                                     if (prefix)
                                     {
                                         core::ostringstream stream;
-                                        stream << arg->get_uint();
+                                        stream << arg->get_uint_unchecked();
                                         stream << stream.str().size();
                                         size.top() += 2 + stream.str().size();
                                     }
@@ -93,7 +93,7 @@ namespace cppdatalib
                                     {
                                         core::ostringstream stream;
                                         stream.precision(CPPDATALIB_REAL_DIG);
-                                        stream << arg->get_real();
+                                        stream << arg->get_real_unchecked();
                                         stream << stream.str().size();
                                         size.top() += 2 + stream.str().size();
                                     }
@@ -102,7 +102,7 @@ namespace cppdatalib
                                 case core::string:
                                 {
                                     if (prefix)
-                                        size.top() += 2 + arg->get_string().size() + std::to_string(arg->get_string().size()).size();
+                                        size.top() += 2 + arg->string_size() + std::to_string(arg->string_size()).size();
                                     break;
                                 }
                                 case core::array:
@@ -147,13 +147,13 @@ namespace cppdatalib
 
         protected:
             void null_(const core::value &) {output_stream.write("0:,", 3);}
-            void bool_(const core::value &v) {v.get_bool()? output_stream.write("4:true,", 7): output_stream.write("5:false,", 8);}
+            void bool_(const core::value &v) {v.get_bool_unchecked()? output_stream.write("4:true,", 7): output_stream.write("5:false,", 8);}
 
             void integer_(const core::value &v)
             {
                 core::ostringstream stream;
 
-                stream << v.get_int();
+                stream << v.get_int_unchecked();
                 output_stream << stream.str().size();
                 output_stream.put(':');
                 output_stream << stream.str();
@@ -164,7 +164,7 @@ namespace cppdatalib
             {
                 core::ostringstream stream;
 
-                stream << v.get_uint();
+                stream << v.get_uint_unchecked();
                 output_stream << stream.str().size();
                 output_stream.put(':');
                 output_stream << stream.str();
@@ -176,7 +176,7 @@ namespace cppdatalib
                 core::ostringstream stream;
 
                 stream.precision(CPPDATALIB_REAL_DIG);
-                stream << v.get_real();
+                stream << v.get_real_unchecked();
                 output_stream << stream.str().size();
                 output_stream.put(':');
                 output_stream << stream.str();
@@ -191,7 +191,7 @@ namespace cppdatalib
                 output_stream << size;
                 output_stream.put(':');
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string().c_str(), v.get_string().size());}
+            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
             void end_string_(const core::value &, bool) {output_stream.put(',');}
 
             void begin_array_(const core::value &v, core::int_t size, bool)

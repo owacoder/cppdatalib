@@ -346,12 +346,12 @@ namespace cppdatalib
                     output_stream.put(separator);
             }
 
-            void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
-            void integer_(const core::value &v) {output_stream << v.get_int();}
-            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
+            void bool_(const core::value &v) {output_stream << (v.get_bool_unchecked()? "true": "false");}
+            void integer_(const core::value &v) {output_stream << v.get_int_unchecked();}
+            void uinteger_(const core::value &v) {output_stream << v.get_uint_unchecked();}
+            void real_(const core::value &v) {output_stream << v.get_real_unchecked();}
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
+            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
             void end_string_(const core::value &, bool) {output_stream.put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'array' value not allowed in row output");}
@@ -379,12 +379,12 @@ namespace cppdatalib
                 }
             }
 
-            void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
-            void integer_(const core::value &v) {output_stream << v.get_int();}
-            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
+            void bool_(const core::value &v) {output_stream << (v.get_bool_unchecked()? "true": "false");}
+            void integer_(const core::value &v) {output_stream << v.get_int_unchecked();}
+            void uinteger_(const core::value &v) {output_stream << v.get_uint_unchecked();}
+            void real_(const core::value &v) {output_stream << v.get_real_unchecked();}
             void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
+            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
             void end_string_(const core::value &, bool) {output_stream.put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool)

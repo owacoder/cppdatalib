@@ -3,6 +3,7 @@
 #define CPPDATALIB_FAST_IO
 #define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
+#define CPPDATALIB_ENABLE_MARIADB
 #include "cppdatalib.h"
 
 struct vt100
@@ -97,6 +98,19 @@ struct vt100
 };
 
 using namespace cppdatalib;
+
+template<typename T>
+std::ostream &operator<<(std::ostream &strm, const std::vector<T> &value)
+{
+    strm << "[";
+    for (auto i = value.begin(); i != value.end(); ++i)
+    {
+        if (i != value.begin())
+            strm << " ";
+        strm << *i;
+    }
+    return strm << "]" << std::flush;
+}
 
 template<typename F, typename S = F>
 struct TestData : public std::vector<std::pair<F, S>>
@@ -352,6 +366,9 @@ int main()
 {
     vt100 vt;
     std::cout << vt.attr_bright;
+
+    std::cout << sizeof(core::value) << std::endl;
+
     Test("base64_encode", base64_encode_tests, base64::encode);
     ReverseTest("base64_decode", base64_encode_tests, base64::decode);
     Test("debug_hex_encode", debug_hex_encode_tests, hex::debug_encode);

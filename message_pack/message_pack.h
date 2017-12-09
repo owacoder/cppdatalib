@@ -496,10 +496,10 @@ namespace cppdatalib
 
         protected:
             void null_(const core::value &) {output_stream.put(0xc0);}
-            void bool_(const core::value &v) {output_stream.put(0xc2 + v.get_bool());}
-            void integer_(const core::value &v) {write_int(output_stream, v.get_int());}
-            void uinteger_(const core::value &v) {write_int(output_stream, v.get_uint());}
-            void real_(const core::value &v) {write_float(output_stream, v.get_real());}
+            void bool_(const core::value &v) {output_stream.put(0xc2 + v.get_bool_unchecked());}
+            void integer_(const core::value &v) {write_int(output_stream, v.get_int_unchecked());}
+            void uinteger_(const core::value &v) {write_int(output_stream, v.get_uint_unchecked());}
+            void real_(const core::value &v) {write_float(output_stream, v.get_real_unchecked());}
             void begin_string_(const core::value &v, core::int_t size, bool)
             {
                 if (size == unknown_size)
@@ -507,7 +507,7 @@ namespace cppdatalib
 
                 write_string_size(output_stream, size, v.get_subtype());
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string().c_str(), v.get_string().size());}
+            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
 
             void begin_array_(const core::value &, core::int_t size, bool)
             {

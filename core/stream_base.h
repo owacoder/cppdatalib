@@ -304,7 +304,7 @@ namespace cppdatalib
 #endif
 
                 string_data_(v, is_key_);
-                nested_scopes.back().items_ += v.get_string().size();
+                nested_scopes.back().items_ += v.string_size();
             }
             void end_string(const core::value &v)
             {
@@ -602,19 +602,19 @@ namespace cppdatalib
                                 switch (arg->get_type())
                                 {
                                     case boolean:
-                                        compare = -(arg->get_bool() < arg2->get_bool());
+                                        compare = -(arg->get_bool_unchecked() < arg2->get_bool_unchecked());
                                         break;
                                     case integer:
-                                        compare = -(arg->get_int() < arg2->get_int());
+                                        compare = -(arg->get_int_unchecked() < arg2->get_int_unchecked());
                                         break;
                                     case uinteger:
-                                        compare = -(arg->get_uint() < arg2->get_uint());
+                                        compare = -(arg->get_uint_unchecked() < arg2->get_uint_unchecked());
                                         break;
                                     case real:
-                                        compare = -(arg->get_real() < arg2->get_real());
+                                        compare = -(arg->get_real_unchecked() < arg2->get_real_unchecked());
                                         break;
                                     case string:
-                                        compare = -(arg->get_string() < arg2->get_string());
+                                        compare = -(arg->get_string_unchecked() < arg2->get_string_unchecked());
                                         break;
                                     case array:
                                     case object:
@@ -670,19 +670,19 @@ namespace cppdatalib
                                 switch (arg->get_type())
                                 {
                                     case boolean:
-                                        compare = (arg->get_bool() > arg2->get_bool()) - (arg->get_bool() < arg2->get_bool());
+                                        compare = (arg->get_bool_unchecked() > arg2->get_bool_unchecked()) - (arg->get_bool_unchecked() < arg2->get_bool_unchecked());
                                         break;
                                     case integer:
-                                        compare = (arg->get_int() > arg2->get_int()) - (arg->get_int() < arg2->get_int());
+                                        compare = (arg->get_int_unchecked() > arg2->get_int_unchecked()) - (arg->get_int_unchecked() < arg2->get_int_unchecked());
                                         break;
                                     case uinteger:
-                                        compare = (arg->get_uint() > arg2->get_uint()) - (arg->get_uint() < arg2->get_uint());
+                                        compare = (arg->get_uint_unchecked() > arg2->get_uint_unchecked()) - (arg->get_uint_unchecked() < arg2->get_uint_unchecked());
                                         break;
                                     case real:
-                                        compare = (arg->get_real() > arg2->get_real()) - (arg->get_real() < arg2->get_real());
+                                        compare = (arg->get_real_unchecked() > arg2->get_real_unchecked()) - (arg->get_real_unchecked() < arg2->get_real_unchecked());
                                         break;
                                     case string:
-                                        compare = (arg->get_string() > arg2->get_string()) - (arg->get_string() < arg2->get_string());
+                                        compare = (arg->get_string_unchecked() > arg2->get_string_unchecked()) - (arg->get_string_unchecked() < arg2->get_string_unchecked());
                                         break;
                                     case array:
                                     case object:
@@ -731,25 +731,23 @@ namespace cppdatalib
                             switch (arg->get_type())
                             {
                                 case boolean:
-                                    equal = (arg->get_bool() == arg2->get_bool());
+                                    equal = (arg->get_bool_unchecked() == arg2->get_bool_unchecked());
                                     break;
                                 case integer:
-                                    equal = (arg->get_int() == arg2->get_int());
+                                    equal = (arg->get_int_unchecked() == arg2->get_int_unchecked());
                                     break;
                                 case uinteger:
-                                    equal = (arg->get_uint() == arg2->get_uint());
+                                    equal = (arg->get_uint_unchecked() == arg2->get_uint_unchecked());
                                     break;
                                 case real:
-                                    equal = (arg->get_real() == arg2->get_real());
+                                    equal = (arg->get_real_unchecked() == arg2->get_real_unchecked());
                                     break;
                                 case string:
-                                    equal = (arg->get_string() == arg2->get_string());
+                                    equal = (arg->get_string_unchecked() == arg2->get_string_unchecked());
                                     break;
                                 case array:
-                                    equal = (arg->get_array().size() == arg2->get_array().size());
-                                    break;
                                 case object:
-                                    equal = (arg->get_object().size() == arg2->get_object().size());
+                                    equal = (arg->size() == arg2->size());
                                     break;
                                 case null:
                                 default:

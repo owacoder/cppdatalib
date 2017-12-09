@@ -106,7 +106,7 @@ namespace cppdatalib
                 if (references.empty())
                     end(), begin();
 
-                references.top()->get_string() += v.get_string();
+                references.top()->get_string_ref() += v.get_string_unchecked();
             }
 
             // begin_container() operates similarly to begin_scalar_(), but pushes a reference to the container as well
@@ -118,7 +118,7 @@ namespace cppdatalib
                 if (!is_key && current_container() == array)
                 {
                     references.top()->push_back(core::null_t());
-                    references.push(&references.top()->get_array().back());
+                    references.push(&references.top()->get_array_ref().back());
                 }
                 else if (!is_key && current_container() == object)
                 {
@@ -160,11 +160,11 @@ namespace cppdatalib
             switch (src.get_type())
             {
                 case null: dst.set_null(src.get_subtype()); return dst;
-                case boolean: dst.set_bool(src.get_bool(), src.get_subtype()); return dst;
-                case integer: dst.set_int(src.get_int(), src.get_subtype()); return dst;
-                case uinteger: dst.set_uint(src.get_uint(), src.get_subtype()); return dst;
-                case real: dst.set_real(src.get_real(), src.get_subtype()); return dst;
-                case string: dst.set_string(src.get_string(), src.get_subtype()); return dst;
+                case boolean: dst.set_bool(src.get_bool_unchecked(), src.get_subtype()); return dst;
+                case integer: dst.set_int(src.get_int_unchecked(), src.get_subtype()); return dst;
+                case uinteger: dst.set_uint(src.get_uint_unchecked(), src.get_subtype()); return dst;
+                case real: dst.set_real(src.get_real_unchecked(), src.get_subtype()); return dst;
+                case string: dst.set_string(src.get_string_unchecked(), src.get_subtype()); return dst;
                 case array:
                 case object:
                 {

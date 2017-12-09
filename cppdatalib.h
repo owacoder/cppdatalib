@@ -40,6 +40,6 @@
 #include "xls/xml.h"
 #include "netstrings/netstrings.h"
 #include "message_pack/message_pack.h"
-#include "mariadb/mariadb.h"
+#include "mysql/mysql.h"
 
 #endif // CPPDATALIB_H

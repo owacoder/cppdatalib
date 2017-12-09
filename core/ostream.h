@@ -134,7 +134,6 @@ namespace cppdatalib
                 return write_formatted_string(p);
             }
 
-            // TODO: faster method to write reals than using the STL
             template<typename T>
             ostream &write_formatted_real(T val)
             {

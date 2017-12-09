@@ -89,9 +89,9 @@ namespace cppdatalib
 
             void null_(const core::value &) {throw core::error("XML RPC - 'null' value not allowed in output");}
             void bool_(const core::value &v) {output_stream << "<value><boolean>" << v.as_int() << "</boolean></value>";}
-            void integer_(const core::value &v) {output_stream << "<value><int>" << v.get_int() << "</int></value>";}
-            void uinteger_(const core::value &v) {output_stream << "<value><int>" << v.get_uint() << "</int></value>";}
-            void real_(const core::value &v) {output_stream << "<value><double>" << v.get_real() << "</double></value>";}
+            void integer_(const core::value &v) {output_stream << "<value><int>" << v.get_int_unchecked() << "</int></value>";}
+            void uinteger_(const core::value &v) {output_stream << "<value><int>" << v.get_uint_unchecked() << "</int></value>";}
+            void real_(const core::value &v) {output_stream << "<value><double>" << v.get_real_unchecked() << "</double></value>";}
             void begin_string_(const core::value &, core::int_t, bool is_key)
             {
                 if (is_key)
@@ -99,7 +99,7 @@ namespace cppdatalib
                 else
                     output_stream << "<value><string>";
             }
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
+            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
             void end_string_(const core::value &, bool is_key)
             {
                 if (is_key)
@@ -184,7 +184,7 @@ namespace cppdatalib
             {
                 output_stream << "<value>\n"; output_padding(current_indent + indent_width);
                 output_stream << "<int>\n"; output_padding(current_indent + indent_width * 2);
-                output_stream << v.get_int() << '\n'; output_padding(current_indent + indent_width);
+                output_stream << v.get_int_unchecked() << '\n'; output_padding(current_indent + indent_width);
                 output_stream << "</int>\n"; output_padding(current_indent);
                 output_stream << "</value>";
             }
@@ -192,7 +192,7 @@ namespace cppdatalib
             {
                 output_stream << "<value>\n"; output_padding(current_indent + indent_width);
                 output_stream << "<int>\n"; output_padding(current_indent + indent_width * 2);
-                output_stream << v.get_uint() << '\n'; output_padding(current_indent + indent_width);
+                output_stream << v.get_uint_unchecked() << '\n'; output_padding(current_indent + indent_width);
                 output_stream << "</int>\n"; output_padding(current_indent);
                 output_stream << "</value>";
             }
@@ -200,7 +200,7 @@ namespace cppdatalib
             {
                 output_stream << "<value>\n"; output_padding(current_indent + indent_width);
                 output_stream << "<double>\n"; output_padding(current_indent + indent_width * 2);
-                output_stream << v.get_real() << '\n'; output_padding(current_indent + indent_width);
+                output_stream << v.get_real_unchecked() << '\n'; output_padding(current_indent + indent_width);
                 output_stream << "</double>\n"; output_padding(current_indent);
                 output_stream << "</value>";
             }
@@ -221,7 +221,7 @@ namespace cppdatalib
                 if (current_container_size() == 0)
                     output_stream << '\n', output_padding(current_indent + indent_width);
 
-                write_string(output_stream, v.get_string());
+                write_string(output_stream, v.get_string_unchecked());
             }
             void end_string_(const core::value &, bool is_key)
             {

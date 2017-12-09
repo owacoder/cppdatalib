@@ -83,10 +83,10 @@ namespace cppdatalib
             }
 
             void null_(const core::value &) {throw core::error("XML Property List - 'null' value not allowed in output");}
-            void bool_(const core::value &v) {output_stream.put('<') << (v.get_bool()? "true": "false") << "/>";}
-            void integer_(const core::value &v) {output_stream << "<integer>" << v.get_int() << "</integer>";}
-            void uinteger_(const core::value &v) {output_stream << "<integer>" << v.get_uint() << "</integer>";}
-            void real_(const core::value &v) {output_stream << "<real>" << v.get_real() << "</real>";}
+            void bool_(const core::value &v) {output_stream.put('<') << (v.get_bool_unchecked()? "true": "false") << "/>";}
+            void integer_(const core::value &v) {output_stream << "<integer>" << v.get_int_unchecked() << "</integer>";}
+            void uinteger_(const core::value &v) {output_stream << "<integer>" << v.get_uint_unchecked() << "</integer>";}
+            void real_(const core::value &v) {output_stream << "<real>" << v.get_real_unchecked() << "</real>";}
             void begin_string_(const core::value &v, core::int_t, bool is_key)
             {
                 if (is_key)
@@ -105,9 +105,9 @@ namespace cppdatalib
             void string_data_(const core::value &v, bool)
             {
                 if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
-                    base64::write(output_stream, v.get_string());
+                    base64::write(output_stream, v.get_string_unchecked());
                 else
-                    write_string(output_stream, v.get_string());
+                    write_string(output_stream, v.get_string_unchecked());
             }
             void end_string_(const core::value &v, bool is_key)
             {
@@ -177,23 +177,23 @@ namespace cppdatalib
                     throw core::error("XML Property List - cannot write non-string key");
             }
 
-            void bool_(const core::value &v) {output_stream << '<' << (v.get_bool()? "true": "false") << "/>";}
+            void bool_(const core::value &v) {output_stream << '<' << (v.get_bool_unchecked()? "true": "false") << "/>";}
             void integer_(const core::value &v)
             {
                 output_stream << "<integer>\n", output_padding(current_indent + indent_width);
-                output_stream << v.get_int() << '\n'; output_padding(current_indent);
+                output_stream << v.get_int_unchecked() << '\n'; output_padding(current_indent);
                 output_stream << "</integer>";
             }
             void uinteger_(const core::value &v)
             {
                 output_stream << "<integer>\n", output_padding(current_indent + indent_width);
-                output_stream << v.get_uint() << '\n'; output_padding(current_indent);
+                output_stream << v.get_uint_unchecked() << '\n'; output_padding(current_indent);
                 output_stream << "</integer>";
             }
             void real_(const core::value &v)
             {
                 output_stream << "<real>\n", output_padding(current_indent + indent_width);
-                output_stream << v.get_real() << '\n'; output_padding(current_indent);
+                output_stream << v.get_real_unchecked() << '\n'; output_padding(current_indent);
                 output_stream << "</real>";
             }
             void begin_string_(const core::value &v, core::int_t, bool is_key)
@@ -217,9 +217,9 @@ namespace cppdatalib
                     output_stream << '\n', output_padding(current_indent + indent_width);
 
                 if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
-                    base64::write(output_stream, v.get_string());
+                    base64::write(output_stream, v.get_string_unchecked());
                 else
-                    write_string(output_stream, v.get_string());
+                    write_string(output_stream, v.get_string_unchecked());
             }
             void end_string_(const core::value &v, bool is_key)
             {

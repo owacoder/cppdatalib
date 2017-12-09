@@ -134,10 +134,10 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case integer: value.set_int(value.get_bool()); break;
-                                case uinteger: value.set_uint(value.get_bool()); break;
-                                case real: value.set_real(value.get_bool()); break;
-                                case string: value.set_string(value.get_bool()? "true": "false"); break;
+                                case integer: value.set_int(value.get_bool_unchecked()); break;
+                                case uinteger: value.set_uint(value.get_bool_unchecked()); break;
+                                case real: value.set_real(value.get_bool_unchecked()); break;
+                                case string: value.set_string(value.get_bool_unchecked()? "true": "false"); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
                                 default: value.set_null(); break;
@@ -147,9 +147,9 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case boolean: value.set_bool(value.get_int() != 0); break;
+                                case boolean: value.set_bool(value.get_int_unchecked() != 0); break;
                                 case uinteger: value.convert_to_uint(); break;
-                                case real: value.set_real(value.get_int()); break;
+                                case real: value.set_real(value.get_int_unchecked()); break;
                                 case string: value.convert_to_string(); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
@@ -160,9 +160,9 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case boolean: value.set_bool(value.get_uint() != 0); break;
+                                case boolean: value.set_bool(value.get_uint_unchecked() != 0); break;
                                 case integer: value.convert_to_int(); break;
-                                case real: value.set_real(value.get_uint()); break;
+                                case real: value.set_real(value.get_uint_unchecked()); break;
                                 case string: value.convert_to_string(); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
@@ -173,7 +173,7 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case boolean: value.set_bool(value.get_real() != 0.0); break;
+                                case boolean: value.set_bool(value.get_real_unchecked() != 0.0); break;
                                 case integer: value.convert_to_int(); break;
                                 case uinteger: value.convert_to_uint(); break;
                                 case string: value.convert_to_string(); break;
@@ -186,7 +186,7 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case boolean: value.set_bool(value.get_string() == "true" || value.as_int()); break;
+                                case boolean: value.set_bool(value.get_string_unchecked() == "true" || value.as_int()); break;
                                 case integer: value.convert_to_int(); break;
                                 case uinteger: value.convert_to_uint(); break;
                                 case real: value.convert_to_real(); break;
@@ -211,7 +211,7 @@ namespace cppdatalib
                                     if (value.size() % 2 != 0)
                                         throw core::error("cppdatalib::core::stream_filter_converter - cannot convert 'array' to 'object' with odd number of elements");
 
-                                    for (size_t i = 0; i < value.get_array().size(); i += 2)
+                                    for (size_t i = 0; i < value.size(); i += 2)
                                         obj.add_member(value[i]) = value[i+1];
 
                                     value = obj;
@@ -233,7 +233,7 @@ namespace cppdatalib
                                 {
                                     array_t arr;
 
-                                    for (auto const &it: value.get_object())
+                                    for (auto const &it: value.get_object_unchecked())
                                     {
                                         arr.push_back(it.first);
                                         arr.push_back(it.second);
@@ -697,8 +697,9 @@ namespace cppdatalib
             {
                 core::real_t variance_ = 0.0;
 
-                for (auto const &sample: samples.get_array())
-                    variance_ += pow(sample.as_real() - base::get_arithmetic_mean(), 2.0);
+                if (samples.is_array())
+                    for (auto const &sample: samples.get_array_unchecked())
+                        variance_ += pow(sample.as_real() - base::get_arithmetic_mean(), 2.0);
 
                 return variance_ / base::sample_size();
             }
@@ -744,9 +745,9 @@ namespace cppdatalib
 
                     sorted = v;
                     if (direction == ascending_sort)
-                        std::sort(sorted.get_array().begin(), sorted.get_array().end());
+                        std::sort(sorted.get_array_unchecked().begin(), sorted.get_array_unchecked().end());
                     else
-                        std::sort(sorted.get_array().rbegin(), sorted.get_array().rend());
+                        std::sort(sorted.get_array_unchecked().rbegin(), sorted.get_array_unchecked().rend());
 
                     buffer_filter::write_buffered_value_(sorted, is_key);
                 }
@@ -772,12 +773,12 @@ namespace cppdatalib
             {
                 core::value map_;
 
-                if ((v.get_type() == core::array && v.size() > column_names.get_array().size())
-                        || column_names.get_array().size() == 0) // Not enough column names to cover all attributes!!
+                if ((v.get_type() == core::array && v.array_size() > column_names.array_size())
+                        || column_names.array_size() == 0) // Not enough column names to cover all attributes!!
                     throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
 
                 if (v.get_type() == core::array)
-                    for (size_t i = 0; i < column_names.get_array().size(); ++i)
+                    for (size_t i = 0; i < column_names.array_size(); ++i)
                     {
                         if (i >= v.size() && fail_on_missing_column)
                             throw core::error("cppdatalib::core::table_to_array_of_maps_filter - missing column entry in table row");

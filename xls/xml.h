@@ -117,10 +117,10 @@ namespace cppdatalib
             }
 
             void bool_(const core::value &v) {output_stream << v.as_int();}
-            void integer_(const core::value &v) {output_stream << v.get_int();}
-            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
+            void integer_(const core::value &v) {output_stream << v.get_int_unchecked();}
+            void uinteger_(const core::value &v) {output_stream << v.get_uint_unchecked();}
+            void real_(const core::value &v) {output_stream << v.get_real_unchecked();}
+            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string_unchecked());}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {

@@ -478,11 +478,11 @@ namespace cppdatalib
                                         if (arg->get_subtype() >= core::user && arg->get_subtype() > 15)
                                             ++size.top(); // type specifier requires another byte
 
-                                        if (arg->get_int() >= INT8_MIN && arg->get_int() <= UINT8_MAX)
+                                        if (arg->get_int_unchecked() >= INT8_MIN && arg->get_int_unchecked() <= UINT8_MAX)
                                             size.top() += 1;
-                                        else if (arg->get_int() >= INT16_MIN && arg->get_int() <= UINT16_MAX)
+                                        else if (arg->get_int_unchecked() >= INT16_MIN && arg->get_int_unchecked() <= UINT16_MAX)
                                             size.top() += 2;
-                                        else if (arg->get_int() >= INT32_MIN && arg->get_int() <= UINT32_MAX)
+                                        else if (arg->get_int_unchecked() >= INT32_MIN && arg->get_int_unchecked() <= UINT32_MAX)
                                             size.top() += 4;
                                         else
                                             size.top() += 8;
@@ -499,11 +499,11 @@ namespace cppdatalib
                                         if (arg->get_subtype() >= core::user && arg->get_subtype() > 15)
                                             ++size.top(); // type specifier requires another byte
 
-                                        if (arg->get_uint() <= UINT8_MAX)
+                                        if (arg->get_uint_unchecked() <= UINT8_MAX)
                                             size.top() += 1;
-                                        else if (arg->get_uint() <= UINT16_MAX)
+                                        else if (arg->get_uint_unchecked() <= UINT16_MAX)
                                             size.top() += 2;
-                                        else if (arg->get_uint() <= UINT32_MAX)
+                                        else if (arg->get_uint_unchecked() <= UINT32_MAX)
                                             size.top() += 4;
                                         else
                                             size.top() += 8;
@@ -522,7 +522,7 @@ namespace cppdatalib
                                         // since there is nothing to show that the data should be read as a floating point number)
                                         // To prevent the loss of data, the subtype is discarded and the value stays the same
 
-                                        if (core::float_from_ieee_754(core::float_to_ieee_754(arg->get_real())) != arg->get_real() && !std::isnan(arg->get_real()))
+                                        if (core::float_from_ieee_754(core::float_to_ieee_754(arg->get_real_unchecked())) != arg->get_real_unchecked() && !std::isnan(arg->get_real_unchecked()))
                                             size.top() += 4; // requires more than 32-bit float to losslessly encode
                                     }
 
@@ -540,7 +540,7 @@ namespace cppdatalib
                                         if (size.top() + arg->size() >= 128)
                                             size.top() += 3; // requires a four-byte size specifier
 
-                                        size.top() += arg->get_string().size();
+                                        size.top() += arg->string_size();
                                     }
                                     break;
                                 }
@@ -587,10 +587,10 @@ namespace cppdatalib
 
                                         // Obtain sizes of keys (ignore values for now, since they'll be added in later invocations)
                                         if (arg->get_subtype() == core::map)
-                                            size.top() += 4 * arg->get_object().size();
+                                            size.top() += 4 * arg->object_size();
                                         else
                                         {
-                                            for (auto it = arg->get_object().begin(); it != arg->get_object().end(); ++it)
+                                            for (auto it = arg->get_object_unchecked().begin(); it != arg->get_object_unchecked().end(); ++it)
                                                 size.top() += 1 /* key size specifier */ + it->first.size() /* key size */;
                                         }
                                     }
@@ -641,8 +641,8 @@ namespace cppdatalib
                 {
                     if (!v.is_int() && !v.is_uint())
                         throw core::error("Binn - map key is not an integer");
-                    else if ((v.is_int() && (v.get_int() < INT32_MIN || v.get_int() > INT32_MAX)) ||
-                             (v.is_uint() && v.get_uint() > INT32_MAX))
+                    else if ((v.is_int() && (v.get_int_unchecked() < INT32_MIN || v.get_int_unchecked() > INT32_MAX)) ||
+                             (v.is_uint() && v.get_uint_unchecked() > INT32_MAX))
                         throw core::error("Binn - map key is out of range");
                 }
                 else if (!v.is_string())
@@ -655,7 +655,7 @@ namespace cppdatalib
                 {
                     /* Bounds of the provided key were already checked in begin_key_() */
 
-                    int64_t key = v.is_int()? v.get_int(): static_cast<int64_t>(v.get_uint());
+                    int64_t key = v.is_int()? v.get_int_unchecked(): static_cast<int64_t>(v.get_uint_unchecked());
                     uint64_t out;
 
                     out = std::abs(key);
@@ -671,7 +671,7 @@ namespace cppdatalib
                 }
                 else if (v.is_int())
                 {
-                    core::int_t i = v.get_int();
+                    core::int_t i = v.get_int_unchecked();
                     uint64_t out;
 
                     if (i < -std::numeric_limits<core::int_t>::max())
@@ -686,14 +686,14 @@ namespace cppdatalib
                         out = ~uint64_t(i) + 1;
                     }
 
-                    if (v.get_int() >= INT8_MIN && v.get_int() <= INT8_MAX)
+                    if (v.get_int_unchecked() >= INT8_MIN && v.get_int_unchecked() <= INT8_MAX)
                         write_type(output_stream, byte, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int8)
                                 .put(out);
-                    else if (v.get_int() >= INT16_MIN && v.get_int() <= INT16_MAX)
+                    else if (v.get_int_unchecked() >= INT16_MIN && v.get_int_unchecked() <= INT16_MAX)
                         write_type(output_stream, word, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int16)
                                 .put(out >> 8)
                                 .put(out & 0xff);
-                    else if (v.get_int() >= INT32_MIN && v.get_int() <= INT32_MAX)
+                    else if (v.get_int_unchecked() >= INT32_MIN && v.get_int_unchecked() <= INT32_MAX)
                         write_type(output_stream, dword, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int32)
                                 .put(out >> 24)
                                 .put((out >> 16) & 0xff)
@@ -712,16 +712,16 @@ namespace cppdatalib
                 }
                 else if (v.is_uint())
                 {
-                    uint64_t out = v.get_uint();
+                    uint64_t out = v.get_uint_unchecked();
 
-                    if (v.get_uint() <= UINT8_MAX)
+                    if (v.get_uint_unchecked() <= UINT8_MAX)
                         write_type(output_stream, byte, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint8)
                                 .put(out);
-                    else if (v.get_uint() <= UINT16_MAX)
+                    else if (v.get_uint_unchecked() <= UINT16_MAX)
                         write_type(output_stream, word, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint16)
                                 .put(out >> 8)
                                 .put(out & 0xff);
-                    else if (v.get_uint() <= UINT32_MAX)
+                    else if (v.get_uint_unchecked() <= UINT32_MAX)
                         write_type(output_stream, dword, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint32)
                                 .put(out >> 24)
                                 .put((out >> 16) & 0xff)
@@ -741,7 +741,7 @@ namespace cppdatalib
             }
 
             void null_(const core::value &v) {write_type(output_stream, nobytes, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) null);}
-            void bool_(const core::value &v) {write_type(output_stream, nobytes, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) v.get_bool()? yes: no);}
+            void bool_(const core::value &v) {write_type(output_stream, nobytes, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) v.get_bool_unchecked()? yes: no);}
 
             /* Integers and UIntegers are handled in begin_scalar_() */
 
@@ -749,9 +749,9 @@ namespace cppdatalib
             {
                 uint64_t out;
 
-                if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real())) == v.get_real() || std::isnan(v.get_real()))
+                if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real_unchecked())) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
                 {
-                    out = core::float_to_ieee_754(v.get_real());
+                    out = core::float_to_ieee_754(v.get_real_unchecked());
                     write_type(output_stream, dword, single_float)
                             .put(out >> 24)
                             .put((out >> 16) & 0xff)
@@ -760,7 +760,7 @@ namespace cppdatalib
                 }
                 else
                 {
-                    out = core::double_to_ieee_754(v.get_real());
+                    out = core::double_to_ieee_754(v.get_real_unchecked());
                     write_type(output_stream, qword, double_float)
                             .put(out >> 56)
                             .put((out >> 48) & 0xff)
@@ -800,7 +800,7 @@ namespace cppdatalib
 
                 write_size(output_stream, size);
             }
-            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string().c_str(), v.get_string().size());}
+            void string_data_(const core::value &v, bool) {output_stream.write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
             void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::blob && v.get_subtype() != core::clob && !is_key) output_stream.put(0);}
 
             void begin_array_(const core::value &v, core::int_t size, bool)

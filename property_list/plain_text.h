@@ -370,25 +370,25 @@ namespace cppdatalib
             void bool_(const core::value &v)
             {
                 output_stream << "<*B";
-                output_stream.put(v.get_bool()? 'Y': 'N');
+                output_stream.put(v.get_bool_unchecked()? 'Y': 'N');
                 output_stream.put('>');
             }
             void integer_(const core::value &v)
             {
                 output_stream << "<*I"
-                              << v.get_int();
+                              << v.get_int_unchecked();
                 output_stream.put('>');
             }
             void uinteger_(const core::value &v)
             {
                 output_stream << "<*I"
-                              << v.get_uint();
+                              << v.get_uint_unchecked();
                 output_stream.put('>');
             }
             void real_(const core::value &v)
             {
                 output_stream << "<*R"
-                              << v.get_real();
+                              << v.get_real_unchecked();
                 output_stream.put('>');
             }
             void begin_string_(const core::value &v, core::int_t, bool)
@@ -406,9 +406,9 @@ namespace cppdatalib
             void string_data_(const core::value &v, bool)
             {
                 if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
-                    hex::write(output_stream, v.get_string());
+                    hex::write(output_stream, v.get_string_unchecked());
                 else
-                    write_string(output_stream, v.get_string());
+                    write_string(output_stream, v.get_string_unchecked());
             }
             void end_string_(const core::value &v, bool)
             {
@@ -487,25 +487,25 @@ namespace cppdatalib
             void bool_(const core::value &v)
             {
                 output_stream << "<*B";
-                output_stream.put(v.get_bool()? 'Y': 'N');
+                output_stream.put(v.get_bool_unchecked()? 'Y': 'N');
                 output_stream.put('>');
             }
             void integer_(const core::value &v)
             {
                 output_stream << "<*I"
-                              << v.get_int();
+                              << v.get_int_unchecked();
                 output_stream.put('>');
             }
             void uinteger_(const core::value &v)
             {
                 output_stream << "<*I"
-                              << v.get_uint();
+                              << v.get_uint_unchecked();
                 output_stream.put('>');
             }
             void real_(const core::value &v)
             {
                 output_stream << "<*R"
-                              << v.get_real();
+                              << v.get_real_unchecked();
                 output_stream.put('>');
             }
             void begin_string_(const core::value &v, core::int_t, bool)
@@ -523,9 +523,9 @@ namespace cppdatalib
             void string_data_(const core::value &v, bool)
             {
                 if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
-                    hex::write(output_stream, v.get_string());
+                    hex::write(output_stream, v.get_string_unchecked());
                 else
-                    write_string(output_stream, v.get_string());
+                    write_string(output_stream, v.get_string_unchecked());
             }
             void end_string_(const core::value &v, bool)
             {
