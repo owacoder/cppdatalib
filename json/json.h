@@ -198,7 +198,8 @@ namespace cppdatalib
                                 }
                                 get_char = false;
                                 delimiter_required = true;
-                                chr = c;
+                                if (c != EOF)
+                                    chr = c;
 
                                 if (!is_float)
                                 {
