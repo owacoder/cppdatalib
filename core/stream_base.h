@@ -512,7 +512,7 @@ namespace cppdatalib
         }
 
         // Convert directly from parser to serializer
-        stream_input &operator>>(stream_input &input, stream_handler &output)
+        stream_handler &operator<<(stream_handler &output, stream_input &&input)
         {
             if (output.requires_string_buffering() > input.provides_buffered_strings() ||
                 output.requires_array_buffering() > input.provides_buffered_arrays() ||
@@ -520,7 +520,7 @@ namespace cppdatalib
                 output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
                 output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
                 output.requires_prefix_object_size() > input.provides_prefix_object_size())
-                throw core::error("cppdatalib::stream_input::operator>>() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
 
             const bool stream_ready = output.active();
 
@@ -530,43 +530,109 @@ namespace cppdatalib
             if (!stream_ready)
                 output.end();
 
+            return output;
+        }
+
+        // Convert directly from parser to serializer
+        void operator<<(stream_handler &&output, stream_input &input)
+        {
+            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
+                output.requires_array_buffering() > input.provides_buffered_arrays() ||
+                output.requires_object_buffering() > input.provides_buffered_objects() ||
+                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
+                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
+                output.requires_prefix_object_size() > input.provides_prefix_object_size())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+
+            const bool stream_ready = output.active();
+
+            if (!stream_ready)
+                output.begin();
+            input.convert(output);
+            if (!stream_ready)
+                output.end();
+        }
+
+        // Convert directly from parser to rvalue serializer
+        void operator<<(stream_handler &&output, stream_input &&input)
+        {
+            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
+                output.requires_array_buffering() > input.provides_buffered_arrays() ||
+                output.requires_object_buffering() > input.provides_buffered_objects() ||
+                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
+                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
+                output.requires_prefix_object_size() > input.provides_prefix_object_size())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+
+            const bool stream_ready = output.active();
+
+            if (!stream_ready)
+                output.begin();
+            input.convert(output);
+            if (!stream_ready)
+                output.end();
+        }
+
+        // Convert directly from parser to serializer
+        stream_input &operator>>(stream_input &input, stream_handler &output)
+        {
+            output << input;
             return input;
+        }
+
+        // Convert directly from parser to serializer
+        stream_input &operator>>(stream_input &input, stream_handler &&output)
+        {
+            output << input;
+            return input;
+        }
+
+        // Convert directly from parser to serializer
+        void operator>>(stream_input &&input, stream_handler &output)
+        {
+            output << input;
+        }
+
+        // Convert directly from parser to rvalue serializer
+        void operator>>(stream_input &&input, stream_handler &&output)
+        {
+            output << input;
         }
 
         struct value::traverse_node_prefix_serialize
         {
-            traverse_node_prefix_serialize(stream_handler &handler) : stream(handler) {}
+            traverse_node_prefix_serialize(stream_handler *handler) : stream(handler) {}
 
             bool operator()(const value *arg, value::traversal_ancestry_finder)
             {
                 if (arg->is_array())
-                    stream.begin_array(*arg, arg->size());
+                    stream->begin_array(*arg, arg->size());
                 else if (arg->is_object())
-                    stream.begin_object(*arg, arg->size());
+                    stream->begin_object(*arg, arg->size());
                 return true;
             }
 
         private:
-            stream_handler &stream;
+            stream_handler *stream;
         };
 
         struct value::traverse_node_postfix_serialize
         {
-            traverse_node_postfix_serialize(stream_handler &handler) : stream(handler) {}
+            traverse_node_postfix_serialize(stream_handler *handler) : stream(handler) {}
 
             bool operator()(const value *arg, value::traversal_ancestry_finder)
             {
                 if (arg->is_array())
-                    stream.end_array(*arg);
+                    stream->end_array(*arg);
                 else if (arg->is_object())
-                    stream.end_object(*arg);
+                    stream->end_object(*arg);
                 else
-                    stream.write(*arg);
+                    stream->write(*arg);
                 return true;
             }
 
         private:
-            stream_handler &stream;
+            stream_handler *stream;
         };
 
         struct value::traverse_less_than_compare_prefix

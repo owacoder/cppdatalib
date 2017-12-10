@@ -351,6 +351,7 @@ namespace cppdatalib
             friend bool operator<=(const value &lhs, const value &rhs);
             friend bool operator==(const value &lhs, const value &rhs);
             friend stream_handler &operator<<(stream_handler &output, const value &input);
+            friend void operator<<(stream_handler &&output, const value &input);
             static value &assign(value &dst, const value &src);
 
         public:

@@ -1,7 +1,7 @@
 #include <iostream>
 
 #define CPPDATALIB_FAST_IO
-#define CPPDATALIB_DISABLE_WRITE_CHECKS
+//#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
 #include "cppdatalib.h"
 
@@ -380,8 +380,38 @@ int readme_simple_test()
     return 0;
 }
 
+int readme_simple_test2()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    try {
+        json::parser(std::cin) >> json::stream_writer(std::cout);        // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
+
+int readme_simple_test3()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    try {
+        json::stream_writer(std::cout) << from_json(std::cin);        // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
+
 int main()
 {
+    return readme_simple_test3();
+
     vt100 vt;
     std::cout << vt.attr_bright;
 

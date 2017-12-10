@@ -180,8 +180,8 @@ namespace cppdatalib
         inline stream_handler &operator<<(stream_handler &output, const value &input)
         {
             const bool stream_ready = output.active();
-            value::traverse_node_prefix_serialize prefix(output);
-            value::traverse_node_postfix_serialize postfix(output);
+            value::traverse_node_prefix_serialize prefix(&output);
+            value::traverse_node_postfix_serialize postfix(&output);
 
             if (!stream_ready)
                 output.begin();
@@ -192,8 +192,29 @@ namespace cppdatalib
             return output;
         }
 
+        // Convert directly from value to rvalue serializer
+        inline void operator<<(stream_handler &&output, const value &input)
+        {
+            const bool stream_ready = output.active();
+            value::traverse_node_prefix_serialize prefix(&output);
+            value::traverse_node_postfix_serialize postfix(&output);
+
+            if (!stream_ready)
+                output.begin();
+            input.traverse(prefix, postfix);
+            if (!stream_ready)
+                output.end();
+        }
+
         // Convert directly from value to serializer
         inline const value &operator>>(const value &input, stream_handler &output)
+        {
+            output << input;
+            return input;
+        }
+
+        // Convert directly from value to rvalue serializer
+        inline const value &operator>>(const value &input, stream_handler &&output)
         {
             output << input;
             return input;

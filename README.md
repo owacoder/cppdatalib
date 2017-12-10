@@ -72,7 +72,9 @@ cppdatalib supports streaming with a small memory footprint. Most conversions re
 Using the library is simple. Everything is under the main namespace `cppdatalib`, and underneath is the `core` namespace and individual format namespaces (e.g. `json`).
 It is recommended to use `using` statements to pull in format namespaces.
 
-For example, the following program attempts to read a JSON structure from STDIN, and output it to STDOUT:
+For example, the following programs are identical attempts to read a JSON structure from STDIN, and output it to STDOUT:
+
+Read through value class:
 
 ```c++
 #include <cppdatalib/cppdatalib.h>
@@ -96,9 +98,45 @@ int main() {
 }
 ```
 
-When using more than one format, you either should use the `to_xxx` and `from_xxx` string functions for a specific format,
-or the `input` and `print` functions that take two parameters, instead of the `>>` and `<<` operators.
-The operators are ambiguous when using more than one format.
+Read without parser (still uses intermediate value - result of `from_json`):
+
+```c++
+#include <cppdatalib/cppdatalib.h>
+
+int main()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    try {
+        json::stream_writer(std::cout) << from_json(std::cin);        // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
+```
+
+Read without intermediate value (extremely memory efficient):
+
+```c++
+#include <cppdatalib/cppdatalib.h>
+
+int main()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    try {
+        json::parser(std::cin) >> json::stream_writer(std::cout);        // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
+```
 
 ### Advanced Usage
 
