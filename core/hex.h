@@ -25,14 +25,13 @@
 #ifndef CPPDATALIB_HEX_H
 #define CPPDATALIB_HEX_H
 
-#include <iostream>
-#include <sstream>
+#include "ostream.h"
 
 namespace cppdatalib
 {
     namespace hex
     {
-        inline std::ostream &debug_write(std::ostream &stream, unsigned char c)
+        inline core::ostream &debug_write(core::ostream &stream, unsigned char c)
         {
             const char alpha[] = "0123456789ABCDEF";
 
@@ -47,7 +46,7 @@ namespace cppdatalib
             return stream.put(' ');
         }
 
-        inline std::ostream &debug_write(std::ostream &stream, const std::string &str)
+        inline core::ostream &debug_write(core::ostream &stream, const std::string &str)
         {
             for (auto c: str)
                 debug_write(stream, c);
@@ -55,7 +54,14 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::ostream &write(std::ostream &stream, unsigned char c)
+        inline std::string debug_encode(const std::string &str)
+        {
+            core::ostringstream stream;
+            debug_write(stream, str);
+            return stream.str();
+        }
+
+        inline core::ostream &write(core::ostream &stream, unsigned char c)
         {
             const char alpha[] = "0123456789ABCDEF";
 
@@ -65,7 +71,7 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::ostream &write(std::ostream &stream, const std::string &str)
+        inline core::ostream &write(core::ostream &stream, const std::string &str)
         {
             for (auto c: str)
                 write(stream, c);
@@ -75,7 +81,7 @@ namespace cppdatalib
 
         inline std::string encode(const std::string &str)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             write(stream, str);
             return stream.str();
         }

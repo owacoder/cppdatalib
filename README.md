@@ -16,23 +16,50 @@ Supported formats include
    - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
    - [CSV](https://tools.ietf.org/html/rfc4180)
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
-   - MySQL (read-only)
+   - [MessagePack](https://msgpack.org/)
+   - MySQL (database/table retrieval and writing)
    - XML property lists (write-only)
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
-   - [MessagePack](https://msgpack.org/) (write-only)
+   - [BJSON](http://bjson.org/) (write-only)
+   - [Netstrings](https://en.wikipedia.org/wiki/Netstring) (write-only)
+
+### Planned formats
+
+   - Transenc
+   - CBOR
+   - TSV
 
 ### Filters
 
 cppdatalib offers a variety of filters that can be applied to stream handlers. These include the following:
 
-   - buffer_filter (Optionally buffers strings, arrays, and objects, or any combination of the same, or acts as a pass-through filter)
-   - automatic_buffer_filter (Automatically determines the correct settings for the underlying buffer_filter based on the output stream handler)
-   - tee_filter (Splits an input stream to two output stream handlers)
-   - duplicate_key_check_filter (Ensures the input stream only provides unique keys in objects. This filter supports complex keys, including nested objects)
-   - converter_filter (Converts from one internal type to another, for example, all integers to strings. This filter has built-in conversions)
-   - custom_converter_filter (Converts the specified internal type, using the user-specified converter function. This filter supports varying output types, including the same type as the input)
-   - generic_converter_filter (Sends all scalar values to a user-specified function for conversion. Arrays and objects cannot be converted with this filter)
+   - `buffer_filter`<br/>
+     Optionally buffers strings, arrays, and objects, or any combination of the same, or acts as a pass-through filter
+   - `automatic_buffer_filter`<br/>
+     Automatically determines the correct settings for the underlying buffer_filter based on the output stream handler
+   - `tee_filter`<br/>
+     Splits an input stream to two output stream handlers
+   - `view_filter`<br/>
+     Applies a view function to every element of the specified type. Essentially the same as `custom_converter_filter`, but can't edit the value and is more efficient.
+   - `range_filter`<br/>
+     Pass-through filter that computes the maximum and minimum values of the specified type, as well as the midpoint (only applicable for numeric values)
+   - `mean_filter`<br/>
+     Pass-through filter that computes the arithmetic, geometric, and harmonic means of numeric values
+   - `dispersal_filter`<br/>
+     Pass-through filter that computes the variance and standard deviation of numeric values (subclass of `mean_filter`, so both central tendency and dispersal can be calculated with this class)
+   - `array_sort_filter`<br/>
+     Sorts all arrays deeper than the specified nesting level (or all arrays, if 0 is specified), in either ascending or descending order
+   - `table_to_array_of_maps_filter`<br/>
+     Converts a table to an array of maps, using an external column-name list. Also supports converting single-dimension arrays to object-wrapped values with specified column key
+   - `duplicate_key_check_filter`<br/>
+     Ensures the input stream only provides unique keys in objects. This filter supports complex keys, including nested objects
+   - `converter_filter`<br/>
+     Converts from one internal type to another, for example, all integers to strings. This filter has built-in conversions
+   - `custom_converter_filter`<br/>
+     Converts the specified internal type, using the user-specified converter function. This filter supports varying output types, including the same type as the input
+   - `generic_converter_filter`<br/>
+     Sends all scalar values to a user-specified function for conversion. Arrays and objects cannot be converted with this filter
 
 Filters can be assigned on top of other filters. How many filters are permitted is limited only by the runtime environment.
 
@@ -40,17 +67,14 @@ Filters can be assigned on top of other filters. How many filters are permitted 
 
 cppdatalib supports streaming with a small memory footprint. Most conversions require no buffering or minimal buffering. Also, there is no limit to the nesting depth of arrays or objects. This makes cppdatalib much more suitable for large datasets.
 
-## Limitations
-
-   - Internal operation of complex object keys is recursive (due to STL constraints) and deeply nested arrays or objects in complex keys may result in undefined behavior. Note that this limitation does not apply to array elements or object values, just object keys.
-   - Currently, comparison of `core::value` objects is recursive, thus comparison of deeply nested arrays or objects may result in undefined behavior.
-
 ## Usage
 
 Using the library is simple. Everything is under the main namespace `cppdatalib`, and underneath is the `core` namespace and individual format namespaces (e.g. `json`).
-If you only need one format, use `using` statements to include its namespace into your scope. You can also include the `core` namespace, as long as you don't have conflicting identifiers.
+It is recommended to use `using` statements to pull in format namespaces.
 
-For example, the following program attempts to read a JSON structure from STDIN, and output it to STDOUT:
+For example, the following programs are identical attempts to read a JSON structure from STDIN, and output it to STDOUT:
+
+Read through value class:
 
 ```c++
 #include <cppdatalib/cppdatalib.h>
@@ -58,12 +82,14 @@ For example, the following program attempts to read a JSON structure from STDIN,
 int main() {
     using namespace cppdatalib;             // Parent namespace
     using namespace json;                   // Format namespace
-    
-    core::value my_value;
-    
+
+    core::value my_value;                   // Global cross-format value class
+
     try {
-        std::cin >> my_value;               // Read in to core::value as JSON
-        std::cout << my_value;              // Write core::value out as JSON
+        json::parser p(std::cin);           // Initialize parser
+        json::stream_writer w(std::cout);   // Initialize writer
+        p >> my_value;                      // Read in to core::value as JSON
+        w << my_value;                      // Write core::value out as JSON
     } catch (core::error e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
@@ -72,9 +98,45 @@ int main() {
 }
 ```
 
-When using more than one format, you either should use the `to_xxx` and `from_xxx` string functions for a specific format,
-or the `input` and `print` functions that take two parameters, instead of the `>>` and `<<` operators.
-The operators are ambiguous when using more than one format.
+Read without parser (still uses intermediate value - result of `from_json`):
+
+```c++
+#include <cppdatalib/cppdatalib.h>
+
+int main()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    try {
+        json::stream_writer(std::cout) << from_json(std::cin);        // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
+```
+
+Read without intermediate value (extremely memory efficient):
+
+```c++
+#include <cppdatalib/cppdatalib.h>
+
+int main()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    try {
+        json::parser(std::cin) >> json::stream_writer(std::cout);        // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
+```
 
 ### Advanced Usage
 
@@ -97,11 +159,12 @@ int main() {
     ubjson::stream_writer writer(std::cout);  // UBJSON writer to standard output
     
     try {
-        json::convert(std::cin, writer);      // Convert from JSON on standard input to UBJSON on standard output
+        json::parser parser(std::cin);
+        parser >> writer;                     // Convert from JSON on standard input to UBJSON on standard output
                                               // Note that this DOES NOT READ the entire stream before writing!
                                               // The data is read and written at the same time
 
-        json::convert(std::cin, builder);     // Convert from JSON on standard input to internal representation in
+        parser >> builder;                    // Convert from JSON on standard input to internal representation in
                                               // `my_value`. Note that my_value is also accessible by using `builder.value()`
 
         core::convert(my_value, writer);      // Convert from internal representation to UBJSON on standard output
@@ -110,10 +173,11 @@ int main() {
     }
 
     try {
+        json::parser parser(std::cin);
         core::stream_filter<core::null, core::string> filter(writer);
                                               // Set up filter on UBJSON output that converts all `null` values to empty strings
 
-        json::convert(std::cin, filter);      // Convert from JSON on standard input to UBJSON on standard output, converting `null`s to empty strings
+        parser >> filter;                     // Convert from JSON on standard input to UBJSON on standard output, converting `null`s to empty strings
                                               // When using a filter, write to the filter, instead of the handler the filter is modifying
                                               // (i.e. don't write to `writer` here unless you don't want to employ the filter)
                                               // Note that this DOES NOT READ the entire stream before writing!
@@ -123,6 +187,7 @@ int main() {
     }
 
     try {
+        json::parser parser(std::cin);
         core::stream_filter<core::null, core::string> filter(writer);
                                               // Set up filter on UBJSON output that converts all `null` values to empty strings
 
@@ -134,8 +199,7 @@ int main() {
         core::generic_stream_filter<decltype(lambda)> generic_filter(filter, lambda);
                                               // Set up filter on top of previous filter that clears all strings beginning with lowercase 'a'
 
-        json::convert(std::cin, generic_filter);
-                                              // Convert from JSON on standard input to UBJSON on standard output,
+        parser >> generic_filter;             // Convert from JSON on standard input to UBJSON on standard output,
                                               // converting `null`s to empty strings, and clearing all strings beginning with 'a'
                                               // Again, note that this does not read the entire stream before writing
                                               // The data is read and written at the same time
@@ -144,14 +208,14 @@ int main() {
     }
 
     try {
+        json::parser parser(std::cin);
         core::stream_filter<core::boolean, core::integer> second_filter(writer);
                                               // Set up filter on UBJSON output that converts booleans to integers
 
         core::stream_filter<core::integer, core::real> first_filter(second_filter);
                                               // Set up filter on top of previous filter that converts all integers to reals
 
-        json::convert(std::cin, first_filter);
-                                              // Convert from JSON on standard input to UBJSON on standard output,
+        parser >> first_filter;               // Convert from JSON on standard input to UBJSON on standard output,
                                               // converting booleans to integers, and converting integers to reals
                                               // Note that order of filters is important. The last filter enabled will be the first to be called.
                                               // If the filter order was switched, all booleans and integers would become reals.
@@ -160,13 +224,13 @@ int main() {
     }
 
     try {
+        json::parser parser(std::cin);
         core::tee_filter tee(writer, builder);
                                               // Set up tee filter. Tee filters split the input to two handlers, which can be stream_filters or other tee_filters.
                                               // In this case, we'll parse the JSON input once, and output to UBJSON on standard output and build an internal
                                               // representation simultaneously.
 
-        json::convert(std::cin, first_filter);
-                                              // Convert from JSON on standard input to UBJSON on standard output,
+        parser >> tee_filter;                 // Convert from JSON on standard input to UBJSON on standard output,
                                               // as well as building internal representation in my_value
     } catch (core::error e) {
         std::cerr << e.what() << std::endl;   // Catch any errors that might have occured (syntax or logical)
@@ -175,6 +239,26 @@ int main() {
     return 0;
 }
 ```
+
+### Compile-time flags
+
+Below is a list of compile-time flags supported by cppdatalib:
+
+   - `CPPDATALIB_BOOL_T` - The underlying boolean type of the implementation. Should be able to store a true and false value. Defaults to `bool`
+   - `CPPDATALIB_INT_T` - The underlying integer type of the implementation. Should be able to store a signed integral value. Defaults to `int64_t`
+   - `CPPDATALIB_UINT_T` - The underlying unsigned integer type of the implementation. Should be able to store an unsigned integral value. Defaults to `uint64_t`
+   - `CPPDATALIB_REAL_T` - The underlying floating-point type of the implementation. Should be able to store at least an IEEE-754 value. Defaults to `double`
+   - `CPPDATALIB_CSTRING_T` - The underlying C-style string type of the implementation. Defaults to `const char *`
+   - `CPPDATALIB_STRING_T` - The underlying string type of the implementation. Defaults to `std::string`
+   - `CPPDATALIB_ARRAY_T` - The underlying array type of the implementation. Defaults to `std::vector<cppdatalib::core::value>`
+   - `CPPDATALIB_OBJECT_T` - The underlying object type of the implementation. Defaults to `std::multimap<cppdatalib::core::value, cppdatalib::core::value>`
+   - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `int16_t`
+   - `CPPDATALIB_ENABLE_MYSQL` - Enables inclusion of the MySQL interface library. If defined, the MySQL headers must be available in the include path
+   - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If write checks are disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but can result in better performance. Use at your own risk
+   - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
+   - `CPPDATALIB_DISABLE_FAST_IO_GCOUNT` - Disables calculation of `gcount()` in the fast input classes. This removes the `gcount()` function altogether. This flag only has an effect if `CPPDATALIB_ENABLE_FAST_INPUT` is defined
+
+Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.
 
 ## Supported datatypes
 
@@ -204,7 +288,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
      
    - Binn supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
-       - `string` subtypes `date`, `time`, `datetime`, `bignum`, and `blob` are supported.
+       - `string` subtypes `date`, `time`, `datetime`, `bignum`, `blob`, and `clob` are supported.
        - `object` subtype `map` is supported.
        - Map keys are limited to signed 32-bit integers.
        - Object keys are limited to 255 characters or fewer.
@@ -222,7 +306,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - No subtypes are supported.
        - Numerical metadata is lost when converting to XML-RPC.
      
-   - CSV supports `null`, `uint`, `bool`, `int`, `real`, `string`, and `array`.<br/>
+   - CSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:
        - `object`s are **not** supported.
        - `uint` values are fully supported when reading.
@@ -241,5 +325,17 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - Numerical metadata is lost when converting to and from XML-XLS.
 
    - MessagePack supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
-       - `string` subtype `blob` is supported.
+     Notes:
+       - MessagePack extensions are not currently supported.
+       - `string` subtypes `blob` and `clob` are supported.
        - MessagePack timestamps are not currently supported.
+
+   - BJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `blob` and `clob` are supported.
+       - Numerical metadata is lost when converting to and from BJSON.
+
+   - Netstrings supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - No subtypes are supported.
+       - Type information is lost when converting to Netstrings.

@@ -77,7 +77,7 @@ namespace cppdatalib
                 {
                     // Attempt to read as an integer
                     {
-                        std::istringstream temp_stream(buffer);
+                        core::istring_wrapper_stream temp_stream(buffer);
                         core::int_t value;
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -89,7 +89,7 @@ namespace cppdatalib
 
                     // Attempt to read as an unsigned integer
                     {
-                        std::istringstream temp_stream(buffer);
+                        core::istring_wrapper_stream temp_stream(buffer);
                         core::uint_t value;
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -100,8 +100,9 @@ namespace cppdatalib
                     }
 
                     // Attempt to read as a real
+                    if (buffer.find_first_of("eE.") != std::string::npos)
                     {
-                        std::istringstream temp_stream(buffer);
+                        core::istring_wrapper_stream temp_stream(buffer);
                         core::real_t value;
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
@@ -116,7 +117,7 @@ namespace cppdatalib
                 }
             }
 
-            std::istream &read_string(core::stream_handler &writer, bool parse_as_strings)
+            core::istream &read_string(core::stream_handler &writer, bool parse_as_strings)
             {
                 int chr;
                 std::string buffer;
@@ -126,7 +127,7 @@ namespace cppdatalib
                     writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
 
                     // buffer is used to temporarily store whitespace for reading strings
-                    while (chr = input_stream.get(), chr != EOF && chr != ',' && chr != '\n')
+                    while (chr = stream().get(), chr != EOF && chr != ',' && chr != '\n')
                     {
                         if (isspace(chr))
                         {
@@ -143,17 +144,17 @@ namespace cppdatalib
                     }
 
                     if (chr != EOF)
-                        input_stream.unget();
+                        stream().unget();
 
                     writer.end_string(core::string_t());
                 }
                 else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
                 {
-                    while (chr = input_stream.get(), chr != EOF && chr != ',' && chr != '\n')
+                    while (chr = stream().get(), chr != EOF && chr != ',' && chr != '\n')
                         buffer.push_back(chr);
 
                     if (chr != EOF)
-                        input_stream.unget();
+                        stream().unget();
 
                     while (!buffer.empty() && isspace(buffer.back() & 0xff))
                         buffer.pop_back();
@@ -161,11 +162,11 @@ namespace cppdatalib
                     deduce_type(buffer, writer);
                 }
 
-                return input_stream;
+                return stream();
             }
 
             // Expects that the leading quote has already been parsed out of the input_stream
-            std::istream &read_quoted_string(core::stream_handler &writer, bool parse_as_strings)
+            core::istream &read_quoted_string(core::stream_handler &writer, bool parse_as_strings)
             {
                 int chr;
                 std::string buffer;
@@ -175,12 +176,12 @@ namespace cppdatalib
                     writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
 
                     // buffer is used to temporarily store whitespace for reading strings
-                    while (chr = input_stream.get(), chr != EOF)
+                    while (chr = stream().get(), chr != EOF)
                     {
                         if (chr == '"')
                         {
-                            if (input_stream.peek() == '"')
-                                chr = input_stream.get();
+                            if (stream().peek() == '"')
+                                chr = stream().get();
                             else
                                 break;
                         }
@@ -203,12 +204,12 @@ namespace cppdatalib
                 }
                 else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
                 {
-                    while (chr = input_stream.get(), chr != EOF)
+                    while (chr = stream().get(), chr != EOF)
                     {
                         if (chr == '"')
                         {
-                            if (input_stream.peek() == '"')
-                                chr = input_stream.get();
+                            if (stream().peek() == '"')
+                                chr = stream().get();
                             else
                                 break;
                         }
@@ -222,25 +223,24 @@ namespace cppdatalib
                     deduce_type(buffer, writer);
                 }
 
-                return input_stream;
+                return stream();
             }
 
             options opts;
 
         public:
-            parser(std::istream &input, options opts = convert_fields_by_deduction) : stream_parser(input), opts(opts) {}
+            parser(core::istream_handle input, options opts = convert_fields_by_deduction) : stream_parser(input), opts(opts) {}
 
-            core::stream_parser &convert(core::stream_handler &writer)
+            core::stream_input &convert(core::stream_handler &writer)
             {
                 const bool parse_as_strings = opts == convert_all_fields_as_strings;
                 int chr;
                 bool comma_just_parsed = true;
                 bool newline_just_parsed = true;
 
-                writer.begin();
                 writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
 
-                while (chr = input_stream.get(), chr != EOF)
+                while (chr = stream().get(), chr != EOF)
                 {
                     if (newline_just_parsed)
                     {
@@ -278,7 +278,7 @@ namespace cppdatalib
                         default:
                             if (!isspace(chr))
                             {
-                                input_stream.unget();
+                                stream().unget();
                                 read_string(writer, parse_as_strings);
                                 comma_just_parsed = false;
                             }
@@ -299,9 +299,8 @@ namespace cppdatalib
                     writer.end_array(core::array_t());
                 }
 
-
                 writer.end_array(core::array_t());
-                writer.end();
+
                 return *this;
             }
         };
@@ -311,10 +310,10 @@ namespace cppdatalib
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
             public:
-                stream_writer_base(std::ostream &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
             protected:
-                std::ostream &write_string(std::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, const std::string &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
@@ -336,24 +335,24 @@ namespace cppdatalib
             char separator;
 
         public:
-            row_writer(std::ostream &output, char separator = ',') : stream_writer_base(output), separator(separator) {}
+            row_writer(core::ostream_handle output, char separator = ',') : stream_writer_base(output), separator(separator) {}
 
         protected:
-            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
-                    output_stream.put(separator);
+                    stream().put(separator);
             }
 
-            void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
-            void integer_(const core::value &v) {output_stream << v.get_int();}
-            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
-            void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
-            void end_string_(const core::value &, bool) {output_stream.put('"');}
+            void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
+            void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
+            void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
+            void real_(const core::value &v) {stream() << v.get_real_unchecked();}
+            void begin_string_(const core::value &, core::int_t, bool) {stream().put('"');}
+            void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+            void end_string_(const core::value &, bool) {stream().put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'array' value not allowed in row output");}
             void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
@@ -364,29 +363,29 @@ namespace cppdatalib
             char separator;
 
         public:
-            stream_writer(std::ostream &output, char separator = ',') : stream_writer_base(output), separator(separator) {}
+            stream_writer(core::ostream_handle output, char separator = ',') : stream_writer_base(output), separator(separator) {}
 
         protected:
-            void begin_() {output_stream << std::setprecision(CPPDATALIB_REAL_DIG);}
+            void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &)
             {
                 if (current_container_size() > 0)
                 {
                     if (nesting_depth() == 1)
-                        output_stream << "\r\n";
+                        stream() << "\r\n";
                     else
-                        output_stream.put(separator);
+                        stream().put(separator);
                 }
             }
 
-            void bool_(const core::value &v) {output_stream << (v.get_bool()? "true": "false");}
-            void integer_(const core::value &v) {output_stream << v.get_int();}
-            void uinteger_(const core::value &v) {output_stream << v.get_uint();}
-            void real_(const core::value &v) {output_stream << v.get_real();}
-            void begin_string_(const core::value &, core::int_t, bool) {output_stream.put('"');}
-            void string_data_(const core::value &v, bool) {write_string(output_stream, v.get_string());}
-            void end_string_(const core::value &, bool) {output_stream.put('"');}
+            void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
+            void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
+            void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
+            void real_(const core::value &v) {stream() << v.get_real_unchecked();}
+            void begin_string_(const core::value &, core::int_t, bool) {stream().put('"');}
+            void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+            void end_string_(const core::value &, bool) {stream().put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
@@ -396,9 +395,8 @@ namespace cppdatalib
             void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
         };
 
-        inline core::value from_csv_table(const std::string &csv, parser::options opts = parser::convert_fields_by_deduction)
+        inline core::value from_csv_table(core::istream_handle stream, parser::options opts = parser::convert_fields_by_deduction)
         {
-            std::istringstream stream(csv);
             parser reader(stream, opts);
             core::value v;
             reader >> v;
@@ -407,7 +405,7 @@ namespace cppdatalib
 
         inline std::string to_csv_row(const core::value &v, char separator = ',')
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             row_writer writer(stream, separator);
             writer << v;
             return stream.str();
@@ -415,13 +413,13 @@ namespace cppdatalib
 
         inline std::string to_csv_table(const core::value &v, char separator = ',')
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer writer(stream, separator);
             writer << v;
             return stream.str();
         }
 
-        inline core::value from_csv(const std::string &csv, parser::options opts = parser::convert_fields_by_deduction) {return from_csv_table(csv, opts);}
+        inline core::value from_csv(core::istream_handle stream, parser::options opts = parser::convert_fields_by_deduction) {return from_csv_table(stream, opts);}
         inline std::string to_csv(const core::value &v, char separator = ',') {return to_csv_table(v, separator);}
     }
 }

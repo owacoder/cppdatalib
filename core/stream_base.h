@@ -26,12 +26,14 @@
 #define CPPDATALIB_STREAM_BASE_H
 
 #include "value.h"
+#include "istream.h"
+#include "ostream.h"
 
 namespace cppdatalib
 {
     namespace core
     {
-        inline bool stream_starts_with(std::istream &stream, const char *str)
+        inline bool stream_starts_with(core::istream &stream, const char *str)
         {
             int c;
             while (*str)
@@ -44,14 +46,15 @@ namespace cppdatalib
 
         class stream_writer
         {
-        protected:
-            std::ostream &output_stream;
+            core::ostream_handle handle;
 
         public:
-            stream_writer(std::ostream &stream) : output_stream(stream) {}
+            stream_writer(core::ostream_handle &output) : handle(output) {}
             virtual ~stream_writer() {}
 
-            std::ostream &stream() {return output_stream;}
+            core::ostream &stream() {return handle;}
+            // May return NULL! See core::ostream_handle::std_stream() for details.
+            std::ostream *std_stream() {return handle.std_stream();}
         };
 
         class stream_handler
@@ -75,28 +78,36 @@ namespace cppdatalib
             };
 
             bool active_;
+            bool is_key_;
 
         public:
-            stream_handler() : active_(false) {}
+            stream_handler() : active_(false), is_key_(false) {}
             virtual ~stream_handler() {}
 
             enum {
-                unknown_size = -1
+                unknown_size = -1 // No other negative value besides unknown_size should be used for the `size` parameters of handlers
             };
 
             bool active() const {return active_;}
 
             void begin()
             {
+                assert("cppdatalib::core::stream_handler - begin() called on active handler" && !active());
+
                 active_ = true;
-                while (!nested_scopes.empty())
-                    nested_scopes.pop_back();
+                nested_scopes = decltype(nested_scopes)();
+                nested_scopes.push_back(scope_data(null));
+                is_key_ = false;
                 begin_();
             }
             void end()
             {
-                if (!nested_scopes.empty())
+                assert("cppdatalib::core::stream_handler - end() called on inactive handler" && active());
+                assert("cppdatalib::core::stream_handler - unexpected end of stream" && nested_scopes.size() == 1);
+
+                if (nested_scopes.size() != 1)
                     throw error("cppdatalib::core::stream_handler - unexpected end of stream");
+
                 end_();
                 active_ = false;
             }
@@ -131,12 +142,10 @@ namespace cppdatalib
             // (increments after the begin_xxx() handler is called)
             // Nesting depth is > 0 before a container is ended, and updated afterward
             // (decrements after the end_xxx() handler is called)
-            size_t nesting_depth() const {return nested_scopes.size();}
+            size_t nesting_depth() const {return nested_scopes.size() - 1;}
 
             type current_container() const
             {
-                if (nested_scopes.empty())
-                    return null;
                 return nested_scopes.back().get_type();
             }
 
@@ -144,15 +153,11 @@ namespace cppdatalib
             // (begins at 0 with no elements, the first element is handled, then it increments to 1)
             size_t current_container_size() const
             {
-                if (nested_scopes.empty())
-                    return 0;
                 return nested_scopes.back().items_parsed();
             }
 
             bool container_key_was_just_parsed() const
             {
-                if (nested_scopes.empty())
-                    return false;
                 return nested_scopes.back().key_was_parsed();
             }
 
@@ -161,76 +166,69 @@ namespace cppdatalib
             // Returns true if value was handled, false otherwise
             bool write(const value &v)
             {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
                 const bool is_key =
-                       !nested_scopes.empty() &&
                         nested_scopes.back().type_ == object &&
-                       !nested_scopes.back().key_was_parsed();
+                        !nested_scopes.back().key_was_parsed();
 
                 if (!write_(v, is_key))
                 {
-                    if (is_key)
-                        begin_key_(v);
+                    if ((v.is_array() || v.is_object()) && v.size() > 0)
+                        *this << v;
                     else
-                        begin_item_(v);
-
-                    switch (v.get_type())
                     {
-                        case string:
-                            begin_string_(v, v.size(), is_key);
-                            string_data_(v, is_key);
-                            end_string_(v, is_key);
-                            break;
-                        case array:
-                            if (v.size() == 0)
-                            {
+                        if (is_key)
+                            begin_key_(v);
+                        else
+                            begin_item_(v);
+
+                        switch (v.get_type())
+                        {
+                            case string:
+                                begin_string_(v, v.size(), is_key);
+                                string_data_(v, is_key);
+                                end_string_(v, is_key);
+                                break;
+                            case array:
                                 begin_array_(v, 0, is_key);
                                 end_array_(v, is_key);
-                            }
-                            else
-                                *this << v;
-                            break;
-                        case object:
-                            if (v.size() == 0)
-                            {
+                                break;
+                            case object:
                                 begin_object_(v, 0, is_key);
                                 end_object_(v, is_key);
-                            }
-                            else
-                                *this << v;
-                            break;
-                        default:
-                            begin_scalar_(v, is_key);
+                                break;
+                            default:
+                                begin_scalar_(v, is_key);
 
-                            switch (v.get_type())
-                            {
-                                case null: null_(v); break;
-                                case boolean: bool_(v); break;
-                                case integer: integer_(v); break;
-                                case uinteger: uinteger_(v); break;
-                                case real: real_(v); break;
-                                default: return false;
-                            }
+                                switch (v.get_type())
+                                {
+                                    case null: null_(v); break;
+                                    case boolean: bool_(v); break;
+                                    case integer: integer_(v); break;
+                                    case uinteger: uinteger_(v); break;
+                                    case real: real_(v); break;
+                                    default: return false;
+                                }
 
-                            end_scalar_(v, is_key);
-                            break;
+                                end_scalar_(v, is_key);
+                                break;
+                        }
+
+                        if (is_key)
+                            end_key_(v);
+                        else
+                            end_item_(v);
                     }
-
-                    if (is_key)
-                        end_key_(v);
-                    else
-                        end_item_(v);
                 }
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.back().get_type() == object)
                 {
-                    if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += !is_key;
-                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
+                    nested_scopes.back().items_ += !is_key;
+                    nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                 }
+                else if (nested_scopes.size() > 1)
+                    ++nested_scopes.back().items_;
 
                 return true;
             }
@@ -281,40 +279,44 @@ namespace cppdatalib
             // If the length of v is equal to size, the entire string is provided
             void begin_string(const core::value &v, core::int_t size)
             {
-                if (!nested_scopes.empty() &&
-                     nested_scopes.back().type_ == object &&
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
+                if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
-                    begin_string_(v, size, true);
+                    begin_string_(v, size, is_key_ = true);
                 }
                 else
                 {
                     begin_item_(v);
-                    begin_string_(v, size, false);
+                    begin_string_(v, size, is_key_ = false);
                 }
 
                 nested_scopes.push_back(string);
             }
-            // An API must call these when a long string is parsed. The number of bytes of this chunk is passed in size, if possible
             void append_to_string(const core::value &v)
             {
-                if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
-                    throw error("cppdatalib::core::stream_handler - attempted to append to string that was never begun");
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                string_data_(v, nested_scopes.size() > 1 &&
-                                 nested_scopes[nested_scopes.size() - 2].get_type() == object &&
-                                !nested_scopes[nested_scopes.size() - 2].key_was_parsed());
-                nested_scopes.back().items_ += v.get_string().size();
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != string)
+                    throw error("cppdatalib::core::stream_handler - attempted to append to string that was never begun");
+#endif
+
+                string_data_(v, is_key_);
+                nested_scopes.back().items_ += v.string_size();
             }
             void end_string(const core::value &v)
             {
-                if (nested_scopes.empty() || nested_scopes.back().get_type() != string)
-                    throw error("cppdatalib::core::stream_handler - attempted to end string that was never begun");
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if ( nested_scopes.size() > 1 &&
-                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
-                    !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != string)
+                    throw error("cppdatalib::core::stream_handler - attempted to end string that was never begun");
+#endif
+
+                if (is_key_)
                 {
                     end_string_(v, true);
                     end_key_(v);
@@ -326,16 +328,13 @@ namespace cppdatalib
                 }
                 nested_scopes.pop_back();
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.back().get_type() == object)
                 {
-                    if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
-                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
+                    nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                    nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                 }
+                else if (nested_scopes.size() > 1)
+                    ++nested_scopes.back().items_;
             }
 
             // An API must call these when an array is parsed. The number of elements is passed in size, if possible
@@ -343,8 +342,9 @@ namespace cppdatalib
             // If the number of elements of v is equal to size, the entire array is provided
             void begin_array(const core::value &v, core::int_t size)
             {
-                if (!nested_scopes.empty() &&
-                     nested_scopes.back().type_ == object &&
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
+                if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
@@ -360,11 +360,14 @@ namespace cppdatalib
             }
             void end_array(const core::value &v)
             {
-                if (nested_scopes.empty() || nested_scopes.back().get_type() != array)
-                    throw error("cppdatalib::core::stream_handler - attempted to end array that was never begun");
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if ( nested_scopes.size() > 1 &&
-                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != array)
+                    throw error("cppdatalib::core::stream_handler - attempted to end array that was never begun");
+#endif
+
+                if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
                     !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
                 {
                     end_array_(v, true);
@@ -377,16 +380,13 @@ namespace cppdatalib
                 }
                 nested_scopes.pop_back();
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.back().get_type() == object)
                 {
-                    if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
-                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
+                    nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                    nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                 }
+                else if (nested_scopes.size() > 1)
+                    ++nested_scopes.back().items_;
             }
 
             // An API must call these when an object is parsed. The number of key/value pairs is passed in size, if possible
@@ -394,8 +394,9 @@ namespace cppdatalib
             // If the number of elements of v is equal to size, the entire object is provided
             void begin_object(const core::value &v, core::int_t size)
             {
-                if (!nested_scopes.empty() &&
-                     nested_scopes.back().type_ == object &&
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
+                if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
                     begin_key_(v);
@@ -411,13 +412,16 @@ namespace cppdatalib
             }
             void end_object(const core::value &v)
             {
-                if (nested_scopes.empty() || nested_scopes.back().get_type() != object)
-                    throw error("cppdatalib::core::stream_handler - attempted to end object that was never begun");
-                if (nested_scopes.back().key_was_parsed())
-                    throw error("cppdatalib::core::stream_handler - attempted to end object before final value was written");
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
-                if ( nested_scopes.size() > 1 &&
-                     nested_scopes[nested_scopes.size() - 2].get_type() == object &&
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != object)
+                    throw error("cppdatalib::core::stream_handler - attempted to end object that was never begun");
+                else if (nested_scopes.back().key_was_parsed())
+                    throw error("cppdatalib::core::stream_handler - attempted to end object before final value was written");
+#endif
+
+                if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
                     !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
                 {
                     end_object_(v, true);
@@ -430,16 +434,13 @@ namespace cppdatalib
                 }
                 nested_scopes.pop_back();
 
-                if (!nested_scopes.empty())
+                if (nested_scopes.back().get_type() == object)
                 {
-                    if (nested_scopes.back().get_type() == object)
-                    {
-                        nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
-                        nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
-                    }
-                    else
-                        ++nested_scopes.back().items_;
+                    nested_scopes.back().items_ += nested_scopes.back().key_was_parsed();
+                    nested_scopes.back().parsed_key_ = !nested_scopes.back().key_was_parsed();
                 }
+                else if (nested_scopes.size() > 1)
+                    ++nested_scopes.back().items_;
             }
 
         protected:
@@ -454,14 +455,10 @@ namespace cppdatalib
             std::vector<scope_data> nested_scopes; // Used as a stack, but not a stack so we can peek below the top
         };
 
-        class stream_parser
+        class stream_input
         {
-        protected:
-            std::istream &input_stream;
-
         public:
-            stream_parser(std::istream &input) : input_stream(input) {}
-            virtual ~stream_parser() {}
+            virtual ~stream_input() {}
 
             // The following functions should be reimplemented to return true if the parser ALWAYS provides the element
             // size (for each respective type) in the begin_xxx() functions.
@@ -476,13 +473,24 @@ namespace cppdatalib
             virtual bool provides_buffered_arrays() const {return false;}
             virtual bool provides_buffered_objects() const {return false;}
 
-            std::istream &stream() {return input_stream;}
+            virtual stream_input &convert(core::stream_handler &output) = 0;
+        };
 
-            virtual stream_parser &convert(core::stream_handler &output) = 0;
+        class stream_parser : public stream_input
+        {
+            core::istream_handle handle;
+
+        public:
+            stream_parser(core::istream_handle &input) : handle(input) {}
+            virtual ~stream_parser() {}
+
+            core::istream &stream() {return handle;}
+            // May return NULL! See core::istream_handle::std_stream() for details.
+            std::istream *std_stream() {return handle.std_stream();}
         };
 
         // Convert directly from parser to serializer
-        stream_handler &operator<<(stream_handler &output, stream_parser &input)
+        stream_handler &operator<<(stream_handler &output, stream_input &input)
         {
             if (output.requires_string_buffering() > input.provides_buffered_strings() ||
                 output.requires_array_buffering() > input.provides_buffered_arrays() ||
@@ -492,12 +500,19 @@ namespace cppdatalib
                 output.requires_prefix_object_size() > input.provides_prefix_object_size())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
 
+            const bool stream_ready = output.active();
+
+            if (!stream_ready)
+                output.begin();
             input.convert(output);
+            if (!stream_ready)
+                output.end();
+
             return output;
         }
 
         // Convert directly from parser to serializer
-        stream_parser &operator>>(stream_parser &input, stream_handler &output)
+        stream_handler &operator<<(stream_handler &output, stream_input &&input)
         {
             if (output.requires_string_buffering() > input.provides_buffered_strings() ||
                 output.requires_array_buffering() > input.provides_buffered_arrays() ||
@@ -505,44 +520,329 @@ namespace cppdatalib
                 output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
                 output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
                 output.requires_prefix_object_size() > input.provides_prefix_object_size())
-                throw core::error("cppdatalib::stream_parser::operator>>() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
 
+            const bool stream_ready = output.active();
+
+            if (!stream_ready)
+                output.begin();
             input.convert(output);
+            if (!stream_ready)
+                output.end();
+
+            return output;
+        }
+
+        // Convert directly from parser to serializer
+        void operator<<(stream_handler &&output, stream_input &input)
+        {
+            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
+                output.requires_array_buffering() > input.provides_buffered_arrays() ||
+                output.requires_object_buffering() > input.provides_buffered_objects() ||
+                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
+                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
+                output.requires_prefix_object_size() > input.provides_prefix_object_size())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+
+            const bool stream_ready = output.active();
+
+            if (!stream_ready)
+                output.begin();
+            input.convert(output);
+            if (!stream_ready)
+                output.end();
+        }
+
+        // Convert directly from parser to rvalue serializer
+        void operator<<(stream_handler &&output, stream_input &&input)
+        {
+            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
+                output.requires_array_buffering() > input.provides_buffered_arrays() ||
+                output.requires_object_buffering() > input.provides_buffered_objects() ||
+                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
+                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
+                output.requires_prefix_object_size() > input.provides_prefix_object_size())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+
+            const bool stream_ready = output.active();
+
+            if (!stream_ready)
+                output.begin();
+            input.convert(output);
+            if (!stream_ready)
+                output.end();
+        }
+
+        // Convert directly from parser to serializer
+        stream_input &operator>>(stream_input &input, stream_handler &output)
+        {
+            output << input;
             return input;
+        }
+
+        // Convert directly from parser to serializer
+        stream_input &operator>>(stream_input &input, stream_handler &&output)
+        {
+            output << input;
+            return input;
+        }
+
+        // Convert directly from parser to serializer
+        void operator>>(stream_input &&input, stream_handler &output)
+        {
+            output << input;
+        }
+
+        // Convert directly from parser to rvalue serializer
+        void operator>>(stream_input &&input, stream_handler &&output)
+        {
+            output << input;
         }
 
         struct value::traverse_node_prefix_serialize
         {
-            traverse_node_prefix_serialize(stream_handler &handler) : stream(handler) {}
+            traverse_node_prefix_serialize(stream_handler *handler) : stream(handler) {}
 
-            void operator()(const value *arg)
+            bool operator()(const value *arg, value::traversal_ancestry_finder)
             {
                 if (arg->is_array())
-                    stream.begin_array(*arg, arg->size());
+                    stream->begin_array(*arg, arg->size());
                 else if (arg->is_object())
-                    stream.begin_object(*arg, arg->size());
+                    stream->begin_object(*arg, arg->size());
+                return true;
             }
 
         private:
-            stream_handler &stream;
+            stream_handler *stream;
         };
 
         struct value::traverse_node_postfix_serialize
         {
-            traverse_node_postfix_serialize(stream_handler &handler) : stream(handler) {}
+            traverse_node_postfix_serialize(stream_handler *handler) : stream(handler) {}
 
-            void operator()(const value *arg)
+            bool operator()(const value *arg, value::traversal_ancestry_finder)
             {
                 if (arg->is_array())
-                    stream.end_array(*arg);
+                    stream->end_array(*arg);
                 else if (arg->is_object())
-                    stream.end_object(*arg);
+                    stream->end_object(*arg);
                 else
-                    stream.write(*arg);
+                    stream->write(*arg);
+                return true;
             }
 
         private:
-            stream_handler &stream;
+            stream_handler *stream;
+        };
+
+        struct value::traverse_less_than_compare_prefix
+        {
+        private:
+            int compare;
+
+        public:
+            traverse_less_than_compare_prefix() : compare(0) {}
+
+            int comparison() const {return compare;}
+
+            void run(const value *arg, const value *arg2)
+            {
+                if (!compare)
+                {
+                    if (arg == NULL && arg2 != NULL)
+                        compare = -1;
+                    else if (arg != NULL && arg2 == NULL)
+                        compare = 1;
+                    else if (arg != NULL && arg2 != NULL)
+                    {
+                        if (arg->get_type() < arg2->get_type())
+                            compare = -1;
+                        else if (arg->get_type() > arg2->get_type())
+                            compare = 1;
+                        else
+                        {
+                            if (arg->get_subtype() < arg2->get_subtype())
+                                compare = -1;
+                            else if (arg->get_subtype() > arg2->get_subtype())
+                                compare = 1;
+                            else
+                            {
+                                switch (arg->get_type())
+                                {
+                                    case boolean:
+                                        compare = -(arg->get_bool_unchecked() < arg2->get_bool_unchecked());
+                                        break;
+                                    case integer:
+                                        compare = -(arg->get_int_unchecked() < arg2->get_int_unchecked());
+                                        break;
+                                    case uinteger:
+                                        compare = -(arg->get_uint_unchecked() < arg2->get_uint_unchecked());
+                                        break;
+                                    case real:
+                                        compare = -(arg->get_real_unchecked() < arg2->get_real_unchecked());
+                                        break;
+                                    case string:
+                                        compare = -(arg->get_string_unchecked() < arg2->get_string_unchecked());
+                                        break;
+                                    case array:
+                                    case object:
+                                    case null:
+                                    default:
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            bool operator()(const value *arg, const value *arg2, value::traversal_ancestry_finder, value::traversal_ancestry_finder)
+            {
+                run(arg, arg2);
+                return compare == 0;
+            }
+        };
+
+        struct value::traverse_compare_prefix
+        {
+        private:
+            int compare;
+
+        public:
+            traverse_compare_prefix() : compare(0) {}
+
+            int comparison() const {return compare;}
+
+            void run(const value *arg, const value *arg2)
+            {
+                if (!compare)
+                {
+                    if (arg == NULL && arg2 != NULL)
+                        compare = -1;
+                    else if (arg != NULL && arg2 == NULL)
+                        compare = 1;
+                    else if (arg != NULL && arg2 != NULL)
+                    {
+                        if (arg->get_type() < arg2->get_type())
+                            compare = -1;
+                        else if (arg->get_type() > arg2->get_type())
+                            compare = 1;
+                        else
+                        {
+                            if (arg->get_subtype() < arg2->get_subtype())
+                                compare = -1;
+                            else if (arg->get_subtype() > arg2->get_subtype())
+                                compare = 1;
+                            else
+                            {
+                                switch (arg->get_type())
+                                {
+                                    case boolean:
+                                        compare = (arg->get_bool_unchecked() > arg2->get_bool_unchecked()) - (arg->get_bool_unchecked() < arg2->get_bool_unchecked());
+                                        break;
+                                    case integer:
+                                        compare = (arg->get_int_unchecked() > arg2->get_int_unchecked()) - (arg->get_int_unchecked() < arg2->get_int_unchecked());
+                                        break;
+                                    case uinteger:
+                                        compare = (arg->get_uint_unchecked() > arg2->get_uint_unchecked()) - (arg->get_uint_unchecked() < arg2->get_uint_unchecked());
+                                        break;
+                                    case real:
+                                        compare = (arg->get_real_unchecked() > arg2->get_real_unchecked()) - (arg->get_real_unchecked() < arg2->get_real_unchecked());
+                                        break;
+                                    case string:
+                                        compare = (arg->get_string_unchecked() > arg2->get_string_unchecked()) - (arg->get_string_unchecked() < arg2->get_string_unchecked());
+                                        break;
+                                    case array:
+                                    case object:
+                                    case null:
+                                    default:
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            bool operator()(const value *arg, const value *arg2, value::traversal_ancestry_finder, value::traversal_ancestry_finder)
+            {
+                run(arg, arg2);
+                return compare == 0;
+            }
+        };
+
+        struct value::traverse_equality_compare_prefix
+        {
+        private:
+            bool equal;
+
+        public:
+            traverse_equality_compare_prefix() : equal(true) {}
+
+            bool comparison_equal() const {return equal;}
+
+            void run(const value *arg, const value *arg2)
+            {
+                if (equal)
+                {
+                    if (arg == NULL && arg2 != NULL)
+                        equal = false;
+                    else if (arg != NULL && arg2 == NULL)
+                        equal = false;
+                    else if (arg != NULL && arg2 != NULL)
+                    {
+                        if (arg->get_type() != arg2->get_type() ||
+                                arg->get_subtype() != arg2->get_subtype())
+                            equal = false;
+                        else
+                        {
+                            switch (arg->get_type())
+                            {
+                                case boolean:
+                                    equal = (arg->get_bool_unchecked() == arg2->get_bool_unchecked());
+                                    break;
+                                case integer:
+                                    equal = (arg->get_int_unchecked() == arg2->get_int_unchecked());
+                                    break;
+                                case uinteger:
+                                    equal = (arg->get_uint_unchecked() == arg2->get_uint_unchecked());
+                                    break;
+                                case real:
+                                    equal = (arg->get_real_unchecked() == arg2->get_real_unchecked());
+                                    break;
+                                case string:
+                                    equal = (arg->get_string_unchecked() == arg2->get_string_unchecked());
+                                    break;
+                                case array:
+                                case object:
+                                    equal = (arg->size() == arg2->size());
+                                    break;
+                                case null:
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            bool operator()(const value *arg, const value *arg2, value::traversal_ancestry_finder, value::traversal_ancestry_finder)
+            {
+                run(arg, arg2);
+                return equal;
+            }
+        };
+
+        struct value::traverse_compare_postfix
+        {
+        public:
+            bool operator()(const value *,
+                            const value *,
+                            value::traversal_ancestry_finder,
+                            value::traversal_ancestry_finder)
+            {
+                return true;
+            }
         };
     }
 }

@@ -27,8 +27,10 @@
 
 #include "core/core.h"
 #include "json/json_pointer.h"
+#include "json/json_patch.h"
 #include "json/json.h"
 #include "bencode/bencode.h"
+#include "bjson/bjson.h"
 #include "property_list/plain_text.h"
 #include "property_list/xml.h"
 #include "rpc/xml.h"
@@ -38,5 +40,6 @@
 #include "xls/xml.h"
 #include "netstrings/netstrings.h"
 #include "message_pack/message_pack.h"
+#include "mysql/mysql.h"
 
 #endif // CPPDATALIB_H

@@ -34,19 +34,17 @@ namespace cppdatalib
         class parser : public core::stream_parser
         {
         public:
-            parser(std::istream &input) : core::stream_parser(input) {}
+            parser(core::istream_handle input) : core::stream_parser(input) {}
 
             bool provides_prefix_string_size() const {return true;}
 
-            core::stream_parser &convert(core::stream_handler &writer)
+            core::stream_input &convert(core::stream_handler &writer)
             {
-                char buffer[core::buffer_size];
+                std::unique_ptr<char []> buffer(new char [core::buffer_size]);
                 bool written = false;
                 int chr;
 
-                writer.begin();
-
-                while (chr = input_stream.peek(), chr != EOF)
+                while (chr = stream().peek(), chr != EOF)
                 {
                     written = true;
 
@@ -54,18 +52,18 @@ namespace cppdatalib
                     {
                         case 'i':
                         {
-                            input_stream.get(); // Eat 'i'
+                            stream().get(); // Eat 'i'
 
                             core::int_t i;
-                            input_stream >> i;
-                            if (!input_stream) throw core::error("Bencode - expected 'integer' value");
+                            stream() >> i;
+                            if (!stream()) throw core::error("Bencode - expected 'integer' value");
 
                             writer.write(i);
-                            if (input_stream.get() != 'e') throw core::error("Bencode - invalid 'integer' value");
+                            if (stream().get() != 'e') throw core::error("Bencode - invalid 'integer' value");
                             break;
                         }
                         case 'e':
-                            input_stream.get(); // Eat 'e'
+                            stream().get(); // Eat 'e'
                             switch (writer.current_container())
                             {
                                 case core::array: writer.end_array(core::array_t()); break;
@@ -74,11 +72,11 @@ namespace cppdatalib
                             }
                             break;
                         case 'l':
-                            input_stream.get(); // Eat 'l'
+                            stream().get(); // Eat 'l'
                             writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
                             break;
                         case 'd':
-                            input_stream.get(); // Eat 'd'
+                            stream().get(); // Eat 'd'
                             writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
                             break;
                         default:
@@ -86,18 +84,18 @@ namespace cppdatalib
                             {
                                 core::int_t size;
 
-                                input_stream >> size;
+                                stream() >> size;
                                 if (size < 0) throw core::error("Bencode - expected string size");
-                                if (input_stream.get() != ':') throw core::error("Bencode - expected ':' separating string size and data");
+                                if (stream().get() != ':') throw core::error("Bencode - expected ':' separating string size and data");
 
                                 writer.begin_string(core::string_t(), size);
                                 while (size > 0)
                                 {
                                     core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                                    input_stream.read(buffer, buffer_size);
-                                    if (input_stream.fail())
+                                    stream().read(buffer.get(), buffer_size);
+                                    if (stream().fail())
                                         throw core::error("Bencode - unexpected end of string");
-                                    writer.append_to_string(core::string_t(buffer, buffer_size));
+                                    writer.append_to_string(core::string_t(buffer.get(), buffer_size));
                                     size -= buffer_size;
                                 }
                                 writer.end_string(core::string_t());
@@ -113,8 +111,9 @@ namespace cppdatalib
 
                 if (!written)
                     throw core::error("Bencode - expected value");
+                else if (writer.nesting_depth())
+                    throw core::error("Bencode - unexpected end of stream");
 
-                writer.end();
                 return *this;
             }
         };
@@ -122,7 +121,7 @@ namespace cppdatalib
         class stream_writer : public core::stream_handler, public core::stream_writer
         {
         public:
-            stream_writer(std::ostream &output) : core::stream_writer(output) {}
+            stream_writer(core::ostream_handle output) : core::stream_writer(output) {}
 
             bool requires_prefix_string_size() const {return true;}
 
@@ -137,36 +136,35 @@ namespace cppdatalib
             void bool_(const core::value &) {throw core::error("Bencode - 'boolean' value not allowed in output");}
             void integer_(const core::value &v)
             {
-                output_stream.put('i');
-                output_stream << v.get_int();
-                output_stream.put('e');
+                stream().put('i');
+                stream() << v.get_int_unchecked();
+                stream().put('e');
             }
             void uinteger_(const core::value &v)
             {
-                output_stream.put('i');
-                output_stream << v.get_uint();
-                output_stream.put('e');
+                stream().put('i');
+                stream() << v.get_uint_unchecked();
+                stream().put('e');
             }
             void real_(const core::value &) {throw core::error("Bencode - 'real' value not allowed in output");}
             void begin_string_(const core::value &, core::int_t size, bool)
             {
                 if (size == unknown_size)
                     throw core::error("Bencode - 'string' value does not have size specified");
-                output_stream << size;
-                output_stream.put(':');
+                stream() << size;
+                stream().put(':');
             }
-            void string_data_(const core::value &v, bool) {output_stream << v.get_string();}
+            void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
 
-            void begin_array_(const core::value &, core::int_t, bool) {output_stream.put('l');}
-            void end_array_(const core::value &, bool) {output_stream.put('e');}
+            void begin_array_(const core::value &, core::int_t, bool) {stream().put('l');}
+            void end_array_(const core::value &, bool) {stream().put('e');}
 
-            void begin_object_(const core::value &, core::int_t, bool) {output_stream.put('d');}
-            void end_object_(const core::value &, bool) {output_stream.put('e');}
+            void begin_object_(const core::value &, core::int_t, bool) {stream().put('d');}
+            void end_object_(const core::value &, bool) {stream().put('e');}
         };
 
-        inline core::value from_bencode(const std::string &bencode)
+        inline core::value from_bencode(core::istream_handle stream)
         {
-            std::istringstream stream(bencode);
             parser p(stream);
             core::value v;
             p >> v;
@@ -175,7 +173,7 @@ namespace cppdatalib
 
         inline std::string to_bencode(const core::value &v)
         {
-            std::ostringstream stream;
+            core::ostringstream stream;
             stream_writer w(stream);
             w << v;
             return stream.str();

@@ -30,5 +30,6 @@
 #include "fp_convert.h"
 // stream_filters.h includes value_builder.h, stream_base.h, and value.h
 #include "stream_filters.h"
+#include "dump.h"
 
 #endif // CPPDATALIB_CORE_CORE_H

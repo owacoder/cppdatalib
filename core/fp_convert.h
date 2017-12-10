@@ -72,10 +72,17 @@ namespace cppdatalib
             mantissa = f & mantissa_mask;
 
             // Handle special cases
-            if (exp == 0 && mantissa == 0) // 0, -0
-                result = 0;
-            else if (exp == exponent_mask) // +/- Infinity, NaN
-                result = mantissa == 0? INFINITY: NAN;
+            if (exp == exponent_mask) // +/- Infinity, NaN
+            {
+                if (mantissa == 0) // +/- Infinity
+                    result = std::numeric_limits<float>::infinity();
+                else // qNaN, sNaN
+                    return f >> sign_offset?
+                        std::numeric_limits<float>::quiet_NaN():
+                        std::numeric_limits<float>::signaling_NaN();
+            }
+            else if (exp == 0 && mantissa == 0) // 0, -0
+                result = 0.0;
             else
             {
                 const int32_t normal = exp != 0;
@@ -146,10 +153,17 @@ namespace cppdatalib
             mantissa = f & mantissa_mask;
 
             // Handle special cases
-            if (exp == 0 && mantissa == 0) // 0, -0
-                result = 0;
-            else if (exp == exponent_mask) // +/- Infinity, NaN
-                result = mantissa == 0? INFINITY: NAN;
+            if (exp == exponent_mask) // +/- Infinity, NaN
+            {
+                if (mantissa == 0) // +/- Infinity
+                    result = std::numeric_limits<float>::infinity();
+                else // qNaN, sNaN
+                    return f >> sign_offset?
+                        std::numeric_limits<float>::quiet_NaN():
+                        std::numeric_limits<float>::signaling_NaN();
+            }
+            else if (exp == 0 && mantissa == 0) // 0, -0
+                result = 0.0;
             else
             {
                 const int32_t normal = exp != 0;
@@ -244,10 +258,17 @@ namespace cppdatalib
             mantissa = f & mantissa_mask;
 
             // Handle special cases
-            if (exp == 0 && mantissa == 0) // 0, -0
-                result = 0;
-            else if (exp == exponent_mask) // +/- Infinity, NaN
-                result = mantissa == 0? INFINITY: NAN;
+            if (exp == exponent_mask) // +/- Infinity, NaN
+            {
+                if (mantissa == 0) // +/- Infinity
+                    result = std::numeric_limits<double>::infinity();
+                else // qNaN, sNaN
+                    return f >> sign_offset?
+                        std::numeric_limits<double>::quiet_NaN():
+                        std::numeric_limits<double>::signaling_NaN();
+            }
+            else if (exp == 0 && mantissa == 0)
+                result = 0.0;
             else
             {
                 const int64_t normal = exp != 0;

@@ -27,6 +27,7 @@
 
 #include "value_builder.h"
 #include <set> // For duplicate_key_check_filter
+#include <algorithm> // For sorting and specialty filters
 
 #include <cassert>
 
@@ -60,6 +61,48 @@ namespace cppdatalib
             bool requires_string_buffering() const {return output.requires_string_buffering();}
             bool requires_array_buffering() const {return output.requires_array_buffering();}
             bool requires_object_buffering() const {return output.requires_object_buffering();}
+
+        protected:
+            void begin_() {output.begin();}
+            void end_() {output.end();}
+
+            bool write_(const value &v, bool is_key)
+            {
+                (void) is_key;
+                output.write(v);
+                return true;
+            }
+
+            void begin_array_(const value &v, int_t size, bool)
+            {
+                output.begin_array(v, size);
+            }
+            void end_array_(const value &v, bool)
+            {
+                output.end_array(v);
+            }
+
+            void begin_object_(const value &v, int_t size, bool)
+            {
+                output.begin_object(v, size);
+            }
+            void end_object_(const value &v, bool)
+            {
+                output.end_object(v);
+            }
+
+            void begin_string_(const value &v, int_t size, bool)
+            {
+                output.begin_string(v, size);
+            }
+            void string_data_(const value &v, bool)
+            {
+                output.append_to_string(v);
+            }
+            void end_string_(const value &v, bool)
+            {
+                output.end_string(v);
+            }
         };
 
         namespace impl
@@ -91,10 +134,10 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case integer: value.set_int(value.get_bool()); break;
-                                case uinteger: value.set_uint(value.get_bool()); break;
-                                case real: value.set_real(value.get_bool()); break;
-                                case string: value.set_string(value.get_bool()? "true": "false"); break;
+                                case integer: value.set_int(value.get_bool_unchecked()); break;
+                                case uinteger: value.set_uint(value.get_bool_unchecked()); break;
+                                case real: value.set_real(value.get_bool_unchecked()); break;
+                                case string: value.set_string(value.get_bool_unchecked()? "true": "false"); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
                                 default: value.set_null(); break;
@@ -104,9 +147,9 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case boolean: value.set_bool(value.get_int() != 0); break;
+                                case boolean: value.set_bool(value.get_int_unchecked() != 0); break;
                                 case uinteger: value.convert_to_uint(); break;
-                                case real: value.set_real(value.get_int()); break;
+                                case real: value.set_real(value.get_int_unchecked()); break;
                                 case string: value.convert_to_string(); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
@@ -117,9 +160,9 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case boolean: value.set_bool(value.get_uint() != 0); break;
+                                case boolean: value.set_bool(value.get_uint_unchecked() != 0); break;
                                 case integer: value.convert_to_int(); break;
-                                case real: value.set_real(value.get_uint()); break;
+                                case real: value.set_real(value.get_uint_unchecked()); break;
                                 case string: value.convert_to_string(); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
@@ -130,7 +173,7 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case boolean: value.set_bool(value.get_real() != 0.0); break;
+                                case boolean: value.set_bool(value.get_real_unchecked() != 0.0); break;
                                 case integer: value.convert_to_int(); break;
                                 case uinteger: value.convert_to_uint(); break;
                                 case string: value.convert_to_string(); break;
@@ -143,7 +186,7 @@ namespace cppdatalib
                             switch (to)
                             {
                                 case null: value.set_null(); break;
-                                case boolean: value.set_bool(value.get_string() == "true" || value.as_int()); break;
+                                case boolean: value.set_bool(value.get_string_unchecked() == "true" || value.as_int()); break;
                                 case integer: value.convert_to_int(); break;
                                 case uinteger: value.convert_to_uint(); break;
                                 case real: value.convert_to_real(); break;
@@ -163,14 +206,15 @@ namespace cppdatalib
                                 case string: value.set_string(""); break;
                                 case object:
                                 {
-                                    object_t obj;
+                                    core::value obj;
+
                                     if (value.size() % 2 != 0)
                                         throw core::error("cppdatalib::core::stream_filter_converter - cannot convert 'array' to 'object' with odd number of elements");
 
-                                    for (size_t i = 0; i < value.get_array().size(); i += 2)
-                                        obj[value[i]] = value[i+1];
+                                    for (size_t i = 0; i < value.size(); i += 2)
+                                        obj.add_member(value[i]) = value[i+1];
 
-                                    value.set_object(obj);
+                                    value = obj;
                                     break;
                                 }
                                 default: value.set_null(); break;
@@ -189,7 +233,7 @@ namespace cppdatalib
                                 {
                                     array_t arr;
 
-                                    for (auto it: value.get_object())
+                                    for (auto const &it: value.get_object_unchecked())
                                     {
                                         arr.push_back(it.first);
                                         arr.push_back(it.second);
@@ -220,23 +264,29 @@ namespace cppdatalib
             core::value cache_val;
             core::value_builder cache;
 
-            buffer_filter_flags flags;
+            const buffer_filter_flags flags;
+            const size_t nesting_level;
+
+            size_t ignore_nesting;
 
         public:
-            buffer_filter(core::stream_handler &output, buffer_filter_flags flags)
+            buffer_filter(core::stream_handler &output, buffer_filter_flags flags, size_t nesting_level = 0)
                 : stream_filter_base(output)
                 , cache(cache_val)
                 , flags(flags)
+                , nesting_level(nesting_level)
             {}
             buffer_filter(const buffer_filter &f)
                 : stream_filter_base(f.output)
                 , cache(cache_val)
                 , flags(f.flags)
+                , nesting_level(f.nesting_level)
             {}
             buffer_filter(buffer_filter &&f)
                 : stream_filter_base(f.output)
                 , cache(cache_val)
                 , flags(f.flags)
+                , nesting_level(f.nesting_level)
             {}
 
             bool requires_prefix_string_size() const {return flags & buffer_strings? false: stream_filter_base::requires_prefix_string_size();}
@@ -251,7 +301,11 @@ namespace cppdatalib
             // The default implementation is just a pass-through to the output, as you can see.
             virtual void write_buffered_value_(const value &v, bool is_key) {(void) is_key; output.write(v);}
 
-            void begin_() {output.begin();}
+            void begin_()
+            {
+                output.begin();
+                ignore_nesting = 0;
+            }
             void end_()
             {
                 if (cache.active())
@@ -262,16 +316,27 @@ namespace cppdatalib
             bool write_(const value &v, bool is_key)
             {
                 (void) is_key;
-                if (cache.active())
+                if (ignore_nesting)
+                    return true;
+                else if (cache.active())
                     return cache.write(v);
                 else
                     return output.write(v);
             }
 
-            void begin_array_(const value &v, int_t size, bool)
+            void begin_array_(const value &v, int_t size, bool is_key)
             {
-                if (cache.active() || (flags & buffer_arrays && size == unknown_size))
+                if (ignore_nesting)
+                    ++ignore_nesting;
+                else if (cache.active() || (flags & buffer_arrays && nesting_level <= nesting_depth()))
                 {
+                    if (size != unknown_size && size_t(size) == v.size())
+                    {
+                        ++ignore_nesting;
+                        write_buffered_value_(v, is_key);
+                        return;
+                    }
+
                     if (!cache.active())
                         cache.begin();
 
@@ -282,7 +347,9 @@ namespace cppdatalib
             }
             void end_array_(const value &v, bool is_key)
             {
-                if (cache.active())
+                if (ignore_nesting)
+                    --ignore_nesting;
+                else if (cache.active())
                 {
                     cache.end_array(v);
 
@@ -297,10 +364,19 @@ namespace cppdatalib
                     output.end_array(v);
             }
 
-            void begin_object_(const value &v, int_t size, bool)
+            void begin_object_(const value &v, int_t size, bool is_key)
             {
-                if (cache.active() || (flags & buffer_objects && size == unknown_size))
+                if (ignore_nesting)
+                    ++ignore_nesting;
+                else if (cache.active() || (flags & buffer_objects && nesting_level <= nesting_depth()))
                 {
+                    if (size != unknown_size && size_t(size) == v.size())
+                    {
+                        ++ignore_nesting;
+                        write_buffered_value_(v, is_key);
+                        return;
+                    }
+
                     if (!cache.active())
                         cache.begin();
 
@@ -311,7 +387,9 @@ namespace cppdatalib
             }
             void end_object_(const value &v, bool is_key)
             {
-                if (cache.active())
+                if (ignore_nesting)
+                    --ignore_nesting;
+                else if (cache.active())
                 {
                     cache.end_object(v);
 
@@ -326,10 +404,19 @@ namespace cppdatalib
                     output.end_object(v);
             }
 
-            void begin_string_(const value &v, int_t size, bool)
+            void begin_string_(const value &v, int_t size, bool is_key)
             {
-                if (cache.active() || (flags & buffer_strings && size == unknown_size))
+                if (ignore_nesting)
+                    ++ignore_nesting;
+                else if (cache.active() || (flags & buffer_strings && nesting_level <= nesting_depth()))
                 {
+                    if (size != unknown_size && size_t(size) == v.size())
+                    {
+                        ++ignore_nesting;
+                        write_buffered_value_(v, is_key);
+                        return;
+                    }
+
                     if (!cache.active())
                         cache.begin();
 
@@ -340,14 +427,18 @@ namespace cppdatalib
             }
             void string_data_(const value &v, bool)
             {
-                if (cache.active())
+                if (ignore_nesting)
+                    return;
+                else if (cache.active())
                     cache.append_to_string(v);
                 else
                     output.append_to_string(v);
             }
             void end_string_(const value &v, bool is_key)
             {
-                if (cache.active())
+                if (ignore_nesting)
+                    --ignore_nesting;
+                else if (cache.active())
                 {
                     cache.end_string(v);
 
@@ -394,8 +485,8 @@ namespace cppdatalib
             bool requires_object_buffering() const {return stream_filter_base::requires_object_buffering() || output2.requires_object_buffering();}
 
         protected:
-            void begin_() {output.begin(); output2.begin();}
-            void end_() {output.end(); output2.end();}
+            void begin_() {stream_filter_base::begin_(); output2.begin();}
+            void end_() {stream_filter_base::end_(); output2.end();}
 
             bool write_(const value &v, bool is_key)
             {
@@ -444,7 +535,262 @@ namespace cppdatalib
             }
         };
 
-        // TODO: duplicate_key_check_filter doesn't do much good as a separate filter unless core::value supports duplicate-key maps
+        template<core::type measure, typename Viewer>
+        class view_filter : public core::buffer_filter
+        {
+            Viewer view;
+
+        public:
+            view_filter(core::stream_handler &output, Viewer v = Viewer())
+                : buffer_filter(output, static_cast<buffer_filter_flags>((measure == core::string? buffer_strings: 0) |
+                                                                         (measure == core::array? buffer_arrays: 0) |
+                                                                         (measure == core::object? buffer_objects: 0)))
+                , view(v)
+            {}
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                if (v.get_type() == measure)
+                    view(v);
+                buffer_filter::write_buffered_value_(v, is_key);
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                if (v.get_type() == measure)
+                    view(v);
+                return buffer_filter::write_(v, is_key);
+            }
+        };
+
+        template<core::type measure = core::real>
+        class range_filter : public core::buffer_filter
+        {
+            core::value max_, min_;
+            bool started;
+
+            void check(const value &v)
+            {
+                if (!started)
+                {
+                    max_ = min_ = v;
+                    started = true;
+                }
+                else if (v < min_)
+                    min_ = v;
+                else if (max_ < v)
+                    max_ = v;
+            }
+
+        public:
+            range_filter(core::stream_handler &output)
+                : buffer_filter(output, static_cast<buffer_filter_flags>((measure == core::string? buffer_strings: 0) |
+                                                                         (measure == core::array? buffer_arrays: 0) |
+                                                                         (measure == core::object? buffer_objects: 0)))
+            {}
+
+            const core::value &get_max() const {return max_;}
+            const core::value &get_min() const {return min_;}
+            core::value get_midpoint() const {return (core::real_t(max_) + core::real_t(min_)) / 2.0;}
+
+        protected:
+            void begin_()
+            {
+                buffer_filter::begin_();
+                started = false;
+            }
+
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                if (v.get_type() == measure)
+                    check(v);
+                buffer_filter::write_buffered_value_(v, is_key);
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                if (v.get_type() == measure)
+                    check(v);
+                return buffer_filter::write_(v, is_key);
+            }
+        };
+
+        enum mean_filter_flag
+        {
+            arithmetic_mean,
+            geometric_mean,
+            harmonic_mean
+        };
+
+        template<core::type measure = core::real>
+        class mean_filter : public core::stream_filter_base
+        {
+            size_t samples;
+            core::real_t sum, product, inverted_sum;
+
+        public:
+            mean_filter(core::stream_handler &output)
+                : stream_filter_base(output)
+            {}
+
+            core::real_t get_mean(mean_filter_flag mean_type) const
+            {
+                switch (mean_type)
+                {
+                    case arithmetic_mean: return sum / samples;
+                    case geometric_mean: return pow(product, 1.0 / samples);
+                    case harmonic_mean: return samples / inverted_sum;
+                    default: return NAN;
+                }
+            }
+
+            core::real_t get_arithmetic_mean() const {return get_mean(arithmetic_mean);}
+            core::real_t get_geometric_mean() const {return get_mean(geometric_mean);}
+            core::real_t get_harmonic_mean() const {return get_mean(harmonic_mean);}
+
+            size_t sample_size() const
+            {
+                return samples;
+            }
+
+        protected:
+            void begin_()
+            {
+                stream_filter_base::begin_();
+                samples = 0;
+                inverted_sum = sum = 0;
+                product = 1;
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                (void) is_key;
+                if (v.get_type() == measure)
+                {
+                    core::real_t value = v.as_real();
+
+                    ++samples;
+
+                    sum += value;
+                    product *= value;
+                    inverted_sum += 1.0 / value;
+                }
+                output.write(v);
+                return true;
+            }
+        };
+
+        template<core::type measure = core::real>
+        class dispersion_filter : public core::mean_filter<measure>
+        {
+            typedef core::mean_filter<measure> base;
+
+            core::value samples;
+
+        public:
+            dispersion_filter(core::stream_handler &output)
+                : base(output)
+            {}
+
+            core::real_t get_variance() const
+            {
+                core::real_t variance_ = 0.0;
+
+                if (samples.is_array())
+                    for (auto const &sample: samples.get_array_unchecked())
+                        variance_ += pow(sample.as_real() - base::get_arithmetic_mean(), 2.0);
+
+                return variance_ / base::sample_size();
+            }
+
+            core::real_t get_standard_deviation() const {return sqrt(get_variance());}
+
+        protected:
+            void begin_()
+            {
+                base::begin_();
+                samples.set_null();
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                base::write_(v, is_key);
+                if (v.get_type() == measure)
+                    samples.push_back(v.as_real());
+                return true;
+            }
+        };
+
+        enum sort_filter_flag
+        {
+            ascending_sort,
+            descending_sort
+        };
+
+        template<sort_filter_flag direction = ascending_sort>
+        class array_sort_filter : public core::buffer_filter
+        {
+        public:
+            array_sort_filter(core::stream_handler &output, size_t nesting_level = 0)
+                : core::buffer_filter(output, buffer_arrays, nesting_level)
+            {}
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                if (v.get_type() == core::array)
+                {
+                    core::value sorted;
+
+                    sorted = v;
+                    if (direction == ascending_sort)
+                        std::sort(sorted.get_array_unchecked().begin(), sorted.get_array_unchecked().end());
+                    else
+                        std::sort(sorted.get_array_unchecked().rbegin(), sorted.get_array_unchecked().rend());
+
+                    buffer_filter::write_buffered_value_(sorted, is_key);
+                }
+                else
+                    buffer_filter::write_buffered_value_(v, is_key);
+            }
+        };
+
+        class table_to_array_of_maps_filter : public core::buffer_filter
+        {
+            core::value column_names;
+            bool fail_on_missing_column;
+
+        public:
+            table_to_array_of_maps_filter(core::stream_handler &output, const core::value &column_names, bool fail_on_missing_column = false)
+                : core::buffer_filter(output, buffer_arrays, 1)
+                , column_names(column_names)
+                , fail_on_missing_column(fail_on_missing_column)
+            {}
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                core::value map_;
+
+                if ((v.get_type() == core::array && v.array_size() > column_names.array_size())
+                        || column_names.array_size() == 0) // Not enough column names to cover all attributes!!
+                    throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
+
+                if (v.get_type() == core::array)
+                    for (size_t i = 0; i < column_names.array_size(); ++i)
+                    {
+                        if (i >= v.size() && fail_on_missing_column)
+                            throw core::error("cppdatalib::core::table_to_array_of_maps_filter - missing column entry in table row");
+                        map_.add_member(column_names[i], i < v.size()? v[i]: core::value(core::null_t()));
+                    }
+                else
+                    map_.add_member(column_names.element(0), v);
+
+                buffer_filter::write_buffered_value_(map_, is_key);
+            }
+        };
+
         class duplicate_key_check_filter : public core::stream_filter_base
         {
             class layer
@@ -483,8 +829,7 @@ namespace cppdatalib
             duplicate_key_check_filter(core::stream_handler &output) : stream_filter_base(output) {}
 
         protected:
-            void begin_() {output.begin(); layers.clear();}
-            void end_() {output.end();}
+            void begin_() {stream_filter_base::begin_(); layers.clear();}
 
             void begin_key_(const value &) {layers.back().begin();}
             void end_key_(const value &)
@@ -582,9 +927,10 @@ namespace cppdatalib
                 {
                     value copy(v);
                     convert(copy);
-                    return buffer_filter::write_buffered_value_(copy, is_key);
+                    buffer_filter::write_buffered_value_(copy, is_key);
+                    return;
                 }
-                return buffer_filter::write_buffered_value_(v, is_key);
+                buffer_filter::write_buffered_value_(v, is_key);
             }
 
             bool write_(const value &v, bool is_key)
@@ -619,9 +965,10 @@ namespace cppdatalib
                 {
                     value copy(v);
                     convert(copy);
-                    return buffer_filter::write_buffered_value_(copy, is_key);
+                    buffer_filter::write_buffered_value_(copy, is_key);
+                    return;
                 }
-                return buffer_filter::write_buffered_value_(v, is_key);
+                buffer_filter::write_buffered_value_(v, is_key);
             }
 
             bool write_(const value &v, bool is_key)
@@ -658,7 +1005,7 @@ namespace cppdatalib
             {
                 value copy(v);
                 convert(copy);
-                return buffer_filter::write_buffered_value_(copy, is_key);
+                buffer_filter::write_buffered_value_(copy, is_key);
             }
 
             bool write_(const value &v, bool is_key)
