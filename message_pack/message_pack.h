@@ -221,7 +221,7 @@ namespace cppdatalib
                         case 0xd2:
                         case 0xd3:
                         {
-                            core::int_t val;
+                            core::int_t val = 0;
                             if ((chr == 0xd0 && !core::read_int8(stream(), val)) ||
                                 (chr == 0xd1 && !core::read_int16_be(stream(), val)) ||
                                 (chr == 0xd2 && !core::read_int32_be(stream(), val)) ||

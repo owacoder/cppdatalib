@@ -2,8 +2,11 @@
 #define CPPDATALIB_ISTREAM_H
 
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <limits>
+#include <cstring>
+#include <memory>
 
 #include "error.h"
 
@@ -677,7 +680,7 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_int8(core::istream &strm, T &val)
         {
-            uint8_t chr;
+            uint8_t chr = 0;
             if (read_uint8(strm, chr))
             {
                 if (chr < 0x80)
@@ -836,7 +839,7 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_int64_be(core::istream &strm, T &val)
         {
-            uint64_t temp;
+            uint64_t temp = 0;
             if (read_uint64_be(strm, temp))
             {
                 if (temp < 0x8000000000000000)

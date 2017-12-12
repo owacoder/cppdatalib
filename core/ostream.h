@@ -6,6 +6,7 @@
 #include <sstream>
 #include <limits>
 #include <cstring>
+#include <memory>
 
 #include "error.h"
 #include "global.h"

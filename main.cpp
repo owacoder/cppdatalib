@@ -340,7 +340,10 @@ TestData<std::string> bencode_tests = {
 
 struct hex_string : public std::string
 {
-    using std::string::string;
+    hex_string() {}
+    hex_string(const char *s) : std::string(s) {}
+    hex_string(const char *s, size_t size) : std::string(s, size) {}
+    hex_string(const std::string &str) : std::string(str) {}
 };
 
 std::ostream &operator<<(std::ostream &ostr, const hex_string &str)
@@ -410,8 +413,6 @@ int readme_simple_test3()
 
 int main()
 {
-    return readme_simple_test3();
-
     vt100 vt;
     std::cout << vt.attr_bright;
 
@@ -432,7 +433,7 @@ int main()
     {
         Test("JSON", json_tests, [](const auto &test){return json::to_json(json::from_json(test));}, false);
         Test("Bencode", bencode_tests, [](const auto &test){return bencode::to_bencode(bencode::from_bencode(test));}, false);
-        Test("MessagePack", message_pack_tests, [](const auto &test){return hex_string(message_pack::to_message_pack(message_pack::from_message_pack(test)));}, false);
+        Test("MessagePack", message_pack_tests, [](const auto &test) -> hex_string {return hex_string(message_pack::to_message_pack(message_pack::from_message_pack(test)));}, false);
     }
     catch (core::error e)
     {
