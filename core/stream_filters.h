@@ -35,78 +35,73 @@ namespace cppdatalib
 {
     namespace core
     {
-        class stream_filter_base : public stream_handler
-        {
-        protected:
-            core::stream_handler &output;
-
-        public:
-            stream_filter_base(core::stream_handler &output)
-                : output(output)
-            {}
-            stream_filter_base(const stream_filter_base &f)
-                : output(f.output)
-            {
-                assert(("cppdatalib::core::stream_filter_base(const stream_filter_base &) - attempted to copy a stream_filter_base while active" && !f.active()));
-            }
-            stream_filter_base(stream_filter_base &&f)
-                : output(f.output)
-            {
-                assert(("cppdatalib::core::stream_filter_base(stream_filter_base &&) - attempted to move a stream_filter_base while active" && !f.active()));
-            }
-
-            bool requires_prefix_string_size() const {return output.requires_prefix_string_size();}
-            bool requires_prefix_array_size() const {return output.requires_prefix_array_size();}
-            bool requires_prefix_object_size() const {return output.requires_prefix_object_size();}
-            bool requires_string_buffering() const {return output.requires_string_buffering();}
-            bool requires_array_buffering() const {return output.requires_array_buffering();}
-            bool requires_object_buffering() const {return output.requires_object_buffering();}
-
-        protected:
-            void begin_() {output.begin();}
-            void end_() {output.end();}
-
-            bool write_(const value &v, bool is_key)
-            {
-                (void) is_key;
-                output.write(v);
-                return true;
-            }
-
-            void begin_array_(const value &v, int_t size, bool)
-            {
-                output.begin_array(v, size);
-            }
-            void end_array_(const value &v, bool)
-            {
-                output.end_array(v);
-            }
-
-            void begin_object_(const value &v, int_t size, bool)
-            {
-                output.begin_object(v, size);
-            }
-            void end_object_(const value &v, bool)
-            {
-                output.end_object(v);
-            }
-
-            void begin_string_(const value &v, int_t size, bool)
-            {
-                output.begin_string(v, size);
-            }
-            void string_data_(const value &v, bool)
-            {
-                output.append_to_string(v);
-            }
-            void end_string_(const value &v, bool)
-            {
-                output.end_string(v);
-            }
-        };
-
         namespace impl
         {
+            class stream_filter_base : public stream_handler
+            {
+            protected:
+                core::stream_handler &output;
+
+            public:
+                stream_filter_base(core::stream_handler &output)
+                    : output(output)
+                {}
+                stream_filter_base(const stream_filter_base &f)
+                    : output(f.output)
+                {
+                    assert(("cppdatalib::impl::stream_filter_base(const stream_filter_base &) - attempted to copy a stream_filter_base while active" && !f.active()));
+                }
+                stream_filter_base(stream_filter_base &&f)
+                    : output(f.output)
+                {
+                    assert(("cppdatalib::impl::stream_filter_base(stream_filter_base &&) - attempted to move a stream_filter_base while active" && !f.active()));
+                }
+
+                unsigned int required_features() const {return output.required_features();}
+
+            protected:
+                void begin_() {output.begin();}
+                void end_() {output.end();}
+
+                bool write_(const value &v, bool is_key)
+                {
+                    (void) is_key;
+                    output.write(v);
+                    return true;
+                }
+
+                void begin_array_(const value &v, int_t size, bool)
+                {
+                    output.begin_array(v, size);
+                }
+                void end_array_(const value &v, bool)
+                {
+                    output.end_array(v);
+                }
+
+                void begin_object_(const value &v, int_t size, bool)
+                {
+                    output.begin_object(v, size);
+                }
+                void end_object_(const value &v, bool)
+                {
+                    output.end_object(v);
+                }
+
+                void begin_string_(const value &v, int_t size, bool)
+                {
+                    output.begin_string(v, size);
+                }
+                void string_data_(const value &v, bool)
+                {
+                    output.append_to_string(v);
+                }
+                void end_string_(const value &v, bool)
+                {
+                    output.end_string(v);
+                }
+            };
+
             template<core::type from, core::type to>
             struct stream_filter_converter
             {
@@ -258,7 +253,7 @@ namespace cppdatalib
             buffer_objects = 0x04
         };
 
-        class buffer_filter : public core::stream_filter_base
+        class buffer_filter : public impl::stream_filter_base
         {
         protected:
             core::value cache_val;
@@ -289,12 +284,19 @@ namespace cppdatalib
                 , nesting_level(f.nesting_level)
             {}
 
-            bool requires_prefix_string_size() const {return flags & buffer_strings? false: stream_filter_base::requires_prefix_string_size();}
-            bool requires_prefix_array_size() const {return flags & buffer_arrays? false: stream_filter_base::requires_prefix_array_size();}
-            bool requires_prefix_object_size() const {return flags & buffer_objects? false: stream_filter_base::requires_prefix_object_size();}
-            bool requires_string_buffering() const {return flags & buffer_strings? false: stream_filter_base::requires_string_buffering();}
-            bool requires_array_buffering() const {return flags & buffer_arrays? false: stream_filter_base::requires_array_buffering();}
-            bool requires_object_buffering() const {return flags & buffer_objects? false: stream_filter_base::requires_object_buffering();}
+            unsigned int required_features() const
+            {
+                unsigned int mask_out = 0;
+
+                if (flags & buffer_strings)
+                    mask_out |= requires_prefix_string_size | requires_buffered_strings;
+                if (flags & buffer_arrays)
+                    mask_out |= requires_prefix_array_size | requires_buffered_arrays;
+                if (flags & buffer_objects)
+                    mask_out |= requires_prefix_object_size | requires_buffered_objects;
+
+                return stream_filter_base::required_features() & ~mask_out;
+            }
 
         protected:
             // Called when this filter is done buffering. This function should write the value to the output stream.
@@ -459,13 +461,13 @@ namespace cppdatalib
         public:
             automatic_buffer_filter(core::stream_handler &output)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(
-                                    (output.requires_prefix_array_size() || output.requires_array_buffering()? buffer_arrays: 0) |
-                                    (output.requires_prefix_object_size() || output.requires_object_buffering()? buffer_objects: 0) |
-                                    (output.requires_prefix_string_size() || output.requires_string_buffering()? buffer_strings: 0)))
+                                    (output.required_features() & (stream_handler::requires_prefix_array_size | stream_handler::requires_buffered_arrays)? buffer_arrays: 0) |
+                                    (output.required_features() & (stream_handler::requires_prefix_object_size | stream_handler::requires_buffered_objects)? buffer_objects: 0) |
+                                    (output.required_features() & (stream_handler::requires_prefix_string_size | stream_handler::requires_buffered_strings)? buffer_strings: 0)))
             {}
         };
 
-        class tee_filter : public core::stream_filter_base
+        class tee_filter : public impl::stream_filter_base
         {
         protected:
             core::stream_handler &output2;
@@ -477,12 +479,7 @@ namespace cppdatalib
                 , output2(output2)
             {}
 
-            bool requires_prefix_string_size() const {return stream_filter_base::requires_prefix_string_size() || output2.requires_prefix_string_size();}
-            bool requires_prefix_array_size() const {return stream_filter_base::requires_prefix_array_size() || output2.requires_prefix_array_size();}
-            bool requires_prefix_object_size() const {return stream_filter_base::requires_prefix_object_size() || output2.requires_prefix_object_size();}
-            bool requires_string_buffering() const {return stream_filter_base::requires_string_buffering() || output2.requires_string_buffering();}
-            bool requires_array_buffering() const {return stream_filter_base::requires_array_buffering() || output2.requires_array_buffering();}
-            bool requires_object_buffering() const {return stream_filter_base::requires_object_buffering() || output2.requires_object_buffering();}
+            unsigned int required_features() const {return stream_filter_base::required_features() | output2.required_features();}
 
         protected:
             void begin_() {stream_filter_base::begin_(); output2.begin();}
@@ -624,7 +621,7 @@ namespace cppdatalib
         };
 
         template<core::type measure = core::real>
-        class mean_filter : public core::stream_filter_base
+        class mean_filter : public impl::stream_filter_base
         {
             size_t samples;
             core::real_t sum, product, inverted_sum;
@@ -791,7 +788,7 @@ namespace cppdatalib
             }
         };
 
-        class duplicate_key_check_filter : public core::stream_filter_base
+        class duplicate_key_check_filter : public impl::stream_filter_base
         {
             class layer
             {

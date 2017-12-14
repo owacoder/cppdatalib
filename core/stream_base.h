@@ -81,6 +81,29 @@ namespace cppdatalib
             bool is_key_;
 
         public:
+            static const unsigned int requires_none = 0x00;
+
+            // The following values must be set (in `required_features()`) if the output format requires
+            // an element's size to be specified before the actual object.
+            // For example, the Netstring (https://en.wikipedia.org/wiki/Netstring)
+            // `3:abc` requires the size to be written before the string itself.
+            //
+            // When these values are requested, the parser MAY have to cache the value before providing
+            // it to the output handler
+            static const unsigned int requires_prefix_array_size = 0x01;
+            static const unsigned int requires_prefix_object_size = 0x02;
+            static const unsigned int requires_prefix_string_size = 0x04;
+
+            // The following values must be set (in `required_features()`) if the output format requires
+            // an element to be entirely specified before writing.
+            // For example, converting filters require that the entire element be processed before it can be converted.
+            //
+            // When these values are requested, the parser WILL have to cache the value before providing
+            // it to the output handler.
+            static const unsigned int requires_buffered_arrays = 0x08;
+            static const unsigned int requires_buffered_objects = 0x10;
+            static const unsigned int requires_buffered_strings = 0x20;
+
             stream_handler() : active_(false), is_key_(false) {}
             virtual ~stream_handler() {}
 
@@ -88,8 +111,13 @@ namespace cppdatalib
                 unknown_size = -1 // No other negative value besides unknown_size should be used for the `size` parameters of handlers
             };
 
+            // Returns all the features required by this handler
+            virtual unsigned int required_features() const {return requires_none;}
+
+            // Returns true if this handler is active (i.e. `begin()` has been called but `end()` has not)
             bool active() const {return active_;}
 
+            // Begins output on this handler
             void begin()
             {
                 assert("cppdatalib::core::stream_handler - begin() called on active handler" && !active());
@@ -100,6 +128,8 @@ namespace cppdatalib
                 is_key_ = false;
                 begin_();
             }
+
+            // Ends output on this handler
             void end()
             {
                 assert("cppdatalib::core::stream_handler - end() called on inactive handler" && active());
@@ -117,49 +147,21 @@ namespace cppdatalib
             virtual void end_() {}
 
         public:
-            // The following functions must be reimplemented to return true if the output format requires
-            // an element's size to be specified before the actual object.
-            // For example, the Netstring (https://en.wikipedia.org/wiki/Netstring)
-            // `3:abc` requires the size to be written before the string itself.
-            //
-            // When these functions are reimplemented, the parser MAY have to cache the value before providing
-            // it to the output handler
-            virtual bool requires_prefix_string_size() const {return false;}
-            virtual bool requires_prefix_array_size() const {return false;}
-            virtual bool requires_prefix_object_size() const {return false;}
-
-            // The following functions must be reimplemented to return true if the output format requires
-            // an element to be entirely specified before writing.
-            // For example, converting filters require that the entire element be processed before it can be converted.
-            //
-            // When these functions are reimplemented, the parser WILL have to cache the value before providing
-            // it to the output handler.
-            virtual bool requires_string_buffering() const {return false;}
-            virtual bool requires_array_buffering() const {return false;}
-            virtual bool requires_object_buffering() const {return false;}
-
             // Nesting depth is 0 before a container is created, and updated afterward
             // (increments after the begin_xxx() handler is called)
             // Nesting depth is > 0 before a container is ended, and updated afterward
             // (decrements after the end_xxx() handler is called)
             size_t nesting_depth() const {return nested_scopes.size() - 1;}
 
-            type current_container() const
-            {
-                return nested_scopes.back().get_type();
-            }
+            // Current container is array, object, string, or null if no container is present
+            type current_container() const {return nested_scopes.back().get_type();}
 
             // Container size is updated after the item was handled
             // (begins at 0 with no elements, the first element is handled, then it increments to 1)
-            size_t current_container_size() const
-            {
-                return nested_scopes.back().items_parsed();
-            }
+            size_t current_container_size() const {return nested_scopes.back().items_parsed();}
 
-            bool container_key_was_just_parsed() const
-            {
-                return nested_scopes.back().key_was_parsed();
-            }
+            // Returns true if this is an object and a value of a key/value pair is expected
+            bool container_key_was_just_parsed() const {return nested_scopes.back().key_was_parsed();}
 
             // An API must call this when a scalar value is encountered,
             // although it should operate correctly for any value.
@@ -275,7 +277,7 @@ namespace cppdatalib
 
         public:
             // An API must call these when a long string is parsed. The number of bytes is passed in size, if possible
-            // size < 0 means unknown size
+            // size == -1 means unknown size
             // If the length of v is equal to size, the entire string is provided
             void begin_string(const core::value &v, core::int_t size)
             {
@@ -338,7 +340,7 @@ namespace cppdatalib
             }
 
             // An API must call these when an array is parsed. The number of elements is passed in size, if possible
-            // size < 0 means unknown size
+            // size == -1 means unknown size
             // If the number of elements of v is equal to size, the entire array is provided
             void begin_array(const core::value &v, core::int_t size)
             {
@@ -390,7 +392,7 @@ namespace cppdatalib
             }
 
             // An API must call these when an object is parsed. The number of key/value pairs is passed in size, if possible
-            // size < 0 means unknown size
+            // size == -1 means unknown size
             // If the number of elements of v is equal to size, the entire object is provided
             void begin_object(const core::value &v, core::int_t size)
             {
@@ -457,23 +459,110 @@ namespace cppdatalib
 
         class stream_input
         {
+        private:
+            core::stream_handler *output;
+
         public:
-            virtual ~stream_input() {}
+            static const unsigned int provides_none = 0x00;
 
-            // The following functions should be reimplemented to return true if the parser ALWAYS provides the element
+            // The following values should return true if the parser ALWAYS provides the element
             // size (for each respective type) in the begin_xxx() functions.
-            virtual bool provides_prefix_string_size() const {return false;}
-            virtual bool provides_prefix_array_size() const {return false;}
-            virtual bool provides_prefix_object_size() const {return false;}
+            static const unsigned int provides_prefix_array_size = 0x01;
+            static const unsigned int provides_prefix_object_size = 0x02;
+            static const unsigned int provides_prefix_string_size = 0x04;
 
-            // The following functions should be reimplemented to return true if the parser ALWAYS provides the entire
+            // The following functions should be reimplemented to return true if the parser ALWAYS provides the entire value
             // (for each respective type) in the begin_xxx() and end_xxx() functions. (or uses the write() function exclusively,
             // which requires the entire value anyway)
-            virtual bool provides_buffered_strings() const {return false;}
-            virtual bool provides_buffered_arrays() const {return false;}
-            virtual bool provides_buffered_objects() const {return false;}
+            static const unsigned int provides_buffered_arrays = 0x08;
+            static const unsigned int provides_buffered_objects = 0x10;
+            static const unsigned int provides_buffered_strings = 0x20;
 
-            virtual stream_input &convert(core::stream_handler &output) = 0;
+            stream_input() : output(NULL) {}
+            stream_input(core::stream_handler &output) : output(&output) {}
+            virtual ~stream_input() {}
+
+            // Resets the input class to start parsing a new stream (NOTE: should NOT attempt to seek to the beginning of the stream!)
+            virtual void reset() = 0;
+
+            // Returns all the features provided by this class
+            virtual unsigned int features() const {return provides_none;}
+
+            // Returns false if nothing is being parsed, true if in the middle of parsing
+            virtual bool busy() const {return output && output->nesting_depth() > 0;}
+
+            // Sets the current output handler (does nothing if set while `busy()`)
+            void set_output(core::stream_handler &output) {if (!busy()) this->output = &output;}
+
+            // Returns the current output handler, or NULL if not set.
+            const core::stream_handler *get_output() const {return output;}
+            core::stream_handler *get_output() {return output;}
+
+            // Returns true if an output is bound to this stream_input
+            bool has_output() const {return output;}
+
+            // Returns true if the bound output is active (inside a `begin()`...`end()` block)
+            // Returns false if no output is bound to this parser
+            bool output_is_active() const {return output && output->active();}
+
+            // Begins parse sequence. Must be called after `set_output()`, with inactive output
+            void begin() {if (output) output->begin();}
+
+            // Begins parse sequence and sets output stream
+            void begin(core::stream_handler &output) {set_output(output); begin();}
+
+            // Ends parse sequence. Must be called with active output
+            void end() {if (output) output->end();}
+
+            // Performs one minimal parse step with specified output and then returns.
+            stream_input &write_one()
+            {
+                if (output)
+                    write_one_();
+                else
+                    throw core::error("cppdatalib::core::stream_input - attempted to parse without output specified");
+                return *this;
+            }
+
+            // Performs (or finishes, if `busy()`) one value conversion and then returns.
+            stream_input &convert()
+            {
+                if (output)
+                    do {write_one_();} while (busy());
+                else
+                    throw core::error("cppdatalib::core::stream_input - attempted to parse without output specified");
+                return *this;
+            }
+
+            // Performs one value conversion and then returns.
+            // The current handler is set to the new output.
+            // NOTE: this function does nothing if `busy()` returns true.
+            stream_input &convert(core::stream_handler &output)
+            {
+                if (busy())
+                    return *this;
+                set_output(output);
+                return convert();
+            }
+
+        protected:
+            // Performs one minimal parse step with specified output and then returns.
+            // Note that this "minimal parse step" is rather vague, but that's okay.
+            // It can be any combination of the following, from preferred to not-so-preferred:
+            //
+            //    1. (preferred)
+            //      A single write to the output, whether it be a begin_xxx(), end_xxx(), write(), or anything else that produces output.
+            //      Strings should be sent chunked (preferably with maximum length of `core::buffer_size`),
+            //      or by character, with `output.append_to_string()`.
+            //    2.
+            //      A single scalar write to the output, strings included as scalars. Containers should have begin_xxx(), end_xxx(), and write()
+            //      called at different invocations of `read_one()`
+            //    3. (not-so-preferred)
+            //      Write the entire value at once, even if it is a container
+            //
+            // Basically, as long as any single invocation of this function writes SOMETHING to `output`, it is acceptable.
+            // Read states should be stored as class members, not in this function, and should be resettable with `reset()`.
+            virtual void write_one_() = 0;
         };
 
         class stream_parser : public stream_input
@@ -492,13 +581,8 @@ namespace cppdatalib
         // Convert directly from parser to serializer
         stream_handler &operator<<(stream_handler &output, stream_input &input)
         {
-            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
-                output.requires_array_buffering() > input.provides_buffered_arrays() ||
-                output.requires_object_buffering() > input.provides_buffered_objects() ||
-                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
-                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
-                output.requires_prefix_object_size() > input.provides_prefix_object_size())
-                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+            if (output.required_features() & ~input.features())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
 
             const bool stream_ready = output.active();
 
@@ -514,13 +598,8 @@ namespace cppdatalib
         // Convert directly from parser to serializer
         stream_handler &operator<<(stream_handler &output, stream_input &&input)
         {
-            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
-                output.requires_array_buffering() > input.provides_buffered_arrays() ||
-                output.requires_object_buffering() > input.provides_buffered_objects() ||
-                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
-                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
-                output.requires_prefix_object_size() > input.provides_prefix_object_size())
-                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+            if (output.required_features() & ~input.features())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
 
             const bool stream_ready = output.active();
 
@@ -536,13 +615,8 @@ namespace cppdatalib
         // Convert directly from parser to serializer
         void operator<<(stream_handler &&output, stream_input &input)
         {
-            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
-                output.requires_array_buffering() > input.provides_buffered_arrays() ||
-                output.requires_object_buffering() > input.provides_buffered_objects() ||
-                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
-                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
-                output.requires_prefix_object_size() > input.provides_prefix_object_size())
-                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+            if (output.required_features() & ~input.features())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
 
             const bool stream_ready = output.active();
 
@@ -556,13 +630,8 @@ namespace cppdatalib
         // Convert directly from parser to rvalue serializer
         void operator<<(stream_handler &&output, stream_input &&input)
         {
-            if (output.requires_string_buffering() > input.provides_buffered_strings() ||
-                output.requires_array_buffering() > input.provides_buffered_arrays() ||
-                output.requires_object_buffering() > input.provides_buffered_objects() ||
-                output.requires_prefix_string_size() > input.provides_prefix_string_size() ||
-                output.requires_prefix_array_size() > input.provides_prefix_array_size() ||
-                output.requires_prefix_object_size() > input.provides_prefix_object_size())
-                throw core::error("cppdatalib::stream_handler::operator<<() - output requires buffering capabilities the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream will fix this problem.");
+            if (output.required_features() & ~input.features())
+                throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
 
             const bool stream_ready = output.active();
 

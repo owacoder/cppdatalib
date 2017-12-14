@@ -34,6 +34,7 @@ namespace cppdatalib
         class parser : public core::stream_parser
         {
             std::unique_ptr<char []> buffer;
+            bool delimiter_required;
 
         private:
             core::istream &read_string(core::stream_handler &writer)
@@ -131,18 +132,27 @@ namespace cppdatalib
             parser(core::istream_handle input)
                 : core::stream_parser(input)
                 , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
-            {}
+            {
+                reset();
+            }
 
-            core::stream_input &convert(core::stream_handler &writer)
+            void reset()
+            {
+                delimiter_required = false;
+                stream() >> std::skipws;
+            }
+
+        protected:
+            void write_one_()
             {
                 const std::string hex = "0123456789ABCDEF";
-                bool delimiter_required = false;
+                bool written = false;
                 char chr;
 
-                while (stream() >> std::skipws >> chr, stream().good() && !stream().eof())
+                if (stream() >> chr, stream())
                 {
-                    if (writer.nesting_depth() == 0 && delimiter_required)
-                        break;
+                    if (get_output()->nesting_depth() == 0 && delimiter_required)
+                        goto finish;
 
                     if (delimiter_required && !strchr(",=)}", chr))
                         throw core::error("Plain Text Property List - expected ',' separating array or object entries");
@@ -156,7 +166,7 @@ namespace cppdatalib
                             if (chr != '*')
                             {
                                 const core::value value_type(core::string_t(), core::blob);
-                                writer.begin_string(value_type, core::stream_handler::unknown_size);
+                                get_output()->begin_string(value_type, core::stream_handler::unknown_size);
 
                                 unsigned int t = 0;
                                 bool have_first_nibble = false;
@@ -169,7 +179,7 @@ namespace cppdatalib
                                     t |= p;
 
                                     if (have_first_nibble)
-                                        writer.append_to_string(core::string_t(1, t));
+                                        get_output()->append_to_string(core::string_t(1, t));
 
                                     have_first_nibble = !have_first_nibble;
                                     stream() >> chr;
@@ -177,7 +187,7 @@ namespace cppdatalib
 
                                 if (have_first_nibble) throw core::error("Plain Text Property List - unfinished byte in binary data");
 
-                                writer.end_string(value_type);
+                                get_output()->end_string(value_type);
                                 break;
                             }
 
@@ -191,7 +201,7 @@ namespace cppdatalib
                                 if (!stream() || (chr != 'Y' && chr != 'N'))
                                     throw core::error("Plain Text Property List - expected 'boolean' value after '<*B' in value");
 
-                                writer.write(chr == 'Y');
+                                get_output()->write(chr == 'Y');
                             }
                             else if (chr == 'I')
                             {
@@ -200,7 +210,7 @@ namespace cppdatalib
                                 if (!stream())
                                     throw core::error("Plain Text Property List - expected 'integer' value after '<*I' in value");
 
-                                writer.write(i);
+                                get_output()->write(i);
                             }
                             else if (chr == 'R')
                             {
@@ -209,32 +219,32 @@ namespace cppdatalib
                                 if (!stream())
                                     throw core::error("Plain Text Property List - expected 'real' value after '<*R' in value");
 
-                                writer.write(r);
+                                get_output()->write(r);
                             }
                             else if (chr == 'D')
                             {
                                 int c;
                                 const core::value value_type(core::string_t(), core::datetime);
-                                writer.begin_string(value_type, core::stream_handler::unknown_size);
+                                get_output()->begin_string(value_type, core::stream_handler::unknown_size);
                                 while (c = stream().get(), c != '>')
                                 {
                                     if (c == EOF) throw core::error("Plain Text Property List - expected '>' after value");
 
-                                    writer.append_to_string(core::string_t(1, c));
+                                    get_output()->append_to_string(core::string_t(1, c));
                                 }
                                 stream().unget();
-                                writer.end_string(value_type);
+                                get_output()->end_string(value_type);
                             }
 
                             stream() >> chr;
                             if (chr != '>') throw core::error("Plain Text Property List - expected '>' after value");
                             break;
                         case '"':
-                            read_string(writer);
+                            read_string(*get_output());
                             delimiter_required = true;
                             break;
                         case ',':
-                            if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
+                            if (get_output()->current_container_size() == 0 || get_output()->container_key_was_just_parsed())
                                 throw core::error("Plain Text Property List - invalid ',' does not separate array or object entries");
                             stream() >> chr; stream().unget(); // Peek ahead
                             if (!stream() || chr == ',' || chr == ']' || chr == '}')
@@ -242,38 +252,37 @@ namespace cppdatalib
                             delimiter_required = false;
                             break;
                         case '=':
-                            if (!writer.container_key_was_just_parsed())
+                            if (!get_output()->container_key_was_just_parsed())
                                 throw core::error("Plain Text Property List - invalid '=' does not separate a key and value pair");
                             delimiter_required = false;
                             break;
                         case '(':
-                            writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                            get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
                             delimiter_required = false;
                             break;
                         case ')':
-                            writer.end_array(core::array_t());
+                            get_output()->end_array(core::array_t());
                             delimiter_required = true;
                             break;
                         case '{':
-                            writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
+                            get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size);
                             delimiter_required = false;
                             break;
                         case '}':
-                            writer.end_object(core::object_t());
+                            get_output()->end_object(core::object_t());
                             delimiter_required = true;
                             break;
                         default:
                             throw core::error("Plain Text Property List - expected value");
                             break;
                     }
+
+                    written = true;
                 }
 
-                if (!delimiter_required)
-                    throw core::error("Plain Text Property List - expected value");
-                else if (writer.nesting_depth())
+finish:
+                if (!written)
                     throw core::error("Plain Text Property List - unexpected end of stream");
-
-                return *this;
             }
         };
 

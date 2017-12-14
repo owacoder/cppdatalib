@@ -78,6 +78,21 @@ namespace cppdatalib
 
         class parser : public core::stream_parser
         {
+            struct container_data
+            {
+                container_data(core::subtype_t sub_type, uint32_t remaining_size)
+                    : sub_type(sub_type)
+                    , remaining_size(remaining_size)
+                {}
+
+                core::subtype_t sub_type;
+                uint32_t remaining_size;
+            };
+
+            std::unique_ptr<char []> buffer;
+            std::stack<container_data, std::vector<container_data>> containers;
+            bool written;
+
             uint32_t read_size(core::istream &input)
             {
                 uint32_t size = 0;
@@ -103,302 +118,294 @@ namespace cppdatalib
             }
 
         public:
-            parser(core::istream_handle input) : core::stream_parser(input) {}
-
-            bool provides_prefix_string_size() const {return true;}
-            bool provides_prefix_object_size() const {return true;}
-            bool provides_prefix_array_size() const {return true;}
-
-            core::stream_input &convert(core::stream_handler &writer)
+            parser(core::istream_handle input)
+                : core::stream_parser(input)
+                , buffer(new char [core::buffer_size])
             {
-                struct container_data
-                {
-                    container_data(core::subtype_t sub_type, uint32_t remaining_size)
-                        : sub_type(sub_type)
-                        , remaining_size(remaining_size)
-                    {}
+                reset();
+            }
 
-                    core::subtype_t sub_type;
-                    uint32_t remaining_size;
-                };
+            void reset()
+            {
+                containers = decltype(containers)();
+                written = false;
+            }
 
-                std::stack<container_data, std::vector<container_data>> containers;
+            unsigned int features() const {return provides_prefix_array_size |
+                                                  provides_prefix_object_size |
+                                                  provides_prefix_string_size;}
 
-                std::unique_ptr<char []> buffer(new char [core::buffer_size]);
-                bool written = false;
+        protected:
+            void write_one_()
+            {
                 int chr;
                 core::uint_t integer;
 
-                while (!written || containers.size() > 0)
+                while (containers.size() > 0 && !get_output()->container_key_was_just_parsed() && containers.top().remaining_size == 0)
                 {
-                    while (containers.size() > 0 && !writer.container_key_was_just_parsed() && containers.top().remaining_size == 0)
-                    {
-                        if (writer.current_container() == core::array)
-                            writer.end_array(core::value(core::array_t(), containers.top().sub_type));
-                        else if (writer.current_container() == core::object)
-                            writer.end_object(core::value(core::object_t(), containers.top().sub_type));
-                        containers.pop();
-                    }
+                    if (get_output()->current_container() == core::array)
+                        get_output()->end_array(core::value(core::array_t(), containers.top().sub_type));
+                    else if (get_output()->current_container() == core::object)
+                        get_output()->end_object(core::value(core::object_t(), containers.top().sub_type));
+                    containers.pop();
+                }
 
-                    if (containers.size() > 0)
-                    {
-                        if (containers.top().remaining_size > 0)
-                            --containers.top().remaining_size;
+                if (containers.size() > 0)
+                {
+                    if (containers.top().remaining_size > 0)
+                        --containers.top().remaining_size;
 
-                        if (writer.current_container() == core::object && !writer.container_key_was_just_parsed())
+                    if (get_output()->current_container() == core::object && !get_output()->container_key_was_just_parsed())
+                    {
+                        // Parse keys here
+                        if (containers.top().sub_type == core::map) // Integer keys
                         {
-                            // Parse keys here
-                            if (containers.top().sub_type == core::map) // Integer keys
-                            {
-                                // Read 4-byte signed integer key
-                                integer = 0;
-                                for (int i = 0; i < 4; ++i)
-                                {
-                                    chr = stream().get();
-                                    if (chr == EOF)
-                                        throw core::error("Binn - expected map key");
-                                    integer = (integer << 8) | chr;
-                                }
-
-                                bool negative = integer >> 31;
-                                if (negative)
-                                    integer = (~integer + 1) & INT32_MAX;
-                                writer.write(negative? -core::int_t(integer): core::int_t(integer));
-                            }
-                            else // String keys
-                            {
-                                chr = stream().get();
-                                if (chr == EOF)
-                                    throw core::error("Binn - expected object key");
-
-                                char key_buffer[255]; // 255 is maximum length of key
-                                stream().read(key_buffer, chr);
-                                if (stream().fail())
-                                    throw core::error("Binn - unexpected end of object key");
-
-                                writer.write(core::string_t(key_buffer, chr));
-                            }
-                        }
-                    }
-                    else if (written)
-                        break;
-
-                    chr = stream().get();
-                    if (chr == EOF)
-                        throw core::error("Binn - expected type specifier");
-
-                    const type storage_type = static_cast<type>(chr >> 5);
-                    int element_subtype = chr & 0xf;
-
-                    if (chr & 0x10)
-                    {
-                        int chr_2 = stream().get();
-                        if (chr_2 == EOF)
-                            throw core::error("Binn - expected subtype extension");
-
-                        element_subtype <<= 8;
-                        element_subtype |= chr_2;
-                    }
-
-                    switch (storage_type)
-                    {
-                        case nobytes: // Null, True, False
-                            switch (element_subtype)
-                            {
-                                case null: writer.write(core::null_t()); break;
-                                case yes: writer.write(true); break;
-                                case no: writer.write(false); break;
-                                default: writer.write(core::value(core::null_t(), core::user + element_subtype)); break;
-                            }
-                            break;
-                        case byte: // Int8, UInt8
-                            chr = stream().get();
-                            if (chr == EOF)
-                                throw core::error("Binn - expected byte value");
-
-                            switch (element_subtype)
-                            {
-                                case int8:
-                                {
-                                    bool negative = chr >> 7;
-                                    if (negative)
-                                        chr = (~core::uint_t(chr) + 1) & INT8_MAX;
-                                    writer.write(negative? -chr: chr);
-                                    break;
-                                }
-                                case uint8: writer.write(core::uint_t(chr)); break;
-                                default: writer.write(core::value(core::uint_t(chr), core::user + element_subtype)); break;
-                            }
-                            break;
-                        case word: // Int16, UInt16
-                            integer = 0;
-                            for (int i = 0; i < 2; ++i)
-                            {
-                                chr = stream().get();
-                                if (chr == EOF)
-                                    throw core::error("Binn - expected word value");
-                                integer = (integer << 8) | chr;
-                            }
-
-                            switch (element_subtype)
-                            {
-                                case int16:
-                                {
-                                    bool negative = integer >> 15;
-                                    if (negative)
-                                        integer = (~integer + 1) & INT16_MAX;
-                                    writer.write(negative? -core::int_t(integer): core::int_t(integer));
-                                    break;
-                                }
-                                case uint16: writer.write(integer); break;
-                                default: writer.write(core::value(integer, core::user + element_subtype)); break;
-                            }
-                            break;
-                        case dword: // Int32, UInt32
+                            // Read 4-byte signed integer key
                             integer = 0;
                             for (int i = 0; i < 4; ++i)
                             {
                                 chr = stream().get();
                                 if (chr == EOF)
-                                    throw core::error("Binn - expected double-word value");
+                                    throw core::error("Binn - expected map key");
                                 integer = (integer << 8) | chr;
                             }
 
-                            switch (element_subtype)
-                            {
-                                case int32:
-                                {
-                                    bool negative = integer >> 31;
-                                    if (negative)
-                                        integer = (~integer + 1) & INT32_MAX;
-                                    writer.write(negative? -core::int_t(integer): core::int_t(integer));
-                                    break;
-                                }
-                                case uint32: writer.write(integer); break;
-                                case single_float: writer.write(static_cast<core::real_t>(core::float_from_ieee_754(integer))); break;
-                                default: writer.write(core::value(integer, core::user + element_subtype)); break;
-                            }
-                            break;
-                        case qword: // Int64, UInt64
-                            integer = 0;
-                            for (int i = 0; i < 8; ++i)
-                            {
-                                chr = stream().get();
-                                if (chr == EOF)
-                                    throw core::error("Binn - expected quad-word value");
-                                integer = (integer << 8) | chr;
-                            }
-
-                            switch (element_subtype)
-                            {
-                                case int64:
-                                {
-                                    bool negative = integer >> 63;
-                                    if (negative)
-                                        integer = ~integer + 1;
-                                    writer.write(negative? -core::int_t(integer): core::int_t(integer));
-                                    break;
-                                }
-                                case uint64: writer.write(integer); break;
-                                case double_float: writer.write(core::double_from_ieee_754(integer)); break;
-                                default: writer.write(core::value(integer, core::user + element_subtype)); break;
-                            }
-                            break;
-                        case string:
-                        {
-                            uint32_t size = read_size(stream());
-                            core::value string_type = "";
-
-                            switch (element_subtype)
-                            {
-                                case text: break;
-                                case datetime: string_type.set_subtype(core::datetime); break;
-                                case date: string_type.set_subtype(core::date); break;
-                                case time: string_type.set_subtype(core::time); break;
-                                case decimal_str: string_type.set_subtype(core::bignum); break;
-                                default: string_type.set_subtype(core::user + element_subtype); break;
-                            }
-
-                            writer.begin_string(string_type, size);
-                            while (size > 0)
-                            {
-                                core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
-                                stream().read(buffer.get(), buffer_size);
-                                if (stream().fail())
-                                    throw core::error("Binn - unexpected end of string");
-                                // Set string in string_type to preserve the subtype
-                                string_type.set_string(core::string_t(buffer.get(), buffer_size));
-                                writer.append_to_string(string_type);
-                                size -= buffer_size;
-                            }
-                            string_type.set_string("");
-                            writer.end_string(string_type);
-
-                            if (stream().get() != 0) // Eat trailing NUL
-                                throw core::error("Binn - unexpected end of string");
-
-                            break;
+                            bool negative = integer >> 31;
+                            if (negative)
+                                integer = (~integer + 1) & INT32_MAX;
+                            get_output()->write(negative? -core::int_t(integer): core::int_t(integer));
                         }
-                        case blob:
+                        else // String keys
                         {
-                            uint32_t size = read_size(stream());
-                            core::value string_type = "";
+                            chr = stream().get();
+                            if (chr == EOF)
+                                throw core::error("Binn - expected object key");
 
-                            switch (element_subtype)
-                            {
-                                case blob_data: string_type.set_subtype(core::blob); break;
-                                default: string_type.set_subtype(core::user + element_subtype); break;
-                            }
+                            char key_buffer[255]; // 255 is maximum length of key
+                            stream().read(key_buffer, chr);
+                            if (stream().fail())
+                                throw core::error("Binn - unexpected end of object key");
 
-                            writer.begin_string(string_type, size);
-                            while (size > 0)
-                            {
-                                core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
-                                stream().read(buffer.get(), buffer_size);
-                                if (stream().fail())
-                                    throw core::error("Binn - unexpected end of string");
-                                // Set string in string_type to preserve the subtype
-                                string_type.set_string(core::string_t(buffer.get(), buffer_size));
-                                writer.append_to_string(string_type);
-                                size -= buffer_size;
-                            }
-                            string_type.set_string("");
-                            writer.end_string(string_type);
-
-                            break;
-                        }
-                        case container:
-                        {
-                            core::subtype_t sub_type = core::normal;
-                            read_size(stream()); // Read size and discard
-                            uint32_t count = read_size(stream()); // Then read element count
-
-                            core::value container;
-
-                            switch (element_subtype)
-                            {
-                                case map: container.set_object(core::object_t(), sub_type = core::map); break;
-                                case object: container.set_object(core::object_t()); break;
-                                case list: container.set_array(core::array_t()); break;
-                                default: container.set_array(core::array_t(), sub_type = core::user + element_subtype); break;
-                            }
-
-                            if (container.is_object())
-                                writer.begin_object(container, count);
-                            else
-                                writer.begin_array(container, count);
-                            containers.push(container_data(sub_type, count));
-                            break;
+                            get_output()->write(core::string_t(key_buffer, chr));
                         }
                     }
-
-                    written = true;
+                }
+                else if (written)
+                {
+                    written = false;
+                    return;
                 }
 
-                if (!written)
-                    throw core::error("Binn - expected value");
+                chr = stream().get();
+                if (chr == EOF)
+                    throw core::error("Binn - unexpected end of stream, expected type specifier");
 
-                return *this;
+                const type storage_type = static_cast<type>(chr >> 5);
+                int element_subtype = chr & 0xf;
+
+                if (chr & 0x10)
+                {
+                    int chr_2 = stream().get();
+                    if (chr_2 == EOF)
+                        throw core::error("Binn - unexpected end of stream, expected subtype extension");
+
+                    element_subtype <<= 8;
+                    element_subtype |= chr_2;
+                }
+
+                switch (storage_type)
+                {
+                    case nobytes: // Null, True, False
+                        switch (element_subtype)
+                        {
+                            case null: get_output()->write(core::null_t()); break;
+                            case yes: get_output()->write(true); break;
+                            case no: get_output()->write(false); break;
+                            default: get_output()->write(core::value(core::null_t(), core::user + element_subtype)); break;
+                        }
+                        break;
+                    case byte: // Int8, UInt8
+                        chr = stream().get();
+                        if (chr == EOF)
+                            throw core::error("Binn - expected byte value");
+
+                        switch (element_subtype)
+                        {
+                            case int8:
+                            {
+                                bool negative = chr >> 7;
+                                if (negative)
+                                    chr = (~core::uint_t(chr) + 1) & INT8_MAX;
+                                get_output()->write(negative? -chr: chr);
+                                break;
+                            }
+                            case uint8: get_output()->write(core::uint_t(chr)); break;
+                            default: get_output()->write(core::value(core::uint_t(chr), core::user + element_subtype)); break;
+                        }
+                        break;
+                    case word: // Int16, UInt16
+                        integer = 0;
+                        for (int i = 0; i < 2; ++i)
+                        {
+                            chr = stream().get();
+                            if (chr == EOF)
+                                throw core::error("Binn - expected word value");
+                            integer = (integer << 8) | chr;
+                        }
+
+                        switch (element_subtype)
+                        {
+                            case int16:
+                            {
+                                bool negative = integer >> 15;
+                                if (negative)
+                                    integer = (~integer + 1) & INT16_MAX;
+                                get_output()->write(negative? -core::int_t(integer): core::int_t(integer));
+                                break;
+                            }
+                            case uint16: get_output()->write(integer); break;
+                            default: get_output()->write(core::value(integer, core::user + element_subtype)); break;
+                        }
+                        break;
+                    case dword: // Int32, UInt32
+                        integer = 0;
+                        for (int i = 0; i < 4; ++i)
+                        {
+                            chr = stream().get();
+                            if (chr == EOF)
+                                throw core::error("Binn - expected double-word value");
+                            integer = (integer << 8) | chr;
+                        }
+
+                        switch (element_subtype)
+                        {
+                            case int32:
+                            {
+                                bool negative = integer >> 31;
+                                if (negative)
+                                    integer = (~integer + 1) & INT32_MAX;
+                                get_output()->write(negative? -core::int_t(integer): core::int_t(integer));
+                                break;
+                            }
+                            case uint32: get_output()->write(integer); break;
+                            case single_float: get_output()->write(static_cast<core::real_t>(core::float_from_ieee_754(integer))); break;
+                            default: get_output()->write(core::value(integer, core::user + element_subtype)); break;
+                        }
+                        break;
+                    case qword: // Int64, UInt64
+                        integer = 0;
+                        for (int i = 0; i < 8; ++i)
+                        {
+                            chr = stream().get();
+                            if (chr == EOF)
+                                throw core::error("Binn - expected quad-word value");
+                            integer = (integer << 8) | chr;
+                        }
+
+                        switch (element_subtype)
+                        {
+                            case int64:
+                            {
+                                bool negative = integer >> 63;
+                                if (negative)
+                                    integer = ~integer + 1;
+                                get_output()->write(negative? -core::int_t(integer): core::int_t(integer));
+                                break;
+                            }
+                            case uint64: get_output()->write(integer); break;
+                            case double_float: get_output()->write(core::double_from_ieee_754(integer)); break;
+                            default: get_output()->write(core::value(integer, core::user + element_subtype)); break;
+                        }
+                        break;
+                    case string:
+                    {
+                        uint32_t size = read_size(stream());
+                        core::value string_type = "";
+
+                        switch (element_subtype)
+                        {
+                            case text: break;
+                            case datetime: string_type.set_subtype(core::datetime); break;
+                            case date: string_type.set_subtype(core::date); break;
+                            case time: string_type.set_subtype(core::time); break;
+                            case decimal_str: string_type.set_subtype(core::bignum); break;
+                            default: string_type.set_subtype(core::user + element_subtype); break;
+                        }
+
+                        get_output()->begin_string(string_type, size);
+                        while (size > 0)
+                        {
+                            core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
+                            stream().read(buffer.get(), buffer_size);
+                            if (stream().fail())
+                                throw core::error("Binn - unexpected end of string");
+                            // Set string in string_type to preserve the subtype
+                            string_type.set_string(core::string_t(buffer.get(), buffer_size));
+                            get_output()->append_to_string(string_type);
+                            size -= buffer_size;
+                        }
+                        string_type.set_string("");
+                        get_output()->end_string(string_type);
+
+                        if (stream().get() != 0) // Eat trailing NUL
+                            throw core::error("Binn - unexpected end of string");
+
+                        break;
+                    }
+                    case blob:
+                    {
+                        uint32_t size = read_size(stream());
+                        core::value string_type = "";
+
+                        switch (element_subtype)
+                        {
+                            case blob_data: string_type.set_subtype(core::blob); break;
+                            default: string_type.set_subtype(core::user + element_subtype); break;
+                        }
+
+                        get_output()->begin_string(string_type, size);
+                        while (size > 0)
+                        {
+                            core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
+                            stream().read(buffer.get(), buffer_size);
+                            if (stream().fail())
+                                throw core::error("Binn - unexpected end of string");
+                            // Set string in string_type to preserve the subtype
+                            string_type.set_string(core::string_t(buffer.get(), buffer_size));
+                            get_output()->append_to_string(string_type);
+                            size -= buffer_size;
+                        }
+                        string_type.set_string("");
+                        get_output()->end_string(string_type);
+
+                        break;
+                    }
+                    case container:
+                    {
+                        core::subtype_t sub_type = core::normal;
+                        read_size(stream()); // Read size and discard
+                        uint32_t count = read_size(stream()); // Then read element count
+
+                        core::value container;
+
+                        switch (element_subtype)
+                        {
+                            case map: container.set_object(core::object_t(), sub_type = core::map); break;
+                            case object: container.set_object(core::object_t()); break;
+                            case list: container.set_array(core::array_t()); break;
+                            default: container.set_array(core::array_t(), sub_type = core::user + element_subtype); break;
+                        }
+
+                        if (container.is_object())
+                            get_output()->begin_object(container, count);
+                        else
+                            get_output()->begin_array(container, count);
+                        containers.push(container_data(sub_type, count));
+                        break;
+                    }
+                }
+
+                written = false;
             }
         };
 

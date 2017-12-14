@@ -128,20 +128,20 @@ bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, bool
     size_t failed = 0;
 
     std::cout << "Testing " << name << "... " << vt.yellow << "0%" << std::flush;
-    std::cout << vt.black;
+    std::cout << vt.attr_reset;
 
     for (const auto &test: tests)
     {
         if (compare(test.second, actual(test.first)))
         {
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << std::flush;
             std::cout << vt.red;
             std::cout << "Test " << (current+1) << " FAILED!\n";
             std::cout << "\tInput: " << test.first << "\n";
             std::cout << "\tExpected output: " << test.second << "\n";
             std::cout << "\tActual output: " << actual(test.first) << std::endl;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
             if (bail_early)
                 return false;
             ++failed;
@@ -150,24 +150,24 @@ bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, bool
         if (current * 100 / tests.size() > percent)
         {
             percent = current * 100 / tests.size();
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << vt.yellow << percent << "%" << std::flush;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
         }
         ++current;
     }
 
     if (!failed)
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.green << "done." << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
     else
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.red << "done. (" << failed << " failed out of " << tests.size() << ")" << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
 
     return failed;
@@ -184,20 +184,20 @@ bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actua
     uintmax_t failed = 0;
 
     std::cout << "Testing " << name << "... " << vt.yellow << "0%" << std::flush;
-    std::cout << vt.black;
+    std::cout << vt.attr_reset;
 
     for (const auto &test: tests)
     {
         if (compare(test.first, actual(test.second)))
         {
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << std::flush;
             std::cout << vt.red;
             std::cout << "Test " << (current+1) << " FAILED!\n";
             std::cout << "\tInput: " << test.second << "\n";
             std::cout << "\tExpected output: " << test.first << "\n";
             std::cout << "\tActual output: " << actual(test.second) << std::endl;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
             if (bail_early)
                 return false;
             ++failed;
@@ -206,24 +206,24 @@ bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actua
         if (current * 100 / tests.size() > percent)
         {
             percent = current * 100 / tests.size();
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << vt.yellow << percent << "%" << std::flush;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
         }
         ++current;
     }
 
     if (!failed)
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.green << "done." << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
     else
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.red << "done. (" << failed << " failed out of " << tests.size() << ")" << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
 
     return failed;
@@ -240,20 +240,20 @@ bool TestRange(const char *name, uintmax_t tests, ExpectedCode expected, ResultC
     uintmax_t failed = 0;
 
     std::cout << "Testing " << name << "... " << vt.yellow << "0%" << std::flush;
-    std::cout << vt.black;
+    std::cout << vt.attr_reset;
 
     for (uintmax_t test = 0; test < tests; ++test)
     {
         if (compare(expected(test), actual(test)))
         {
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << std::flush;
             std::cout << vt.red;
             std::cout << "Test " << (test+1) << " FAILED!\n";
             std::cout << "\tInput: " << test << "\n";
             std::cout << "\tExpected output: " << expected(test) << "\n";
             std::cout << "\tActual output: " << actual(test) << std::endl;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
             if (bail_early)
                 return false;
             ++failed;
@@ -262,23 +262,23 @@ bool TestRange(const char *name, uintmax_t tests, ExpectedCode expected, ResultC
         if (test * 100 / tests > percent)
         {
             percent = test * 100 / tests;
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << vt.yellow << percent << "%" << std::flush;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
         }
     }
 
     if (!failed)
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.green << "done." << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
     else
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.red << "done. (" << failed << " failed out of " << tests << ")" << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
 
     return failed;
@@ -404,6 +404,31 @@ int readme_simple_test3()
 
     try {
         json::stream_writer(std::cout) << from_json(std::cin);        // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
+
+int readme_simple_test4()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    core::value my_value;                   // Global cross-format value class
+    core::value_builder builder(my_value);
+
+    try {
+        json::parser p(std::cin);
+        json::stream_writer w(std::cout);
+
+        p.begin(builder);
+        do
+            p.write_one();                  // Read in to core::value from STDIN as JSON
+        while (p.busy());
+        p.end();
+        w << my_value;                      // Write core::value out to STDOUT as JSON
     } catch (core::error e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }

@@ -35,9 +35,20 @@ namespace cppdatalib
     {
         class parser : public core::stream_parser
         {
-            std::unique_ptr<char []> buffer;
+            struct container_data
+            {
+                container_data(char content_type, core::int_t remaining_size)
+                    : content_type(content_type)
+                    , remaining_size(remaining_size)
+                {}
 
-        private:
+                char content_type;
+                core::int_t remaining_size;
+            };
+
+            std::unique_ptr<char []> buffer;
+            std::stack<container_data, std::vector<container_data>> containers;
+
             inline char size_specifier(core::int_t min, core::int_t max)
             {
                 if (min >= 0 && max <= UINT8_MAX)
@@ -220,199 +231,184 @@ namespace cppdatalib
             parser(core::istream_handle input)
                 : core::stream_parser(input)
                 , buffer(new char [core::buffer_size])
-            {}
-
-            bool provides_prefix_string_size() const {return true;}
-
-            core::stream_input &convert(core::stream_handler &writer)
             {
-                struct container_data
-                {
-                    container_data(char content_type, core::int_t remaining_size)
-                        : content_type(content_type)
-                        , remaining_size(remaining_size)
-                    {}
+                reset();
+            }
 
-                    char content_type;
-                    core::int_t remaining_size;
-                };
+            unsigned int features() const {return provides_prefix_string_size;}
 
+            void reset()
+            {
+                containers = decltype(containers)();
+            }
+
+        protected:
+            void write_one_()
+            {
                 const char valid_types[] = "ZTFUiIlLdDCHS[{";
-                std::stack<container_data, std::vector<container_data>> containers;
-                bool written = false;
                 int chr;
 
-                while (!written || writer.nesting_depth() > 0)
+                if (containers.size() > 0)
                 {
-                    if (containers.size() > 0)
-                    {
-                        if (containers.top().content_type)
-                            chr = containers.top().content_type;
-                        else
-                        {
-                            chr = stream().get();
-                            if (chr == EOF) break;
-                        }
-
-                        if (containers.top().remaining_size > 0 && !writer.container_key_was_just_parsed())
-                            --containers.top().remaining_size;
-                        if (writer.current_container() == core::object && chr != 'N' && chr != '}' && !writer.container_key_was_just_parsed())
-                        {
-                            // Parse key here, remap read character to 'N' (the no-op instruction)
-                            if (!containers.top().content_type)
-                                stream().unget();
-                            read_string('S', writer);
-                            chr = 'N';
-                        }
-                    }
+                    if (containers.top().content_type)
+                        chr = containers.top().content_type;
                     else
                     {
                         chr = stream().get();
-                        if (chr == EOF) break;
+                        if (chr == EOF)
+                            throw core::error("UBJSON - unexpected end of stream");
                     }
 
-                    written |= chr != 'N';
-
-                    switch (chr)
+                    if (containers.top().remaining_size > 0 && !get_output()->container_key_was_just_parsed())
+                        --containers.top().remaining_size;
+                    if (get_output()->current_container() == core::object && chr != 'N' && chr != '}' && !get_output()->container_key_was_just_parsed())
                     {
-                        case 'Z':
-                            writer.write(core::null_t());
-                            break;
-                        case 'T':
-                            writer.write(true);
-                            break;
-                        case 'F':
-                            writer.write(false);
-                            break;
-                        case 'U':
-                        case 'i':
-                        case 'I':
-                        case 'l':
-                        case 'L':
-                        {
-                            core::int_t i;
-                            read_int(i, chr);
-                            writer.write(i);
-                            break;
-                        }
-                        case 'd':
-                        case 'D':
-                            read_float(chr, writer);
-                            break;
-                        case 'C':
-                        case 'H':
-                        case 'S':
-                            read_string(chr, writer);
-                            break;
-                        case 'N': break;
-                        case '[':
-                        {
-                            int type = 0;
-                            core::int_t size = -1;
-
-                            chr = stream().get();
-                            if (chr == EOF) throw core::error("UBJSON - expected array value after '['");
-
-                            if (chr == '$') // Type specified
-                            {
-                                chr = stream().get();
-                                if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
-                                type = chr;
-                                chr = stream().get();
-                                if (chr == EOF) throw core::error("UBJSON - unexpected end of array");
-                            }
-
-                            if (chr == '#') // Count specified
-                            {
-                                chr = stream().get();
-                                if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
-
-                                read_int(size, chr);
-                                if (size < 0) throw core::error("UBJSON - invalid negative size specified for array");
-                            }
-
-                            // If type != 0, then size must be >= 0
-                            if (type != 0 && size < 0)
-                                throw core::error("UBJSON - array element type specified but number of elements is not specified");
-                            else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
-                                stream().unget();
-
-                            writer.begin_array(core::array_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
-                            containers.push(container_data(type, size));
-
-                            break;
-                        }
-                        case ']':
-                            if (!containers.empty() && containers.top().remaining_size >= 0)
-                                throw core::error("UBJSON - attempted to end an array with size specified already");
-
-                            writer.end_array(core::array_t());
-                            containers.pop();
-                            break;
-                        case '{':
-                        {
-                            int type = 0;
-                            core::int_t size = -1;
-
-                            chr = stream().get();
-                            if (chr == EOF) throw core::error("UBJSON - expected object value after '{'");
-
-                            if (chr == '$') // Type specified
-                            {
-                                chr = stream().get();
-                                if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
-                                type = chr;
-                                chr = stream().get();
-                                if (chr == EOF) throw core::error("UBJSON - unexpected end of object");
-                            }
-
-                            if (chr == '#') // Count specified
-                            {
-                                chr = stream().get();
-                                if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
-
-                                read_int(size, chr);
-                                if (size < 0) throw core::error("UBJSON - invalid negative size specified for object");
-                            }
-
-                            // If type != 0, then size must be >= 0
-                            if (type != 0 && size < 0)
-                                throw core::error("UBJSON - object element type specified but number of elements is not specified");
-                            else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
-                                stream().unget();
-
-                            writer.begin_object(core::object_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
-                            containers.push(container_data(type, size));
-
-                            break;
-                        }
-                        case '}':
-                            if (!containers.empty() && containers.top().remaining_size >= 0)
-                                throw core::error("UBJSON - attempted to end an object with size specified already");
-
-                            writer.end_object(core::object_t());
-                            containers.pop();
-                            break;
-                        default:
-                            throw core::error("UBJSON - expected value");
-                    }
-
-                    if (containers.size() > 0 && !writer.container_key_was_just_parsed() && containers.top().remaining_size == 0)
-                    {
-                        if (writer.current_container() == core::array)
-                            writer.end_array(core::array_t());
-                        else if (writer.current_container() == core::object)
-                            writer.end_object(core::object_t());
-                        containers.pop();
+                        // Parse key here, remap read character to 'N' (the no-op instruction)
+                        if (!containers.top().content_type)
+                            stream().unget();
+                        read_string('S', *get_output());
+                        chr = 'N';
                     }
                 }
+                else
+                {
+                    chr = stream().get();
+                    if (chr == EOF)
+                        throw core::error("UBJSON - unexpected end of stream");
+                }
 
-                if (!written)
-                    throw core::error("UBJSON - expected value");
-                else if (containers.size() > 0)
-                    throw core::error("UBJSON - unexpected end of data");
+                switch (chr)
+                {
+                    case 'Z':
+                        get_output()->write(core::null_t());
+                        break;
+                    case 'T':
+                        get_output()->write(true);
+                        break;
+                    case 'F':
+                        get_output()->write(false);
+                        break;
+                    case 'U':
+                    case 'i':
+                    case 'I':
+                    case 'l':
+                    case 'L':
+                    {
+                        core::int_t i;
+                        read_int(i, chr);
+                        get_output()->write(i);
+                        break;
+                    }
+                    case 'd':
+                    case 'D':
+                        read_float(chr, *get_output());
+                        break;
+                    case 'C':
+                    case 'H':
+                    case 'S':
+                        read_string(chr, *get_output());
+                        break;
+                    case 'N': break;
+                    case '[':
+                    {
+                        int type = 0;
+                        core::int_t size = -1;
 
-                return *this;
+                        chr = stream().get();
+                        if (chr == EOF) throw core::error("UBJSON - expected array value after '['");
+
+                        if (chr == '$') // Type specified
+                        {
+                            chr = stream().get();
+                            if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
+                            type = chr;
+                            chr = stream().get();
+                            if (chr == EOF) throw core::error("UBJSON - unexpected end of array");
+                        }
+
+                        if (chr == '#') // Count specified
+                        {
+                            chr = stream().get();
+                            if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
+
+                            read_int(size, chr);
+                            if (size < 0) throw core::error("UBJSON - invalid negative size specified for array");
+                        }
+
+                        // If type != 0, then size must be >= 0
+                        if (type != 0 && size < 0)
+                            throw core::error("UBJSON - array element type specified but number of elements is not specified");
+                        else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
+                            stream().unget();
+
+                        get_output()->begin_array(core::array_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
+                        containers.push(container_data(type, size));
+
+                        break;
+                    }
+                    case ']':
+                        if (!containers.empty() && containers.top().remaining_size >= 0)
+                            throw core::error("UBJSON - attempted to end an array with size specified already");
+
+                        get_output()->end_array(core::array_t());
+                        containers.pop();
+                        break;
+                    case '{':
+                    {
+                        int type = 0;
+                        core::int_t size = -1;
+
+                        chr = stream().get();
+                        if (chr == EOF) throw core::error("UBJSON - expected object value after '{'");
+
+                        if (chr == '$') // Type specified
+                        {
+                            chr = stream().get();
+                            if (chr == EOF || !strchr(valid_types, chr)) throw core::error("UBJSON - expected type specifier after '$'");
+                            type = chr;
+                            chr = stream().get();
+                            if (chr == EOF) throw core::error("UBJSON - unexpected end of object");
+                        }
+
+                        if (chr == '#') // Count specified
+                        {
+                            chr = stream().get();
+                            if (chr == EOF) throw core::error("UBJSON - expected count specifier after '#'");
+
+                            read_int(size, chr);
+                            if (size < 0) throw core::error("UBJSON - invalid negative size specified for object");
+                        }
+
+                        // If type != 0, then size must be >= 0
+                        if (type != 0 && size < 0)
+                            throw core::error("UBJSON - object element type specified but number of elements is not specified");
+                        else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
+                            stream().unget();
+
+                        get_output()->begin_object(core::object_t(), size >= 0? size: core::int_t(core::stream_handler::unknown_size));
+                        containers.push(container_data(type, size));
+
+                        break;
+                    }
+                    case '}':
+                        if (!containers.empty() && containers.top().remaining_size >= 0)
+                            throw core::error("UBJSON - attempted to end an object with size specified already");
+
+                        get_output()->end_object(core::object_t());
+                        containers.pop();
+                        break;
+                    default:
+                        throw core::error("UBJSON - expected value");
+                }
+
+                if (containers.size() > 0 && !get_output()->container_key_was_just_parsed() && containers.top().remaining_size == 0)
+                {
+                    if (get_output()->current_container() == core::array)
+                        get_output()->end_array(core::array_t());
+                    else if (get_output()->current_container() == core::object)
+                        get_output()->end_object(core::object_t());
+                    containers.pop();
+                }
             }
         };
 

@@ -33,88 +33,81 @@ namespace cppdatalib
     {
         class parser : public core::stream_parser
         {
+            std::unique_ptr<char []> buffer;
+
         public:
-            parser(core::istream_handle input) : core::stream_parser(input) {}
-
-            bool provides_prefix_string_size() const {return true;}
-
-            core::stream_input &convert(core::stream_handler &writer)
+            parser(core::istream_handle input)
+                : core::stream_parser(input)
+                , buffer(new char [core::buffer_size])
             {
-                std::unique_ptr<char []> buffer(new char [core::buffer_size]);
-                bool written = false;
+                reset();
+            }
+
+            void reset() {}
+
+            unsigned int features() const {return provides_prefix_string_size;}
+
+        protected:
+            void write_one_()
+            {
                 int chr;
 
-                while (chr = stream().peek(), chr != EOF)
-                {
-                    written = true;
-
-                    switch (chr)
-                    {
-                        case 'i':
-                        {
-                            stream().get(); // Eat 'i'
-
-                            core::int_t i;
-                            stream() >> i;
-                            if (!stream()) throw core::error("Bencode - expected 'integer' value");
-
-                            writer.write(i);
-                            if (stream().get() != 'e') throw core::error("Bencode - invalid 'integer' value");
-                            break;
-                        }
-                        case 'e':
-                            stream().get(); // Eat 'e'
-                            switch (writer.current_container())
-                            {
-                                case core::array: writer.end_array(core::array_t()); break;
-                                case core::object: writer.end_object(core::object_t()); break;
-                                default: throw core::error("Bencode - attempt to end element does not exist"); break;
-                            }
-                            break;
-                        case 'l':
-                            stream().get(); // Eat 'l'
-                            writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
-                            break;
-                        case 'd':
-                            stream().get(); // Eat 'd'
-                            writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
-                            break;
-                        default:
-                            if (isdigit(chr))
-                            {
-                                core::int_t size;
-
-                                stream() >> size;
-                                if (size < 0) throw core::error("Bencode - expected string size");
-                                if (stream().get() != ':') throw core::error("Bencode - expected ':' separating string size and data");
-
-                                writer.begin_string(core::string_t(), size);
-                                while (size > 0)
-                                {
-                                    core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                                    stream().read(buffer.get(), buffer_size);
-                                    if (stream().fail())
-                                        throw core::error("Bencode - unexpected end of string");
-                                    writer.append_to_string(core::string_t(buffer.get(), buffer_size));
-                                    size -= buffer_size;
-                                }
-                                writer.end_string(core::string_t());
-                            }
-                            else
-                                throw core::error("Bencode - expected value");
-                            break;
-                    }
-
-                    if (writer.nesting_depth() == 0)
-                        break;
-                }
-
-                if (!written)
-                    throw core::error("Bencode - expected value");
-                else if (writer.nesting_depth())
+                chr = stream().get();
+                if (chr == EOF)
                     throw core::error("Bencode - unexpected end of stream");
 
-                return *this;
+                switch (chr)
+                {
+                    case 'i':
+                    {
+                        core::int_t i;
+                        stream() >> i;
+                        if (!stream()) throw core::error("Bencode - expected 'integer' value");
+
+                        get_output()->write(i);
+                        if (stream().get() != 'e') throw core::error("Bencode - invalid 'integer' value");
+                        break;
+                    }
+                    case 'e':
+                        switch (get_output()->current_container())
+                        {
+                            case core::array: get_output()->end_array(core::array_t()); break;
+                            case core::object: get_output()->end_object(core::object_t()); break;
+                            default: throw core::error("Bencode - attempt to end element does not exist"); break;
+                        }
+                        break;
+                    case 'l':
+                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
+                        break;
+                    case 'd':
+                        get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size);
+                        break;
+                    default:
+                        if (isdigit(chr))
+                        {
+                            core::int_t size;
+
+                            stream().unget();
+                            stream() >> size;
+                            if (size < 0) throw core::error("Bencode - expected string size");
+                            if (stream().get() != ':') throw core::error("Bencode - expected ':' separating string size and data");
+
+                            get_output()->begin_string(core::string_t(), size);
+                            while (size > 0)
+                            {
+                                core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
+                                stream().read(buffer.get(), buffer_size);
+                                if (stream().fail())
+                                    throw core::error("Bencode - unexpected end of string");
+                                get_output()->append_to_string(core::string_t(buffer.get(), buffer_size));
+                                size -= buffer_size;
+                            }
+                            get_output()->end_string(core::string_t());
+                        }
+                        else
+                            throw core::error("Bencode - expected value");
+                        break;
+                }
             }
         };
 
