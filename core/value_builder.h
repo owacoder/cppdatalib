@@ -224,14 +224,26 @@ namespace cppdatalib
         inline stream_input &operator>>(stream_input &input, value &output)
         {
             value_builder builder(output);
-            builder.begin();
             input.convert(builder);
-            builder.end();
             return input;
         }
 
         // Convert directly from parser to value
+        inline void operator>>(stream_input &&input, value &output)
+        {
+            value_builder builder(output);
+            input.convert(builder);
+        }
+
+        // Convert directly from parser to value
         inline value &operator<<(value &output, stream_input &input)
+        {
+            input >> output;
+            return output;
+        }
+
+        // Convert directly from parser to value
+        inline value &operator<<(value &output, stream_input &&input)
         {
             input >> output;
             return output;

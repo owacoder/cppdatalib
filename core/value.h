@@ -324,6 +324,7 @@ namespace cppdatalib
 
             private:
                 friend class value;
+                friend class value_parser;
 
                 const value *p;
                 array_t::const_iterator array;

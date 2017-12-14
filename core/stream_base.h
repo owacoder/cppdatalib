@@ -104,7 +104,10 @@ namespace cppdatalib
             static const unsigned int requires_buffered_objects = 0x10;
             static const unsigned int requires_buffered_strings = 0x20;
 
-            stream_handler() : active_(false), is_key_(false) {}
+            stream_handler() : active_(false), is_key_(false)
+            {
+                nested_scopes.push_back(scope_data(null));
+            }
             virtual ~stream_handler() {}
 
             enum {
@@ -506,7 +509,11 @@ namespace cppdatalib
             bool output_is_active() const {return output && output->active();}
 
             // Begins parse sequence. Must be called after `set_output()`, with inactive output
-            void begin() {if (output) output->begin();}
+            void begin()
+            {
+                if (output) output->begin();
+                reset();
+            }
 
             // Begins parse sequence and sets output stream
             void begin(core::stream_handler &output) {set_output(output); begin();}
@@ -527,10 +534,21 @@ namespace cppdatalib
             // Performs (or finishes, if `busy()`) one value conversion and then returns.
             stream_input &convert()
             {
-                if (output)
+                if (output && !busy())
+                {
+                    const bool active = output_is_active();
+
+                    if (!active)
+                        output->begin();
+
+                    reset();
                     do {write_one_();} while (busy());
+
+                    if (!active)
+                        output->end();
+                }
                 else
-                    throw core::error("cppdatalib::core::stream_input - attempted to parse without output specified");
+                    throw core::error("cppdatalib::core::stream_input - attempted to parse without output specified or while busy");
                 return *this;
             }
 
@@ -539,8 +557,6 @@ namespace cppdatalib
             // NOTE: this function does nothing if `busy()` returns true.
             stream_input &convert(core::stream_handler &output)
             {
-                if (busy())
-                    return *this;
                 set_output(output);
                 return convert();
             }
@@ -584,13 +600,7 @@ namespace cppdatalib
             if (output.required_features() & ~input.features())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
 
-            const bool stream_ready = output.active();
-
-            if (!stream_ready)
-                output.begin();
             input.convert(output);
-            if (!stream_ready)
-                output.end();
 
             return output;
         }
@@ -601,13 +611,7 @@ namespace cppdatalib
             if (output.required_features() & ~input.features())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
 
-            const bool stream_ready = output.active();
-
-            if (!stream_ready)
-                output.begin();
             input.convert(output);
-            if (!stream_ready)
-                output.end();
 
             return output;
         }
@@ -618,13 +622,7 @@ namespace cppdatalib
             if (output.required_features() & ~input.features())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
 
-            const bool stream_ready = output.active();
-
-            if (!stream_ready)
-                output.begin();
             input.convert(output);
-            if (!stream_ready)
-                output.end();
         }
 
         // Convert directly from parser to rvalue serializer
@@ -633,13 +631,7 @@ namespace cppdatalib
             if (output.required_features() & ~input.features())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
 
-            const bool stream_ready = output.active();
-
-            if (!stream_ready)
-                output.begin();
             input.convert(output);
-            if (!stream_ready)
-                output.end();
         }
 
         // Convert directly from parser to serializer
@@ -675,9 +667,9 @@ namespace cppdatalib
             bool operator()(const value *arg, value::traversal_ancestry_finder)
             {
                 if (arg->is_array())
-                    stream->begin_array(*arg, arg->size());
+                    stream->begin_array(*arg, arg->array_size());
                 else if (arg->is_object())
-                    stream->begin_object(*arg, arg->size());
+                    stream->begin_object(*arg, arg->object_size());
                 return true;
             }
 

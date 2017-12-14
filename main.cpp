@@ -416,7 +416,7 @@ int readme_simple_test4()
     using namespace cppdatalib;             // Parent namespace
     using namespace json;                   // Format namespace
 
-    core::value my_value;                   // Global cross-format value class
+    core::value my_value, m2;               // Global cross-format value class
     core::value_builder builder(my_value);
 
     try {
@@ -428,7 +428,16 @@ int readme_simple_test4()
             p.write_one();                  // Read in to core::value from STDIN as JSON
         while (p.busy());
         p.end();
-        w << my_value;                      // Write core::value out to STDOUT as JSON
+        p >> my_value >> m2;
+
+        core::value_parser vp(my_value);
+        vp.begin(w);
+        do
+            vp.write_one();
+        while (vp.busy());
+        vp.end();
+
+        w << m2;                // Write core::value out to STDOUT as JSON
     } catch (core::error e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
@@ -438,6 +447,8 @@ int readme_simple_test4()
 
 int main()
 {
+    return readme_simple_test4();
+
     vt100 vt;
     std::cout << vt.attr_bright;
 

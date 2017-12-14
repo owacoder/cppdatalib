@@ -35,7 +35,6 @@ namespace cppdatalib
         {
             std::unique_ptr<char []> buffer;
             bool delimiter_required;
-            bool get_char;
             char chr;
 
         private:
@@ -120,7 +119,6 @@ namespace cppdatalib
 
             void reset()
             {
-                get_char = true;
                 delimiter_required = false;
                 stream() >> std::skipws;
             }
@@ -128,10 +126,10 @@ namespace cppdatalib
         protected:
             void write_one_()
             {
-                if (get_char? (stream() >> chr, stream().good()): true)
-                {
-                    get_char = true;
+                char chr;
 
+                if (stream() >> chr, stream().good())
+                {
                     if (delimiter_required)
                     {
                         if (get_output()->nesting_depth() == 0)
@@ -164,9 +162,10 @@ namespace cppdatalib
                         case ',':
                             if (get_output()->current_container_size() == 0 || get_output()->container_key_was_just_parsed())
                                 throw core::error("JSON - invalid ',' does not separate array or object entries");
-                            stream() >> chr; get_char = false; // Peek ahead
+                            stream() >> chr; // Peek ahead
                             if (!stream() || chr == ',' || chr == ']' || chr == '}')
                                 throw core::error("JSON - invalid ',' does not separate array or object entries");
+                            stream().unget();
                             delimiter_required = false;
                             break;
                         case ':':
@@ -205,10 +204,8 @@ namespace cppdatalib
                                     buffer.push_back(c);
                                     is_float = c == '.' || tolower(c) == 'e';
                                 }
-                                get_char = false;
+                                stream().unget();
                                 delimiter_required = true;
-                                if (c != EOF)
-                                    chr = c;
 
                                 if (!is_float)
                                 {
@@ -258,6 +255,8 @@ namespace cppdatalib
                             break;
                     }
                 }
+                else
+                    throw core::error("JSON - unexpected end of stream");
             }
         };
 
