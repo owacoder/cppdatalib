@@ -29,9 +29,18 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+
 #include <vector>
 #include <list>
+#include <forward_list>
+#include <queue>
+
+#include <set>
+#include <unordered_set>
+
 #include <map>
+#include <unordered_map>
+
 #include <stack>
 #include <cmath>
 #include <iostream>
@@ -45,6 +54,14 @@
 
 namespace cppdatalib
 {
+    namespace core
+    {
+        class value;
+    }
+
+    template<typename T> core::value to_cppdatalib(T);
+    template<typename T> T from_cppdatalib(const core::value &);
+
     namespace core
     {
         enum type : int8_t
@@ -85,7 +102,6 @@ namespace cppdatalib
             user = 0
         };
 
-        class value;
         class value_builder;
         class stream_handler;
 
@@ -282,9 +298,6 @@ namespace cppdatalib
 #endif
 
         struct null_t {};
-
-        template<typename T> core::value to_cppdatalib(T v);
-        template<typename T> T from_cppdatalib(const core::value &v);
 
         /* The core value class for all of cppdatalib.
          *
@@ -900,33 +913,137 @@ namespace cppdatalib
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
             template<typename T>
-            value(std::initializer_list<T> v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(std::initializer_list<T> v, subtype_t subtype = core::normal)
             {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<typename T, size_t N>
+            value(const std::array<T, N> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
             template<typename T>
-            value(const std::vector<T> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const std::deque<T> &v, subtype_t subtype = core::normal)
             {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<typename T>
+            value(const std::vector<T> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<typename T>
+            value(const std::list<T> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<typename T>
+            value(const std::forward_list<T> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<typename T>
+            value(const std::set<T> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<typename T, typename Container = std::deque<T>>
+            value(std::stack<T, Container> v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                while (!v.empty())
+                {
+                    arr_.insert(arr_.begin(), v.top());
+                    v.pop();
+                }
+            }
+            template<typename T, typename Container = std::deque<T>>
+            value(std::queue<T, Container> v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                while (!v.empty())
+                {
+                    push_back(v.front());
+                    v.pop();
+                }
+            }
+            template<typename T, typename Container = std::deque<T>, typename Compare = std::less<typename Container::value_type>>
+            value(std::priority_queue<T, Container, Compare> v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                while (!v.empty())
+                {
+                    push_back(v.top());
+                    v.pop();
+                }
+            }
+            template<typename T>
+            value(const std::multiset<T> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<typename T>
+            value(const std::unordered_set<T> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<typename T>
+            value(const std::unordered_multiset<T> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
             template<typename T, typename U>
-            value(const std::map<T, U> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const std::map<T, U> &v, subtype_t subtype = core::normal)
             {
+                object_init(subtype, core::object_t());
                 for (auto const &element: v)
                     add_member(element.first, element.second);
             }
             template<typename T, typename U>
-            value(const std::multimap<T, U> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const std::unordered_map<T, U> &v, subtype_t subtype = core::normal)
             {
+                object_init(subtype, core::object_t());
+                for (auto const &element: v)
+                    add_member(element.first, element.second);
+            }
+            template<typename T, typename U>
+            value(const std::multimap<T, U> &v, subtype_t subtype = core::normal)
+            {
+                object_init(subtype, core::object_t());
+                for (auto const &element: v)
+                    add_member(element.first, element.second);
+            }
+            template<typename T, typename U>
+            value(const std::unordered_multimap<T, U> &v, subtype_t subtype = core::normal)
+            {
+                object_init(subtype, core::object_t());
                 for (auto const &element: v)
                     add_member(element.first, element.second);
             }
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
-            value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(T v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
-                assign(*this, to_cppdatalib(v));
+                assign(*this, to_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(v));
             }
 
             ~value()
@@ -971,6 +1088,33 @@ namespace cppdatalib
                 }
                 subtype_ = other.subtype_;
                 return *this;
+            }
+
+            void swap(value &other)
+            {
+                using std::swap;
+
+                if (type_ == other.type_)
+                {
+                    swap(subtype_, other.subtype_);
+                    switch (type_)
+                    {
+                        case boolean: swap(bool_, other.bool_); break;
+                        case integer: swap(int_, other.int_); break;
+                        case uinteger: swap(uint_, other.uint_); break;
+                        case real: swap(real_, other.real_); break;
+                        case string: swap(str_, other.str_); break;
+                        case array: swap(arr_, other.arr_); break;
+                        case object: swap(obj_, other.obj_); break;
+                        default: break;
+                    }
+                }
+                else
+                {
+                    value temp = *this;
+                    *this = other;
+                    other = temp;
+                }
             }
 
             subtype_t get_subtype() const {return subtype_;}
@@ -1075,22 +1219,22 @@ namespace cppdatalib
             value &add_member(const value &key)
             {
                 clear(object);
-                return obj_.insert(decltype(obj_)::value_type(key, null_t()))->second;
+                return obj_.insert({key, null_t()})->second;
             }
             value &add_member(value &&key)
             {
                 clear(object);
-                return obj_.insert(decltype(obj_)::value_type(key, null_t()))->second;
+                return obj_.insert({key, null_t()})->second;
             }
             value &add_member(const value &key, const value &val)
             {
                 clear(object);
-                return obj_.insert(decltype(obj_)::value_type(key, val))->second;
+                return obj_.insert(std::make_pair(key, null_t()))->second = val;
             }
             value &add_member(value &&key, value &&val)
             {
                 clear(object);
-                return obj_.insert(decltype(obj_)::value_type(key, val))->second;
+                return obj_.insert(std::make_pair(key, null_t()))->second = std::move(val);
             }
 
             void push_back(const value &v) {clear(array); arr_.push_back(v);}
@@ -1133,8 +1277,258 @@ namespace cppdatalib
             array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_;}
             object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_;}
 
+        private:
             template<typename T>
-            operator T() const {return from_cppdatalib<T>(*this);}
+            class cast {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator T() const {return from_cppdatalib<T>(bind);}
+            };
+
+            template<typename T, typename Container>
+            class cast<std::stack<T, Container>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::stack<T, Container>() const
+                {
+                    std::stack<T, Container> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.push(element);
+                    return result;
+                }
+            };
+
+            template<typename T, typename Container>
+            class cast<std::queue<T, Container>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::queue<T, Container>() const
+                {
+                    std::queue<T, Container> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.push(element);
+                    return result;
+                }
+            };
+
+            template<typename T, typename Container, typename Compare>
+            class cast<std::priority_queue<T, Container, Compare>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::priority_queue<T, Container, Compare>() const
+                {
+                    std::priority_queue<T, Container, Compare> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.push(element);
+                    return result;
+                }
+            };
+
+            template<typename T>
+            class cast<std::forward_list<T>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::forward_list<T>() const
+                {
+                    std::forward_list<T> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.push_back(element);
+                    return result;
+                }
+            };
+
+            template<typename T>
+            class cast<std::list<T>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::list<T>() const
+                {
+                    std::list<T> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.push_back(element);
+                    return result;
+                }
+            };
+
+            template<typename T>
+            class cast<std::deque<T>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::deque<T>() const
+                {
+                    std::deque<T> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.push_back(element);
+                    return result;
+                }
+            };
+
+            template<typename T>
+            class cast<std::vector<T>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::vector<T>() const
+                {
+                    std::vector<T> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.push_back(element);
+                    return result;
+                }
+            };
+
+            template<typename T>
+            class cast<std::set<T>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::set<T>() const
+                {
+                    std::set<T> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.insert(element);
+                    return result;
+                }
+            };
+
+            template<typename T>
+            class cast<std::multiset<T>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::multiset<T>() const
+                {
+                    std::multiset<T> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.insert(element);
+                    return result;
+                }
+            };
+
+            template<typename T>
+            class cast<std::unordered_set<T>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::unordered_set<T>() const
+                {
+                    std::unordered_set<T> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.insert(element);
+                    return result;
+                }
+            };
+
+            template<typename T>
+            class cast<std::unordered_multiset<T>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::unordered_multiset<T>() const
+                {
+                    std::unordered_multiset<T> result;
+                    if (bind.is_array())
+                        for (const auto &element: bind.get_array_unchecked())
+                            result.insert(element);
+                    return result;
+                }
+            };
+
+            template<typename K, typename V>
+            class cast<std::map<K, V>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::map<K, V>() const
+                {
+                    std::map<K, V> result;
+                    if (bind.is_object())
+                        for (const auto &element: bind.get_object_unchecked())
+                            result.insert({element.first, element.second});
+                    return result;
+                }
+            };
+
+            template<typename K, typename V>
+            class cast<std::multimap<K, V>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::multimap<K, V>() const
+                {
+                    std::multimap<K, V> result;
+                    if (bind.is_object())
+                        for (const auto &element: bind.get_object_unchecked())
+                            result.insert({element.first, element.second});
+                    return result;
+                }
+            };
+
+            template<typename K, typename V>
+            class cast<std::unordered_map<K, V>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::unordered_map<K, V>() const
+                {
+                    std::unordered_map<K, V> result;
+                    if (bind.is_object())
+                        for (const auto &element: bind.get_object_unchecked())
+                            result.insert({element.first, element.second});
+                    return result;
+                }
+            };
+
+            template<typename K, typename V>
+            class cast<std::unordered_multimap<K, V>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::unordered_multimap<K, V>() const
+                {
+                    std::unordered_multimap<K, V> result;
+                    if (bind.is_object())
+                        for (const auto &element: bind.get_object_unchecked())
+                            result.insert({element.first, element.second});
+                    return result;
+                }
+            };
+
+        public:
+            template<typename T>
+            operator T() const {return cast<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this);}
 
         private:
             // WARNING: DO NOT CALL mutable_clear() anywhere but the destructor!
@@ -1269,7 +1663,6 @@ namespace cppdatalib
                     case null: *this = default_value; break;
                     case boolean:
                     {
-                        clear(new_type);
                         switch (new_type)
                         {
                             case integer: set_int((bool) bool_); break;
@@ -1282,7 +1675,6 @@ namespace cppdatalib
                     }
                     case integer:
                     {
-                        clear(new_type);
                         switch (new_type)
                         {
                             case boolean: set_bool(int_ != 0); break;
@@ -1295,7 +1687,6 @@ namespace cppdatalib
                     }
                     case uinteger:
                     {
-                        clear(new_type);
                         switch (new_type)
                         {
                             case boolean: set_bool(uint_ != 0); break;
@@ -1308,7 +1699,6 @@ namespace cppdatalib
                     }
                     case real:
                     {
-                        clear(new_type);
                         switch (new_type)
                         {
                             case boolean: set_bool(real_ != 0.0); break;
@@ -1359,7 +1749,6 @@ namespace cppdatalib
                             }
                             default: *this = default_value; break;
                         }
-                        clear(new_type);
                         break;
                     }
                     default: break;
@@ -1390,120 +1779,241 @@ namespace cppdatalib
                 return val < min || max < val? T(0): T(val);
             }
         }
-
-        core::value to_cppdatalib(signed char v) {return v;}
-        core::value to_cppdatalib(unsigned char v) {return v;}
-        core::value to_cppdatalib(signed short v) {return v;}
-        core::value to_cppdatalib(unsigned short v) {return v;}
-        core::value to_cppdatalib(signed int v) {return v;}
-        core::value to_cppdatalib(unsigned int v) {return v;}
-        core::value to_cppdatalib(signed long v) {return v;}
-        core::value to_cppdatalib(unsigned long v) {return v;}
-        core::value to_cppdatalib(signed long long v) {return v;}
-        core::value to_cppdatalib(unsigned long long v) {return v;}
-        core::value to_cppdatalib(float v) {return core::real_t(v);}
-        core::value to_cppdatalib(double v) {return v;}
-        core::value to_cppdatalib(long double v) {return core::real_t(v);}
-        core::value to_cppdatalib(char *v) {return v;}
-        core::value to_cppdatalib(const char *v) {return v;}
-        core::value to_cppdatalib(const std::string &v) {return v;}
-        template<typename T> core::value to_cppdatalib(std::initializer_list<T> v) {return v;}
-
-        template<typename T>
-        core::value to_cppdatalib(const std::vector<T> &v)
-        {
-            core::value result;
-            for (auto const &element: v)
-                result.push_back(element);
-            return result;
-        }
-
-        template<typename T, typename U>
-        core::value to_cppdatalib(const std::map<T, U> &v)
-        {
-            core::value result;
-            for (auto const &element: v)
-                result.add_member(element.first) = element.second;
-            return result;
-        }
-
-        template<typename T, typename U>
-        core::value to_cppdatalib(const std::multimap<T, U> &v)
-        {
-            core::value result;
-            for (auto const &element: v)
-                result.add_member(element.first) = element.second;
-            return result;
-        }
-
-        template<> bool from_cppdatalib<bool>(const core::value &v) {return v.as_bool();}
-        template<> signed char from_cppdatalib<signed char>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<signed char>::min(),
-                                      v.as_int(),
-                                      std::numeric_limits<signed char>::max());
-        }
-        template<> unsigned char from_cppdatalib<unsigned char>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<unsigned char>::min(),
-                                      v.as_uint(),
-                                      std::numeric_limits<unsigned char>::max());
-        }
-        template<> signed short from_cppdatalib<signed short>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<signed short>::min(),
-                                      v.as_int(),
-                                      std::numeric_limits<signed short>::max());
-        }
-        template<> unsigned short from_cppdatalib<unsigned short>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<unsigned short>::min(),
-                                      v.as_uint(),
-                                      std::numeric_limits<unsigned short>::max());
-        }
-        template<> signed int from_cppdatalib<signed int>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<signed int>::min(),
-                                      v.as_int(),
-                                      std::numeric_limits<signed int>::max());
-        }
-        template<> unsigned int from_cppdatalib<unsigned int>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<unsigned int>::min(),
-                                      v.as_uint(),
-                                      std::numeric_limits<unsigned int>::max());
-        }
-        template<> signed long from_cppdatalib<signed long>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<signed long>::min(),
-                                      v.as_int(),
-                                      std::numeric_limits<signed long>::max());
-        }
-        template<> unsigned long from_cppdatalib<unsigned long>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<unsigned long>::min(),
-                                      v.as_uint(),
-                                      std::numeric_limits<unsigned long>::max());
-        }
-        template<> signed long long from_cppdatalib<signed long long>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<signed long long>::min(),
-                                      v.as_int(),
-                                      std::numeric_limits<signed long long>::max());
-        }
-        template<> unsigned long long from_cppdatalib<unsigned long long>(const core::value &v)
-        {
-            return impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
-                                      v.as_uint(),
-                                      std::numeric_limits<unsigned long long>::max());
-        }
-
-        template<> float from_cppdatalib<float>(const core::value &v) {return v.as_real();}
-        template<> double from_cppdatalib<double>(const core::value &v) {return v.as_real();}
-        template<> long double from_cppdatalib<long double>(const core::value &v) {return v.as_real();}
-
-        template<> std::string from_cppdatalib<std::string>(const core::value &v) {return v.as_string();}
     }
+
+    // Fail base conversion with unimplemented function name
+    template<typename T> core::value to_cppdatalib(T) {return T::You_must_reimplement_cppdatalib_conversions_for_custom_type_conversions();}
+    template<typename T> T from_cppdatalib(const core::value &) {return T::You_must_reimplement_cppdatalib_conversions_for_custom_type_conversions();}
+
+    // Remove references, const, and volatile specifiers
+    template<typename T> core::value to_cppdatalib(T &v) {return to_cppdatalib<typename std::remove_reference<T>::type>(v);}
+    template<typename T> core::value to_cppdatalib(T &&v) {return to_cppdatalib<typename std::remove_reference<T>::type>(v);}
+    template<typename T> core::value to_cppdatalib(const T &v) {return to_cppdatalib<typename std::remove_cv<T>::type>(v);}
+    template<typename T> core::value to_cppdatalib(volatile T &v) {return to_cppdatalib<typename std::remove_cv<T>::type>(v);}
+
+    core::value to_cppdatalib(signed char v) {return v;}
+    core::value to_cppdatalib(unsigned char v) {return v;}
+    core::value to_cppdatalib(signed short v) {return v;}
+    core::value to_cppdatalib(unsigned short v) {return v;}
+    core::value to_cppdatalib(signed int v) {return v;}
+    core::value to_cppdatalib(unsigned int v) {return v;}
+    core::value to_cppdatalib(signed long v) {return v;}
+    core::value to_cppdatalib(unsigned long v) {return v;}
+    core::value to_cppdatalib(signed long long v) {return v;}
+    core::value to_cppdatalib(unsigned long long v) {return v;}
+    core::value to_cppdatalib(float v) {return core::real_t(v);}
+    core::value to_cppdatalib(double v) {return v;}
+    core::value to_cppdatalib(long double v) {return core::real_t(v);}
+    core::value to_cppdatalib(char *v) {return v;}
+    core::value to_cppdatalib(const char *v) {return v;}
+    core::value to_cppdatalib(const std::string &v) {return v;}
+    template<typename T> core::value to_cppdatalib(std::initializer_list<T> v) {return v;}
+
+    template<typename T>
+    core::value to_cppdatalib(const std::list<T> &v)
+    {
+        core::value result = core::array_t();
+        for (auto const &element: v)
+            result.push_back(element);
+        return result;
+    }
+
+    template<typename T>
+    core::value to_cppdatalib(const std::forward_list<T> &v)
+    {
+        core::value result = core::array_t();
+        for (auto const &element: v)
+            result.push_back(element);
+        return result;
+    }
+
+    template<typename T>
+    core::value to_cppdatalib(const std::deque<T> &v)
+    {
+        core::value result = core::array_t();
+        for (auto const &element: v)
+            result.push_back(element);
+        return result;
+    }
+
+    template<typename T>
+    core::value to_cppdatalib(const std::vector<T> &v)
+    {
+        core::value result = core::array_t();
+        for (auto const &element: v)
+            result.push_back(element);
+        return result;
+    }
+
+    template<typename T>
+    core::value to_cppdatalib(const std::set<T> &v)
+    {
+        core::value result = core::array_t();
+        for (auto const &element: v)
+            result.push_back(element);
+        return result;
+    }
+
+    template<typename T>
+    core::value to_cppdatalib(const std::unordered_set<T> &v)
+    {
+        core::value result = core::array_t();
+        for (auto const &element: v)
+            result.push_back(element);
+        return result;
+    }
+
+    template<typename T>
+    core::value to_cppdatalib(const std::multiset<T> &v)
+    {
+        core::value result = core::array_t();
+        for (auto const &element: v)
+            result.push_back(element);
+        return result;
+    }
+
+    template<typename T>
+    core::value to_cppdatalib(const std::unordered_multiset<T> &v)
+    {
+        core::value result = core::array_t();
+        for (auto const &element: v)
+            result.push_back(element);
+        return result;
+    }
+
+    template<typename T, typename Container = std::deque<T>>
+    core::value to_cppdatalib(std::stack<T, Container> v)
+    {
+        core::value result = core::array_t();
+        while (!v.empty())
+            result.push_back(v.top()), v.pop();
+        std::reverse(result.get_array_ref().begin(), result.get_array_ref().end());
+        return result;
+    }
+
+    template<typename T, typename Container = std::deque<T>>
+    core::value to_cppdatalib(std::queue<T, Container> v)
+    {
+        core::value result = core::array_t();
+        while (!v.empty())
+            result.push_back(v.front()), v.pop();
+        return result;
+    }
+
+    template<typename T, typename Container = std::deque<T>, typename Compare = std::less<typename Container::value_type>>
+    core::value to_cppdatalib(std::priority_queue<T, Container, Compare> v)
+    {
+        core::value result = core::array_t();
+        while (!v.empty())
+            result.push_back(v.front()), v.pop();
+        return result;
+    }
+
+    template<typename T, typename U>
+    core::value to_cppdatalib(const std::map<T, U> &v)
+    {
+        core::value result = core::object_t();
+        for (auto const &element: v)
+            result.add_member(element.first) = element.second;
+        return result;
+    }
+
+    template<typename T, typename U>
+    core::value to_cppdatalib(const std::unordered_map<T, U> &v)
+    {
+        core::value result = core::object_t();
+        for (auto const &element: v)
+            result.add_member(element.first) = element.second;
+        return result;
+    }
+
+    template<typename T, typename U>
+    core::value to_cppdatalib(const std::multimap<T, U> &v)
+    {
+        core::value result = core::object_t();
+        for (auto const &element: v)
+            result.add_member(element.first) = element.second;
+        return result;
+    }
+
+    template<typename T, typename U>
+    core::value to_cppdatalib(const std::unordered_multimap<T, U> &v)
+    {
+        core::value result = core::object_t();
+        for (auto const &element: v)
+            result.add_member(element.first) = element.second;
+        return result;
+    }
+
+    template<> bool from_cppdatalib<bool>(const core::value &v) {return v.as_bool();}
+    template<> signed char from_cppdatalib<signed char>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<signed char>::min(),
+                                  v.as_int(),
+                                  std::numeric_limits<signed char>::max());
+    }
+    template<> unsigned char from_cppdatalib<unsigned char>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<unsigned char>::min(),
+                                  v.as_uint(),
+                                  std::numeric_limits<unsigned char>::max());
+    }
+    template<> signed short from_cppdatalib<signed short>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<signed short>::min(),
+                                  v.as_int(),
+                                  std::numeric_limits<signed short>::max());
+    }
+    template<> unsigned short from_cppdatalib<unsigned short>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<unsigned short>::min(),
+                                  v.as_uint(),
+                                  std::numeric_limits<unsigned short>::max());
+    }
+    template<> signed int from_cppdatalib<signed int>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<signed int>::min(),
+                                  v.as_int(),
+                                  std::numeric_limits<signed int>::max());
+    }
+    template<> unsigned int from_cppdatalib<unsigned int>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<unsigned int>::min(),
+                                  v.as_uint(),
+                                  std::numeric_limits<unsigned int>::max());
+    }
+    template<> signed long from_cppdatalib<signed long>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<signed long>::min(),
+                                  v.as_int(),
+                                  std::numeric_limits<signed long>::max());
+    }
+    template<> unsigned long from_cppdatalib<unsigned long>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<unsigned long>::min(),
+                                  v.as_uint(),
+                                  std::numeric_limits<unsigned long>::max());
+    }
+    template<> signed long long from_cppdatalib<signed long long>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<signed long long>::min(),
+                                  v.as_int(),
+                                  std::numeric_limits<signed long long>::max());
+    }
+    template<> unsigned long long from_cppdatalib<unsigned long long>(const core::value &v)
+    {
+        return core::impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
+                                  v.as_uint(),
+                                  std::numeric_limits<unsigned long long>::max());
+    }
+
+    template<> float from_cppdatalib<float>(const core::value &v) {return v.as_real();}
+    template<> double from_cppdatalib<double>(const core::value &v) {return v.as_real();}
+    template<> long double from_cppdatalib<long double>(const core::value &v) {return v.as_real();}
+
+    template<> std::string from_cppdatalib<std::string>(const core::value &v) {return v.as_string();}
+
+    void swap(core::value &l, core::value &r) {l.swap(r);}
 }
 
 #endif // CPPDATALIB_VALUE_H

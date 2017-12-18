@@ -411,6 +411,27 @@ int readme_simple_test3()
     return 0;
 }
 
+struct point
+{
+    int x, y;
+};
+
+namespace cppdatalib
+{
+    template<> core::value to_cppdatalib(point p)
+    {
+        return core::object_t{{"x", p.x}, {"y", p.y}};
+    }
+
+    template<> point from_cppdatalib(const core::value &v)
+    {
+        point p;
+        p.x = v["x"];
+        p.y = v["y"];
+        return p;
+    }
+}
+
 int readme_simple_test4()
 {
     using namespace cppdatalib;             // Parent namespace
@@ -418,6 +439,12 @@ int readme_simple_test4()
 
     core::value my_value, m2;               // Global cross-format value class
     core::value_builder builder(my_value);
+
+
+
+    std::stack<int, std::vector<int>> stack;
+    stack.push(0);
+    stack.push(1);
 
     try {
         json::parser p(std::cin);
@@ -437,6 +464,9 @@ int readme_simple_test4()
         while (vp.busy());
         vp.end();
 
+        std::multimap<const char *, int> map = {{"x", 1}, {"y", 2}};
+        m2 = stack;
+        m2 = map;
         w << m2;                // Write core::value out to STDOUT as JSON
     } catch (core::error e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
