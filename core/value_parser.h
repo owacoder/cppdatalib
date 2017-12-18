@@ -10,12 +10,12 @@ namespace cppdatalib
         class value_parser : public core::stream_input
         {
             std::stack<value::traversal_reference, std::vector<value::traversal_reference>> references;
-            const value &bind;
+            const value *bind;
             const value *p;
 
         public:
             value_parser(const value &bind)
-                : bind(bind)
+                : bind(&bind)
             {
                 reset();
             }
@@ -30,7 +30,7 @@ namespace cppdatalib
             void reset()
             {
                 references = decltype(references)();
-                p = &bind;
+                p = bind;
             }
 
         protected:
@@ -71,7 +71,7 @@ namespace cppdatalib
                         const value *peek = references.top().p;
                         if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
                             p = std::addressof(*references.top().array++);
-                        else if (references.top().object != peek->get_object_unchecked().end())
+                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
                         {
                             if (!references.top().traversed_key_already)
                                 p = std::addressof(references.top().object->first);
