@@ -3,6 +3,7 @@
 #define CPPDATALIB_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
+//#define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 #include "cppdatalib.h"
 
 struct vt100
@@ -485,12 +486,12 @@ int readme_simple_test4()
 
 int main()
 {
-    return readme_simple_test4();
+    std::cout << sizeof(cppdatalib::core::value) << std::endl;
+
+    //return readme_simple_test4();
 
     vt100 vt;
     std::cout << vt.attr_bright;
-
-    std::cout << sizeof(cppdatalib::core::value) << std::endl;
 
     Test("base64_encode", base64_encode_tests, cppdatalib::base64::encode);
     ReverseTest("base64_decode", base64_encode_tests, cppdatalib::base64::decode);

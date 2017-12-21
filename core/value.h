@@ -974,7 +974,7 @@ namespace cppdatalib
                 array_init(subtype, core::array_t());
                 while (!v.empty())
                 {
-                    arr_.insert(arr_.begin(), v.top());
+                    arr_ref_().insert(arr_ref_().begin(), v.top());
                     v.pop();
                 }
             }
@@ -1069,8 +1069,8 @@ namespace cppdatalib
 
             ~value()
             {
-                if ((type_ == array && arr_.size() > 0) ||
-                    (type_ == object && obj_.size() > 0))
+                if ((type_ == array && arr_ref_().size() > 0) ||
+                    (type_ == object && obj_ref_().size() > 0))
                     traverse(traverse_node_null, traverse_node_mutable_clear);
                 deinit();
             }
@@ -1084,9 +1084,15 @@ namespace cppdatalib
                     case integer: new (&int_) int_t(std::move(other.int_)); break;
                     case uinteger: new (&uint_) bool_t(std::move(other.uint_)); break;
                     case real: new (&real_) real_t(std::move(other.real_)); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: new (&str_) string_t(std::move(other.str_)); break;
                     case array: new (&arr_) array_t(std::move(other.arr_)); break;
                     case object: new (&obj_) object_t(std::move(other.obj_)); break;
+#else
+                    case string: new (&str_) string_t*(); str_ = new string_t(std::move(*other.str_)); break;
+                    case array: new (&arr_) array_t*(); arr_ = new array_t(std::move(*other.arr_)); break;
+                    case object: new (&obj_) object_t*(); obj_ = new object_t(std::move(*other.obj_)); break;
+#endif
                     default: break;
                 }
                 type_ = other.type_;
@@ -1102,9 +1108,9 @@ namespace cppdatalib
                     case integer: int_ = std::move(other.int_); break;
                     case uinteger: uint_ = std::move(other.uint_); break;
                     case real: real_ = std::move(other.real_); break;
-                    case string: str_ = std::move(other.str_); break;
-                    case array: arr_ = std::move(other.arr_); break;
-                    case object: obj_ = std::move(other.obj_); break;
+                    case string: str_ref_() = std::move(other.str_ref_()); break;
+                    case array: arr_ref_() = std::move(other.arr_ref_()); break;
+                    case object: obj_ref_() = std::move(other.obj_ref_()); break;
                     default: break;
                 }
                 subtype_ = other.subtype_;
@@ -1139,10 +1145,10 @@ namespace cppdatalib
             void set_subtype(subtype_t _type) {subtype_ = _type;}
 
             type get_type() const {return type_;}
-            size_t size() const {return is_array()? arr_.size(): is_object()? obj_.size(): is_string()? str_.size(): 0;}
-            size_t array_size() const {return is_array()? arr_.size(): 0;}
-            size_t object_size() const {return is_object()? obj_.size(): 0;}
-            size_t string_size() const {return is_string()? str_.size(): 0;}
+            size_t size() const {return is_array()? arr_ref_().size(): is_object()? obj_ref_().size(): is_string()? str_ref_().size(): 0;}
+            size_t array_size() const {return is_array()? arr_ref_().size(): 0;}
+            size_t object_size() const {return is_object()? obj_ref_().size(): 0;}
+            size_t string_size() const {return is_string()? str_ref_().size(): 0;}
 
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
@@ -1158,37 +1164,37 @@ namespace cppdatalib
             int_t get_int_unchecked() const {return int_;}
             uint_t get_uint_unchecked() const {return uint_;}
             real_t get_real_unchecked() const {return real_;}
-            const string_t &get_string_unchecked() const {return str_;}
-            const array_t &get_array_unchecked() const {return arr_;}
-            const object_t &get_object_unchecked() const {return obj_;}
+            const string_t &get_string_unchecked() const {return str_ref_();}
+            const array_t &get_array_unchecked() const {return arr_ref_();}
+            const object_t &get_object_unchecked() const {return obj_ref_();}
 
             bool_t &get_bool_ref() {clear(boolean); return bool_;}
             int_t &get_int_ref() {clear(integer); return int_;}
             uint_t &get_uint_ref() {clear(uinteger); return uint_;}
             real_t &get_real_ref() {clear(real); return real_;}
-            string_t &get_string_ref() {clear(string); return str_;}
-            array_t &get_array_ref() {clear(array); return arr_;}
-            object_t &get_object_ref() {clear(object); return obj_;}
+            string_t &get_string_ref() {clear(string); return str_ref_();}
+            array_t &get_array_ref() {clear(array); return arr_ref_();}
+            object_t &get_object_ref() {clear(object); return obj_ref_();}
 
             void set_null() {clear(null);}
             void set_bool(bool_t v) {clear(boolean); bool_ = v;}
             void set_int(int_t v) {clear(integer); int_ = v;}
             void set_uint(uint_t v) {clear(uinteger); uint_ = v;}
             void set_real(real_t v) {clear(real); real_ = v;}
-            void set_string(cstring_t v) {clear(string); str_ = v;}
-            void set_string(const string_t &v) {clear(string); str_ = v;}
-            void set_array(const array_t &v) {clear(array); arr_ = v;}
-            void set_object(const object_t &v) {clear(object); obj_ = v;}
+            void set_string(cstring_t v) {clear(string); str_ref_() = v;}
+            void set_string(const string_t &v) {clear(string); str_ref_() = v;}
+            void set_array(const array_t &v) {clear(array); arr_ref_() = v;}
+            void set_object(const object_t &v) {clear(object); obj_ref_() = v;}
 
             void set_null(subtype_t subtype) {clear(null); subtype_ = subtype;}
             void set_bool(bool_t v, subtype_t subtype) {clear(boolean); bool_ = v; subtype_ = subtype;}
             void set_int(int_t v, subtype_t subtype) {clear(integer); int_ = v; subtype_ = subtype;}
             void set_uint(uint_t v, subtype_t subtype) {clear(uinteger); uint_ = v; subtype_ = subtype;}
             void set_real(real_t v, subtype_t subtype) {clear(real); real_ = v; subtype_ = subtype;}
-            void set_string(cstring_t v, subtype_t subtype) {clear(string); str_ = v; subtype_ = subtype;}
-            void set_string(const string_t &v, subtype_t subtype) {clear(string); str_ = v; subtype_ = subtype;}
-            void set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ = v; subtype_ = subtype;}
-            void set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ = v; subtype_ = subtype;}
+            void set_string(cstring_t v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
+            void set_string(const string_t &v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
+            void set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ref_() = v; subtype_ = subtype;}
+            void set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ref_() = v; subtype_ = subtype;}
 
             value operator[](cstring_t key) const {return member(key);}
             value &operator[](cstring_t key) {return member(key);}
@@ -1198,8 +1204,8 @@ namespace cppdatalib
             {
                 if (is_object())
                 {
-                    auto it = obj_.find(key);
-                    if (it != obj_.end())
+                    auto it = obj_ref_().find(key);
+                    if (it != obj_ref_().end())
                         return it->second;
                 }
                 return value();
@@ -1207,92 +1213,92 @@ namespace cppdatalib
             value &member(const value &key)
             {
                 clear(object);
-                auto it = obj_.lower_bound(key);
+                auto it = obj_ref_().lower_bound(key);
                 if (it->first == key)
                     return it->second;
-                it = obj_.insert(it, {key, null_t()});
+                it = obj_ref_().insert(it, {key, null_t()});
                 return it->second;
             }
             const value *member_ptr(const value &key) const
             {
                 if (is_object())
                 {
-                    auto it = obj_.find(key);
-                    if (it != obj_.end())
+                    auto it = obj_ref_().find(key);
+                    if (it != obj_ref_().end())
                         return std::addressof(it->second);
                 }
                 return NULL;
             }
-            bool_t is_member(cstring_t key) const {return is_object() && obj_.find(key) != obj_.end();}
-            bool_t is_member(const string_t &key) const {return is_object() && obj_.find(key) != obj_.end();}
-            bool_t is_member(const value &key) const {return is_object() && obj_.find(key) != obj_.end();}
-            size_t member_count(cstring_t key) const {return is_object()? obj_.count(key): 0;}
-            size_t member_count(const string_t &key) const {return is_object()? obj_.count(key): 0;}
-            size_t member_count(const value &key) const {return is_object()? obj_.count(key): 0;}
-            void erase_member(cstring_t key) {if (is_object()) obj_.erase(key);}
-            void erase_member(const string_t &key) {if (is_object()) obj_.erase(key);}
-            void erase_member(const value &key) {if (is_object()) obj_.erase(key);}
+            bool_t is_member(cstring_t key) const {return is_object() && obj_ref_().find(key) != obj_ref_().end();}
+            bool_t is_member(const string_t &key) const {return is_object() && obj_ref_().find(key) != obj_ref_().end();}
+            bool_t is_member(const value &key) const {return is_object() && obj_ref_().find(key) != obj_ref_().end();}
+            size_t member_count(cstring_t key) const {return is_object()? obj_ref_().count(key): 0;}
+            size_t member_count(const string_t &key) const {return is_object()? obj_ref_().count(key): 0;}
+            size_t member_count(const value &key) const {return is_object()? obj_ref_().count(key): 0;}
+            void erase_member(cstring_t key) {if (is_object()) obj_ref_().erase(key);}
+            void erase_member(const string_t &key) {if (is_object()) obj_ref_().erase(key);}
+            void erase_member(const value &key) {if (is_object()) obj_ref_().erase(key);}
 
             value &add_member(const value &key)
             {
                 clear(object);
-                return obj_.insert({key, null_t()})->second;
+                return obj_ref_().insert({key, null_t()})->second;
             }
             value &add_member(value &&key)
             {
                 clear(object);
-                return obj_.insert({key, null_t()})->second;
+                return obj_ref_().insert({key, null_t()})->second;
             }
             value &add_member(const value &key, const value &val)
             {
                 clear(object);
-                return obj_.insert(std::make_pair(key, null_t()))->second = val;
+                return obj_ref_().insert(std::make_pair(key, null_t()))->second = val;
             }
             value &add_member(value &&key, value &&val)
             {
                 clear(object);
-                return obj_.insert(std::make_pair(key, null_t()))->second = std::move(val);
+                return obj_ref_().insert(std::make_pair(key, null_t()))->second = std::move(val);
             }
 
-            void push_back(const value &v) {clear(array); arr_.push_back(v);}
-            void push_back(value &&v) {clear(array); arr_.push_back(v);}
+            void push_back(const value &v) {clear(array); arr_ref_().push_back(v);}
+            void push_back(value &&v) {clear(array); arr_ref_().push_back(v);}
             value operator[](size_t pos) const {return element(pos);}
             value &operator[](size_t pos) {return element(pos);}
-            value element(size_t pos) const {return is_array() && pos < arr_.size()? arr_[pos]: value();}
+            value element(size_t pos) const {return is_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
             value &element(size_t pos)
             {
                 clear(array);
-                if (arr_.size() <= pos)
-                    arr_.insert(arr_.end(), pos - arr_.size() + 1, core::null_t());
-                return arr_[pos];
+                if (arr_ref_().size() <= pos)
+                    arr_ref_().insert(arr_ref_().end(), pos - arr_ref_().size() + 1, core::null_t());
+                return arr_ref_()[pos];
             }
-            void erase_element(int_t pos) {if (is_array()) arr_.erase(arr_.begin() + pos);}
+            void erase_element(int_t pos) {if (is_array()) arr_ref_().erase(arr_ref_().begin() + pos);}
 
             // The following are convenience conversion functions
             bool_t get_bool(bool_t default_ = false) const {return is_bool()? bool_: default_;}
             int_t get_int(int_t default_ = 0) const {return is_int()? int_: default_;}
             uint_t get_uint(uint_t default_ = 0) const {return is_uint()? uint_: default_;}
             real_t get_real(real_t default_ = 0.0) const {return is_real()? real_: default_;}
-            cstring_t get_cstring(cstring_t default_ = "") const {return is_string()? str_.c_str(): default_;}
-            string_t get_string(const string_t &default_ = string_t()) const {return is_string()? str_: default_;}
-            array_t get_array(const array_t &default_ = array_t()) const {return is_array()? arr_: default_;}
-            object_t get_object(const object_t &default_ = object_t()) const {return is_object()? obj_: default_;}
+            cstring_t get_cstring(cstring_t default_ = "") const {return is_string()? str_ref_().c_str(): default_;}
+            string_t get_string(const string_t &default_ = string_t()) const {return is_string()? str_ref_(): default_;}
+            array_t get_array(const array_t &default_ = array_t()) const {return is_array()? arr_ref_(): default_;}
+            object_t get_object(const object_t &default_ = object_t()) const {return is_object()? obj_ref_(): default_;}
 
             bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, default_).bool_;}
             int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, default_).int_;}
             uint_t as_uint(uint_t default_ = 0) const {return value(*this).convert_to(uinteger, default_).uint_;}
             real_t as_real(real_t default_ = 0.0) const {return value(*this).convert_to(real, default_).real_;}
-            string_t as_string(const string_t &default_ = string_t()) const {return value(*this).convert_to(string, default_).str_;}
-            array_t as_array(const array_t &default_ = array_t()) const {return value(*this).convert_to(array, default_).arr_;}
-            object_t as_object(const object_t &default_ = object_t()) const {return value(*this).convert_to(object, default_).obj_;}
+            string_t as_string(const string_t &default_ = string_t()) const {return value(*this).convert_to(string, default_).str_ref_();}
+            array_t as_array(const array_t &default_ = array_t()) const {return value(*this).convert_to(array, default_).arr_ref_();}
+            object_t as_object(const object_t &default_ = object_t()) const {return value(*this).convert_to(object, default_).obj_ref_();}
 
             bool_t &convert_to_bool(bool_t default_ = false) {return convert_to(boolean, default_).bool_;}
             int_t &convert_to_int(int_t default_ = 0) {return convert_to(integer, default_).int_;}
             uint_t &convert_to_uint(uint_t default_ = 0) {return convert_to(uinteger, default_).uint_;}
             real_t &convert_to_real(real_t default_ = 0.0) {return convert_to(real, default_).real_;}
-            string_t &convert_to_string(const string_t &default_ = string_t()) {return convert_to(string, default_).str_;}
-            array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_;}
-            object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_;}
+            string_t &convert_to_string(const string_t &default_ = string_t()) {return convert_to(string, default_).str_ref_();}
+            array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_ref_();}
+            object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_ref_();}
 
         private:
             template<typename T>
@@ -1574,15 +1580,27 @@ namespace cppdatalib
             // (They're defined as `const` members in the std::map implementation)
             void mutable_clear() const
             {
+#ifdef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                typedef string_t *string_t_ptr;
+                typedef array_t *array_t_ptr;
+                typedef object_t *object_t_ptr;
+#endif
+
                 switch (type_)
                 {
                     case boolean: bool_.~bool_t(); break;
                     case integer: int_.~int_t(); break;
                     case uinteger: uint_.~uint_t(); break;
                     case real: real_.~real_t(); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: str_.~string_t(); break;
                     case array: arr_.~array_t(); break;
                     case object: obj_.~object_t(); break;
+#else
+                    case string: delete str_; str_.~string_t_ptr(); break;
+                    case array: delete arr_; arr_.~array_t_ptr(); break;
+                    case object: delete obj_; obj_.~object_t_ptr(); break;
+#endif
                     default: break;
                 }
                 type_ = null;
@@ -1607,9 +1625,15 @@ namespace cppdatalib
                     case integer: new (&int_) int_t(); break;
                     case uinteger: new (&uint_) uint_t(); break;
                     case real: new (&real_) real_t(); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: new (&str_) string_t(); break;
                     case array: new (&arr_) array_t(); break;
                     case object: new (&obj_) object_t(); break;
+#else
+                    case string: new (&str_) string_t*(); str_ = new string_t(); break;
+                    case array: new (&arr_) array_t*(); arr_ = new array_t(); break;
+                    case object: new (&obj_) object_t*(); obj_ = new object_t(); break;
+#endif
                     default: break;
                 }
                 type_ = new_type;
@@ -1651,7 +1675,11 @@ namespace cppdatalib
             template<typename... Args>
             void string_init(subtype_t new_subtype, Args... args)
             {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 new (&str_) string_t(args...);
+#else
+                new (&str_) string_t*(); str_ = new string_t(args...);
+#endif
                 type_ = string;
                 subtype_ = new_subtype;
             }
@@ -1659,7 +1687,11 @@ namespace cppdatalib
             template<typename... Args>
             void array_init(subtype_t new_subtype, Args... args)
             {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 new (&arr_) array_t(args...);
+#else
+                new (&arr_) array_t*(); arr_ = new array_t(args...);
+#endif
                 type_ = array;
                 subtype_ = new_subtype;
             }
@@ -1667,22 +1699,38 @@ namespace cppdatalib
             template<typename... Args>
             void object_init(subtype_t new_subtype, Args... args)
             {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 new (&obj_) object_t(args...);
+#else
+                new (&obj_) object_t*(); obj_ = new object_t(args...);
+#endif
                 type_ = object;
                 subtype_ = new_subtype;
             }
 
             void deinit()
             {
+#ifdef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                typedef string_t *string_t_ptr;
+                typedef array_t *array_t_ptr;
+                typedef object_t *object_t_ptr;
+#endif
+
                 switch (type_)
                 {
                     case boolean: bool_.~bool_t(); break;
                     case integer: int_.~int_t(); break;
                     case uinteger: uint_.~uint_t(); break;
                     case real: real_.~real_t(); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: str_.~string_t(); break;
                     case array: arr_.~array_t(); break;
                     case object: obj_.~object_t(); break;
+#else
+                    case string: delete str_; str_.~string_t_ptr(); break;
+                    case array: delete arr_; arr_.~array_t_ptr(); break;
+                    case object: delete obj_; obj_.~object_t_ptr(); break;
+#endif
                     default: break;
                 }
                 type_ = null;
@@ -1756,10 +1804,10 @@ namespace cppdatalib
                     {
                         switch (new_type)
                         {
-                            case boolean: set_bool(str_ == "true"); break;
+                            case boolean: set_bool(str_ref_() == "true"); break;
                             case integer:
                             {
-                                std::istringstream str(str_);
+                                std::istringstream str(str_ref_());
                                 clear(integer);
                                 str >> int_;
                                 if (!str)
@@ -1768,7 +1816,7 @@ namespace cppdatalib
                             }
                             case uinteger:
                             {
-                                std::istringstream str(str_);
+                                std::istringstream str(str_ref_());
                                 clear(uinteger);
                                 str >> uint_;
                                 if (!str)
@@ -1777,7 +1825,7 @@ namespace cppdatalib
                             }
                             case real:
                             {
-                                std::istringstream str(str_);
+                                std::istringstream str(str_ref_());
                                 clear(real);
                                 str >> real_;
                                 if (!str)
@@ -1794,15 +1842,66 @@ namespace cppdatalib
                 return *this;
             }
 
+            string_t &str_ref_() {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                return str_;
+#else
+                return *str_;
+#endif
+            }
+            const string_t &str_ref_() const {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                return str_;
+#else
+                return *str_;
+#endif
+            }
+
+            array_t &arr_ref_() {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                return arr_;
+#else
+                return *arr_;
+#endif
+            }
+            const array_t &arr_ref_() const {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                return arr_;
+#else
+                return *arr_;
+#endif
+            }
+
+            object_t &obj_ref_() {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                return obj_;
+#else
+                return *obj_;
+#endif
+            }
+            const object_t &obj_ref_() const {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                return obj_;
+#else
+                return *obj_;
+#endif
+            }
+
             union
             {
                 bool_t bool_;
                 int_t int_;
                 uint_t uint_;
                 real_t real_;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 string_t str_;
                 mutable array_t arr_; // Mutable to provide editable traversal access to const destructor
                 mutable object_t obj_; // Mutable to provide editable traversal access to const destructor
+#else
+                string_t *str_;
+                mutable array_t *arr_; // Mutable to provide editable traversal access to const destructor
+                mutable object_t *obj_; // Mutable to provide editable traversal access to const destructor
+#endif
             };
             mutable type type_; // Mutable to provide editable traversal access to const destructor
             subtype_t subtype_;
