@@ -1082,7 +1082,7 @@ namespace cppdatalib
                 {
                     case boolean: new (&bool_) bool_t(std::move(other.bool_)); break;
                     case integer: new (&int_) int_t(std::move(other.int_)); break;
-                    case uinteger: new (&uint_) bool_t(std::move(other.uint_)); break;
+                    case uinteger: new (&uint_) uint_t(std::move(other.uint_)); break;
                     case real: new (&real_) real_t(std::move(other.real_)); break;
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: new (&str_) string_t(std::move(other.str_)); break;
@@ -1141,7 +1141,7 @@ namespace cppdatalib
             }
 
             subtype_t get_subtype() const {return subtype_;}
-            subtype_t &get_subtype() {return subtype_;}
+            subtype_t &get_subtype_ref() {return subtype_;}
             void set_subtype(subtype_t _type) {subtype_ = _type;}
 
             type get_type() const {return type_;}

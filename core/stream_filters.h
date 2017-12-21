@@ -629,6 +629,10 @@ namespace cppdatalib
         public:
             mean_filter(core::stream_handler &output)
                 : stream_filter_base(output)
+                , samples(0)
+                , sum(0)
+                , product(0)
+                , inverted_sum(0)
             {}
 
             core::real_t get_mean(mean_filter_flag mean_type) const
@@ -684,37 +688,170 @@ namespace cppdatalib
             typedef core::mean_filter<measure> base;
 
             core::value samples;
+            core::real_t variance_;
+            bool calculated;
 
         public:
             dispersion_filter(core::stream_handler &output)
                 : base(output)
+                , calculated(false)
             {}
 
-            core::real_t get_variance() const
+            core::real_t get_variance()
             {
-                core::real_t variance_ = 0.0;
-
-                if (samples.is_array())
+                if (!calculated && samples.is_array())
+                {
+                    variance_ = 0.0;
                     for (auto const &sample: samples.get_array_unchecked())
                         variance_ += pow(sample.as_real() - base::get_arithmetic_mean(), 2.0);
+                    calculated = true;
+                }
 
                 return variance_ / base::sample_size();
             }
 
-            core::real_t get_standard_deviation() const {return sqrt(get_variance());}
+            core::real_t get_standard_deviation() {return sqrt(get_variance());}
 
         protected:
             void begin_()
             {
                 base::begin_();
                 samples.set_null();
+                calculated = false;
             }
 
             bool write_(const value &v, bool is_key)
             {
                 base::write_(v, is_key);
                 if (v.get_type() == measure)
-                    samples.push_back(v.as_real());
+                {
+                    samples.push_back(v);
+                    calculated = false;
+                }
+                return true;
+            }
+        };
+
+        template<core::type measure = core::real>
+        class median_filter : public impl::stream_filter_base
+        {
+            core::value samples;
+            bool sorted;
+
+        public:
+            median_filter(core::stream_handler &output)
+                : stream_filter_base(output)
+                , sorted(false)
+            {}
+
+            core::value get_median()
+            {
+                using namespace std;
+
+                if (!sorted && samples.is_array())
+                {
+                    sort(samples.get_array_ref().begin(), samples.get_array_ref().end());
+                    sorted = true;
+                }
+
+                if (samples.array_size() == 0) // No samples
+                    return core::null_t();
+                else if (samples.array_size() & 1) // Odd number of samples
+                    return samples.element(samples.array_size() / 2);
+                else // Even number of samples
+                    return (samples.element(samples.array_size() / 2 - 1).as_real() +
+                            samples.element(samples.array_size() / 2).as_real()) / 2;
+            }
+
+            size_t sample_size() const
+            {
+                return samples.size();
+            }
+
+        protected:
+            void begin_()
+            {
+                stream_filter_base::begin_();
+                samples.set_null();
+                sorted = false;
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                stream_filter_base::write_(v, is_key);
+                if (v.get_type() == measure)
+                {
+                    samples.push_back(v);
+                    sorted = false;
+                }
+                return true;
+            }
+        };
+
+        template<core::type measure = core::real>
+        class mode_filter : public impl::stream_filter_base
+        {
+            core::value samples;
+            core::value modes;
+            bool calculated;
+
+        public:
+            mode_filter(core::stream_handler &output)
+                : stream_filter_base(output)
+                , calculated(false)
+            {}
+
+            const core::value &get_modes()
+            {
+                using namespace std;
+
+                if (!calculated)
+                {
+                    core::uint_t max_frequency = 1;
+                    modes.set_null();
+
+                    if (samples.is_object())
+                    {
+                        for (const auto &item: samples.get_object_unchecked())
+                            max_frequency = std::max(item.second.get_uint_unchecked(), max_frequency); // Don't worry about get_uint_unchecked, we know all values are unsigned integers
+
+                        for (const auto &item: samples.get_object_unchecked())
+                        {
+                            if (item.second.get_uint_unchecked() == max_frequency)
+                                modes.push_back(item.first);
+                        }
+
+                        if (modes.size() == samples.size())
+                            modes.set_null();
+                    }
+
+                    calculated = true;
+                }
+
+                return modes;
+            }
+
+            size_t sample_size() const
+            {
+                return samples.size();
+            }
+
+        protected:
+            void begin_()
+            {
+                stream_filter_base::begin_();
+                samples.set_null();
+                calculated = false;
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                stream_filter_base::write_(v, is_key);
+                if (v.get_type() == measure)
+                {
+                    samples.member(v).get_uint_ref() += 1;
+                    calculated = false;
+                }
                 return true;
             }
         };
@@ -736,15 +873,17 @@ namespace cppdatalib
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
+                using namespace std;
+
                 if (v.get_type() == core::array)
                 {
                     core::value sorted;
 
                     sorted = v;
                     if (direction == ascending_sort)
-                        std::sort(sorted.get_array_unchecked().begin(), sorted.get_array_unchecked().end());
+                        sort(sorted.get_array_ref().begin(), sorted.get_array_ref().end());
                     else
-                        std::sort(sorted.get_array_unchecked().rbegin(), sorted.get_array_unchecked().rend());
+                        sort(sorted.get_array_ref().rbegin(), sorted.get_array_ref().rend());
 
                     buffer_filter::write_buffered_value_(sorted, is_key);
                 }
@@ -770,11 +909,11 @@ namespace cppdatalib
             {
                 core::value map_;
 
-                if ((v.get_type() == core::array && v.array_size() > column_names.array_size())
+                if ((v.is_array() && v.array_size() > column_names.array_size())
                         || column_names.array_size() == 0) // Not enough column names to cover all attributes!!
                     throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
 
-                if (v.get_type() == core::array)
+                if (v.is_array())
                     for (size_t i = 0; i < column_names.array_size(); ++i)
                     {
                         if (i >= v.size() && fail_on_missing_column)

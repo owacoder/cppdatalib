@@ -488,6 +488,20 @@ int main()
 {
     std::cout << sizeof(cppdatalib::core::value) << std::endl;
 
+    cppdatalib::core::stream_handler dummy;
+    cppdatalib::core::median_filter<cppdatalib::core::uinteger> median(dummy);
+    cppdatalib::core::mode_filter<cppdatalib::core::uinteger> mode(median);
+    cppdatalib::core::range_filter<cppdatalib::core::uinteger> range(mode);
+    cppdatalib::core::dispersion_filter<cppdatalib::core::uinteger> dispersal(range);
+
+    cppdatalib::core::array_t array = {1, 2};
+    dispersal << array;
+
+    std::cout << median.get_median() << std::endl;
+    std::cout << mode.get_modes() << std::endl;
+    std::cout << range.get_max() << std::endl;
+    std::cout << dispersal.get_arithmetic_mean() << std::endl << dispersal.get_standard_deviation() << std::endl;
+
     //return readme_simple_test4();
 
     vt100 vt;
