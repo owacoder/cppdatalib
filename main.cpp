@@ -96,8 +96,6 @@ struct vt100
     const char * const bg_white = "\033[47m";
 };
 
-using namespace cppdatalib;
-
 template<typename T>
 std::ostream &operator<<(std::ostream &strm, const std::vector<T> &value)
 {
@@ -348,8 +346,8 @@ struct hex_string : public std::string
 
 std::ostream &operator<<(std::ostream &ostr, const hex_string &str)
 {
-    core::ostream_handle wrap(ostr);
-    hex::debug_write(wrap, str);
+    cppdatalib::core::ostream_handle wrap(ostr);
+    cppdatalib::hex::debug_write(wrap, str);
     return ostr;
 }
 
@@ -416,21 +414,20 @@ struct point
     int x, y;
 };
 
-namespace cppdatalib
-{
-    template<> core::value to_cppdatalib(point p)
-    {
-        return core::object_t{{"x", p.x}, {"y", p.y}};
-    }
+#include "adapters/qt.h"
 
-    template<> point from_cppdatalib(const core::value &v)
-    {
-        point p;
-        p.x = v["x"];
-        p.y = v["y"];
-        return p;
-    }
+void to_cppdatalib(const point &p, cppdatalib::core::value &result)
+{
+    result = cppdatalib::core::object_t{{"x", p.x}, {"y", p.y}};
 }
+
+void from_cppdatalib(const cppdatalib::core::value &v, point &p)
+{
+    p.x = v["x"];
+    p.y = v["y"];
+}
+
+#include <QDebug>
 
 int readme_simple_test4()
 {
@@ -467,6 +464,17 @@ int readme_simple_test4()
         std::multimap<const char *, int> map = {{"x", 1}, {"y", 2}};
         m2 = stack;
         m2 = map;
+        point p2 = point();
+        p2.x = 9;
+        m2 = p2;
+        p2 = m2;
+        p2.x += 1000;
+        m2 = p2;
+        /*m2 = QVector<int>() << 1 << 2;
+        QVector<int> n = m2;*/
+        //std::vector<int> vec = from_cppdatalib<std::vector<int>>(m2);
+        QVariant v = m2;
+        m2 = v;
         w << m2;                // Write core::value out to STDOUT as JSON
     } catch (core::error e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
@@ -482,26 +490,26 @@ int main()
     vt100 vt;
     std::cout << vt.attr_bright;
 
-    std::cout << sizeof(core::value) << std::endl;
+    std::cout << sizeof(cppdatalib::core::value) << std::endl;
 
-    Test("base64_encode", base64_encode_tests, base64::encode);
-    ReverseTest("base64_decode", base64_encode_tests, base64::decode);
-    Test("debug_hex_encode", debug_hex_encode_tests, hex::debug_encode);
-    Test("hex_encode", hex_encode_tests, hex::encode);
+    Test("base64_encode", base64_encode_tests, cppdatalib::base64::encode);
+    ReverseTest("base64_decode", base64_encode_tests, cppdatalib::base64::decode);
+    Test("debug_hex_encode", debug_hex_encode_tests, cppdatalib::hex::debug_encode);
+    Test("hex_encode", hex_encode_tests, cppdatalib::hex::encode);
 #if 0
-    TestRange("float_from_ieee_754", UINT32_MAX, core::float_cast_from_ieee_754,
-              core::float_from_ieee_754, true, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
+    TestRange("float_from_ieee_754", UINT32_MAX, cppdatalib::core::float_cast_from_ieee_754,
+              cppdatalib::core::float_from_ieee_754, true, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
     TestRange("float_to_ieee_754", UINT32_MAX, [](const auto &f){return f;},
-              [](const auto &f){return core::float_to_ieee_754(core::float_cast_from_ieee_754(f));}, true,
-              [](const auto &f, const auto &s){return f != s && !isnan(core::float_from_ieee_754(f)) && !isnan(core::float_from_ieee_754(s));});
+              [](const auto &f){return core::float_to_ieee_754(cppdatalib::core::float_cast_from_ieee_754(f));}, true,
+              [](const auto &f, const auto &s){return f != s && !isnan(cppdatalib::core::float_from_ieee_754(f)) && !isnan(cppdatalib::core::float_from_ieee_754(s));});
 #endif
     try
     {
-        Test("JSON", json_tests, [](const auto &test){return json::to_json(json::from_json(test));}, false);
-        Test("Bencode", bencode_tests, [](const auto &test){return bencode::to_bencode(bencode::from_bencode(test));}, false);
-        Test("MessagePack", message_pack_tests, [](const auto &test) -> hex_string {return hex_string(message_pack::to_message_pack(message_pack::from_message_pack(test)));}, false);
+        Test("JSON", json_tests, [](const auto &test){return cppdatalib::json::to_json(cppdatalib::json::from_json(test));}, false);
+        Test("Bencode", bencode_tests, [](const auto &test){return cppdatalib::bencode::to_bencode(cppdatalib::bencode::from_bencode(test));}, false);
+        Test("MessagePack", message_pack_tests, [](const auto &test) -> hex_string {return hex_string(cppdatalib::message_pack::to_message_pack(cppdatalib::message_pack::from_message_pack(test)));}, false);
     }
-    catch (core::error e)
+    catch (cppdatalib::core::error e)
     {
         std::cout << e.what() << std::endl;
     }

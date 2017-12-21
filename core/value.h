@@ -34,6 +34,8 @@
 #include <list>
 #include <forward_list>
 #include <queue>
+#include <valarray>
+#include <bitset>
 
 #include <set>
 #include <unordered_set>
@@ -59,8 +61,11 @@ namespace cppdatalib
         class value;
     }
 
-    template<typename T> core::value to_cppdatalib(T);
-    template<typename T> T from_cppdatalib(const core::value &);
+    template<typename T> void to_cppdatalib(T v, core::value &result);
+    template<typename T> core::value to_cppdatalib(T v);
+
+    template<typename T> void from_cppdatalib(const core::value &v, T &result);
+    template<typename T> T from_cppdatalib(const core::value &v);
 
     namespace core
     {
@@ -81,23 +86,25 @@ namespace cppdatalib
             normal = -1,
 
             // Integers
-            timestamp = -2, // Number of seconds since the epoch, Jan 1, 1970
+            timestamp = -10, // Number of seconds since the epoch, Jan 1, 1970
 
             // Strings
-            blob = -3, // A chunk of binary data
-            clob = -4, // A chunk of binary data, that should be interpreted as text
-            symbol = -5, // A symbolic atom, or identifier
-            datetime = -6, // A datetime structure, with unspecified format
-            date = -7, // A date structure, with unspecified format
-            time = -8, // A time structure, with unspecified format
-            bignum = -9, // A high-precision, decimal-encoded, number
+            blob = -20, // A chunk of binary data
+            clob = -21, // A chunk of binary data, that should be interpreted as text
+            symbol = -22, // A symbolic atom, or identifier
+            datetime = -23, // A datetime structure, with unspecified format
+            date = -24, // A date structure, with unspecified format
+            time = -25, // A time structure, with unspecified format
+            bignum = -26, // A high-precision, decimal-encoded, number
+            uuid = -27, // A generic UUID value
 
             // Arrays
-            regexp = -10, // A regular expression definition containing two string elements, the first is the definition, the second is the options list
-            sexp = -11, // Ordered collection of values, distinct from an array only by name
+            regexp = -30, // A regular expression definition containing two string elements, the first is the definition, the second is the options list
+            sexp = -31, // Ordered collection of values, distinct from an array only by name
 
             // Objects
-            map = -12, // A normal object with integral keys
+            map = -40, // A normal object with integral keys
+            hash = -41, // A hash lookup (not supported as such in the value class, but can be used as a tag for external variant classes)
 
             user = 0
         };
@@ -912,57 +919,57 @@ namespace cppdatalib
             value(T v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
-            template<typename T>
-            value(std::initializer_list<T> v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(std::initializer_list<Ts...> v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T, size_t N>
-            value(const std::array<T, N> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::array<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T>
-            value(const std::deque<T> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::deque<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T>
-            value(const std::vector<T> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::vector<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T>
-            value(const std::list<T> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::list<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T>
-            value(const std::forward_list<T> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::forward_list<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T>
-            value(const std::set<T> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::set<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T, typename Container = std::deque<T>>
-            value(std::stack<T, Container> v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(std::stack<Ts...> v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 while (!v.empty())
@@ -971,8 +978,8 @@ namespace cppdatalib
                     v.pop();
                 }
             }
-            template<typename T, typename Container = std::deque<T>>
-            value(std::queue<T, Container> v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(std::queue<Ts...> v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 while (!v.empty())
@@ -981,8 +988,8 @@ namespace cppdatalib
                     v.pop();
                 }
             }
-            template<typename T, typename Container = std::deque<T>, typename Compare = std::less<typename Container::value_type>>
-            value(std::priority_queue<T, Container, Compare> v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(std::priority_queue<Ts...> v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 while (!v.empty())
@@ -991,50 +998,64 @@ namespace cppdatalib
                     v.pop();
                 }
             }
-            template<typename T>
-            value(const std::multiset<T> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::multiset<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T>
-            value(const std::unordered_set<T> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::unordered_set<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T>
-            value(const std::unordered_multiset<T> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::unordered_multiset<Ts...> &v, subtype_t subtype = core::normal)
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename T, typename U>
-            value(const std::map<T, U> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::valarray<Ts...> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            template<size_t N>
+            value(const std::bitset<N> &v, subtype_t subtype = core::normal)
+            {
+                array_init(subtype, core::array_t());
+                for (size_t i = 0; i < N; ++i)
+                    push_back(v[i]);
+            }
+            template<typename... Ts>
+            value(const std::map<Ts...> &v, subtype_t subtype = core::normal)
             {
                 object_init(subtype, core::object_t());
                 for (auto const &element: v)
                     add_member(element.first, element.second);
             }
-            template<typename T, typename U>
-            value(const std::unordered_map<T, U> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::unordered_map<Ts...> &v, subtype_t subtype = core::normal)
             {
                 object_init(subtype, core::object_t());
                 for (auto const &element: v)
                     add_member(element.first, element.second);
             }
-            template<typename T, typename U>
-            value(const std::multimap<T, U> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::multimap<Ts...> &v, subtype_t subtype = core::normal)
             {
                 object_init(subtype, core::object_t());
                 for (auto const &element: v)
                     add_member(element.first, element.second);
             }
-            template<typename T, typename U>
-            value(const std::unordered_multimap<T, U> &v, subtype_t subtype = core::normal)
+            template<typename... Ts>
+            value(const std::unordered_multimap<Ts...> &v, subtype_t subtype = core::normal)
             {
                 object_init(subtype, core::object_t());
                 for (auto const &element: v)
@@ -1110,11 +1131,7 @@ namespace cppdatalib
                     }
                 }
                 else
-                {
-                    value temp = *this;
-                    *this = other;
-                    other = temp;
-                }
+                    std::swap(*this, other);
             }
 
             subtype_t get_subtype() const {return subtype_;}
@@ -1286,15 +1303,15 @@ namespace cppdatalib
                 operator T() const {return from_cppdatalib<T>(bind);}
             };
 
-            template<typename T, typename Container>
-            class cast<std::stack<T, Container>>
+            template<typename... Ts>
+            class cast<std::stack<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::stack<T, Container>() const
+                operator std::stack<Ts...>() const
                 {
-                    std::stack<T, Container> result;
+                    std::stack<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.push(element);
@@ -1302,15 +1319,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T, typename Container>
-            class cast<std::queue<T, Container>>
+            template<typename... Ts>
+            class cast<std::queue<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::queue<T, Container>() const
+                operator std::queue<Ts...>() const
                 {
-                    std::queue<T, Container> result;
+                    std::queue<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.push(element);
@@ -1318,15 +1335,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T, typename Container, typename Compare>
-            class cast<std::priority_queue<T, Container, Compare>>
+            template<typename... Ts>
+            class cast<std::priority_queue<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::priority_queue<T, Container, Compare>() const
+                operator std::priority_queue<Ts...>() const
                 {
-                    std::priority_queue<T, Container, Compare> result;
+                    std::priority_queue<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.push(element);
@@ -1334,15 +1351,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T>
-            class cast<std::forward_list<T>>
+            template<typename... Ts>
+            class cast<std::forward_list<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::forward_list<T>() const
+                operator std::forward_list<Ts...>() const
                 {
-                    std::forward_list<T> result;
+                    std::forward_list<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.push_back(element);
@@ -1350,15 +1367,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T>
-            class cast<std::list<T>>
+            template<typename... Ts>
+            class cast<std::list<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::list<T>() const
+                operator std::list<Ts...>() const
                 {
-                    std::list<T> result;
+                    std::list<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.push_back(element);
@@ -1366,15 +1383,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T>
-            class cast<std::deque<T>>
+            template<typename... Ts>
+            class cast<std::deque<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::deque<T>() const
+                operator std::deque<Ts...>() const
                 {
-                    std::deque<T> result;
+                    std::deque<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.push_back(element);
@@ -1382,15 +1399,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T>
-            class cast<std::vector<T>>
+            template<typename... Ts>
+            class cast<std::vector<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::vector<T>() const
+                operator std::vector<Ts...>() const
                 {
-                    std::vector<T> result;
+                    std::vector<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.push_back(element);
@@ -1398,15 +1415,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T>
-            class cast<std::set<T>>
+            template<typename... Ts>
+            class cast<std::set<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::set<T>() const
+                operator std::set<Ts...>() const
                 {
-                    std::set<T> result;
+                    std::set<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.insert(element);
@@ -1414,15 +1431,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T>
-            class cast<std::multiset<T>>
+            template<typename... Ts>
+            class cast<std::multiset<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::multiset<T>() const
+                operator std::multiset<Ts...>() const
                 {
-                    std::multiset<T> result;
+                    std::multiset<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.insert(element);
@@ -1430,15 +1447,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T>
-            class cast<std::unordered_set<T>>
+            template<typename... Ts>
+            class cast<std::unordered_set<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::unordered_set<T>() const
+                operator std::unordered_set<Ts...>() const
                 {
-                    std::unordered_set<T> result;
+                    std::unordered_set<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.insert(element);
@@ -1446,15 +1463,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename T>
-            class cast<std::unordered_multiset<T>>
+            template<typename... Ts>
+            class cast<std::unordered_multiset<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::unordered_multiset<T>() const
+                operator std::unordered_multiset<Ts...>() const
                 {
-                    std::unordered_multiset<T> result;
+                    std::unordered_multiset<Ts...> result;
                     if (bind.is_array())
                         for (const auto &element: bind.get_array_unchecked())
                             result.insert(element);
@@ -1462,15 +1479,35 @@ namespace cppdatalib
                 }
             };
 
-            template<typename K, typename V>
-            class cast<std::map<K, V>>
+            template<typename... Ts>
+            class cast<std::valarray<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::map<K, V>() const
+                operator std::valarray<Ts...>() const
                 {
-                    std::map<K, V> result;
+                    std::valarray<Ts...> result;
+                    if (bind.is_array())
+                    {
+                        size_t index = 0;
+                        result.resize(bind.array_size());
+                        for (const auto &element: bind.get_array_unchecked())
+                            result[index++] = element;
+                    }
+                    return result;
+                }
+            };
+
+            template<typename... Ts>
+            class cast<std::map<Ts...>>
+            {
+                const core::value &bind;
+            public:
+                cast(const core::value &bind) : bind(bind) {}
+                operator std::map<Ts...>() const
+                {
+                    std::map<Ts...> result;
                     if (bind.is_object())
                         for (const auto &element: bind.get_object_unchecked())
                             result.insert({element.first, element.second});
@@ -1478,15 +1515,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename K, typename V>
-            class cast<std::multimap<K, V>>
+            template<typename... Ts>
+            class cast<std::multimap<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::multimap<K, V>() const
+                operator std::multimap<Ts...>() const
                 {
-                    std::multimap<K, V> result;
+                    std::multimap<Ts...> result;
                     if (bind.is_object())
                         for (const auto &element: bind.get_object_unchecked())
                             result.insert({element.first, element.second});
@@ -1494,15 +1531,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename K, typename V>
-            class cast<std::unordered_map<K, V>>
+            template<typename... Ts>
+            class cast<std::unordered_map<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::unordered_map<K, V>() const
+                operator std::unordered_map<Ts...>() const
                 {
-                    std::unordered_map<K, V> result;
+                    std::unordered_map<Ts...> result;
                     if (bind.is_object())
                         for (const auto &element: bind.get_object_unchecked())
                             result.insert({element.first, element.second});
@@ -1510,15 +1547,15 @@ namespace cppdatalib
                 }
             };
 
-            template<typename K, typename V>
-            class cast<std::unordered_multimap<K, V>>
+            template<typename... Ts>
+            class cast<std::unordered_multimap<Ts...>>
             {
                 const core::value &bind;
             public:
                 cast(const core::value &bind) : bind(bind) {}
-                operator std::unordered_multimap<K, V>() const
+                operator std::unordered_multimap<Ts...>() const
                 {
-                    std::unordered_multimap<K, V> result;
+                    std::unordered_multimap<Ts...> result;
                     if (bind.is_object())
                         for (const auto &element: bind.get_object_unchecked())
                             result.insert({element.first, element.second});
@@ -1782,236 +1819,147 @@ namespace cppdatalib
     }
 
     // Fail base conversion with unimplemented function name
-    template<typename T> core::value to_cppdatalib(T) {return T::You_must_reimplement_cppdatalib_conversions_for_custom_type_conversions();}
-    template<typename T> T from_cppdatalib(const core::value &) {return T::You_must_reimplement_cppdatalib_conversions_for_custom_type_conversions();}
-
-    // Remove references, const, and volatile specifiers
-    template<typename T> core::value to_cppdatalib(T &v) {return to_cppdatalib<typename std::remove_reference<T>::type>(v);}
-    template<typename T> core::value to_cppdatalib(T &&v) {return to_cppdatalib<typename std::remove_reference<T>::type>(v);}
-    template<typename T> core::value to_cppdatalib(const T &v) {return to_cppdatalib<typename std::remove_cv<T>::type>(v);}
-    template<typename T> core::value to_cppdatalib(volatile T &v) {return to_cppdatalib<typename std::remove_cv<T>::type>(v);}
-
-    core::value to_cppdatalib(signed char v) {return v;}
-    core::value to_cppdatalib(unsigned char v) {return v;}
-    core::value to_cppdatalib(signed short v) {return v;}
-    core::value to_cppdatalib(unsigned short v) {return v;}
-    core::value to_cppdatalib(signed int v) {return v;}
-    core::value to_cppdatalib(unsigned int v) {return v;}
-    core::value to_cppdatalib(signed long v) {return v;}
-    core::value to_cppdatalib(unsigned long v) {return v;}
-    core::value to_cppdatalib(signed long long v) {return v;}
-    core::value to_cppdatalib(unsigned long long v) {return v;}
-    core::value to_cppdatalib(float v) {return core::real_t(v);}
-    core::value to_cppdatalib(double v) {return v;}
-    core::value to_cppdatalib(long double v) {return core::real_t(v);}
-    core::value to_cppdatalib(char *v) {return v;}
-    core::value to_cppdatalib(const char *v) {return v;}
-    core::value to_cppdatalib(const std::string &v) {return v;}
-    template<typename T> core::value to_cppdatalib(std::initializer_list<T> v) {return v;}
-
-    template<typename T>
-    core::value to_cppdatalib(const std::list<T> &v)
+    template<typename T> void to_cppdatalib(T, core::value &) {T::You_must_reimplement_cppdatalib_conversions_for_custom_type_conversions();}
+    template<typename T> void from_cppdatalib(const core::value &, T &) {T::You_must_reimplement_cppdatalib_conversions_for_custom_type_conversions();}
+    template<typename T> core::value to_cppdatalib(T v)
     {
-        core::value result = core::array_t();
-        for (auto const &element: v)
-            result.push_back(element);
-        return result;
+        core::value val;
+        to_cppdatalib(v, val);
+        return val;
+    }
+    template<typename T> T from_cppdatalib(const core::value &v)
+    {
+        typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type Result;
+        Result val = Result();
+        from_cppdatalib(v, val);
+        return val;
     }
 
-    template<typename T>
-    core::value to_cppdatalib(const std::forward_list<T> &v)
-    {
-        core::value result = core::array_t();
-        for (auto const &element: v)
-            result.push_back(element);
-        return result;
-    }
+    template<> void to_cppdatalib(signed char v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(unsigned char v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(signed short v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(unsigned short v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(signed int v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(unsigned int v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(signed long v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(unsigned long v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(signed long long v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(unsigned long long v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(float v, core::value &result) {result = core::real_t(v);}
+    template<> void to_cppdatalib(double v, core::value &result) {result = core::real_t(v);}
+    template<> void to_cppdatalib(long double v, core::value &result) {result = core::real_t(v);}
+    template<> void to_cppdatalib(char *v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(const char *v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(const std::string &v, core::value &result) {result = v;}
 
-    template<typename T>
-    core::value to_cppdatalib(const std::deque<T> &v)
-    {
-        core::value result = core::array_t();
-        for (auto const &element: v)
-            result.push_back(element);
-        return result;
-    }
+    template<> void to_cppdatalib(const core::array_t &v, core::value &result) {result = v;}
+    template<> void to_cppdatalib(const core::object_t &v, core::value &result) {result = v;}
 
-    template<typename T>
-    core::value to_cppdatalib(const std::vector<T> &v)
-    {
-        core::value result = core::array_t();
-        for (auto const &element: v)
-            result.push_back(element);
-        return result;
-    }
+    template<typename... Ts> void to_cppdatalib(std::initializer_list<Ts...> v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::list<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::forward_list<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::deque<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::vector<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::set<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::unordered_set<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::multiset<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::unordered_multiset<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::valarray<Ts...> &v, core::value &result) {result = v;}
+    template<size_t N> void to_cppdatalib(const std::bitset<N> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(std::stack<Ts...> v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(std::queue<Ts...> v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(std::priority_queue<Ts...> v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::map<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::unordered_map<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::multimap<Ts...> &v, core::value &result) {result = v;}
+    template<typename... Ts> void to_cppdatalib(const std::unordered_multimap<Ts...> &v, core::value &result) {result = v;}
 
-    template<typename T>
-    core::value to_cppdatalib(const std::set<T> &v)
+    template<> void from_cppdatalib(const core::value &v, bool &result) {result = v.as_bool();}
+    template<> void from_cppdatalib(const core::value &v, signed char &result)
     {
-        core::value result = core::array_t();
-        for (auto const &element: v)
-            result.push_back(element);
-        return result;
-    }
-
-    template<typename T>
-    core::value to_cppdatalib(const std::unordered_set<T> &v)
-    {
-        core::value result = core::array_t();
-        for (auto const &element: v)
-            result.push_back(element);
-        return result;
-    }
-
-    template<typename T>
-    core::value to_cppdatalib(const std::multiset<T> &v)
-    {
-        core::value result = core::array_t();
-        for (auto const &element: v)
-            result.push_back(element);
-        return result;
-    }
-
-    template<typename T>
-    core::value to_cppdatalib(const std::unordered_multiset<T> &v)
-    {
-        core::value result = core::array_t();
-        for (auto const &element: v)
-            result.push_back(element);
-        return result;
-    }
-
-    template<typename T, typename Container = std::deque<T>>
-    core::value to_cppdatalib(std::stack<T, Container> v)
-    {
-        core::value result = core::array_t();
-        while (!v.empty())
-            result.push_back(v.top()), v.pop();
-        std::reverse(result.get_array_ref().begin(), result.get_array_ref().end());
-        return result;
-    }
-
-    template<typename T, typename Container = std::deque<T>>
-    core::value to_cppdatalib(std::queue<T, Container> v)
-    {
-        core::value result = core::array_t();
-        while (!v.empty())
-            result.push_back(v.front()), v.pop();
-        return result;
-    }
-
-    template<typename T, typename Container = std::deque<T>, typename Compare = std::less<typename Container::value_type>>
-    core::value to_cppdatalib(std::priority_queue<T, Container, Compare> v)
-    {
-        core::value result = core::array_t();
-        while (!v.empty())
-            result.push_back(v.front()), v.pop();
-        return result;
-    }
-
-    template<typename T, typename U>
-    core::value to_cppdatalib(const std::map<T, U> &v)
-    {
-        core::value result = core::object_t();
-        for (auto const &element: v)
-            result.add_member(element.first) = element.second;
-        return result;
-    }
-
-    template<typename T, typename U>
-    core::value to_cppdatalib(const std::unordered_map<T, U> &v)
-    {
-        core::value result = core::object_t();
-        for (auto const &element: v)
-            result.add_member(element.first) = element.second;
-        return result;
-    }
-
-    template<typename T, typename U>
-    core::value to_cppdatalib(const std::multimap<T, U> &v)
-    {
-        core::value result = core::object_t();
-        for (auto const &element: v)
-            result.add_member(element.first) = element.second;
-        return result;
-    }
-
-    template<typename T, typename U>
-    core::value to_cppdatalib(const std::unordered_multimap<T, U> &v)
-    {
-        core::value result = core::object_t();
-        for (auto const &element: v)
-            result.add_member(element.first) = element.second;
-        return result;
-    }
-
-    template<> bool from_cppdatalib<bool>(const core::value &v) {return v.as_bool();}
-    template<> signed char from_cppdatalib<signed char>(const core::value &v)
-    {
-        return core::impl::zero_convert(std::numeric_limits<signed char>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<signed char>::min(),
                                   v.as_int(),
                                   std::numeric_limits<signed char>::max());
     }
-    template<> unsigned char from_cppdatalib<unsigned char>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, unsigned char &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<unsigned char>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<unsigned char>::min(),
                                   v.as_uint(),
                                   std::numeric_limits<unsigned char>::max());
     }
-    template<> signed short from_cppdatalib<signed short>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, signed short &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<signed short>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<signed short>::min(),
                                   v.as_int(),
                                   std::numeric_limits<signed short>::max());
     }
-    template<> unsigned short from_cppdatalib<unsigned short>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, unsigned short &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<unsigned short>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<unsigned short>::min(),
                                   v.as_uint(),
                                   std::numeric_limits<unsigned short>::max());
     }
-    template<> signed int from_cppdatalib<signed int>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, signed int &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<signed int>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<signed int>::min(),
                                   v.as_int(),
                                   std::numeric_limits<signed int>::max());
     }
-    template<> unsigned int from_cppdatalib<unsigned int>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, unsigned int &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<unsigned int>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<unsigned int>::min(),
                                   v.as_uint(),
                                   std::numeric_limits<unsigned int>::max());
     }
-    template<> signed long from_cppdatalib<signed long>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, signed long &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<signed long>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<signed long>::min(),
                                   v.as_int(),
                                   std::numeric_limits<signed long>::max());
     }
-    template<> unsigned long from_cppdatalib<unsigned long>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, unsigned long &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<unsigned long>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<unsigned long>::min(),
                                   v.as_uint(),
                                   std::numeric_limits<unsigned long>::max());
     }
-    template<> signed long long from_cppdatalib<signed long long>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, signed long long &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<signed long long>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<signed long long>::min(),
                                   v.as_int(),
                                   std::numeric_limits<signed long long>::max());
     }
-    template<> unsigned long long from_cppdatalib<unsigned long long>(const core::value &v)
+    template<> void from_cppdatalib(const core::value &v, unsigned long long &result)
     {
-        return core::impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
+        result = core::impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
                                   v.as_uint(),
                                   std::numeric_limits<unsigned long long>::max());
     }
 
-    template<> float from_cppdatalib<float>(const core::value &v) {return v.as_real();}
-    template<> double from_cppdatalib<double>(const core::value &v) {return v.as_real();}
-    template<> long double from_cppdatalib<long double>(const core::value &v) {return v.as_real();}
+    template<> void from_cppdatalib(const core::value &v, float &result) {result = v.as_real();}
+    template<> void from_cppdatalib(const core::value &v, double &result) {result = v.as_real();}
+    template<> void from_cppdatalib(const core::value &v, long double &result) {result = v.as_real();}
+    template<> void from_cppdatalib(const core::value &v, std::string &result) {result = v.as_string();}
 
-    template<> std::string from_cppdatalib<std::string>(const core::value &v) {return v.as_string();}
+    void from_cppdatalib(const core::value &v, core::array_t &result) {result = v.as_array();}
+    void from_cppdatalib(const core::value &v, core::object_t &result) {result = v.as_object();}
+
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::stack<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::queue<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::priority_queue<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::list<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::forward_list<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::deque<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::vector<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::set<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::unordered_set<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::multiset<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::unordered_multiset<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::valarray<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::map<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::multimap<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::unordered_map<Ts...> &result) {result = v;}
+    template<typename... Ts> void from_cppdatalib(const core::value &v, std::unordered_multimap<Ts...> &result) {result = v;}
 
     void swap(core::value &l, core::value &r) {l.swap(r);}
 }

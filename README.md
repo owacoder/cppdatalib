@@ -240,6 +240,15 @@ int main() {
 }
 ```
 
+### Extending the library
+
+Almost every part of cppdatalib is extensible. To create a new format, follow the following guidelines:
+
+   1. Create a new namespace under `cppdatalib` for the format
+   2. In the new namespace, define a class `stream_writer` that inherits `core::stream_writer` and `core::stream_handler`. The stream writer class can reimplement the following functions:
+      - `void begin_();` - Called to initialize the format.
+      - `void end_();` - Called to deinitalize the format.
+
 ### Compile-time flags
 
 Below is a list of compile-time flags supported by cppdatalib:
