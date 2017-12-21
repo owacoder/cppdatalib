@@ -242,12 +242,39 @@ int main() {
 
 ### Extending the library
 
-Almost every part of cppdatalib is extensible. To create a new format, follow the following guidelines:
+Almost every part of cppdatalib is extensible.
+
+To create a new output format, follow the following guidelines:
 
    1. Create a new namespace under `cppdatalib` for the format
    2. In the new namespace, define a class `stream_writer` that inherits `core::stream_writer` and `core::stream_handler`. The stream writer class can reimplement the following functions:
-      - `void begin_();` - Called to initialize the format.
-      - `void end_();` - Called to deinitalize the format.
+      - `void begin_();` - Called to initialize the format. The default implementation does nothing
+      - `void end_();` - Called to deinitalize the format. The default implementation does nothing
+      - `bool write_(const core::value &v, bool is_key);` - Called when a value is written by `write()`, with the value to be written passed in `v`. `is_key` is true if the specified value is an object key. Reimplementations of this function should return `true` if the value was written, and `false` if the value still needs to be processed. The default implementation returns `false`
+      - `void begin_item_(const core::value &v);` - Called when starting to parse any non-key value. The opposite of `begin_key_()`. The default implementation does nothing.
+      - `void end_item_(const core::value &v);` - Called when ending parsing of any non-key value. The opposite of `end_key_()`. The default implementation does nothing.
+      - `void begin_scalar_(const core::value &v, bool is_key);` - Called when starting to parse any scalar value. This includes all value types except arrays and objects. `is_key` is true if the specified value is an object key. The default implementation does nothing.
+      - `void end_scalar_(const core::value &v, bool is_key);` - Called when ending parsing of any scalar value. This includes all value types except arrays and objects. `is_key` is true if the specified value is an object key. The default implementation does nothing.
+      - `void begin_key_(const core::value &v);` - Called when starting to parse any key value. The opposite of `begin_item_()`. The default implementation does nothing.
+      - `void end_key_(const core::value &v);` - Called when ending parsing of any key value. The opposite of `end_item_()`. The default implementation does nothing.
+      - `void null_(const core::value &v);` - Called when a scalar `null` is written. The default implementation does nothing.
+      - `void bool_(const core::value &v);` - Called when a scalar `boolean` is written. The default implementation does nothing.
+      - `void integer_(const core::value &v);` - Called when a scalar `integer` is written. The default implementation does nothing.
+      - `void uinteger_(const core::value &v);` - Called when a scalar `uinteger` is written. The default implementation does nothing.
+      - `void real_(const core::value &v);` - Called when a scalar `real` is written. The default implementation does nothing.
+      - `void begin_string_(const core::value &v, core::int_t size, bool is_key);` - Called when starting to parse a string. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size`. If `v.size()` is equal to `size`, the entire string is available for analysis. `is_key` is true if the string is an object key. The default implementation does nothing.
+      - `void string_data_(const core::value &v, bool is_key);` - Called when data is available to append to a string. The string is contained in `v`. `is_key` is true if the string currently being parsed is an object key. The default implementation does nothing.
+      - `void end_string_(const core::value &v, bool is_key);` - Called when ending parsing of a string. `is_key` is true if the string is an object key. The default implementation does nothing.
+      - `void begin_array_(const core::value &v, core::int_t size, bool is_key);` - Called when starting to parse an array. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size`. If `v.size()` is equal to `size`, the entire array is available for analysis. `is_key` is true if the array is an object key. The default implementation does nothing.
+      - `void end_array_(const core::value &v, bool is_key);` - Called when ending parsing of an array. `is_key` is true if the array is an object key. The default implementation does nothing.
+      - `void begin_object_(const core::value &v, core::int_t size, bool is_key);` - Called when starting to parse an object. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size`. If `v.size()` is equal to `size`, the entire object is available for analysis. `is_key` is true if the object is an object key. The default implementation does nothing.
+      - `void end_object_(const core::value &v, bool is_key);` - Called when ending parsing of an object. `is_key` is true if the object is an object key. The default implementation does nothing.
+   3. All data should be written via the member function `core::ostream &output_stream();`
+   4. Required buffering features should be provided by member function `unsigned int required_features() const;` The available features are `const` members of the `core::stream_handler` class. The default implementation returns `stream_handler::requires_none`.
+      
+Since the default implementations of all these functions do nothing, an instance of `core::stream_handler` can be used as a dummy output sink that does nothing.
+
+To create a new filter, follow the guidelines for output formats, but place them in the `cppdatalib::core` namespace. Inherit all filters from `core::stream_filter_base`. Writing should be done exclusively via member variable `output`. The reimplementation rules all still apply, but `core::stream_filter_base` provides pass-through writing of all values to `output`. This allows you to reimplement just what you need, and pass everything else through unmodified.
 
 ### Compile-time flags
 
