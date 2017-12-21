@@ -269,6 +269,12 @@ To create a new output format, follow the following guidelines:
       - `void end_array_(const core::value &v, bool is_key);` - Called when ending parsing of an array. `is_key` is true if the array is an object key. The default implementation does nothing.
       - `void begin_object_(const core::value &v, core::int_t size, bool is_key);` - Called when starting to parse an object. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size`. If `v.size()` is equal to `size`, the entire object is available for analysis. `is_key` is true if the object is an object key. The default implementation does nothing.
       - `void end_object_(const core::value &v, bool is_key);` - Called when ending parsing of an object. `is_key` is true if the object is an object key. The default implementation does nothing.
+   3. All data should be written via the member function `core::ostream &output_stream();`
+   4. Required buffering features should be provided by member function `unsigned int required_features() const;` The available features are `const` members of the `core::stream_handler` class. The default implementation returns `stream_handler::requires_none`.
+      
+Since the default implementations of all these functions do nothing, an instance of `core::stream_handler` can be used as a dummy output sink that does nothing.
+
+To create a new filter, follow the guidelines for output formats, but place them in the `cppdatalib::core` namespace. Inherit all filters from `core::stream_filter_base`. Writing should be done exclusively via member variable `output`. The reimplementation rules all still apply, but `core::stream_filter_base` provides pass-through writing of all values to `output`. This allows you to reimplement just what you need, and pass everything else through unmodified.
 
 ### Compile-time flags
 
