@@ -754,7 +754,7 @@ namespace cppdatalib
             if (strm)
             {
                 val = 0;
-                for (size_t i = 0; i < 4; ++i)
+                for (int i = 0; i < 4; ++i)
                     val = (val << 8) | uint8_t(buf[i]);
             }
             return strm;
@@ -768,7 +768,7 @@ namespace cppdatalib
             if (strm)
             {
                 val = 0;
-                for (size_t i = 0; i < 4; ++i)
+                for (int i = 0; i < 4; ++i)
                     val |= uint32_t(uint8_t(buf[i])) << 8*i;
             }
             return strm;
@@ -816,7 +816,7 @@ namespace cppdatalib
             if (strm)
             {
                 val = 0;
-                for (size_t i = 0; i < 8; ++i)
+                for (int i = 0; i < 8; ++i)
                     val = (val << 8) | uint8_t(buf[i]);
             }
             return strm;
@@ -830,7 +830,7 @@ namespace cppdatalib
             if (strm)
             {
                 val = 0;
-                for (size_t i = 0; i < 8; ++i)
+                for (int i = 0; i < 8; ++i)
                     val |= uint64_t(uint8_t(buf[i])) << 8*i;
             }
             return strm;

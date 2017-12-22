@@ -380,6 +380,66 @@ namespace cppdatalib
             std::ostream *std_stream() {return d_;}
         };
 #endif
+
+        template<typename T>
+        core::ostream &write_uint8(core::ostream &strm, T val)
+        {
+            return strm.put(val & 0xff);
+        }
+
+        template<typename T>
+        core::ostream &write_uint16_be(core::ostream &strm, T val)
+        {
+            char buf[2];
+            buf[0] = uint8_t(val >> 8);
+            buf[1] = uint8_t(val);
+            return strm.write(buf, 2);
+        }
+
+        template<typename T>
+        core::ostream &write_uint16_le(core::ostream &strm, T val)
+        {
+            char buf[2];
+            buf[0] = uint8_t(val);
+            buf[1] = uint8_t(val >> 8);
+            return strm.write(buf, 2);
+        }
+
+        template<typename T>
+        core::ostream &write_uint32_be(core::ostream &strm, T val)
+        {
+            char buf[4];
+            for (int i = 3; i >= 0; --i, val >>= 8)
+                buf[i] = uint8_t(val);
+            return strm.write(buf, 4);
+        }
+
+        template<typename T>
+        core::ostream &write_uint32_le(core::ostream &strm, T val)
+        {
+            char buf[4];
+            for (int i = 0; i < 4; ++i, val >>= 8)
+                buf[i] = uint8_t(val);
+            return strm.write(buf, 4);
+        }
+
+        template<typename T>
+        core::ostream &write_uint64_be(core::ostream &strm, T val)
+        {
+            char buf[8];
+            for (int i = 7; i >= 0; --i, val >>= 8)
+                buf[i] = uint8_t(val);
+            return strm.write(buf, 8);
+        }
+
+        template<typename T>
+        core::ostream &write_uint64_le(core::ostream &strm, T val)
+        {
+            char buf[8];
+            for (int i = 0; i < 8; ++i, val >>= 8)
+                buf[i] = uint8_t(val);
+            return strm.write(buf, 8);
+        }
     }
 }
 
