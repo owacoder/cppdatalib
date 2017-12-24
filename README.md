@@ -1,6 +1,6 @@
 # cppdatalib
 
-Simple, header-only, C++11 data conversion library
+A header-only, C++11 data conversion library
 
 ## Features
 
@@ -293,6 +293,7 @@ Below is a list of compile-time flags supported by cppdatalib:
    - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If write checks are disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but can result in better performance. Use at your own risk
    - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
    - `CPPDATALIB_DISABLE_FAST_IO_GCOUNT` - Disables calculation of `gcount()` in the fast input classes. This removes the `gcount()` function altogether. This flag only has an effect if `CPPDATALIB_ENABLE_FAST_INPUT` is defined
+   - `CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE` - Trims value sizes down to optimize space for large numeric arrays. This theoretically slows down string, array, and object values somewhat, but provides massive space savings
 
 Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.
 

@@ -57,397 +57,631 @@
 //  QByteArray
 // ------------
 
-void to_cppdatalib(QByteArray v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QByteArray>
 {
-    result.set_string(v.toStdString(), cppdatalib::core::blob);
-}
+    const QByteArray &bind;
+public:
+    cast_to_cppdatalib(const QByteArray &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toStdString(), cppdatalib::core::blob);}
+};
 
-void from_cppdatalib(const cppdatalib::core::value &v, QByteArray &result)
+template<>
+class cast_from_cppdatalib<QByteArray>
 {
-    result = QByteArray::fromStdString(v.as_string());
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QByteArray() const {return QByteArray::fromStdString(bind.as_string());}
+};
 
 // ---------------
 //  QLatin1String
 // ---------------
 
-void to_cppdatalib(QLatin1String v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QLatin1String>
 {
-    result.set_string(cppdatalib::core::string_t(v.data(), v.size()), cppdatalib::core::clob);
-}
+    const QLatin1String &bind;
+public:
+    cast_to_cppdatalib(const QLatin1String &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.data(), bind.size()), cppdatalib::core::clob);}
+};
 
 // -------
 //  QChar
 // -------
 
-void to_cppdatalib(QChar v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QChar>
 {
-    result = QString(v).toUtf8().toStdString();
-}
+    const QChar &bind;
+public:
+    cast_to_cppdatalib(const QChar &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return QString(bind).toStdString();}
+};
 
 // ---------
 //  QString
 // ---------
 
-void to_cppdatalib(QString v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QString>
 {
-    result = v.toUtf8().toStdString();
-}
+    const QString &bind;
+public:
+    cast_to_cppdatalib(const QString &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return bind.toStdString();}
+};
 
-void from_cppdatalib(const cppdatalib::core::value &v, QString &result)
+template<>
+class cast_from_cppdatalib<QString>
 {
-    result = QString::fromUtf8(QByteArray::fromStdString(v.as_string()));
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QString() const {return QString::fromStdString(bind.as_string());}
+};
 
 // -------
 //  QDate
 // -------
 
-void to_cppdatalib(QDate v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QDate>
 {
-    result.set_string(v.toString().toUtf8().toStdString(), cppdatalib::core::date);
-}
+    const QDate &bind;
+public:
+    cast_to_cppdatalib(const QDate &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toString().toStdString(), cppdatalib::core::date);}
+};
 
-void from_cppdatalib(const cppdatalib::core::value &v, QDate &result)
+template<>
+class cast_from_cppdatalib<QDate>
 {
-    result = QDate::fromString(QString::fromUtf8(QByteArray::fromStdString(v.as_string())));
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QDate() const {return QDate::fromString(QString::fromStdString(bind.as_string()));}
+};
 
 // -------
 //  QTime
 // -------
 
-void to_cppdatalib(QTime v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QTime>
 {
-    result.set_string(v.toString().toUtf8().toStdString(), cppdatalib::core::time);
-}
+    const QTime &bind;
+public:
+    cast_to_cppdatalib(const QTime &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toString().toStdString(), cppdatalib::core::time);}
+};
 
-void from_cppdatalib(const cppdatalib::core::value &v, QTime &result)
+template<>
+class cast_from_cppdatalib<QTime>
 {
-    result = QTime::fromString(QString::fromUtf8(QByteArray::fromStdString(v.as_string())));
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QTime() const {return QTime::fromString(QString::fromStdString(bind.as_string()));}
+};
 
 // -----------
 //  QDateTime
 // -----------
 
-void to_cppdatalib(QDateTime v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QDateTime>
 {
-    result.set_string(v.toString().toUtf8().toStdString(), cppdatalib::core::datetime);
-}
+    const QDateTime &bind;
+public:
+    cast_to_cppdatalib(const QDateTime &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toString().toStdString(), cppdatalib::core::datetime);}
+};
 
-void from_cppdatalib(const cppdatalib::core::value &v, QDateTime &result)
+template<>
+class cast_from_cppdatalib<QDateTime>
 {
-    result = QDateTime::fromString(QString::fromUtf8(QByteArray::fromStdString(v.as_string())));
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QDateTime() const {return QDateTime::fromString(QString::fromStdString(bind.as_string()));}
+};
 
 // -------
 //  QUuid
 // -------
 
-void to_cppdatalib(QUuid v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QUuid>
 {
-    result.set_string(v.toString().toUtf8().toStdString(), cppdatalib::core::uuid);
-}
+    const QUuid &bind;
+public:
+    cast_to_cppdatalib(const QUuid &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toString().toStdString(), cppdatalib::core::uuid);}
+};
 
-void from_cppdatalib(const cppdatalib::core::value &v, QUuid &result)
+template<>
+class cast_from_cppdatalib<QUuid>
 {
-    result = QUuid(QString::fromUtf8(QByteArray::fromStdString(v.as_string())));
-}
-
-// ----------
-//  QVariant
-// ----------
-
-void to_cppdatalib(QVariant v, cppdatalib::core::value &result)
-{
-    switch (v.type())
-    {
-        default:
-        case QVariant::Invalid: result.set_null(); break;
-        case QVariant::Bool: result = v.toBool(); break;
-        case QVariant::ByteArray: result = v.toByteArray(); break;
-        case QVariant::Char: result = v.toChar(); break;
-        case QVariant::Date: result = v.toDate(); break;
-        case QVariant::DateTime: result = v.toDateTime(); break;
-        case QVariant::Double: result = v.toDouble(); break;
-        case QVariant::Hash: result = v.toHash(); break;
-        case QVariant::Int: result = v.toInt(); break;
-        case QVariant::List: result = v.toList(); break;
-        case QVariant::LongLong: result = v.toLongLong(); break;
-        case QVariant::Map: result = v.toMap(); break;
-        case QVariant::String: result = v.toString(); break;
-        case QVariant::StringList: result = v.toStringList(); break;
-        case QVariant::Time: result = v.toTime(); break;
-        case QVariant::UInt: result = v.toUInt(); break;
-        case QVariant::ULongLong: result = v.toULongLong(); break;
-        case QVariant::Uuid: result = v.toUuid(); break;
-    }
-}
-
-void from_cppdatalib(const cppdatalib::core::value &v, QVariant &result)
-{
-    switch (v.get_type())
-    {
-        case cppdatalib::core::null: result = QVariant(); break;
-        case cppdatalib::core::boolean: result = v.get_bool_unchecked(); break;
-        case cppdatalib::core::integer: result = qlonglong(v.get_int_unchecked()); break;
-        case cppdatalib::core::uinteger: result = qulonglong(v.get_uint_unchecked()); break;
-        case cppdatalib::core::real: result = v.get_real_unchecked(); break;
-        case cppdatalib::core::string:
-        {
-            switch (v.get_subtype())
-            {
-                case cppdatalib::core::blob:
-                case cppdatalib::core::clob:
-                    result = QByteArray::fromStdString(v.get_string_unchecked());
-                    break;
-                case cppdatalib::core::date: result = QDate::fromString(QString::fromUtf8(QByteArray::fromStdString(v.get_string_unchecked()))); break;
-                case cppdatalib::core::time: result = QTime::fromString(QString::fromUtf8(QByteArray::fromStdString(v.get_string_unchecked()))); break;
-                case cppdatalib::core::datetime: result = QDateTime::fromString(QString::fromUtf8(QByteArray::fromStdString(v.get_string_unchecked()))); break;
-                case cppdatalib::core::uuid: result = QUuid(QString::fromUtf8(QByteArray::fromStdString(v.get_string_unchecked()))); break;
-                default: result = QString::fromUtf8(QByteArray::fromStdString(v.get_string_unchecked())); break;
-            }
-            break;
-        }
-        case cppdatalib::core::array: result = cppdatalib::from_cppdatalib<QVariantList>(v); break;
-        case cppdatalib::core::object:
-        {
-            if (v.get_subtype() == cppdatalib::core::hash)
-                result = cppdatalib::from_cppdatalib<QVariantHash>(v);
-            else
-                result = cppdatalib::from_cppdatalib<QVariantMap>(v);
-            break;
-        }
-    }
-}
-
-// ----------------
-//  QByteArrayList
-// ----------------
-
-void to_cppdatalib(QByteArrayList v, cppdatalib::core::value &result)
-{
-    result = cppdatalib::core::array_t();
-    for (const auto &item: v)
-        result.push_back(item);
-}
-
-void from_cppdatalib(const cppdatalib::core::value &v, QByteArrayList &result)
-{
-    result.clear();
-    if (v.is_array())
-        for (const auto &item: v.get_array_unchecked())
-            result.push_back(item);
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QUuid() const {return QUuid(QString::fromStdString(bind.as_string()));}
+};
 
 // -------------
 //  QStringList
 // -------------
 
-void to_cppdatalib(QStringList v, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<QStringList>
 {
-    result = cppdatalib::core::array_t();
-    for (const auto &item: v)
-        result.push_back(item);
-}
-
-void from_cppdatalib(const cppdatalib::core::value &v, QStringList &result)
-{
-    result.clear();
-    if (v.is_array())
-        for (const auto &item: v.get_array_unchecked())
+    const QStringList &bind;
+public:
+    cast_to_cppdatalib(const QStringList &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
             result.push_back(item);
-}
+        return result;
+    }
+};
+
+template<>
+class cast_from_cppdatalib<QStringList>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QStringList() const
+    {
+        QStringList result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
 
 // ---------
 //  QVector
 // ---------
 
-template<typename... Ts> void to_cppdatalib(QVector<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QVector, Ts...>
 {
-    result = cppdatalib::core::array_t();
-    for (const auto &item: v)
-        result.push_back(item);
-}
-
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QVector<Ts...> &result)
-{
-    result.clear();
-    if (v.is_array())
-        for (const auto &item: v.get_array_unchecked())
+    const QVector<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QVector<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
             result.push_back(item);
-}
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<QVector, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QVector<Ts...>() const
+    {
+        QVector<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
 
 // -------
 //  QList
 // -------
 
-template<typename... Ts> void to_cppdatalib(QList<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QList, Ts...>
 {
-    result = cppdatalib::core::array_t();
-    for (const auto &item: v)
-        result.push_back(item);
-}
-
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QList<Ts...> &result)
-{
-    result.clear();
-    if (v.is_array())
-        for (const auto &item: v.get_array_unchecked())
+    const QList<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QList<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
             result.push_back(item);
-}
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<QList, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QList<Ts...>() const
+    {
+        QList<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
 
 // -------------
 //  QLinkedList
 // -------------
 
-template<typename... Ts> void to_cppdatalib(QLinkedList<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QLinkedList, Ts...>
 {
-    result = cppdatalib::core::array_t();
-    for (const auto &item: v)
-        result.push_back(item);
-}
-
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QLinkedList<Ts...> &result)
-{
-    result.clear();
-    if (v.is_array())
-        for (const auto &item: v.get_array_unchecked())
+    const QLinkedList<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QLinkedList<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
             result.push_back(item);
-}
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<QLinkedList, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QLinkedList<Ts...>() const
+    {
+        QLinkedList<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
 
 // --------
 //  QStack
 // --------
 
-template<typename... Ts> void to_cppdatalib(QStack<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QStack, Ts...>
 {
-    result = cppdatalib::core::array_t();
-    for (const auto &item: v)
-        result.push_back(item);
-}
+    const QStack<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QStack<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
 
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QStack<Ts...> &result)
+template<typename... Ts>
+class cast_template_from_cppdatalib<QStack, Ts...>
 {
-    result.clear();
-    if (v.is_array())
-        for (const auto &item: v.get_array_unchecked())
-            result.push(item);
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QStack<Ts...>() const
+    {
+        QStack<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
 
 // --------
 //  QQueue
 // --------
 
-template<typename... Ts> void to_cppdatalib(QQueue<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QQueue, Ts...>
 {
-    result = cppdatalib::core::array_t();
-    for (const auto &item: v)
-        result.push_back(item);
-}
+    const QQueue<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QQueue<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
 
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QQueue<Ts...> &result)
+template<typename... Ts>
+class cast_template_from_cppdatalib<QQueue, Ts...>
 {
-    result.clear();
-    if (v.is_array())
-        for (const auto &item: v.get_array_unchecked())
-            result.push(item);
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QQueue<Ts...>() const
+    {
+        QQueue<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
 
 // ------
 //  QSet
 // ------
 
-template<typename... Ts> void to_cppdatalib(QSet<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QSet, Ts...>
 {
-    result = cppdatalib::core::array_t();
-    for (const auto &item: v)
-        result.push_back(item);
-}
+    const QSet<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QSet<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
 
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QSet<Ts...> &result)
+template<typename... Ts>
+class cast_template_from_cppdatalib<QSet, Ts...>
 {
-    result.clear();
-    if (v.is_array())
-        for (const auto &item: v.get_array_unchecked())
-            result.push(item);
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QSet<Ts...>() const
+    {
+        QSet<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
 
 // ------
 //  QMap
 // ------
 
-template<typename... Ts> void to_cppdatalib(QMap<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QMap, Ts...>
 {
-    result = cppdatalib::core::object_t();
-    for (auto it = v.cbegin(); it != v.cend(); ++it)
-        result.add_member(it.key(), it.value());
-}
+    const QMap<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QMap<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        for (auto it = bind.cbegin(); it != bind.end(); ++it)
+            result.add_member(it.key(), it.value());
+        return result;
+    }
+};
 
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QMap<Ts...> &result)
+template<typename... Ts>
+class cast_template_from_cppdatalib<QMap, Ts...>
 {
-    result.clear();
-    if (v.is_object())
-        for (const auto &item: v.get_object_unchecked())
-            result.insert(item.first, item.second);
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QMap<Ts...>() const
+    {
+        QMap<Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert(item.first, item.second);
+        return result;
+    }
+};
 
 // -----------
 //  QMultiMap
 // -----------
 
-template<typename... Ts> void to_cppdatalib(QMultiMap<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QMultiMap, Ts...>
 {
-    result = cppdatalib::core::object_t();
-    for (auto it = v.cbegin(); it != v.cend(); ++it)
-        result.add_member(it.key(), it.value());
-}
+    const QMultiMap<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QMultiMap<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        for (auto it = bind.cbegin(); it != bind.end(); ++it)
+            result.add_member(it.key(), it.value());
+        return result;
+    }
+};
 
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QMultiMap<Ts...> &result)
+template<typename... Ts>
+class cast_template_from_cppdatalib<QMultiMap, Ts...>
 {
-    result.clear();
-    if (v.is_object())
-        for (const auto &item: v.get_object_unchecked())
-            result.insert(item.first, item.second);
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QMultiMap<Ts...>() const
+    {
+        QMultiMap<Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert(item.first, item.second);
+        return result;
+    }
+};
 
 // -------
 //  QHash
 // -------
 
-template<typename... Ts> void to_cppdatalib(QHash<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QHash, Ts...>
 {
-    result.set_object(cppdatalib::core::object_t(), cppdatalib::core::hash);
-    for (auto it = v.cbegin(); it != v.cend(); ++it)
-        result.add_member(it.key(), it.value());
-}
+    const QHash<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QHash<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        result.set_subtype(cppdatalib::core::hash);
+        for (auto it = bind.cbegin(); it != bind.end(); ++it)
+            result.add_member(it.key(), it.value());
+        return result;
+    }
+};
 
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QHash<Ts...> &result)
+template<typename... Ts>
+class cast_template_from_cppdatalib<QHash, Ts...>
 {
-    result.clear();
-    if (v.is_object())
-        for (const auto &item: v.get_object_unchecked())
-            result.insert(item.first, item.second);
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QHash<Ts...>() const
+    {
+        QHash<Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert(item.first, item.second);
+        return result;
+    }
+};
 
 // ------------
 //  QMultiHash
 // ------------
 
-template<typename... Ts> void to_cppdatalib(QMultiHash<Ts...> v, cppdatalib::core::value &result)
+template<typename... Ts>
+class cast_template_to_cppdatalib<QMultiHash, Ts...>
 {
-    result.set_object(cppdatalib::core::object_t(), cppdatalib::core::hash);
-    for (auto it = v.cbegin(); it != v.cend(); ++it)
-        result.add_member(it.key(), it.value());
-}
+    const QMultiHash<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QMultiHash<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        result.set_subtype(cppdatalib::core::hash);
+        for (auto it = bind.cbegin(); it != bind.end(); ++it)
+            result.add_member(it.key(), it.value());
+        return result;
+    }
+};
 
-template<typename... Ts> void from_cppdatalib(const cppdatalib::core::value &v, QMultiHash<Ts...> &result)
+template<typename... Ts>
+class cast_template_from_cppdatalib<QMultiHash, Ts...>
 {
-    result.clear();
-    if (v.is_object())
-        for (const auto &item: v.get_object_unchecked())
-            result.insert(item.first, item.second);
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QMultiHash<Ts...>() const
+    {
+        QMultiHash<Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert(item.first, item.second);
+        return result;
+    }
+};
+
+// ----------
+//  QVariant
+// ----------
+
+template<>
+class cast_to_cppdatalib<QVariant>
+{
+    const QVariant &bind;
+public:
+    cast_to_cppdatalib(const QVariant &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        switch (bind.type())
+        {
+            default:
+            case QVariant::Invalid: result.set_null(); break;
+            case QVariant::Bool: result = bind.toBool(); break;
+            case QVariant::ByteArray: result = bind.toByteArray(); break;
+            case QVariant::Char: result = bind.toChar(); break;
+            case QVariant::Date: result = bind.toDate(); break;
+            case QVariant::DateTime: result = bind.toDateTime(); break;
+            case QVariant::Double: result = bind.toDouble(); break;
+            case QVariant::Hash: result = bind.toHash(); break;
+            case QVariant::Int: result = bind.toInt(); break;
+            case QVariant::List: result = bind.toList(); break;
+            case QVariant::LongLong: result = bind.toLongLong(); break;
+            case QVariant::Map: result = bind.toMap(); break;
+            case QVariant::String: result = bind.toString(); break;
+            case QVariant::StringList: result = bind.toStringList(); break;
+            case QVariant::Time: result = bind.toTime(); break;
+            case QVariant::UInt: result = bind.toUInt(); break;
+            case QVariant::ULongLong: result = bind.toULongLong(); break;
+            case QVariant::Uuid: result = bind.toUuid(); break;
+        }
+        return result;
+    }
+};
+
+template<>
+class cast_from_cppdatalib<QVariant>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QVariant() const
+    {
+        QVariant result;
+        switch (bind.get_type())
+        {
+            default:
+            case cppdatalib::core::null: result = QVariant(); break;
+            case cppdatalib::core::boolean: result = bind.get_bool_unchecked(); break;
+            case cppdatalib::core::integer: result = qlonglong(bind.get_int_unchecked()); break;
+            case cppdatalib::core::uinteger: result = qulonglong(bind.get_uint_unchecked()); break;
+            case cppdatalib::core::real: result = bind.get_real_unchecked(); break;
+            case cppdatalib::core::string:
+            {
+                switch (bind.get_subtype())
+                {
+                    case cppdatalib::core::blob:
+                    case cppdatalib::core::clob:
+                        result = QByteArray::fromStdString(bind.get_string_unchecked());
+                        break;
+                    case cppdatalib::core::date: result = QDate::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
+                    case cppdatalib::core::time: result = QTime::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
+                    case cppdatalib::core::datetime: result = QDateTime::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
+                    case cppdatalib::core::uuid: result = QUuid(QString::fromStdString(bind.get_string_unchecked())); break;
+                    default: result = QString::fromStdString(bind.get_string_unchecked()); break;
+                }
+                break;
+            }
+            case cppdatalib::core::array: result = static_cast<QVariantList>(cast_template_from_cppdatalib<QList, QVariant>(bind)); break;
+            case cppdatalib::core::object:
+            {
+                if (bind.get_subtype() == cppdatalib::core::hash)
+                    result = static_cast<QVariantHash>(cast_template_from_cppdatalib<QHash, QString, QVariant>(bind));
+                else
+                    result = static_cast<QVariantMap>(cast_template_from_cppdatalib<QMap, QString, QVariant>(bind));
+                break;
+            }
+        }
+        return result;
+    }
+};
 
 #endif // CPPDATALIB_QT_H

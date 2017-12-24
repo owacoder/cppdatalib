@@ -417,16 +417,29 @@ struct point
 
 #include "adapters/qt.h"
 
-void to_cppdatalib(const point &p, cppdatalib::core::value &result)
+template<>
+class cast_to_cppdatalib<point>
 {
-    result = cppdatalib::core::object_t{{"x", p.x}, {"y", p.y}};
-}
+    const point &bind;
+public:
+    cast_to_cppdatalib(const point &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::object_t{{"x", bind.x}, {"y", bind.y}};}
+};
 
-void from_cppdatalib(const cppdatalib::core::value &v, point &p)
+template<>
+struct cast_from_cppdatalib<point>
 {
-    p.x = v["x"];
-    p.y = v["y"];
-}
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator point() const
+    {
+        point p;
+        p.x = bind["x"];
+        p.y = bind["y"];
+        return p;
+    }
+};
 
 #include <QDebug>
 
@@ -437,8 +450,6 @@ int readme_simple_test4()
 
     core::value my_value, m2;               // Global cross-format value class
     core::value_builder builder(my_value);
-
-
 
     std::stack<int, std::vector<int>> stack;
     stack.push(0);
@@ -486,6 +497,15 @@ int readme_simple_test4()
 
 int main()
 {
+    cppdatalib::core::value xyz;
+    std::tuple<int, int, std::string, QVector<QString>> tuple;
+    QVector<QString> value = {"value", ""};
+    xyz = std::make_tuple(0, 0.5, "hello", value, "stranger");
+    std::cout << xyz << std::endl;
+    tuple = xyz;
+    xyz = tuple;
+    std::cout << xyz << std::endl;
+
     std::cout << sizeof(cppdatalib::core::value) << std::endl;
 
     cppdatalib::core::stream_handler dummy;
@@ -494,8 +514,7 @@ int main()
     cppdatalib::core::range_filter<cppdatalib::core::uinteger> range(mode);
     cppdatalib::core::dispersion_filter<cppdatalib::core::uinteger> dispersal(range);
 
-    cppdatalib::core::array_t array = {1, 2};
-    dispersal << array;
+    dispersal << cppdatalib::core::array_t{2, 0, 1, 2, 3, 4, 4};
 
     std::cout << median.get_median() << std::endl;
     std::cout << mode.get_modes() << std::endl;

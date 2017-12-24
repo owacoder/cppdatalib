@@ -36,6 +36,7 @@
 #include <queue>
 #include <valarray>
 #include <bitset>
+#include <tuple>
 
 #include <set>
 #include <unordered_set>
@@ -54,19 +55,50 @@
 #include <limits>
 #include <algorithm>
 
-namespace cppdatalib
-{
+#include <type_traits>
+
+#ifdef CPPDATALIB_CPP17
+#include <variant>
+#include <optional>
+#include <any>
+#endif
+
+namespace cppdatalib {
     namespace core
     {
         class value;
+        namespace impl
+        {
+            template<size_t size, typename T, typename... Ts>
+            struct unpack : unpack<size-1, Ts...> {};
+
+            template<typename T, typename... Ts>
+            struct unpack<0, T, Ts...> {typedef T type;};
+
+            template<typename... Ts>
+            struct unpack_first {typedef typename unpack<1, Ts...>::type type;};
+
+            template<typename...>
+            constexpr auto is_template_helper() {return 0;}
+            template<template<typename...> class T, typename...>
+            constexpr auto is_template_helper() {return 1;}
+
+            template<typename T> struct is_template
+            {
+                typedef T type;
+                static const int value = is_template_helper<T>();
+            };
+        }
     }
+}
 
-    template<typename T> void to_cppdatalib(T v, core::value &result);
-    template<typename T> core::value to_cppdatalib(T v);
+template<typename T> class cast_to_cppdatalib;
+template<template<typename...> class Template, typename... Ts> struct cast_template_to_cppdatalib;
+template<typename T> class cast_from_cppdatalib;
+template<template<typename...> class Template, typename... Ts> struct cast_template_from_cppdatalib;
 
-    template<typename T> void from_cppdatalib(const core::value &v, T &result);
-    template<typename T> T from_cppdatalib(const core::value &v);
-
+namespace cppdatalib
+{
     namespace core
     {
         enum type : int8_t
@@ -926,145 +958,15 @@ namespace cppdatalib
                 for (auto const &element: v)
                     push_back(element);
             }
-            template<typename... Ts>
-            value(const std::array<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(const std::deque<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(const std::vector<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(const std::list<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(const std::forward_list<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(const std::set<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(std::stack<Ts...> v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                while (!v.empty())
-                {
-                    arr_ref_().insert(arr_ref_().begin(), v.top());
-                    v.pop();
-                }
-            }
-            template<typename... Ts>
-            value(std::queue<Ts...> v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                while (!v.empty())
-                {
-                    push_back(v.front());
-                    v.pop();
-                }
-            }
-            template<typename... Ts>
-            value(std::priority_queue<Ts...> v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                while (!v.empty())
-                {
-                    push_back(v.top());
-                    v.pop();
-                }
-            }
-            template<typename... Ts>
-            value(const std::multiset<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(const std::unordered_set<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(const std::unordered_multiset<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<typename... Ts>
-            value(const std::valarray<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
-            template<size_t N>
-            value(const std::bitset<N> &v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (size_t i = 0; i < N; ++i)
-                    push_back(v[i]);
-            }
-            template<typename... Ts>
-            value(const std::map<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                object_init(subtype, core::object_t());
-                for (auto const &element: v)
-                    add_member(element.first, element.second);
-            }
-            template<typename... Ts>
-            value(const std::unordered_map<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                object_init(subtype, core::object_t());
-                for (auto const &element: v)
-                    add_member(element.first, element.second);
-            }
-            template<typename... Ts>
-            value(const std::multimap<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                object_init(subtype, core::object_t());
-                for (auto const &element: v)
-                    add_member(element.first, element.second);
-            }
-            template<typename... Ts>
-            value(const std::unordered_multimap<Ts...> &v, subtype_t subtype = core::normal)
-            {
-                object_init(subtype, core::object_t());
-                for (auto const &element: v)
-                    add_member(element.first, element.second);
-            }
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
-                assign(*this, to_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(v));
+                assign(*this, cast_to_cppdatalib<T>(v));
+            }
+            template<template<typename...> class Template, typename... Ts>
+            value(const Template<Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            {
+                assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v));
             }
 
             ~value()
@@ -1300,278 +1202,11 @@ namespace cppdatalib
             array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_ref_();}
             object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_ref_();}
 
-        private:
             template<typename T>
-            class cast {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator T() const {return from_cppdatalib<T>(bind);}
-            };
+            operator T() const {return cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this);}
 
-            template<typename... Ts>
-            class cast<std::stack<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::stack<Ts...>() const
-                {
-                    std::stack<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.push(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::queue<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::queue<Ts...>() const
-                {
-                    std::queue<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.push(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::priority_queue<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::priority_queue<Ts...>() const
-                {
-                    std::priority_queue<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.push(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::forward_list<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::forward_list<Ts...>() const
-                {
-                    std::forward_list<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.push_back(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::list<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::list<Ts...>() const
-                {
-                    std::list<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.push_back(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::deque<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::deque<Ts...>() const
-                {
-                    std::deque<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.push_back(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::vector<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::vector<Ts...>() const
-                {
-                    std::vector<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.push_back(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::set<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::set<Ts...>() const
-                {
-                    std::set<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.insert(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::multiset<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::multiset<Ts...>() const
-                {
-                    std::multiset<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.insert(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::unordered_set<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::unordered_set<Ts...>() const
-                {
-                    std::unordered_set<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.insert(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::unordered_multiset<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::unordered_multiset<Ts...>() const
-                {
-                    std::unordered_multiset<Ts...> result;
-                    if (bind.is_array())
-                        for (const auto &element: bind.get_array_unchecked())
-                            result.insert(element);
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::valarray<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::valarray<Ts...>() const
-                {
-                    std::valarray<Ts...> result;
-                    if (bind.is_array())
-                    {
-                        size_t index = 0;
-                        result.resize(bind.array_size());
-                        for (const auto &element: bind.get_array_unchecked())
-                            result[index++] = element;
-                    }
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::map<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::map<Ts...>() const
-                {
-                    std::map<Ts...> result;
-                    if (bind.is_object())
-                        for (const auto &element: bind.get_object_unchecked())
-                            result.insert({element.first, element.second});
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::multimap<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::multimap<Ts...>() const
-                {
-                    std::multimap<Ts...> result;
-                    if (bind.is_object())
-                        for (const auto &element: bind.get_object_unchecked())
-                            result.insert({element.first, element.second});
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::unordered_map<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::unordered_map<Ts...>() const
-                {
-                    std::unordered_map<Ts...> result;
-                    if (bind.is_object())
-                        for (const auto &element: bind.get_object_unchecked())
-                            result.insert({element.first, element.second});
-                    return result;
-                }
-            };
-
-            template<typename... Ts>
-            class cast<std::unordered_multimap<Ts...>>
-            {
-                const core::value &bind;
-            public:
-                cast(const core::value &bind) : bind(bind) {}
-                operator std::unordered_multimap<Ts...>() const
-                {
-                    std::unordered_multimap<Ts...> result;
-                    if (bind.is_object())
-                        for (const auto &element: bind.get_object_unchecked())
-                            result.insert({element.first, element.second});
-                    return result;
-                }
-            };
-
-        public:
-            template<typename T>
-            operator T() const {return cast<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this);}
+            template<template<typename...> class Template, typename... Ts>
+            operator Template<Ts...>() const {return cast_template_from_cppdatalib<Template, Ts...>(*this);}
 
         private:
             // WARNING: DO NOT CALL mutable_clear() anywhere but the destructor!
@@ -1745,6 +1380,7 @@ namespace cppdatalib
 
                 switch (type_)
                 {
+                    default:
                     case null: *this = default_value; break;
                     case boolean:
                     {
@@ -1836,7 +1472,6 @@ namespace cppdatalib
                         }
                         break;
                     }
-                    default: break;
                 }
 
                 return *this;
@@ -1914,153 +1549,1085 @@ namespace cppdatalib
             {
                 return val < min || max < val? T(0): T(val);
             }
+
+            template<typename...> struct dummy_template {};
         }
     }
 
-    // Fail base conversion with unimplemented function name
-    template<typename T> void to_cppdatalib(T, core::value &) {T::You_must_reimplement_cppdatalib_conversions_for_custom_type_conversions();}
-    template<typename T> void from_cppdatalib(const core::value &, T &) {T::You_must_reimplement_cppdatalib_conversions_for_custom_type_conversions();}
-    template<typename T> core::value to_cppdatalib(T v)
-    {
-        core::value val;
-        to_cppdatalib(v, val);
-        return val;
-    }
-    template<typename T> T from_cppdatalib(const core::value &v)
-    {
-        typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type Result;
-        Result val = Result();
-        from_cppdatalib(v, val);
-        return val;
-    }
-
-    template<> void to_cppdatalib(signed char v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(unsigned char v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(signed short v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(unsigned short v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(signed int v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(unsigned int v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(signed long v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(unsigned long v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(signed long long v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(unsigned long long v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(float v, core::value &result) {result = core::real_t(v);}
-    template<> void to_cppdatalib(double v, core::value &result) {result = core::real_t(v);}
-    template<> void to_cppdatalib(long double v, core::value &result) {result = core::real_t(v);}
-    template<> void to_cppdatalib(char *v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(const char *v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(const std::string &v, core::value &result) {result = v;}
-
-    template<> void to_cppdatalib(const core::array_t &v, core::value &result) {result = v;}
-    template<> void to_cppdatalib(const core::object_t &v, core::value &result) {result = v;}
-
-    template<typename... Ts> void to_cppdatalib(std::initializer_list<Ts...> v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::list<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::forward_list<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::deque<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::vector<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::set<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::unordered_set<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::multiset<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::unordered_multiset<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::valarray<Ts...> &v, core::value &result) {result = v;}
-    template<size_t N> void to_cppdatalib(const std::bitset<N> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(std::stack<Ts...> v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(std::queue<Ts...> v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(std::priority_queue<Ts...> v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::map<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::unordered_map<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::multimap<Ts...> &v, core::value &result) {result = v;}
-    template<typename... Ts> void to_cppdatalib(const std::unordered_multimap<Ts...> &v, core::value &result) {result = v;}
-
-    template<> void from_cppdatalib(const core::value &v, bool &result) {result = v.as_bool();}
-    template<> void from_cppdatalib(const core::value &v, signed char &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<signed char>::min(),
-                                  v.as_int(),
-                                  std::numeric_limits<signed char>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, unsigned char &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<unsigned char>::min(),
-                                  v.as_uint(),
-                                  std::numeric_limits<unsigned char>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, signed short &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<signed short>::min(),
-                                  v.as_int(),
-                                  std::numeric_limits<signed short>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, unsigned short &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<unsigned short>::min(),
-                                  v.as_uint(),
-                                  std::numeric_limits<unsigned short>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, signed int &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<signed int>::min(),
-                                  v.as_int(),
-                                  std::numeric_limits<signed int>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, unsigned int &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<unsigned int>::min(),
-                                  v.as_uint(),
-                                  std::numeric_limits<unsigned int>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, signed long &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<signed long>::min(),
-                                  v.as_int(),
-                                  std::numeric_limits<signed long>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, unsigned long &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<unsigned long>::min(),
-                                  v.as_uint(),
-                                  std::numeric_limits<unsigned long>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, signed long long &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<signed long long>::min(),
-                                  v.as_int(),
-                                  std::numeric_limits<signed long long>::max());
-    }
-    template<> void from_cppdatalib(const core::value &v, unsigned long long &result)
-    {
-        result = core::impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
-                                  v.as_uint(),
-                                  std::numeric_limits<unsigned long long>::max());
-    }
-
-    template<> void from_cppdatalib(const core::value &v, float &result) {result = v.as_real();}
-    template<> void from_cppdatalib(const core::value &v, double &result) {result = v.as_real();}
-    template<> void from_cppdatalib(const core::value &v, long double &result) {result = v.as_real();}
-    template<> void from_cppdatalib(const core::value &v, std::string &result) {result = v.as_string();}
-
-    void from_cppdatalib(const core::value &v, core::array_t &result) {result = v.as_array();}
-    void from_cppdatalib(const core::value &v, core::object_t &result) {result = v.as_object();}
-
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::stack<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::queue<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::priority_queue<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::list<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::forward_list<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::deque<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::vector<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::set<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::unordered_set<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::multiset<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::unordered_multiset<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::valarray<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::map<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::multimap<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::unordered_map<Ts...> &result) {result = v;}
-    template<typename... Ts> void from_cppdatalib(const core::value &v, std::unordered_multimap<Ts...> &result) {result = v;}
-
     void swap(core::value &l, core::value &r) {l.swap(r);}
 }
+
+template<typename T>
+class cast_to_cppdatalib
+{
+public:
+    cast_to_cppdatalib(T) {}
+    operator cppdatalib::core::value() const {return T::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+};
+
+template<template<typename...> class Template, typename... Ts>
+struct cast_template_to_cppdatalib
+{
+public:
+    cast_template_to_cppdatalib(const Template<Ts...> &) {}
+    operator cppdatalib::core::value() const {return Template<Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+};
+
+template<typename T>
+class cast_from_cppdatalib {
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &) {}
+    operator T() const {return T::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+};
+
+template<template<typename...> class Template, typename... Ts>
+struct cast_template_from_cppdatalib
+{
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &) {}
+    operator Template<Ts...>() const {return Template<Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+};
+
+template<>
+class cast_to_cppdatalib<signed char>
+{
+    signed char bind;
+public:
+    cast_to_cppdatalib(signed char bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<unsigned char>
+{
+    unsigned char bind;
+public:
+    cast_to_cppdatalib(unsigned char bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<signed short>
+{
+    signed short bind;
+public:
+    cast_to_cppdatalib(signed short bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<unsigned short>
+{
+    unsigned short bind;
+public:
+    cast_to_cppdatalib(unsigned short bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<signed int>
+{
+    signed int bind;
+public:
+    cast_to_cppdatalib(signed int bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<unsigned int>
+{
+    unsigned int bind;
+public:
+    cast_to_cppdatalib(unsigned int bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<signed long>
+{
+    signed long bind;
+public:
+    cast_to_cppdatalib(signed long bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<unsigned long>
+{
+    unsigned long bind;
+public:
+    cast_to_cppdatalib(unsigned long bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<signed long long>
+{
+    signed long long bind;
+public:
+    cast_to_cppdatalib(signed long long bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<unsigned long long>
+{
+    unsigned long long bind;
+public:
+    cast_to_cppdatalib(unsigned long long bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<float>
+{
+    float bind;
+public:
+    cast_to_cppdatalib(float bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::real_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<double>
+{
+    double bind;
+public:
+    cast_to_cppdatalib(double bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::real_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<long double>
+{
+    long double bind;
+public:
+    cast_to_cppdatalib(long double bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::real_t>(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<char *>
+{
+    char * const &bind;
+public:
+    cast_to_cppdatalib(char * const &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<const char *>
+{
+    const char * const &bind;
+public:
+    cast_to_cppdatalib(const char * const &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind));}
+};
+
+template<>
+class cast_to_cppdatalib<cppdatalib::core::string_t>
+{
+    const cppdatalib::core::string_t &bind;
+public:
+    cast_to_cppdatalib(const cppdatalib::core::string_t &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+};
+
+template<>
+class cast_to_cppdatalib<cppdatalib::core::array_t>
+{
+    const cppdatalib::core::array_t &bind;
+public:
+    cast_to_cppdatalib(const cppdatalib::core::array_t &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+};
+
+template<>
+class cast_to_cppdatalib<cppdatalib::core::object_t>
+{
+    const cppdatalib::core::object_t &bind;
+public:
+    cast_to_cppdatalib(const cppdatalib::core::object_t &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::list, Ts...>
+{
+    const std::list<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::list<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::forward_list, Ts...>
+{
+    const std::forward_list<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::forward_list<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::deque, Ts...>
+{
+    const std::deque<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::deque<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::vector, Ts...>
+{
+    const std::vector<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::vector<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::set, Ts...>
+{
+    const std::set<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::set<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::unordered_set, Ts...>
+{
+    const std::unordered_set<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::unordered_set<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::multiset, Ts...>
+{
+    const std::multiset<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::multiset<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::unordered_multiset, Ts...>
+{
+    const std::unordered_multiset<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::unordered_multiset<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (const auto &item: bind)
+            result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::valarray, Ts...>
+{
+    const std::valarray<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::valarray<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (size_t i = 0; i < bind.size(); ++i)
+            result.push_back(bind[i]);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::initializer_list, Ts...>
+{
+    cppdatalib::core::array_t bind;
+public:
+    cast_template_to_cppdatalib(std::initializer_list<Ts...> bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::stack, Ts...>
+{
+    std::stack<Ts...> bind;
+public:
+    cast_template_to_cppdatalib(std::stack<Ts...> bind) : bind(bind) {}
+    operator cppdatalib::core::value()
+    {
+        using namespace std;
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        while (!bind.empty())
+        {
+            result.push_back(bind.top());
+            bind.pop();
+        }
+        reverse(result.get_array_ref().begin(), result.get_array_ref().end());
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::queue, Ts...>
+{
+    std::queue<Ts...> bind;
+public:
+    cast_template_to_cppdatalib(std::queue<Ts...> bind) : bind(bind) {}
+    operator cppdatalib::core::value()
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        while (!bind.empty())
+        {
+            result.push_back(bind.front());
+            bind.pop();
+        }
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::priority_queue, Ts...>
+{
+    std::priority_queue<Ts...> bind;
+public:
+    cast_template_to_cppdatalib(std::priority_queue<Ts...> bind) : bind(bind) {}
+    operator cppdatalib::core::value()
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        while (!bind.empty())
+        {
+            result.push_back(bind.front());
+            bind.pop();
+        }
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::map, Ts...>
+{
+    const std::map<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::map<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        for (const auto &item: bind)
+            result.add_member(item.first, item.second);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::multimap, Ts...>
+{
+    const std::multimap<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::multimap<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        for (const auto &item: bind)
+            result.add_member(item.first, item.second);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::unordered_map, Ts...>
+{
+    const std::unordered_map<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::unordered_map<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        for (const auto &item: bind)
+            result.add_member(item.first, item.second);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::unordered_multimap, Ts...>
+{
+    const std::unordered_multimap<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::unordered_multimap<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        for (const auto &item: bind)
+            result.add_member(item.first, item.second);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::pair, Ts...>
+{
+    const std::pair<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::pair<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::array_t{bind.first, bind.second};}
+};
+
+namespace cppdatalib
+{
+    namespace core
+    {
+        namespace impl
+        {
+            template<size_t tuple_size>
+            struct push_back : public push_back<tuple_size - 1>
+            {
+                template<typename... Ts>
+                push_back(const std::tuple<Ts...> &tuple, core::array_t &result) : push_back<tuple_size - 1>(tuple, result) {
+                    result.push_back(std::get<tuple_size - 1>(tuple));
+                }
+            };
+
+            template<>
+            struct push_back<0>
+            {
+                template<typename... Ts>
+                push_back(const std::tuple<Ts...> &, core::array_t &) {}
+            };
+        }
+    }
+}
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::tuple, Ts...>
+{
+    const std::tuple<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::tuple<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::array_t result;
+        cppdatalib::core::impl::push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind, result);
+        return result;
+    }
+};
+
+#ifdef CPPDATALIB_CPP17
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::optional, Ts...>
+{
+    const std::optional<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::optional<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (bind)
+            return *bind;
+        return cppdatalib::core::null_t();
+    }
+};
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<std::variant, Ts...>
+{
+    const std::variant<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::variant<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return std::get<bind.index()>(bind);}
+};
+#endif
+
+template<>
+class cast_from_cppdatalib<bool>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator bool() const {return bind.as_bool();}
+};
+
+template<>
+class cast_from_cppdatalib<signed char>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator signed char() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed char>::min(),
+                                      bind.as_int(),
+                                      std::numeric_limits<signed char>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<unsigned char>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator unsigned char() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned char>::min(),
+                                      bind.as_uint(),
+                                      std::numeric_limits<unsigned char>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<signed short>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator signed short() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed short>::min(),
+                                      bind.as_int(),
+                                      std::numeric_limits<signed short>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<unsigned short>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator unsigned short() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned short>::min(),
+                                      bind.as_uint(),
+                                      std::numeric_limits<unsigned short>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<signed int>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator signed int() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed int>::min(),
+                                      bind.as_int(),
+                                      std::numeric_limits<signed int>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<unsigned int>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator unsigned int() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned int>::min(),
+                                      bind.as_uint(),
+                                      std::numeric_limits<unsigned int>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<signed long>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator signed long() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed long>::min(),
+                                      bind.as_int(),
+                                      std::numeric_limits<signed long>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<unsigned long>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator unsigned long() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned long>::min(),
+                                      bind.as_uint(),
+                                      std::numeric_limits<unsigned long>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<signed long long>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator signed long long() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed long long>::min(),
+                                      bind.as_int(),
+                                      std::numeric_limits<signed long long>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<unsigned long long>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator unsigned long long() const {
+        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
+                                      bind.as_uint(),
+                                      std::numeric_limits<unsigned long long>::max());
+    }
+};
+
+template<>
+class cast_from_cppdatalib<float>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator float() const {return bind.as_real();}
+};
+
+template<>
+class cast_from_cppdatalib<double>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator double() const {return bind.as_real();}
+};
+
+template<>
+class cast_from_cppdatalib<long double>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator long double() const {return bind.as_real();}
+};
+
+template<>
+class cast_from_cppdatalib<cppdatalib::core::string_t>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator cppdatalib::core::string_t() const {return bind.as_string();}
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::basic_string, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::basic_string<Ts...>() const {return bind.as_string();}
+};
+
+template<>
+class cast_from_cppdatalib<cppdatalib::core::array_t>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator cppdatalib::core::array_t() const {return bind.as_array();}
+};
+
+template<>
+class cast_from_cppdatalib<cppdatalib::core::object_t>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator cppdatalib::core::object_t() const {return bind.as_object();}
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::stack, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::stack<Ts...>() const
+    {
+        std::stack<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::queue, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::queue<Ts...>() const
+    {
+        std::queue<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::priority_queue, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::priority_queue<Ts...>() const
+    {
+        std::priority_queue<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::list, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::list<Ts...>() const
+    {
+        std::list<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::forward_list, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::forward_list<Ts...>() const
+    {
+        std::forward_list<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::deque, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::deque<Ts...>() const
+    {
+        std::deque<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::vector, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::vector<Ts...>() const
+    {
+        std::vector<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_back(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::valarray, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::valarray<Ts...>() const
+    {
+        std::valarray<Ts...> result;
+        size_t index = 0;
+        result.resize(bind.array_size());
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result[index++] = item;
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::set, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::set<Ts...>() const
+    {
+        std::set<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::multiset, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::multiset<Ts...>() const
+    {
+        std::multiset<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::unordered_set, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::unordered_set<Ts...>() const
+    {
+        std::unordered_set<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::unordered_multiset, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::unordered_multiset<Ts...>() const
+    {
+        std::unordered_multiset<Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::map, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::map<Ts...>() const
+    {
+        std::map<Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::multimap, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::multimap<Ts...>() const
+    {
+        std::multimap<Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::unordered_map, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::unordered_map<Ts...>() const
+    {
+        std::unordered_map<Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::unordered_multimap, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::unordered_multimap<Ts...>() const
+    {
+        std::unordered_multimap<Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert(item);
+        return result;
+    }
+};
+
+namespace cppdatalib
+{
+    namespace core
+    {
+        namespace impl
+        {
+            template<size_t tuple_size>
+            struct tuple_push_back : public tuple_push_back<tuple_size - 1>
+            {
+                template<typename... Ts>
+                tuple_push_back(const core::array_t &list, std::tuple<Ts...> &result) : tuple_push_back<tuple_size - 1>(list, result) {
+                    typedef typename std::tuple_element<tuple_size-1, std::tuple<Ts...>>::type element_type;
+                    // TODO: cast_from_cppdatalib doesn't support template types properly
+                    if (tuple_size <= list.size()) // If the list contains enough elements, assign it
+                        std::get<tuple_size-1>(result) = list[tuple_size - 1].operator element_type();
+                    else // Otherwise, clear the tuple's element value
+                        std::get<tuple_size-1>(result) = element_type();
+                }
+            };
+
+            template<>
+            struct tuple_push_back<0>
+            {
+                template<typename... Ts>
+                tuple_push_back(const core::array_t &, std::tuple<Ts...> &) {}
+            };
+        }
+    }
+}
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::tuple, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::tuple<Ts...>() const
+    {
+        std::tuple<Ts...> result;
+        if (bind.is_array())
+            cppdatalib::core::impl::tuple_push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind.get_array_unchecked(), result);
+        return result;
+    }
+};
+
+#ifdef CPPDATALIB_CPP17
+template<typename... Ts>
+class cast_template_from_cppdatalib<std::optional, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::optional<Ts...>() const
+    {
+        std::optional<Ts...> result;
+        if (!bind.is_null())
+            result = static_cast<typename cppdatalib::core::impl::unpack_first<Ts...>::type>(bind);
+        return result;
+    }
+};
+
+template<>
+class cast_from_cppdatalib<std::any>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::any() const
+    {
+        std::any result;
+        switch (bind.get_type())
+        {
+            default:
+            case core::null: result = std::any(); break;
+            case core::boolean: result = bind.get_bool_unchecked(); break;
+            case core::integer: result = bind.get_int_unchecked(); break;
+            case core::uinteger: result = bind.get_uint_unchecked(); break;
+            case core::real: result = bind.get_real_unchecked(); break;
+            case core::string: result = bind.get_string_unchecked(); break;
+            case core::array: result = bind.get_array_unchecked(); break;
+            case core::object: result = bind.get_object_unchecked(); break;
+        }
+        return result;
+    }
+};
+#endif
 
 #endif // CPPDATALIB_VALUE_H
