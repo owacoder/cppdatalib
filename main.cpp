@@ -500,14 +500,12 @@ int main()
 {
     cppdatalib::core::value xyz;
     std::tuple<int, int, std::string, QVector<QString>> tuple;
-    QVector<QString> value = {"value", ""};
-    xyz = std::make_tuple(0, 0.5, "hello", value, "stranger");
+    QStringList value = {"value", ""};
+    xyz = std::make_tuple(0, 1.5, "hello", value, "stranger");
     std::cout << xyz << std::endl;
-    xyz.erase_element(4);
-    xyz.erase_element(3);
-    xyz.erase_element(2);
     tuple = xyz;
     xyz = tuple;
+    std::cout << xyz << std::endl;
     std::array<int, 3> stdarr = xyz;
     xyz = stdarr;
     std::cout << xyz << std::endl;

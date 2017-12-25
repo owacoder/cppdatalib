@@ -212,6 +212,45 @@ template<>
 class cast_to_cppdatalib<Poco::Dynamic::Var>
 {
     const Poco::Dynamic::Var &bind;
+
+    static void extract_struct(const Poco::Dynamic::Var &v, cppdatalib::core::value &result)
+    {
+        // Try extracting with string keys first
+        try
+        {
+            const auto &struct_ref = v.extract<Poco::DynamicStruct>();
+            result = cppdatalib::core::object_t();
+            for (auto it = struct_ref.begin(); it != struct_ref.end(); ++it)
+                result.add_member(cppdatalib::core::value(it->first),
+                                  cppdatalib::core::value(it->second));
+            return;
+        }
+        catch (Poco::BadCastException) {}
+
+        // If that fails, try Poco::Dynamic::Var keys
+        try
+        {
+            const auto &struct_ref = v.extract<Poco::Dynamic::Struct<Poco::Dynamic::Var>>();
+            result = cppdatalib::core::object_t();
+            for (auto it = struct_ref.begin(); it != struct_ref.end(); ++it)
+                result.add_member(cppdatalib::core::value(it->first),
+                                  cppdatalib::core::value(it->second));
+            return;
+        }
+        catch (Poco::BadCastException) {}
+
+        // Otherwise, try int keys
+        {
+            const auto &struct_ref = v.extract<Poco::Dynamic::Struct<int>>();
+            result = cppdatalib::core::object_t();
+            for (auto it = struct_ref.begin(); it != struct_ref.end(); ++it)
+                result.add_member(cppdatalib::core::value(it->first),
+                                  cppdatalib::core::value(it->second));
+        }
+
+        // If that fails, there's no hope. I give up!
+    }
+
 public:
     cast_to_cppdatalib(const Poco::Dynamic::Var &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
@@ -230,13 +269,7 @@ public:
                 result.push_back(cppdatalib::core::value(item));
         }
         else if (bind.isString()) result = bind.convert<std::string>();
-        else if (bind.isStruct())
-        {
-            result = cppdatalib::core::object_t();
-            for (auto it = bind.begin(); it != bind.end(); ++it)
-                result.add_member(cppdatalib::core::value(it->first),
-                                  cppdatalib::core::value(it->second));
-        }
+        else if (bind.isStruct()) extract_struct(bind, result);
         else if (bind.isInteger())
         {
             if (bind.isSigned())
