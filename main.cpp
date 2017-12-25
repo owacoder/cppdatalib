@@ -416,6 +416,7 @@ struct point
 };
 
 #include "adapters/qt.h"
+#include "adapters/poco.h"
 
 template<>
 class cast_to_cppdatalib<point>
@@ -502,8 +503,13 @@ int main()
     QVector<QString> value = {"value", ""};
     xyz = std::make_tuple(0, 0.5, "hello", value, "stranger");
     std::cout << xyz << std::endl;
+    xyz.erase_element(4);
+    xyz.erase_element(3);
+    xyz.erase_element(2);
     tuple = xyz;
     xyz = tuple;
+    std::array<int, 3> stdarr = xyz;
+    xyz = stdarr;
     std::cout << xyz << std::endl;
 
     std::cout << sizeof(cppdatalib::core::value) << std::endl;

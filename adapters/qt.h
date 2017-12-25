@@ -53,6 +53,28 @@
 
 #include "../core/value.h"
 
+// -------
+//  QPair
+// -------
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<QPair, Ts...>
+{
+    const QPair<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const QPair<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::array_t{cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)};}
+};
+
+template<typename T1, typename T2>
+class cast_template_from_cppdatalib<QPair, T1, T2>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator QPair<T1, T2>() const {return QPair<T1, T2>{bind.element(0).operator T1(), bind.element(1).operator T2()};}
+};
+
 // ------------
 //  QByteArray
 // ------------
@@ -260,23 +282,23 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
         for (const auto &item: bind)
-            result.push_back(item);
+            result.push_back(cppdatalib::core::value(item));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QVector, Ts...>
+template<typename T>
+class cast_template_from_cppdatalib<QVector, T>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QVector<Ts...>() const
+    operator QVector<T>() const
     {
-        QVector<Ts...> result;
+        QVector<T> result;
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item);
+                result.push_back(item.operator T());
         return result;
     }
 };
@@ -295,23 +317,23 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
         for (const auto &item: bind)
-            result.push_back(item);
+            result.push_back(cppdatalib::core::value(item));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QList, Ts...>
+template<typename T>
+class cast_template_from_cppdatalib<QList, T>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QList<Ts...>() const
+    operator QList<T>() const
     {
-        QList<Ts...> result;
+        QList<T> result;
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item);
+                result.push_back(item.operator T());
         return result;
     }
 };
@@ -330,23 +352,23 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
         for (const auto &item: bind)
-            result.push_back(item);
+            result.push_back(cppdatalib::core::value(item));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QLinkedList, Ts...>
+template<typename T>
+class cast_template_from_cppdatalib<QLinkedList, T>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QLinkedList<Ts...>() const
+    operator QLinkedList<T>() const
     {
-        QLinkedList<Ts...> result;
+        QLinkedList<T> result;
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item);
+                result.push_back(item.operator T());
         return result;
     }
 };
@@ -365,23 +387,23 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
         for (const auto &item: bind)
-            result.push_back(item);
+            result.push_back(cppdatalib::core::value(item));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QStack, Ts...>
+template<typename T>
+class cast_template_from_cppdatalib<QStack, T>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QStack<Ts...>() const
+    operator QStack<T>() const
     {
-        QStack<Ts...> result;
+        QStack<T> result;
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item);
+                result.push_back(item.operator T());
         return result;
     }
 };
@@ -400,23 +422,23 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
         for (const auto &item: bind)
-            result.push_back(item);
+            result.push_back(cppdatalib::core::value(item));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QQueue, Ts...>
+template<typename T>
+class cast_template_from_cppdatalib<QQueue, T>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QQueue<Ts...>() const
+    operator QQueue<T>() const
     {
-        QQueue<Ts...> result;
+        QQueue<T> result;
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item);
+                result.push_back(item.operator T());
         return result;
     }
 };
@@ -435,23 +457,23 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
         for (const auto &item: bind)
-            result.push_back(item);
+            result.push_back(cppdatalib::core::value(item));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QSet, Ts...>
+template<typename T>
+class cast_template_from_cppdatalib<QSet, T>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QSet<Ts...>() const
+    operator QSet<T>() const
     {
-        QSet<Ts...> result;
+        QSet<T> result;
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item);
+                result.insert(item.operator T());
         return result;
     }
 };
@@ -469,24 +491,25 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (auto it = bind.cbegin(); it != bind.end(); ++it)
-            result.add_member(it.key(), it.value());
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            result.add_member(cppdatalib::core::value(it.key()),
+                              cppdatalib::core::value(it.value()));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QMap, Ts...>
+template<typename K, typename V>
+class cast_template_from_cppdatalib<QMap, K, V>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QMap<Ts...>() const
+    operator QMap<K, V>() const
     {
-        QMap<Ts...> result;
+        QMap<K, V> result;
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first, item.second);
+                result.insert(item.first.operator K(), item.second.operator V());
         return result;
     }
 };
@@ -504,24 +527,25 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (auto it = bind.cbegin(); it != bind.end(); ++it)
-            result.add_member(it.key(), it.value());
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            result.add_member(cppdatalib::core::value(it.key()),
+                              cppdatalib::core::value(it.value()));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QMultiMap, Ts...>
+template<typename K, typename V>
+class cast_template_from_cppdatalib<QMultiMap, K, V>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QMultiMap<Ts...>() const
+    operator QMultiMap<K, V>() const
     {
-        QMultiMap<Ts...> result;
+        QMultiMap<K, V> result;
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first, item.second);
+                result.insert(item.first.operator K(), item.second.operator V());
         return result;
     }
 };
@@ -539,25 +563,25 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
-        result.set_subtype(cppdatalib::core::hash);
-        for (auto it = bind.cbegin(); it != bind.end(); ++it)
-            result.add_member(it.key(), it.value());
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            result.add_member(cppdatalib::core::value(it.key()),
+                              cppdatalib::core::value(it.value()));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QHash, Ts...>
+template<typename K, typename V>
+class cast_template_from_cppdatalib<QHash, K, V>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QHash<Ts...>() const
+    operator QHash<K, V>() const
     {
-        QHash<Ts...> result;
+        QHash<K, V> result;
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first, item.second);
+                result.insert(item.first.operator K(), item.second.operator V());
         return result;
     }
 };
@@ -575,25 +599,25 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
-        result.set_subtype(cppdatalib::core::hash);
-        for (auto it = bind.cbegin(); it != bind.end(); ++it)
-            result.add_member(it.key(), it.value());
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            result.add_member(cppdatalib::core::value(it.key()),
+                              cppdatalib::core::value(it.value()));
         return result;
     }
 };
 
-template<typename... Ts>
-class cast_template_from_cppdatalib<QMultiHash, Ts...>
+template<typename K, typename V>
+class cast_template_from_cppdatalib<QMultiHash, K, V>
 {
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QMultiHash<Ts...>() const
+    operator QMultiHash<K, V>() const
     {
-        QMultiHash<Ts...> result;
+        QMultiHash<K, V> result;
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first, item.second);
+                result.insert(item.first.operator K(), item.second.operator V());
         return result;
     }
 };
@@ -670,13 +694,13 @@ public:
                 }
                 break;
             }
-            case cppdatalib::core::array: result = static_cast<QVariantList>(cast_template_from_cppdatalib<QList, QVariant>(bind)); break;
+            case cppdatalib::core::array: result = bind.operator QVariantList(); break;
             case cppdatalib::core::object:
             {
                 if (bind.get_subtype() == cppdatalib::core::hash)
-                    result = static_cast<QVariantHash>(cast_template_from_cppdatalib<QHash, QString, QVariant>(bind));
+                    result = bind.operator QVariantHash();
                 else
-                    result = static_cast<QVariantMap>(cast_template_from_cppdatalib<QMap, QString, QVariant>(bind));
+                    result = bind.operator QVariantMap();
                 break;
             }
         }
