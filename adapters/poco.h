@@ -35,7 +35,240 @@
 #include <Poco/Dynamic/Struct.h>
 #include <Poco/Dynamic/Var.h>
 
+#include <Poco/Optional.h>
+#include <Poco/Nullable.h>
+
+#include <Poco/HashMap.h>
+
+#include <Poco/Tuple.h>
+
 #include "../core/value.h"
+
+// ----------
+//  Optional
+// ----------
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<Poco::Optional, Ts...>
+{
+    const Poco::Optional<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const Poco::Optional<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (!bind.isSpecified())
+            return cppdatalib::core::null_t();
+        return cppdatalib::core::value(bind.value());
+    }
+};
+
+template<typename T>
+class cast_template_from_cppdatalib<Poco::Optional, T>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator Poco::Optional<T>() const
+    {
+        Poco::Optional<T> result;
+        if (!bind.is_null())
+            result = bind.operator T();
+        return result;
+    }
+};
+
+// ----------
+//  Nullable
+// ----------
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<Poco::Nullable, Ts...>
+{
+    const Poco::Nullable<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const Poco::Nullable<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (!bind.isSpecified())
+            return cppdatalib::core::null_t();
+        return cppdatalib::core::value(bind.value());
+    }
+};
+
+template<typename T>
+class cast_template_from_cppdatalib<Poco::Nullable, T>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator Poco::Nullable<T>() const
+    {
+        Poco::Nullable<T> result;
+        if (!bind.is_null())
+            result = bind.operator T();
+        return result;
+    }
+};
+
+// ---------
+//  HashMap
+// ---------
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<Poco::HashMap, Ts...>
+{
+    const Poco::HashMap<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const Poco::HashMap<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        result.set_subtype(cppdatalib::core::hash);
+        for (const auto &item: bind)
+            result.add_member(cppdatalib::core::value(item.first),
+                              cppdatalib::core::value(item.second));
+        return result;
+    }
+};
+
+template<typename K, typename V, typename... Ts>
+class cast_template_from_cppdatalib<Poco::HashMap, K, V, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator Poco::HashMap<K, V, Ts...>() const
+    {
+        Poco::HashMap<K, V, Ts...> result;
+        if (bind.is_object())
+            for (const auto &item: bind.get_object_unchecked())
+                result.insert({item.first.operator K(),
+                               item.second.operator V()});
+        return result;
+    }
+};
+
+// -----------------
+//  LinearHashTable
+// -----------------
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<Poco::LinearHashTable, Ts...>
+{
+    const Poco::LinearHashTable<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const Poco::LinearHashTable<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::object_t();
+        for (const auto &item: bind)
+            result.push_back(cppdatalib::core::value(item));
+        return result;
+    }
+};
+
+template<typename T, typename... Ts>
+class cast_template_from_cppdatalib<Poco::LinearHashTable, T, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator Poco::LinearHashTable<T, Ts...>() const
+    {
+        Poco::LinearHashTable<T, Ts...> result;
+        if (bind.is_array())
+            for (const auto &item: bind.get_array_unchecked())
+                result.insert(item.operator T());
+        return result;
+    }
+};
+
+// -------
+//  Tuple
+// -------
+
+namespace cppdatalib
+{
+    namespace poco
+    {
+        namespace impl
+        {
+            template<int tuple_size>
+            struct push_back : public push_back<tuple_size - 1>
+            {
+                template<typename... Ts>
+                push_back(const Poco::Tuple<Ts...> &tuple, core::array_t &result) : push_back<tuple_size - 1>(tuple, result) {
+                    result.push_back(tuple.template get<tuple_size - 1>());
+                }
+            };
+
+            template<>
+            struct push_back<0>
+            {
+                template<typename... Ts>
+                push_back(const Poco::Tuple<Ts...> &, core::array_t &) {}
+            };
+        }
+    }
+}
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<Poco::Tuple, Ts...>
+{
+    const Poco::Tuple<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const Poco::Tuple<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::array_t result;
+        cppdatalib::poco::impl::push_back<Poco::Tuple<Ts...>::length>(bind, result);
+        return result;
+    }
+};
+
+namespace cppdatalib
+{
+    namespace poco
+    {
+        namespace impl
+        {
+            template<int tuple_size>
+            struct tuple_push_back : public tuple_push_back<tuple_size - 1>
+            {
+                template<typename... Ts>
+                tuple_push_back(const core::array_t &list, Poco::Tuple<Ts...> &result) : tuple_push_back<tuple_size - 1>(list, result) {
+                    typedef typename Poco::TypeGetter<tuple_size - 1, typename Poco::Tuple<Ts...>::Type>::HeadType element_type;
+                    if (tuple_size <= list.size()) // If the list contains enough elements, assign it
+                        result.set<tuple_size - 1>(list[tuple_size - 1].operator element_type());
+                    else // Otherwise, clear the tuple's element value
+                        result.set<tuple_size - 1>(element_type{});
+                }
+            };
+
+            template<>
+            struct tuple_push_back<0>
+            {
+                template<typename... Ts>
+                tuple_push_back(const core::array_t &, Poco::Tuple<Ts...> &) {}
+            };
+        }
+    }
+}
+
+template<typename... Ts>
+class cast_template_from_cppdatalib<Poco::Tuple, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator Poco::Tuple<Ts...>() const
+    {
+        Poco::Tuple<Ts...> result;
+        if (bind.is_array())
+            cppdatalib::poco::impl::tuple_push_back<Poco::Tuple<Ts...>::length>(bind.get_array_unchecked(), result);
+        return result;
+    }
+};
 
 // ---------------
 //  Dynamic::Pair

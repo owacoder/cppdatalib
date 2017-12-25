@@ -492,8 +492,8 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
         for (auto it = bind.begin(); it != bind.end(); ++it)
-            result.add_member(cppdatalib::core::value(it.key()),
-                              cppdatalib::core::value(it.value()));
+            result.add_member_at_end(cppdatalib::core::value(it.key()),
+                                     cppdatalib::core::value(it.value()));
         return result;
     }
 };
@@ -528,8 +528,8 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
         for (auto it = bind.begin(); it != bind.end(); ++it)
-            result.add_member(cppdatalib::core::value(it.key()),
-                              cppdatalib::core::value(it.value()));
+            result.add_member_at_end(cppdatalib::core::value(it.key()),
+                                     cppdatalib::core::value(it.value()));
         return result;
     }
 };

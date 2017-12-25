@@ -94,7 +94,7 @@ namespace cppdatalib
                     references.top()->push_back(v);
                 else if (!is_key && current_container() == object)
                 {
-                    references.top()->add_member(keys.top()) = v;
+                    references.top()->add_member(keys.top(), v);
                     keys.pop();
                 }
                 else

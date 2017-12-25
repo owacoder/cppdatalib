@@ -1158,22 +1158,43 @@ namespace cppdatalib
             value &add_member(const value &key)
             {
                 clear(object);
-                return obj_ref_().insert({key, null_t()})->second;
+                return obj_ref_().insert(std::make_pair(key, null_t()))->second;
             }
             value &add_member(value &&key)
             {
                 clear(object);
-                return obj_ref_().insert({key, null_t()})->second;
+                return obj_ref_().insert(std::make_pair(std::move(key), null_t()))->second;
             }
             value &add_member(const value &key, const value &val)
             {
                 clear(object);
-                return obj_ref_().insert(std::make_pair(key, null_t()))->second = val;
+                return obj_ref_().insert(std::make_pair(key, val))->second;
             }
             value &add_member(value &&key, value &&val)
             {
                 clear(object);
-                return obj_ref_().insert(std::make_pair(key, null_t()))->second = std::move(val);
+                return obj_ref_().insert(std::make_pair(std::move(key), std::move(val)))->second;
+            }
+
+            value &add_member_at_end(const value &key)
+            {
+                clear(object);
+                return obj_ref_().insert(obj_ref_().end(), std::make_pair(key, null_t()))->second;
+            }
+            value &add_member_at_end(value &&key)
+            {
+                clear(object);
+                return obj_ref_().insert(obj_ref_().end(), std::make_pair(std::move(key), null_t()))->second;
+            }
+            value &add_member_at_end(const value &key, const value &val)
+            {
+                clear(object);
+                return obj_ref_().insert(obj_ref_().end(), std::make_pair(key, val))->second;
+            }
+            value &add_member_at_end(value &&key, value &&val)
+            {
+                clear(object);
+                return obj_ref_().insert(obj_ref_().end(), std::make_pair(std::move(key), std::move(val)))->second;
             }
 
             void push_back(const value &v) {clear(array); arr_ref_().push_back(v);}
@@ -2042,8 +2063,8 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
         for (const auto &item: bind)
-            result.add_member(cppdatalib::core::value(item.first),
-                              cppdatalib::core::value(item.second));
+            result.add_member_at_end(cppdatalib::core::value(item.first),
+                                     cppdatalib::core::value(item.second));
         return result;
     }
 };
@@ -2058,8 +2079,8 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
         for (const auto &item: bind)
-            result.add_member(cppdatalib::core::value(item.first),
-                              cppdatalib::core::value(item.second));
+            result.add_member_at_end(cppdatalib::core::value(item.first),
+                                     cppdatalib::core::value(item.second));
         return result;
     }
 };

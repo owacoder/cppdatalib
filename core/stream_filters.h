@@ -207,7 +207,7 @@ namespace cppdatalib
                                         throw core::error("cppdatalib::core::stream_filter_converter - cannot convert 'array' to 'object' with odd number of elements");
 
                                     for (size_t i = 0; i < value.size(); i += 2)
-                                        obj.add_member(value[i]) = value[i+1];
+                                        obj.add_member(value[i], value[i+1]);
 
                                     value = obj;
                                     break;
