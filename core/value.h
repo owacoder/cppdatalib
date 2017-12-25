@@ -1130,7 +1130,7 @@ namespace cppdatalib
             {
                 clear(object);
                 auto it = obj_ref_().lower_bound(key);
-                if (it->first == key)
+                if (it != obj_ref_().end() && it->first == key)
                     return it->second;
                 it = obj_ref_().insert(it, {key, null_t()});
                 return it->second;
