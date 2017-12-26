@@ -44,7 +44,7 @@ namespace cppdatalib
                         {
                             get_output()->begin_array(*p, p->array_size());
 
-                            references.push(value::traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
+                            references.push(value::traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
                             if (!p->get_array_unchecked().empty())
                                 p = std::addressof(*references.top().array++);
                             else

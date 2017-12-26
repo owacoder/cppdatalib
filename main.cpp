@@ -485,7 +485,6 @@ int readme_simple_test4()
         m2 = p2;
         /*m2 = QVector<int>() << 1 << 2;
         QVector<int> n = m2;*/
-        //std::vector<int> vec = from_cppdatalib<std::vector<int>>(m2);
         QVariant v = m2;
         m2 = v;
         w << m2;                // Write core::value out to STDOUT as JSON

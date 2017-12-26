@@ -118,7 +118,7 @@ namespace cppdatalib
                 if (!is_key && current_container() == array)
                 {
                     references.top()->push_back(core::null_t());
-                    references.push(&references.top()->get_array_ref().back());
+                    references.push(&references.top()->get_array_ref().data().back());
                 }
                 else if (!is_key && current_container() == object)
                 {

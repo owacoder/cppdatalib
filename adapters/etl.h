@@ -31,7 +31,7 @@
  * software nor the authorship and existence of this file.
  */
 
-#include "../core/value.h"
+#include "etl/src/array.h"
 
 /*
  *  TODO: implement conversions for maps, sets, intrusive_queue and intrusive_stack, strings, optional, and variant

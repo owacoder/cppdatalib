@@ -185,19 +185,12 @@ namespace cppdatalib
         typedef std::string string_t;
 #endif
 
-#ifdef CPPDATALIB_ARRAY_T
-        typedef CPPDATALIB_ARRAY_T array_t;
-#else
-        // TODO: evidently undefined behavior to instantiate container holding incomplete type
-        typedef std::vector<value> array_t;
-#endif
-
-#ifdef CPPDATALIB_OBJECT_T
-        typedef CPPDATALIB_OBJECT_T object_t;
-#else
-        // TODO: evidently undefined behavior to instantiate container holding incomplete type
-        typedef std::multimap<value, value> object_t;
-#endif
+        class array_t;
+        class object_t;
+        class array_iterator_t;
+        class array_const_iterator_t;
+        class object_iterator_t;
+        class object_const_iterator_t;
 
 #ifdef CPPDATALIB_SUBTYPE_T
         typedef CPPDATALIB_SUBTYPE_T subtype_t;
@@ -224,36 +217,7 @@ namespace cppdatalib
         class value
         {
         public:
-            struct traversal_reference
-            {
-                traversal_reference(const value *p, array_t::const_iterator a, object_t::const_iterator o, bool traversed_key, bool frozen = false)
-                    : p(p)
-                    , array(a)
-                    , object(o)
-                    , traversed_key_already(traversed_key)
-                    , frozen(frozen)
-                {}
-
-                bool is_array() const {return p && p->is_array() && array != array_t::const_iterator() && array != p->get_array_unchecked().end();}
-                size_t get_array_index() const {return is_array()? array - p->get_array_unchecked().begin(): 0;}
-                const core::value *get_array_element() const {return is_array()? std::addressof(*array): NULL;}
-
-                bool is_object() const {return p && p->is_object() && object != object_t::const_iterator() && object != p->get_object_unchecked().end();}
-                bool is_object_key() const {return is_object() && !traversed_key_already;}
-                const core::value *get_object_key() const {return is_object()? std::addressof(object->first): NULL;}
-                const core::value *get_object_value() const {return is_object()? std::addressof(object->second): NULL;}
-
-            private:
-                friend class value;
-                friend class value_parser;
-
-                const value *p;
-                array_t::const_iterator array;
-                object_t::const_iterator object;
-                bool traversed_key_already;
-                bool frozen;
-            };
-
+            struct traversal_reference;
             struct traversal_ancestry_finder;
 
         private:
@@ -307,500 +271,48 @@ namespace cppdatalib
             // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate, typename PostfixPredicate>
-            void traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
-            {
-                std::stack<traversal_reference, std::vector<traversal_reference>> references;
-                const value *p = this;
-
-                while (!references.empty() || p != NULL)
-                {
-                    if (p != NULL)
-                    {
-                        if (!prefix(p, traversal_ancestry_finder(references)))
-                            return;
-
-                        if (p->is_array())
-                        {
-                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
-                            if (!p->get_array_unchecked().empty())
-                                p = std::addressof(*references.top().array++);
-                            else
-                                p = NULL;
-                        }
-                        else if (p->is_object())
-                        {
-                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
-                            if (!p->get_object_unchecked().empty())
-                                p = std::addressof(references.top().object->first);
-                            else
-                                p = NULL;
-                        }
-                        else
-                        {
-                            references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
-                            p = NULL;
-                        }
-                    }
-                    else
-                    {
-                        const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                            p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
-                        {
-                            if (!references.top().traversed_key_already)
-                                p = std::addressof(references.top().object->first);
-                            else
-                                p = std::addressof((references.top().object++)->second);
-
-                            references.top().traversed_key_already = !references.top().traversed_key_already;
-                        }
-                        else
-                        {
-                            references.pop();
-                            if (!postfix(peek, traversal_ancestry_finder(references)))
-                                return;
-                        }
-                    }
-                }
-            }
+            void traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const;
 
             // Predicates must be callables with argument types `const core::value *arg, core::value::traversal_ancestry_finder arg_finder, bool prefix` and return value bool
             // `prefix` is set to true if the current invocation is for the prefix handling of the specified element
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename Predicate>
-            void traverse(Predicate &predicate) const
-            {
-                std::stack<traversal_reference, std::vector<traversal_reference>> references;
-                const value *p = this;
-
-                while (!references.empty() || p != NULL)
-                {
-                    if (p != NULL)
-                    {
-                        if (!predicate(p, traversal_ancestry_finder(references), true))
-                            return;
-
-                        if (p->is_array())
-                        {
-                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
-                            if (!p->get_array_unchecked().empty())
-                                p = std::addressof(*references.top().array++);
-                            else
-                                p = NULL;
-                        }
-                        else if (p->is_object())
-                        {
-                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
-                            if (!p->get_object_unchecked().empty())
-                                p = std::addressof(references.top().object->first);
-                            else
-                                p = NULL;
-                        }
-                        else
-                        {
-                            references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
-                            p = NULL;
-                        }
-                    }
-                    else
-                    {
-                        const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                            p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
-                        {
-                            if (!references.top().traversed_key_already)
-                                p = std::addressof(references.top().object->first);
-                            else
-                                p = std::addressof((references.top().object++)->second);
-
-                            references.top().traversed_key_already = !references.top().traversed_key_already;
-                        }
-                        else
-                        {
-                            references.pop();
-                            if (!predicate(peek, traversal_ancestry_finder(references), false))
-                                return;
-                        }
-                    }
-                }
-            }
+            void traverse(Predicate &predicate) const;
 
             // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             // NOTE: The predicate is only called for object values, not object keys. It's invoked for all other values.
             template<typename PrefixPredicate, typename PostfixPredicate>
-            void value_traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
-            {
-                std::stack<traversal_reference, std::vector<traversal_reference>> references;
-                const value *p = this;
-
-                while (!references.empty() || p != NULL)
-                {
-                    if (p != NULL)
-                    {
-                        if (!prefix(p, traversal_ancestry_finder(references)))
-                            return;
-
-                        if (p->is_array())
-                        {
-                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
-                            if (!p->get_array_unchecked().empty())
-                                p = std::addressof(*references.top().array++);
-                            else
-                                p = NULL;
-                        }
-                        else if (p->is_object())
-                        {
-                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
-                            if (!p->get_object_unchecked().empty())
-                                p = std::addressof((references.top().object++)->second);
-                            else
-                                p = NULL;
-                        }
-                        else
-                        {
-                            references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
-                            p = NULL;
-                        }
-                    }
-                    else
-                    {
-                        const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                            p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
-                            p = std::addressof((references.top().object++)->second);
-                        else
-                        {
-                            references.pop();
-                            if (!postfix(peek, traversal_ancestry_finder(references)))
-                                return;
-                        }
-                    }
-                }
-            }
+            void value_traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const;
 
             // Predicates must be callables with argument types `const core::value *arg, core::value::traversal_ancestry_finder arg_finder, bool prefix` and return value bool
             // `prefix` is set to true if the current invocation is for the prefix handling of the specified element
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             // NOTE: The predicate is only called for object values, not object keys. It's invoked for all other values.
             template<typename Predicate>
-            void value_traverse(Predicate &predicate) const
-            {
-                std::stack<traversal_reference, std::vector<traversal_reference>> references;
-                const value *p = this;
-
-                while (!references.empty() || p != NULL)
-                {
-                    if (p != NULL)
-                    {
-                        if (!predicate(p, traversal_ancestry_finder(references), true))
-                            return;
-
-                        if (p->is_array())
-                        {
-                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
-                            if (!p->get_array_unchecked().empty())
-                                p = std::addressof(*references.top().array++);
-                            else
-                                p = NULL;
-                        }
-                        else if (p->is_object())
-                        {
-                            references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
-                            if (!p->get_object_unchecked().empty())
-                                p = std::addressof((references.top().object++)->second);
-                            else
-                                p = NULL;
-                        }
-                        else
-                        {
-                            references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
-                            p = NULL;
-                        }
-                    }
-                    else
-                    {
-                        const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                            p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
-                            p = std::addressof((references.top().object++)->second);
-                        else
-                        {
-                            references.pop();
-                            if (!predicate(peek, traversal_ancestry_finder(references), false))
-                                return;
-                        }
-                    }
-                }
-            }
+            void value_traverse(Predicate &predicate) const;
 
             // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate>
-            void prefix_traverse(PrefixPredicate &prefix) {traverse(prefix, traverse_node_null);}
+            void prefix_traverse(PrefixPredicate &prefix);
 
             // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PostfixPredicate>
-            void postfix_traverse(PostfixPredicate &postfix) {traverse(traverse_node_null, postfix);}
+            void postfix_traverse(PostfixPredicate &postfix);
 
             // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2, core::value::traversal_ancestry_finder arg_finder, core::value::traversal_ancestry_finder arg2_finder`
             // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate, typename PostfixPredicate>
-            void parallel_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
-            {
-                std::stack<traversal_reference, std::vector<traversal_reference>> references;
-                std::stack<traversal_reference, std::vector<traversal_reference>> other_references;
-                const value *p = this, *other_p = &other;
-
-                while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
-                {
-                    if (p != NULL || other_p != NULL)
-                    {
-                        if (!prefix(p, other_p, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
-                            return;
-
-                        if (p != NULL)
-                        {
-                            if (p->is_array())
-                            {
-                                references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false));
-                                if (!p->get_array_unchecked().empty())
-                                    p = std::addressof(*references.top().array++);
-                                else
-                                    p = NULL;
-                            }
-                            else if (p->is_object())
-                            {
-                                references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
-                                if (!p->get_object_unchecked().empty())
-                                    p = std::addressof(references.top().object->first);
-                                else
-                                    p = NULL;
-                            }
-                            else
-                            {
-                                references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false));
-                                p = NULL;
-                            }
-                        }
-
-                        if (other_p != NULL)
-                        {
-                            if (other_p->is_array())
-                            {
-                                other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin(), object_t::const_iterator(), false));
-                                if (!other_p->get_array_unchecked().empty())
-                                    other_p = std::addressof(*other_references.top().array++);
-                                else
-                                    other_p = NULL;
-                            }
-                            else if (other_p->is_object())
-                            {
-                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), other_p->get_object_unchecked().begin(), true));
-                                if (!other_p->get_object_unchecked().empty())
-                                    other_p = std::addressof(other_references.top().object->first);
-                                else
-                                    other_p = NULL;
-                            }
-                            else
-                            {
-                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), object_t::const_iterator(), false));
-                                other_p = NULL;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        const value *peek = references.empty()? NULL: references.top().p;
-                        const value *other_peek = other_references.empty()? NULL: other_references.top().p;
-
-                        if (peek)
-                        {
-                            if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                                p = std::addressof(*references.top().array++);
-                            else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
-                            {
-                                if (!references.top().traversed_key_already)
-                                    p = std::addressof(references.top().object->first);
-                                else
-                                    p = std::addressof((references.top().object++)->second);
-
-                                references.top().traversed_key_already = !references.top().traversed_key_already;
-                            }
-                        }
-
-                        if (other_peek)
-                        {
-                            if (other_peek->is_array() && other_references.top().array != other_peek->get_array_unchecked().end())
-                                other_p = std::addressof(*other_references.top().array++);
-                            else if (other_peek->is_object() && other_references.top().object != other_peek->get_object_unchecked().end())
-                            {
-                                if (!other_references.top().traversed_key_already)
-                                    other_p = std::addressof(other_references.top().object->first);
-                                else
-                                    other_p = std::addressof((other_references.top().object++)->second);
-
-                                other_references.top().traversed_key_already = !other_references.top().traversed_key_already;
-                            }
-                        }
-
-                        if (p == NULL && other_p == NULL)
-                        {
-                            if (peek != NULL) references.pop();
-                            if (other_peek != NULL) other_references.pop();
-                            if (!postfix(peek, other_peek, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
-                                return;
-                        }
-                    }
-                }
-            }
+            void parallel_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const;
 
             // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2, core::value::traversal_ancestry_finder arg_finder, core::value::traversal_ancestry_finder arg2_finder`
             // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate, typename PostfixPredicate>
-            void parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
-            {
-                std::stack<traversal_reference, std::vector<traversal_reference>> references;
-                std::stack<traversal_reference, std::vector<traversal_reference>> other_references;
-                const value *p = this, *other_p = &other;
-
-                while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
-                {
-                    if (p != NULL || other_p != NULL)
-                    {
-                        bool p_frozen = false, other_p_frozen = false;
-
-                        auto save_refs = references;
-                        auto save_other_refs = other_references;
-
-                        if (!save_refs.empty() && !save_refs.top().is_array() && !save_refs.top().is_object())
-                            save_refs.pop();
-
-                        if (!save_other_refs.empty() && !save_other_refs.top().is_array() && !save_other_refs.top().is_object())
-                            save_other_refs.pop();
-
-                        traversal_reference save_ref = save_refs.empty()? traversal_reference(NULL, array_t::const_iterator(), object_t::const_iterator(), false): save_refs.top();
-                        traversal_reference save_other_ref = save_other_refs.empty()? traversal_reference(NULL, array_t::const_iterator(), object_t::const_iterator(), false): save_other_refs.top();
-
-                        if (save_ref.is_object() && save_other_ref.is_object())
-                        {
-                            p_frozen = false;
-                            other_p_frozen = false;
-                            if (*save_ref.get_object_key() < *save_other_ref.get_object_key())
-                                other_p_frozen = true;
-                            else if (*save_other_ref.get_object_key() < *save_ref.get_object_key())
-                                p_frozen = true;
-                        }
-
-                        if (!prefix(p_frozen? NULL: p, other_p_frozen? NULL: other_p, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
-                            return;
-
-                        if (p != NULL)
-                        {
-                            if (p->is_array())
-                            {
-                                references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_t::const_iterator(), false, p_frozen));
-                                if (!p->get_array_unchecked().empty() && !p_frozen)
-                                    p = std::addressof(*references.top().array++);
-                                else
-                                    p = NULL;
-                            }
-                            else if (p->is_object())
-                            {
-                                references.push(traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true, p_frozen));
-                                if (!p->get_object_unchecked().empty() && !p_frozen)
-                                    p = std::addressof(references.top().object->first);
-                                else
-                                    p = NULL;
-                            }
-                            else
-                            {
-                                references.push(traversal_reference(p, array_t::const_iterator(), object_t::const_iterator(), false, p_frozen));
-                                p = NULL;
-                            }
-                        }
-
-                        if (other_p != NULL)
-                        {
-                            if (other_p->is_array())
-                            {
-                                other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin(), object_t::const_iterator(), false, other_p_frozen));
-                                if (!other_p->get_array_unchecked().empty() && !other_p_frozen)
-                                    other_p = std::addressof(*other_references.top().array++);
-                                else
-                                    other_p = NULL;
-                            }
-                            else if (other_p->is_object())
-                            {
-                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), other_p->get_object_unchecked().begin(), true, other_p_frozen));
-                                if (!other_p->get_object_unchecked().empty() && !other_p_frozen)
-                                    other_p = std::addressof(other_references.top().object->first);
-                                else
-                                    other_p = NULL;
-                            }
-                            else
-                            {
-                                other_references.push(traversal_reference(other_p, array_t::const_iterator(), object_t::const_iterator(), false, other_p_frozen));
-                                other_p = NULL;
-                            }
-                        }
-                    }
-                    else // p and other_p are both NULL here
-                    {
-                        const value *peek = references.empty()? NULL: references.top().p;
-                        const value *other_peek = other_references.empty()? NULL: other_references.top().p;
-                        bool p_was_frozen = peek? references.top().frozen: false;
-                        bool other_p_was_frozen = peek? other_references.top().frozen: false;
-
-                        if (peek)
-                        {
-                            if (references.top().frozen)
-                                p = references.top().p;
-                            else if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                                p = std::addressof(*references.top().array++);
-                            else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
-                            {
-                                if (!references.top().traversed_key_already)
-                                    p = std::addressof(references.top().object->first);
-                                else
-                                    p = std::addressof((references.top().object++)->second);
-
-                                references.top().traversed_key_already = !references.top().traversed_key_already;
-                            }
-                        }
-
-                        if (other_peek)
-                        {
-                            if (other_references.top().frozen)
-                                other_p = other_references.top().p;
-                            else if (other_peek->is_array() && other_references.top().array != other_peek->get_array_unchecked().end())
-                                other_p = std::addressof(*other_references.top().array++);
-                            else if (other_peek->is_object() && other_references.top().object != other_peek->get_object_unchecked().end())
-                            {
-                                if (!other_references.top().traversed_key_already)
-                                    other_p = std::addressof(other_references.top().object->first);
-                                else
-                                    other_p = std::addressof((other_references.top().object++)->second);
-
-                                other_references.top().traversed_key_already = !other_references.top().traversed_key_already;
-                            }
-                        }
-
-                        if (peek != NULL) references.pop();
-                        if (other_peek != NULL) other_references.pop();
-                        if (!postfix(p_was_frozen? NULL: peek, other_p_was_frozen? NULL: other_peek, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
-                            return;
-                    }
-                }
-            }
-
+            void parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const;
             value() : type_(null), subtype_(core::normal) {}
             value(null_t, subtype_t subtype = core::normal) : type_(null), subtype_(subtype) {}
             value(bool_t v, subtype_t subtype = core::normal) {bool_init(subtype, v);}
@@ -810,10 +322,10 @@ namespace cppdatalib
             value(cstring_t v, subtype_t subtype = core::normal) {string_init(subtype, v);}
             value(const string_t &v, subtype_t subtype = core::normal) {string_init(subtype, v);}
             value(string_t &&v, subtype_t subtype = core::normal) {string_init(subtype, std::move(v));}
-            value(const array_t &v, subtype_t subtype = core::normal) {array_init(subtype, v);}
-            value(array_t &&v, subtype_t subtype = core::normal) {array_init(subtype, std::move(v));}
-            value(const object_t &v, subtype_t subtype = core::normal) {object_init(subtype, v);}
-            value(object_t &&v, subtype_t subtype = core::normal) {object_init(subtype, std::move(v));}
+            value(const array_t &v, subtype_t subtype = core::normal);
+            value(array_t &&v, subtype_t subtype = core::normal);
+            value(const object_t &v, subtype_t subtype = core::normal);
+            value(object_t &&v, subtype_t subtype = core::normal);
             template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = core::normal) {int_init(subtype, v);}
             template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
@@ -848,53 +360,12 @@ namespace cppdatalib
                 assign(*this, cast_sized_template_to_cppdatalib<Template, N>(v));
             }
 
-            ~value()
-            {
-                if ((type_ == array && arr_ref_().size() > 0) ||
-                    (type_ == object && obj_ref_().size() > 0))
-                    traverse(traverse_node_null, traverse_node_mutable_clear);
-                deinit();
-            }
+            ~value();
 
             value(const value &other) : type_(null), subtype_(core::normal) {assign(*this, other);}
-            value(value &&other)
-            {
-                switch (other.type_)
-                {
-                    case boolean: new (&bool_) bool_t(std::move(other.bool_)); break;
-                    case integer: new (&int_) int_t(std::move(other.int_)); break;
-                    case uinteger: new (&uint_) uint_t(std::move(other.uint_)); break;
-                    case real: new (&real_) real_t(std::move(other.real_)); break;
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                    case string: new (&str_) string_t(std::move(other.str_)); break;
-#else
-                    case string: new (&ptr_) string_t*(); ptr_ = new string_t(std::move(other.str_ref_())); break;
-#endif
-                    case array: new (&ptr_) array_t*(); ptr_ = new array_t(std::move(other.arr_ref_())); break;
-                    case object: new (&ptr_) object_t*(); ptr_ = new object_t(std::move(other.obj_ref_())); break;
-                    default: break;
-                }
-                type_ = other.type_;
-                subtype_ = other.subtype_;
-            }
+            value(value &&other);
             value &operator=(const value &other) {return assign(*this, other);}
-            value &operator=(value &&other)
-            {
-                clear(other.type_);
-                switch (other.type_)
-                {
-                    case boolean: bool_ = std::move(other.bool_); break;
-                    case integer: int_ = std::move(other.int_); break;
-                    case uinteger: uint_ = std::move(other.uint_); break;
-                    case real: real_ = std::move(other.real_); break;
-                    case string: str_ref_() = std::move(other.str_ref_()); break;
-                    case array: arr_ref_() = std::move(other.arr_ref_()); break;
-                    case object: obj_ref_() = std::move(other.obj_ref_()); break;
-                    default: break;
-                }
-                subtype_ = other.subtype_;
-                return *this;
-            }
+            value &operator=(value &&other);
 
             void swap(value &other)
             {
@@ -928,9 +399,9 @@ namespace cppdatalib
             void set_subtype(subtype_t _type) {subtype_ = _type;}
 
             type get_type() const {return type_;}
-            size_t size() const {return is_array()? arr_ref_().size(): is_object()? obj_ref_().size(): is_string()? str_ref_().size(): 0;}
-            size_t array_size() const {return is_array()? arr_ref_().size(): 0;}
-            size_t object_size() const {return is_object()? obj_ref_().size(): 0;}
+            size_t size() const;
+            size_t array_size() const;
+            size_t object_size() const;
             size_t string_size() const {return is_string()? str_ref_().size(): 0;}
 
             bool_t is_null() const {return type_ == null;}
@@ -966,8 +437,8 @@ namespace cppdatalib
             void set_real(real_t v) {clear(real); real_ = v;}
             void set_string(cstring_t v) {clear(string); str_ref_() = v;}
             void set_string(const string_t &v) {clear(string); str_ref_() = v;}
-            void set_array(const array_t &v) {clear(array); arr_ref_() = v;}
-            void set_object(const object_t &v) {clear(object); obj_ref_() = v;}
+            void set_array(const array_t &v);
+            void set_object(const object_t &v);
 
             void set_null(subtype_t subtype) {clear(null); subtype_ = subtype;}
             void set_bool(bool_t v, subtype_t subtype) {clear(boolean); bool_ = v; subtype_ = subtype;}
@@ -976,107 +447,43 @@ namespace cppdatalib
             void set_real(real_t v, subtype_t subtype) {clear(real); real_ = v; subtype_ = subtype;}
             void set_string(cstring_t v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
             void set_string(const string_t &v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
-            void set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ref_() = v; subtype_ = subtype;}
-            void set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ref_() = v; subtype_ = subtype;}
+            void set_array(const array_t &v, subtype_t subtype);
+            void set_object(const object_t &v, subtype_t subtype);
 
-            value operator[](cstring_t key) const {return member(key);}
-            value &operator[](cstring_t key) {return member(key);}
-            value operator[](const string_t &key) const {return member(key);}
-            value &operator[](const string_t &key) {return member(key);}
-            value member(const value &key) const
-            {
-                if (is_object())
-                {
-                    auto it = obj_ref_().find(key);
-                    if (it != obj_ref_().end())
-                        return it->second;
-                }
-                return value();
-            }
-            value &member(const value &key)
-            {
-                clear(object);
-                auto it = obj_ref_().lower_bound(key);
-                if (it != obj_ref_().end() && it->first == key)
-                    return it->second;
-                it = obj_ref_().insert(it, {key, null_t()});
-                return it->second;
-            }
-            const value *member_ptr(const value &key) const
-            {
-                if (is_object())
-                {
-                    auto it = obj_ref_().find(key);
-                    if (it != obj_ref_().end())
-                        return std::addressof(it->second);
-                }
-                return NULL;
-            }
-            bool_t is_member(cstring_t key) const {return is_object() && obj_ref_().find(key) != obj_ref_().end();}
-            bool_t is_member(const string_t &key) const {return is_object() && obj_ref_().find(key) != obj_ref_().end();}
-            bool_t is_member(const value &key) const {return is_object() && obj_ref_().find(key) != obj_ref_().end();}
-            size_t member_count(cstring_t key) const {return is_object()? obj_ref_().count(key): 0;}
-            size_t member_count(const string_t &key) const {return is_object()? obj_ref_().count(key): 0;}
-            size_t member_count(const value &key) const {return is_object()? obj_ref_().count(key): 0;}
-            void erase_member(cstring_t key) {if (is_object()) obj_ref_().erase(key);}
-            void erase_member(const string_t &key) {if (is_object()) obj_ref_().erase(key);}
-            void erase_member(const value &key) {if (is_object()) obj_ref_().erase(key);}
+            value operator[](cstring_t key) const;
+            value &operator[](cstring_t key);
+            value operator[](const string_t &key) const;
+            value &operator[](const string_t &key);
+            value member(const value &key) const;
+            value &member(const value &key);
+            const value *member_ptr(const value &key) const;
+            bool_t is_member(cstring_t key) const;
+            bool_t is_member(const string_t &key) const;
+            bool_t is_member(const value &key) const;
+            size_t member_count(cstring_t key) const;
+            size_t member_count(const string_t &key) const;
+            size_t member_count(const value &key) const;
+            void erase_member(cstring_t key);
+            void erase_member(const string_t &key);
+            void erase_member(const value &key);
 
-            value &add_member(const value &key)
-            {
-                clear(object);
-                return obj_ref_().insert(std::make_pair(key, null_t()))->second;
-            }
-            value &add_member(value &&key)
-            {
-                clear(object);
-                return obj_ref_().insert(std::make_pair(std::move(key), null_t()))->second;
-            }
-            value &add_member(const value &key, const value &val)
-            {
-                clear(object);
-                return obj_ref_().insert(std::make_pair(key, val))->second;
-            }
-            value &add_member(value &&key, value &&val)
-            {
-                clear(object);
-                return obj_ref_().insert(std::make_pair(std::move(key), std::move(val)))->second;
-            }
+            value &add_member(const value &key);
+            value &add_member(value &&key);
+            value &add_member(const value &key, const value &val);
+            value &add_member(value &&key, value &&val);
 
-            value &add_member_at_end(const value &key)
-            {
-                clear(object);
-                return obj_ref_().insert(obj_ref_().end(), std::make_pair(key, null_t()))->second;
-            }
-            value &add_member_at_end(value &&key)
-            {
-                clear(object);
-                return obj_ref_().insert(obj_ref_().end(), std::make_pair(std::move(key), null_t()))->second;
-            }
-            value &add_member_at_end(const value &key, const value &val)
-            {
-                clear(object);
-                return obj_ref_().insert(obj_ref_().end(), std::make_pair(key, val))->second;
-            }
-            value &add_member_at_end(value &&key, value &&val)
-            {
-                clear(object);
-                return obj_ref_().insert(obj_ref_().end(), std::make_pair(std::move(key), std::move(val)))->second;
-            }
+            value &add_member_at_end(const value &key);
+            value &add_member_at_end(value &&key);
+            value &add_member_at_end(const value &key, const value &val);
+            value &add_member_at_end(value &&key, value &&val);
 
-            void push_back(const value &v) {clear(array); arr_ref_().push_back(v);}
-            void push_back(value &&v) {clear(array); arr_ref_().push_back(v);}
-            value operator[](size_t pos) const {return element(pos);}
-            value &operator[](size_t pos) {return element(pos);}
-            value element(size_t pos) const {return is_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
-            value &element(size_t pos)
-            {
-                clear(array);
-                if (arr_ref_().size() <= pos)
-                    arr_ref_().insert(arr_ref_().end(), pos - arr_ref_().size() + 1, core::null_t());
-                return arr_ref_()[pos];
-            }
-            void erase_element(int_t pos) {if (is_array()) arr_ref_().erase(arr_ref_().begin() + pos);}
+            void push_back(const value &v);
+            void push_back(value &&v);
+            value operator[](size_t pos) const;
+            value &operator[](size_t pos);
+            value element(size_t pos) const;
+            value &element(size_t pos);
+            void erase_element(int_t pos);
 
             // The following are convenience conversion functions
             bool_t get_bool(bool_t default_ = false) const {return is_bool()? bool_: default_;}
@@ -1085,24 +492,30 @@ namespace cppdatalib
             real_t get_real(real_t default_ = 0.0) const {return is_real()? real_: default_;}
             cstring_t get_cstring(cstring_t default_ = "") const {return is_string()? str_ref_().c_str(): default_;}
             string_t get_string(const string_t &default_ = string_t()) const {return is_string()? str_ref_(): default_;}
-            array_t get_array(const array_t &default_ = array_t()) const {return is_array()? arr_ref_(): default_;}
-            object_t get_object(const object_t &default_ = object_t()) const {return is_object()? obj_ref_(): default_;}
+            array_t get_array(const array_t &default_) const;
+            object_t get_object(const object_t &default_) const;
+            array_t get_array() const;
+            object_t get_object() const;
 
             bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, default_).bool_;}
             int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, default_).int_;}
             uint_t as_uint(uint_t default_ = 0) const {return value(*this).convert_to(uinteger, default_).uint_;}
             real_t as_real(real_t default_ = 0.0) const {return value(*this).convert_to(real, default_).real_;}
             string_t as_string(const string_t &default_ = string_t()) const {return value(*this).convert_to(string, default_).str_ref_();}
-            array_t as_array(const array_t &default_ = array_t()) const {return value(*this).convert_to(array, default_).arr_ref_();}
-            object_t as_object(const object_t &default_ = object_t()) const {return value(*this).convert_to(object, default_).obj_ref_();}
+            array_t as_array(const array_t &default_) const;
+            object_t as_object(const object_t &default_) const;
+            array_t as_array() const;
+            object_t as_object() const;
 
             bool_t &convert_to_bool(bool_t default_ = false) {return convert_to(boolean, default_).bool_;}
             int_t &convert_to_int(int_t default_ = 0) {return convert_to(integer, default_).int_;}
             uint_t &convert_to_uint(uint_t default_ = 0) {return convert_to(uinteger, default_).uint_;}
             real_t &convert_to_real(real_t default_ = 0.0) {return convert_to(real, default_).real_;}
             string_t &convert_to_string(const string_t &default_ = string_t()) {return convert_to(string, default_).str_ref_();}
-            array_t &convert_to_array(const array_t &default_ = array_t()) {return convert_to(array, default_).arr_ref_();}
-            object_t &convert_to_object(const object_t &default_ = object_t()) {return convert_to(object, default_).obj_ref_();}
+            array_t &convert_to_array(const array_t &default_) {return convert_to(array, default_).arr_ref_();}
+            object_t &convert_to_object(const object_t &default_) {return convert_to(object, default_).obj_ref_();}
+            array_t &convert_to_array();
+            object_t &convert_to_object();
 
             template<typename T>
             operator T() const {return cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this);}
@@ -1121,28 +534,7 @@ namespace cppdatalib
             // It violates const-correctness for the sole purpose of allowing
             // complex object keys to be destroyed iteratively, instead of recursively.
             // (They're defined as `const` members in the std::map implementation)
-            void mutable_clear() const
-            {
-                typedef void *ptr;
-
-                switch (type_)
-                {
-                    case boolean: bool_.~bool_t(); break;
-                    case integer: int_.~int_t(); break;
-                    case uinteger: uint_.~uint_t(); break;
-                    case real: real_.~real_t(); break;
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                    case string: str_.~string_t(); break;
-#else
-                    case string: delete reinterpret_cast<string_t*>(ptr_); ptr_.~ptr(); break;
-#endif
-                    case array: delete reinterpret_cast<array_t*>(ptr_); ptr_.~ptr(); break;
-                    case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
-                    default: break;
-                }
-                type_ = null;
-            }
-
+            void mutable_clear() const;
             void shallow_clear() {deinit();}
 
             void clear(type new_type)
@@ -1154,26 +546,7 @@ namespace cppdatalib
                 init(new_type, normal);
             }
 
-            void init(type new_type, subtype_t new_subtype)
-            {
-                switch (new_type)
-                {
-                    case boolean: new (&bool_) bool_t(); break;
-                    case integer: new (&int_) int_t(); break;
-                    case uinteger: new (&uint_) uint_t(); break;
-                    case real: new (&real_) real_t(); break;
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                    case string: new (&str_) string_t(); break;
-#else
-                    case string: new (&ptr_) string_t*(); ptr_ = new string_t(); break;
-#endif
-                    case array: new (&ptr_) array_t*(); ptr_ = new array_t(); break;
-                    case object: new (&ptr_) object_t*(); ptr_ = new object_t(); break;
-                    default: break;
-                }
-                type_ = new_type;
-                subtype_ = new_subtype;
-            }
+            void init(type new_type, subtype_t new_subtype);
 
             template<typename... Args>
             void bool_init(subtype_t new_subtype, Args... args)
@@ -1235,28 +608,7 @@ namespace cppdatalib
                 subtype_ = new_subtype;
             }
 
-            void deinit()
-            {
-                typedef void *ptr;
-
-                switch (type_)
-                {
-                    case boolean: bool_.~bool_t(); break;
-                    case integer: int_.~int_t(); break;
-                    case uinteger: uint_.~uint_t(); break;
-                    case real: real_.~real_t(); break;
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                    case string: str_.~string_t(); break;
-#else
-                    case string: delete reinterpret_cast<string_t*>(ptr_); ptr_.~ptr(); break;
-#endif
-                    case array: delete reinterpret_cast<array_t*>(ptr_); ptr_.~ptr(); break;
-                    case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
-                    default: break;
-                }
-                type_ = null;
-                subtype_ = normal;
-            }
+            void deinit();
 
             // TODO: ensure that all conversions are generic enough (for example, string -> bool doesn't just need to be "true")
             value &convert_to(type new_type, const value &default_value)
@@ -1406,6 +758,945 @@ namespace cppdatalib
             mutable type type_; // Mutable to provide editable traversal access to const destructor
             subtype_t subtype_;
         };
+
+        namespace impl
+        {
+            template<typename IteratorType, typename PointedTo>
+            struct const_iterator_t
+            {
+                const_iterator_t(IteratorType iterator = IteratorType()) : it(iterator) {}
+                virtual ~const_iterator_t() {}
+
+                IteratorType &data() {return it;}
+                const IteratorType &data() const {return it;}
+
+                operator IteratorType &() {return it;}
+                operator const IteratorType &() const {return it;}
+
+                const_iterator_t<IteratorType, PointedTo> &operator++() {++it; return *this;}
+                const_iterator_t<IteratorType, PointedTo> operator++(int) {const_iterator_t<IteratorType, PointedTo> temp(*this); ++it; return temp;}
+
+                const PointedTo &operator*() const {return *it;}
+                const PointedTo *operator->() const {return it.operator->();}
+
+            protected:
+                IteratorType it;
+            };
+
+            template<typename IteratorType, typename PointedTo>
+            bool operator==(const const_iterator_t<IteratorType, PointedTo> &lhs, const const_iterator_t<IteratorType, PointedTo> &rhs)
+            {
+                return lhs.data() == rhs.data();
+            }
+            template<typename IteratorType, typename PointedTo>
+            bool operator!=(const const_iterator_t<IteratorType, PointedTo> &lhs, const const_iterator_t<IteratorType, PointedTo> &rhs)
+            {
+                return !(lhs == rhs);
+            }
+
+            template<typename IteratorType, typename PointedTo>
+            struct iterator_t
+            {
+                iterator_t(IteratorType iterator = IteratorType()) : it(iterator) {}
+                virtual ~iterator_t() {}
+
+                IteratorType &data() {return it;}
+                const IteratorType &data() const {return it;}
+
+                operator IteratorType &() {return it;}
+                operator const IteratorType &() const {return it;}
+
+                iterator_t<IteratorType, PointedTo> &operator++() {++it; return *this;}
+                iterator_t<IteratorType, PointedTo> operator++(int) {iterator_t<IteratorType, PointedTo> temp(*this); ++it; return temp;}
+
+                PointedTo &operator*() {return *it;}
+                PointedTo *operator->() {return it.operator->();}
+
+            protected:
+                IteratorType it;
+            };
+
+            template<typename IteratorType, typename PointedTo>
+            bool operator==(const iterator_t<IteratorType, PointedTo> &lhs, const iterator_t<IteratorType, PointedTo> &rhs)
+            {
+                return lhs.data() == rhs.data();
+            }
+            template<typename IteratorType, typename PointedTo>
+            bool operator!=(const iterator_t<IteratorType, PointedTo> &lhs, const iterator_t<IteratorType, PointedTo> &rhs)
+            {
+                return !(lhs == rhs);
+            }
+        }
+
+        struct array_t
+        {
+#ifdef CPPDATALIB_ARRAY_T
+            typedef CPPDATALIB_ARRAY_T container_type;
+#else
+            typedef std::vector<value> container_type;
+#endif
+            array_t() {}
+            array_t(const container_type &data) : m_data(data) {}
+            array_t(std::initializer_list<typename container_type::value_type> il) : m_data{il} {}
+            template<typename... Ts>
+            array_t(Ts&&... args) : m_data(std::forward<Ts>(args)...) {}
+
+            typedef typename container_type::iterator iterator;
+            typedef typename container_type::const_iterator const_iterator;
+
+            bool empty() const {return m_data.empty();}
+            size_t size() const {return m_data.size();}
+
+            array_iterator_t begin();
+            array_const_iterator_t begin() const;
+            array_iterator_t end();
+            array_const_iterator_t end() const;
+            array_const_iterator_t cbegin() const;
+            array_const_iterator_t cend() const;
+
+            container_type &data() {return m_data;}
+            const container_type &data() const {return m_data;}
+
+            operator container_type &() {return m_data;}
+            operator const container_type &() const {return m_data;}
+
+        private:
+            container_type m_data;
+        };
+
+        struct array_iterator_t : public impl::iterator_t<array_t::iterator, typename array_t::container_type::value_type>
+        {
+            using impl::iterator_t<array_t::iterator, typename array_t::container_type::value_type>::iterator_t;
+        };
+        struct array_const_iterator_t : public impl::const_iterator_t<array_t::const_iterator, const typename array_t::container_type::value_type>
+        {
+            using impl::const_iterator_t<array_t::const_iterator, const typename array_t::container_type::value_type>::const_iterator_t;
+        };
+
+        array_iterator_t array_t::begin() {return m_data.begin();}
+        array_const_iterator_t array_t::begin() const {return m_data.begin();}
+        array_iterator_t array_t::end() {return m_data.end();}
+        array_const_iterator_t array_t::end() const {return m_data.end();}
+        array_const_iterator_t array_t::cbegin() const {return m_data.cbegin();}
+        array_const_iterator_t array_t::cend() const {return m_data.cend();}
+
+        struct object_t
+        {
+#ifdef CPPDATALIB_OBJECT_T
+            typedef CPPDATALIB_OBJECT_T container_type;
+#else
+            typedef std::multimap<value, value> container_type;
+#endif
+            object_t() {}
+            object_t(const container_type &data) : m_data(data) {}
+            object_t(std::initializer_list<typename container_type::value_type> il) : m_data{il} {}
+            template<typename... Ts>
+            object_t(Ts&&... args) : m_data(std::forward<Ts>(args)...) {}
+
+            typedef typename container_type::iterator iterator;
+            typedef typename container_type::const_iterator const_iterator;
+
+            bool empty() const {return m_data.empty();}
+            size_t size() const {return m_data.size();}
+
+            object_iterator_t begin();
+            object_const_iterator_t begin() const;
+            object_iterator_t end();
+            object_const_iterator_t end() const;
+            object_const_iterator_t cbegin() const;
+            object_const_iterator_t cend() const;
+
+            container_type &data() {return m_data;}
+            const container_type &data() const {return m_data;}
+
+            operator container_type &() {return m_data;}
+            operator const container_type &() const {return m_data;}
+
+        private:
+            container_type m_data;
+        };
+
+        struct object_iterator_t : public impl::iterator_t<object_t::iterator, typename object_t::container_type::value_type>
+        {
+            using impl::iterator_t<object_t::iterator, typename object_t::container_type::value_type>::iterator_t;
+        };
+        struct object_const_iterator_t : public impl::const_iterator_t<object_t::const_iterator, typename object_t::container_type::value_type>
+        {
+            using impl::const_iterator_t<object_t::const_iterator, typename object_t::container_type::value_type>::const_iterator_t;
+        };
+
+        object_iterator_t object_t::begin() {return m_data.begin();}
+        object_const_iterator_t object_t::begin() const {return m_data.begin();}
+        object_iterator_t object_t::end() {return m_data.end();}
+        object_const_iterator_t object_t::end() const {return m_data.end();}
+        object_const_iterator_t object_t::cbegin() const {return m_data.cbegin();}
+        object_const_iterator_t object_t::cend() const {return m_data.cend();}
+
+        struct value::traversal_reference
+        {
+            traversal_reference(const value *p, array_const_iterator_t a, object_const_iterator_t o, bool traversed_key, bool frozen = false)
+                : p(p)
+                , array(a)
+                , object(o)
+                , traversed_key_already(traversed_key)
+                , frozen(frozen)
+            {}
+
+            bool is_array() const {return p && p->is_array() && array != array_const_iterator_t() && array != p->get_array_unchecked().end();}
+            size_t get_array_index() const {return is_array()? array.data() - p->get_array_unchecked().begin().data(): 0;}
+            const core::value *get_array_element() const {return is_array()? std::addressof(*array): NULL;}
+
+            bool is_object() const {return p && p->is_object() && object != object_const_iterator_t() && object != p->get_object_unchecked().end();}
+            bool is_object_key() const {return is_object() && !traversed_key_already;}
+            const core::value *get_object_key() const {return is_object()? std::addressof(object->first): NULL;}
+            const core::value *get_object_value() const {return is_object()? std::addressof(object->second): NULL;}
+
+        private:
+            friend class value;
+            friend class value_parser;
+
+            const value *p;
+            array_const_iterator_t array;
+            object_const_iterator_t object;
+            bool traversed_key_already;
+            bool frozen;
+        };
+
+        // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
+        // If return value is non-zero, processing continues, otherwise processing aborts immediately
+        template<typename PrefixPredicate, typename PostfixPredicate>
+        void value::traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
+        {
+            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            const value *p = this;
+
+            while (!references.empty() || p != NULL)
+            {
+                if (p != NULL)
+                {
+                    if (!prefix(p, traversal_ancestry_finder(references)))
+                        return;
+
+                    if (p->is_array())
+                    {
+                        references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                        if (!p->get_array_unchecked().empty())
+                            p = std::addressof(*references.top().array++);
+                        else
+                            p = NULL;
+                    }
+                    else if (p->is_object())
+                    {
+                        references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                        if (!p->get_object_unchecked().empty())
+                            p = std::addressof(references.top().object->first);
+                        else
+                            p = NULL;
+                    }
+                    else
+                    {
+                        references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                        p = NULL;
+                    }
+                }
+                else
+                {
+                    const value *peek = references.top().p;
+                    if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
+                        p = std::addressof(*references.top().array++);
+                    else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
+                    {
+                        if (!references.top().traversed_key_already)
+                            p = std::addressof(references.top().object->first);
+                        else
+                            p = std::addressof((references.top().object++)->second);
+
+                        references.top().traversed_key_already = !references.top().traversed_key_already;
+                    }
+                    else
+                    {
+                        references.pop();
+                        if (!postfix(peek, traversal_ancestry_finder(references)))
+                            return;
+                    }
+                }
+            }
+        }
+
+        // Predicates must be callables with argument types `const core::value *arg, core::value::traversal_ancestry_finder arg_finder, bool prefix` and return value bool
+        // `prefix` is set to true if the current invocation is for the prefix handling of the specified element
+        // If return value is non-zero, processing continues, otherwise processing aborts immediately
+        template<typename Predicate>
+        void value::traverse(Predicate &predicate) const
+        {
+            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            const value *p = this;
+
+            while (!references.empty() || p != NULL)
+            {
+                if (p != NULL)
+                {
+                    if (!predicate(p, traversal_ancestry_finder(references), true))
+                        return;
+
+                    if (p->is_array())
+                    {
+                        references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                        if (!p->get_array_unchecked().empty())
+                            p = std::addressof(*references.top().array++);
+                        else
+                            p = NULL;
+                    }
+                    else if (p->is_object())
+                    {
+                        references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                        if (!p->get_object_unchecked().empty())
+                            p = std::addressof(references.top().object->first);
+                        else
+                            p = NULL;
+                    }
+                    else
+                    {
+                        references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                        p = NULL;
+                    }
+                }
+                else
+                {
+                    const value *peek = references.top().p;
+                    if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
+                        p = std::addressof(*references.top().array++);
+                    else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
+                    {
+                        if (!references.top().traversed_key_already)
+                            p = std::addressof(references.top().object->first);
+                        else
+                            p = std::addressof((references.top().object++)->second);
+
+                        references.top().traversed_key_already = !references.top().traversed_key_already;
+                    }
+                    else
+                    {
+                        references.pop();
+                        if (!predicate(peek, traversal_ancestry_finder(references), false))
+                            return;
+                    }
+                }
+            }
+        }
+
+        // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
+        // If return value is non-zero, processing continues, otherwise processing aborts immediately
+        // NOTE: The predicate is only called for object values, not object keys. It's invoked for all other values.
+        template<typename PrefixPredicate, typename PostfixPredicate>
+        void value::value_traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
+        {
+            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            const value *p = this;
+
+            while (!references.empty() || p != NULL)
+            {
+                if (p != NULL)
+                {
+                    if (!prefix(p, traversal_ancestry_finder(references)))
+                        return;
+
+                    if (p->is_array())
+                    {
+                        references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                        if (!p->get_array_unchecked().empty())
+                            p = std::addressof(*references.top().array++);
+                        else
+                            p = NULL;
+                    }
+                    else if (p->is_object())
+                    {
+                        references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                        if (!p->get_object_unchecked().empty())
+                            p = std::addressof((references.top().object++)->second);
+                        else
+                            p = NULL;
+                    }
+                    else
+                    {
+                        references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                        p = NULL;
+                    }
+                }
+                else
+                {
+                    const value *peek = references.top().p;
+                    if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
+                        p = std::addressof(*references.top().array++);
+                    else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
+                        p = std::addressof((references.top().object++)->second);
+                    else
+                    {
+                        references.pop();
+                        if (!postfix(peek, traversal_ancestry_finder(references)))
+                            return;
+                    }
+                }
+            }
+        }
+
+        // Predicates must be callables with argument types `const core::value *arg, core::value::traversal_ancestry_finder arg_finder, bool prefix` and return value bool
+        // `prefix` is set to true if the current invocation is for the prefix handling of the specified element
+        // If return value is non-zero, processing continues, otherwise processing aborts immediately
+        // NOTE: The predicate is only called for object values, not object keys. It's invoked for all other values.
+        template<typename Predicate>
+        void value::value_traverse(Predicate &predicate) const
+        {
+            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            const value *p = this;
+
+            while (!references.empty() || p != NULL)
+            {
+                if (p != NULL)
+                {
+                    if (!predicate(p, traversal_ancestry_finder(references), true))
+                        return;
+
+                    if (p->is_array())
+                    {
+                        references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                        if (!p->get_array_unchecked().empty())
+                            p = std::addressof(*references.top().array++);
+                        else
+                            p = NULL;
+                    }
+                    else if (p->is_object())
+                    {
+                        references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                        if (!p->get_object_unchecked().empty())
+                            p = std::addressof((references.top().object++)->second);
+                        else
+                            p = NULL;
+                    }
+                    else
+                    {
+                        references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                        p = NULL;
+                    }
+                }
+                else
+                {
+                    const value *peek = references.top().p;
+                    if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
+                        p = std::addressof(*references.top().array++);
+                    else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
+                        p = std::addressof((references.top().object++)->second);
+                    else
+                    {
+                        references.pop();
+                        if (!predicate(peek, traversal_ancestry_finder(references), false))
+                            return;
+                    }
+                }
+            }
+        }
+
+        // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
+        // If return value is non-zero, processing continues, otherwise processing aborts immediately
+        template<typename PrefixPredicate>
+        void value::prefix_traverse(PrefixPredicate &prefix) {traverse(prefix, traverse_node_null);}
+
+        // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
+        // If return value is non-zero, processing continues, otherwise processing aborts immediately
+        template<typename PostfixPredicate>
+        void value::postfix_traverse(PostfixPredicate &postfix) {traverse(traverse_node_null, postfix);}
+
+        // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2, core::value::traversal_ancestry_finder arg_finder, core::value::traversal_ancestry_finder arg2_finder`
+        // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
+        // If return value is non-zero, processing continues, otherwise processing aborts immediately
+        template<typename PrefixPredicate, typename PostfixPredicate>
+        void value::parallel_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
+        {
+            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            std::stack<traversal_reference, std::vector<traversal_reference>> other_references;
+            const value *p = this, *other_p = &other;
+
+            while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
+            {
+                if (p != NULL || other_p != NULL)
+                {
+                    if (!prefix(p, other_p, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
+                        return;
+
+                    if (p != NULL)
+                    {
+                        if (p->is_array())
+                        {
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                            if (!p->get_array_unchecked().empty())
+                                p = std::addressof(*references.top().array++);
+                            else
+                                p = NULL;
+                        }
+                        else if (p->is_object())
+                        {
+                            references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                            if (!p->get_object_unchecked().empty())
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = NULL;
+                        }
+                        else
+                        {
+                            references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                            p = NULL;
+                        }
+                    }
+
+                    if (other_p != NULL)
+                    {
+                        if (other_p->is_array())
+                        {
+                            other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                            if (!other_p->get_array_unchecked().empty())
+                                other_p = std::addressof(*other_references.top().array++);
+                            else
+                                other_p = NULL;
+                        }
+                        else if (other_p->is_object())
+                        {
+                            other_references.push(traversal_reference(other_p, array_const_iterator_t(), other_p->get_object_unchecked().begin(), true));
+                            if (!other_p->get_object_unchecked().empty())
+                                other_p = std::addressof(other_references.top().object->first);
+                            else
+                                other_p = NULL;
+                        }
+                        else
+                        {
+                            other_references.push(traversal_reference(other_p, array_const_iterator_t(), object_const_iterator_t(), false));
+                            other_p = NULL;
+                        }
+                    }
+                }
+                else
+                {
+                    const value *peek = references.empty()? NULL: references.top().p;
+                    const value *other_peek = other_references.empty()? NULL: other_references.top().p;
+
+                    if (peek)
+                    {
+                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
+                            p = std::addressof(*references.top().array++);
+                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
+                        {
+                            if (!references.top().traversed_key_already)
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = std::addressof((references.top().object++)->second);
+
+                            references.top().traversed_key_already = !references.top().traversed_key_already;
+                        }
+                    }
+
+                    if (other_peek)
+                    {
+                        if (other_peek->is_array() && other_references.top().array != other_peek->get_array_unchecked().end())
+                            other_p = std::addressof(*other_references.top().array++);
+                        else if (other_peek->is_object() && other_references.top().object != other_peek->get_object_unchecked().end())
+                        {
+                            if (!other_references.top().traversed_key_already)
+                                other_p = std::addressof(other_references.top().object->first);
+                            else
+                                other_p = std::addressof((other_references.top().object++)->second);
+
+                            other_references.top().traversed_key_already = !other_references.top().traversed_key_already;
+                        }
+                    }
+
+                    if (p == NULL && other_p == NULL)
+                    {
+                        if (peek != NULL) references.pop();
+                        if (other_peek != NULL) other_references.pop();
+                        if (!postfix(peek, other_peek, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
+                            return;
+                    }
+                }
+            }
+        }
+
+        // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2, core::value::traversal_ancestry_finder arg_finder, core::value::traversal_ancestry_finder arg2_finder`
+        // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
+        // If return value is non-zero, processing continues, otherwise processing aborts immediately
+        template<typename PrefixPredicate, typename PostfixPredicate>
+        void value::parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
+        {
+            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            std::stack<traversal_reference, std::vector<traversal_reference>> other_references;
+            const value *p = this, *other_p = &other;
+
+            while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
+            {
+                if (p != NULL || other_p != NULL)
+                {
+                    bool p_frozen = false, other_p_frozen = false;
+
+                    auto save_refs = references;
+                    auto save_other_refs = other_references;
+
+                    if (!save_refs.empty() && !save_refs.top().is_array() && !save_refs.top().is_object())
+                        save_refs.pop();
+
+                    if (!save_other_refs.empty() && !save_other_refs.top().is_array() && !save_other_refs.top().is_object())
+                        save_other_refs.pop();
+
+                    traversal_reference save_ref = save_refs.empty()? traversal_reference(NULL, array_const_iterator_t(), object_const_iterator_t(), false): save_refs.top();
+                    traversal_reference save_other_ref = save_other_refs.empty()? traversal_reference(NULL, array_const_iterator_t(), object_const_iterator_t(), false): save_other_refs.top();
+
+                    if (save_ref.is_object() && save_other_ref.is_object())
+                    {
+                        p_frozen = false;
+                        other_p_frozen = false;
+                        if (*save_ref.get_object_key() < *save_other_ref.get_object_key())
+                            other_p_frozen = true;
+                        else if (*save_other_ref.get_object_key() < *save_ref.get_object_key())
+                            p_frozen = true;
+                    }
+
+                    if (!prefix(p_frozen? NULL: p, other_p_frozen? NULL: other_p, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
+                        return;
+
+                    if (p != NULL)
+                    {
+                        if (p->is_array())
+                        {
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false, p_frozen));
+                            if (!p->get_array_unchecked().empty() && !p_frozen)
+                                p = std::addressof(*references.top().array++);
+                            else
+                                p = NULL;
+                        }
+                        else if (p->is_object())
+                        {
+                            references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true, p_frozen));
+                            if (!p->get_object_unchecked().empty() && !p_frozen)
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = NULL;
+                        }
+                        else
+                        {
+                            references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false, p_frozen));
+                            p = NULL;
+                        }
+                    }
+
+                    if (other_p != NULL)
+                    {
+                        if (other_p->is_array())
+                        {
+                            other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin(), object_const_iterator_t(), false, other_p_frozen));
+                            if (!other_p->get_array_unchecked().empty() && !other_p_frozen)
+                                other_p = std::addressof(*other_references.top().array++);
+                            else
+                                other_p = NULL;
+                        }
+                        else if (other_p->is_object())
+                        {
+                            other_references.push(traversal_reference(other_p, array_const_iterator_t(), other_p->get_object_unchecked().begin(), true, other_p_frozen));
+                            if (!other_p->get_object_unchecked().empty() && !other_p_frozen)
+                                other_p = std::addressof(other_references.top().object->first);
+                            else
+                                other_p = NULL;
+                        }
+                        else
+                        {
+                            other_references.push(traversal_reference(other_p, array_const_iterator_t(), object_const_iterator_t(), false, other_p_frozen));
+                            other_p = NULL;
+                        }
+                    }
+                }
+                else // p and other_p are both NULL here
+                {
+                    const value *peek = references.empty()? NULL: references.top().p;
+                    const value *other_peek = other_references.empty()? NULL: other_references.top().p;
+                    bool p_was_frozen = peek? references.top().frozen: false;
+                    bool other_p_was_frozen = peek? other_references.top().frozen: false;
+
+                    if (peek)
+                    {
+                        if (references.top().frozen)
+                            p = references.top().p;
+                        else if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
+                            p = std::addressof(*references.top().array++);
+                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
+                        {
+                            if (!references.top().traversed_key_already)
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = std::addressof((references.top().object++)->second);
+
+                            references.top().traversed_key_already = !references.top().traversed_key_already;
+                        }
+                    }
+
+                    if (other_peek)
+                    {
+                        if (other_references.top().frozen)
+                            other_p = other_references.top().p;
+                        else if (other_peek->is_array() && other_references.top().array != other_peek->get_array_unchecked().end())
+                            other_p = std::addressof(*other_references.top().array++);
+                        else if (other_peek->is_object() && other_references.top().object != other_peek->get_object_unchecked().end())
+                        {
+                            if (!other_references.top().traversed_key_already)
+                                other_p = std::addressof(other_references.top().object->first);
+                            else
+                                other_p = std::addressof((other_references.top().object++)->second);
+
+                            other_references.top().traversed_key_already = !other_references.top().traversed_key_already;
+                        }
+                    }
+
+                    if (peek != NULL) references.pop();
+                    if (other_peek != NULL) other_references.pop();
+                    if (!postfix(p_was_frozen? NULL: peek, other_p_was_frozen? NULL: other_peek, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
+                        return;
+                }
+            }
+        }
+
+        value::value(const array_t &v, subtype_t subtype) {array_init(subtype, v);}
+        value::value(array_t &&v, subtype_t subtype) {array_init(subtype, std::move(v));}
+        value::value(const object_t &v, subtype_t subtype) {object_init(subtype, v);}
+        value::value(object_t &&v, subtype_t subtype) {object_init(subtype, std::move(v));}
+
+        value::value(value &&other)
+        {
+            switch (other.type_)
+            {
+                case boolean: new (&bool_) bool_t(std::move(other.bool_)); break;
+                case integer: new (&int_) int_t(std::move(other.int_)); break;
+                case uinteger: new (&uint_) uint_t(std::move(other.uint_)); break;
+                case real: new (&real_) real_t(std::move(other.real_)); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                case string: new (&str_) string_t(std::move(other.str_)); break;
+#else
+                case string: new (&ptr_) string_t*(); ptr_ = new string_t(std::move(other.str_ref_())); break;
+#endif
+                case array: new (&ptr_) array_t*(); ptr_ = new array_t(std::move(other.arr_ref_())); break;
+                case object: new (&ptr_) object_t*(); ptr_ = new object_t(std::move(other.obj_ref_())); break;
+                default: break;
+            }
+            type_ = other.type_;
+            subtype_ = other.subtype_;
+        }
+
+        value::~value()
+        {
+            if ((type_ == array && arr_ref_().size() > 0) ||
+                (type_ == object && obj_ref_().size() > 0))
+                traverse(traverse_node_null, traverse_node_mutable_clear);
+            deinit();
+        }
+
+        value &value::operator=(value &&other)
+        {
+            clear(other.type_);
+            switch (other.type_)
+            {
+                case boolean: bool_ = std::move(other.bool_); break;
+                case integer: int_ = std::move(other.int_); break;
+                case uinteger: uint_ = std::move(other.uint_); break;
+                case real: real_ = std::move(other.real_); break;
+                case string: str_ref_() = std::move(other.str_ref_()); break;
+                case array: arr_ref_() = std::move(other.arr_ref_()); break;
+                case object: obj_ref_() = std::move(other.obj_ref_()); break;
+                default: break;
+            }
+            subtype_ = other.subtype_;
+            return *this;
+        }
+
+        size_t value::size() const {return is_array()? arr_ref_().size(): is_object()? obj_ref_().size(): is_string()? str_ref_().size(): 0;}
+        size_t value::array_size() const {return is_array()? arr_ref_().size(): 0;}
+        size_t value::object_size() const {return is_object()? obj_ref_().size(): 0;}
+
+        void value::set_array(const array_t &v) {clear(array); arr_ref_() = v;}
+        void value::set_object(const object_t &v) {clear(object); obj_ref_() = v;}
+        void value::set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ref_() = v; subtype_ = subtype;}
+        void value::set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ref_() = v; subtype_ = subtype;}
+
+        value value::operator[](cstring_t key) const {return member(key);}
+        value &value::operator[](cstring_t key) {return member(key);}
+        value value::operator[](const string_t &key) const {return member(key);}
+        value &value::operator[](const string_t &key) {return member(key);}
+        value value::member(const value &key) const
+        {
+            if (is_object())
+            {
+                auto it = obj_ref_().data().find(key);
+                if (it != obj_ref_().end())
+                    return it->second;
+            }
+            return value();
+        }
+        value &value::member(const value &key)
+        {
+            clear(object);
+            auto it = obj_ref_().data().lower_bound(key);
+            if (it != obj_ref_().end() && it->first == key)
+                return it->second;
+            it = obj_ref_().data().insert(it, {key, null_t()});
+            return it->second;
+        }
+        const value *value::member_ptr(const value &key) const
+        {
+            if (is_object())
+            {
+                auto it = obj_ref_().data().find(key);
+                if (it != obj_ref_().end())
+                    return std::addressof(it->second);
+            }
+            return NULL;
+        }
+        bool_t value::is_member(cstring_t key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        bool_t value::is_member(const string_t &key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        bool_t value::is_member(const value &key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        size_t value::member_count(cstring_t key) const {return is_object()? obj_ref_().data().count(key): 0;}
+        size_t value::member_count(const string_t &key) const {return is_object()? obj_ref_().data().count(key): 0;}
+        size_t value::member_count(const value &key) const {return is_object()? obj_ref_().data().count(key): 0;}
+        void value::erase_member(cstring_t key) {if (is_object()) obj_ref_().data().erase(key);}
+        void value::erase_member(const string_t &key) {if (is_object()) obj_ref_().data().erase(key);}
+        void value::erase_member(const value &key) {if (is_object()) obj_ref_().data().erase(key);}
+
+        value &value::add_member(const value &key)
+        {
+            clear(object);
+            return obj_ref_().data().insert(std::make_pair(key, null_t()))->second;
+        }
+        value &value::add_member(value &&key)
+        {
+            clear(object);
+            return obj_ref_().data().insert(std::make_pair(std::move(key), null_t()))->second;
+        }
+        value &value::add_member(const value &key, const value &val)
+        {
+            clear(object);
+            return obj_ref_().data().insert(std::make_pair(key, val))->second;
+        }
+        value &value::add_member(value &&key, value &&val)
+        {
+            clear(object);
+            return obj_ref_().data().insert(std::make_pair(std::move(key), std::move(val)))->second;
+        }
+
+        value &value::add_member_at_end(const value &key)
+        {
+            clear(object);
+            return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(key, null_t()))->second;
+        }
+        value &value::add_member_at_end(value &&key)
+        {
+            clear(object);
+            return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(std::move(key), null_t()))->second;
+        }
+        value &value::add_member_at_end(const value &key, const value &val)
+        {
+            clear(object);
+            return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(key, val))->second;
+        }
+        value &value::add_member_at_end(value &&key, value &&val)
+        {
+            clear(object);
+            return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(std::move(key), std::move(val)))->second;
+        }
+
+        void value::push_back(const value &v) {clear(array); arr_ref_().data().push_back(v);}
+        void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(v);}
+        value value::operator[](size_t pos) const {return element(pos);}
+        value &value::operator[](size_t pos) {return element(pos);}
+        value value::element(size_t pos) const {return is_array() && pos < arr_ref_().size()? arr_ref_().data()[pos]: value();}
+        value &value::element(size_t pos)
+        {
+            clear(array);
+            if (arr_ref_().size() <= pos)
+                arr_ref_().data().insert(arr_ref_().end().data(), pos - arr_ref_().size() + 1, core::null_t());
+            return arr_ref_().data()[pos];
+        }
+        void value::erase_element(int_t pos) {if (is_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
+
+        array_t value::get_array(const array_t &default_) const {return is_array()? arr_ref_(): default_;}
+        object_t value::get_object(const object_t &default_) const {return is_object()? obj_ref_(): default_;}
+        array_t value::get_array() const {return is_array()? arr_ref_(): array_t();}
+        object_t value::get_object() const {return is_object()? obj_ref_(): object_t();}
+
+        array_t value::as_array(const array_t &default_) const {return value(*this).convert_to(array, default_).arr_ref_();}
+        object_t value::as_object(const object_t &default_) const {return value(*this).convert_to(object, default_).obj_ref_();}
+        array_t value::as_array() const {return value(*this).convert_to(array, array_t()).arr_ref_();}
+        object_t value::as_object() const {return value(*this).convert_to(object, object_t()).obj_ref_();}
+
+        array_t &value::convert_to_array() {return convert_to(array, array_t()).arr_ref_();}
+        object_t &value::convert_to_object() {return convert_to(object, object_t()).obj_ref_();}
+
+        void value::mutable_clear() const
+        {
+            typedef void *ptr;
+
+            switch (type_)
+            {
+                case boolean: bool_.~bool_t(); break;
+                case integer: int_.~int_t(); break;
+                case uinteger: uint_.~uint_t(); break;
+                case real: real_.~real_t(); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                case string: str_.~string_t(); break;
+#else
+                case string: delete reinterpret_cast<string_t*>(ptr_); ptr_.~ptr(); break;
+#endif
+                case array: delete reinterpret_cast<array_t*>(ptr_); ptr_.~ptr(); break;
+                case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
+                default: break;
+            }
+            type_ = null;
+        }
+
+        void value::init(type new_type, subtype_t new_subtype)
+        {
+            switch (new_type)
+            {
+                case boolean: new (&bool_) bool_t(); break;
+                case integer: new (&int_) int_t(); break;
+                case uinteger: new (&uint_) uint_t(); break;
+                case real: new (&real_) real_t(); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                case string: new (&str_) string_t(); break;
+#else
+                case string: new (&ptr_) string_t*(); ptr_ = new string_t(); break;
+#endif
+                case array: new (&ptr_) array_t*(); ptr_ = new array_t(); break;
+                case object: new (&ptr_) object_t*(); ptr_ = new object_t(); break;
+                default: break;
+            }
+            type_ = new_type;
+            subtype_ = new_subtype;
+        }
+
+        void value::deinit()
+        {
+            typedef void *ptr;
+
+            switch (type_)
+            {
+                case boolean: bool_.~bool_t(); break;
+                case integer: int_.~int_t(); break;
+                case uinteger: uint_.~uint_t(); break;
+                case real: real_.~real_t(); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                case string: str_.~string_t(); break;
+#else
+                case string: delete reinterpret_cast<string_t*>(ptr_); ptr_.~ptr(); break;
+#endif
+                case array: delete reinterpret_cast<array_t*>(ptr_); ptr_.~ptr(); break;
+                case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
+                default: break;
+            }
+            type_ = null;
+            subtype_ = normal;
+        }
 
         namespace impl
         {
@@ -1836,7 +2127,7 @@ public:
             result.push_back(cppdatalib::core::value(bind.top()));
             bind.pop();
         }
-        reverse(result.get_array_ref().begin(), result.get_array_ref().end());
+        reverse(result.get_array_ref().begin().data(), result.get_array_ref().end().data());
         return result;
     }
 };
@@ -1961,7 +2252,7 @@ namespace cppdatalib
             {
                 template<typename... Ts>
                 push_back(const std::tuple<Ts...> &tuple, core::array_t &result) : push_back<tuple_size - 1>(tuple, result) {
-                    result.push_back(cppdatalib::core::value(std::get<tuple_size - 1>(tuple)));
+                    result.data().push_back(cppdatalib::core::value(std::get<tuple_size - 1>(tuple)));
                 }
             };
 
@@ -2543,7 +2834,7 @@ namespace cppdatalib
                 tuple_push_back(const core::array_t &list, std::tuple<Ts...> &result) : tuple_push_back<tuple_size - 1>(list, result) {
                     typedef typename std::tuple_element<tuple_size-1, std::tuple<Ts...>>::type element_type;
                     if (tuple_size <= list.size()) // If the list contains enough elements, assign it
-                        std::get<tuple_size-1>(result) = list[tuple_size - 1].operator element_type();
+                        std::get<tuple_size-1>(result) = list.data()[tuple_size - 1].operator element_type();
                     else // Otherwise, clear the tuple's element value
                         std::get<tuple_size-1>(result) = element_type{};
                 }

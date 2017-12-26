@@ -230,8 +230,8 @@ namespace cppdatalib
 
                                     for (auto const &it: value.get_object_unchecked())
                                     {
-                                        arr.push_back(it.first);
-                                        arr.push_back(it.second);
+                                        arr.data().push_back(it.first);
+                                        arr.data().push_back(it.second);
                                     }
 
                                     value.set_array(arr);
@@ -750,7 +750,7 @@ namespace cppdatalib
 
                 if (!sorted && samples.is_array())
                 {
-                    sort(samples.get_array_ref().begin(), samples.get_array_ref().end());
+                    sort(samples.get_array_ref().begin().data(), samples.get_array_ref().end().data());
                     sorted = true;
                 }
 
@@ -883,7 +883,7 @@ namespace cppdatalib
                     if (direction == ascending_sort)
                         sort(sorted.get_array_ref().begin(), sorted.get_array_ref().end());
                     else
-                        sort(sorted.get_array_ref().rbegin(), sorted.get_array_ref().rend());
+                        sort(sorted.get_array_ref().data().rbegin(), sorted.get_array_ref().data().rend());
 
                     buffer_filter::write_buffered_value_(sorted, is_key);
                 }
