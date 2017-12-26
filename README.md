@@ -7,7 +7,13 @@ A header-only, C++11 data conversion library
 ### Formats
 
 cppdatalib offers implementations of several different serialization formats designed for hierarchical data (and some that aren't).
-cppdatalib is able to easily convert to and from a standard internal representation.
+cppdatalib is able to easily convert to and from a standard internal representation. Adapters also exist to integrate smoothly with
+the following external frameworks:
+
+   - [Qt](https://www.qt.io/)
+   - [POCO](https://pocoproject.org/)
+   - [ETL](https://www.etlcpp.com/home.html)
+
 Supported formats include
 
    - [JSON](https://json.org/)
@@ -278,7 +284,7 @@ To create a new filter, follow the guidelines for output formats, but place them
 
 ### Compile-time flags
 
-Below is a list of compile-time flags supported by cppdatalib:
+Below is a list of compile-time type adjustments supported by cppdatalib:
 
    - `CPPDATALIB_BOOL_T` - The underlying boolean type of the implementation. Should be able to store a true and false value. Defaults to `bool`
    - `CPPDATALIB_INT_T` - The underlying integer type of the implementation. Should be able to store a signed integral value. Defaults to `int64_t`
@@ -289,11 +295,17 @@ Below is a list of compile-time flags supported by cppdatalib:
    - `CPPDATALIB_ARRAY_T` - The underlying array type of the implementation. Defaults to `std::vector<cppdatalib::core::value>`
    - `CPPDATALIB_OBJECT_T` - The underlying object type of the implementation. Defaults to `std::multimap<cppdatalib::core::value, cppdatalib::core::value>`
    - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `int16_t`
+
+Enable/Disable flags are listed below:
+
    - `CPPDATALIB_ENABLE_MYSQL` - Enables inclusion of the MySQL interface library. If defined, the MySQL headers must be available in the include path
    - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If write checks are disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but can result in better performance. Use at your own risk
    - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
    - `CPPDATALIB_DISABLE_FAST_IO_GCOUNT` - Disables calculation of `gcount()` in the fast input classes. This removes the `gcount()` function altogether. This flag only has an effect if `CPPDATALIB_ENABLE_FAST_INPUT` is defined
-   - `CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE` - Trims value sizes down to optimize space for large numeric arrays. This theoretically slows down string, array, and object values somewhat, but provides massive space savings
+   - `CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE` - Trims value sizes down to optimize space for large numeric arrays. This theoretically slows down string values somewhat, but saves space
+   - `CPPDATALIB_ENABLE_QT` - Enables the [Qt](https://www.qt.io/) adapters, to smoothly integrate with the most common Qt types. The Qt source tree must be in the include path
+   - `CPPDATALIB_ENABLE_POCO` - Enables the [POCO](https://pocoproject.org/) adapters, to smoothly integrate with POCO types. The "Poco" source tree must be in the include path
+   - `CPPDATALIB_ENABLE_ETL` - Enables the [ETL](https://www.etlcpp.com/home.html) adapters, to smoothly integrate with ETL types. The "etl" source tree must be in the include path
 
 Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.
 
