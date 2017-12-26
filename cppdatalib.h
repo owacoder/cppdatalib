@@ -42,4 +42,16 @@
 #include "message_pack/message_pack.h"
 #include "mysql/mysql.h"
 
+#ifdef CPPDATALIB_ENABLE_QT
+#include "adapters/qt.h"
+#endif
+
+#ifdef CPPDATALIB_ENABLE_POCO
+#include "adapters/poco.h"
+#endif
+
+#ifdef CPPDATALIB_ENABLE_ETL
+#include "adapters/etl.h"
+#endif
+
 #endif // CPPDATALIB_H

@@ -41,10 +41,46 @@
 #include "etl/src/intrusive_forward_list.h"
 #include "etl/src/queue.h"
 #include "etl/src/stack.h"
+#include "etl/src/optional.h"
+
+#include "../core/value.h"
 
 /*
  *  TODO: implement conversions for maps, sets, intrusive_queue and intrusive_stack, priority_queue, strings, optional, and variant
  */
+
+// ----------
+//  optional
+// ----------
+
+template<typename... Ts>
+class cast_template_to_cppdatalib<etl::optional, Ts...>
+{
+    const etl::optional<Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const etl::optional<Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (!bind.isSpecified())
+            return cppdatalib::core::null_t();
+        return cppdatalib::core::value(bind.value());
+    }
+};
+
+template<typename T>
+class cast_template_from_cppdatalib<etl::optional, T>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator etl::optional<T>() const
+    {
+        etl::optional<T> result;
+        if (!bind.is_null())
+            result = bind.operator T();
+        return result;
+    }
+};
 
 // -------
 //  array

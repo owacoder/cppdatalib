@@ -51,7 +51,7 @@
 #include <QDateTime>
 #include <QUuid>
 
-#include "../core/value.h"
+#include "../core/value_builder.h"
 
 // -------
 //  QPair
