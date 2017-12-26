@@ -124,7 +124,7 @@ namespace cppdatalib
                                     return NULL;
                             }
 
-                            reference = &reference->get_array_unchecked()[array_index];
+                            reference = &reference->get_array_unchecked().data()[array_index];
                         }
                         else
                         {
@@ -228,7 +228,7 @@ namespace cppdatalib
                             {
                                 parent = reference;
                                 reference->push_back(core::null_t());
-                                return &reference->get_array_ref().back();
+                                return &reference->get_array_ref().data().back();
                             }
 
                             for (auto c: path_node)
@@ -260,7 +260,7 @@ namespace cppdatalib
                             }
 
                             parent = reference;
-                            reference = &reference->get_array_ref()[array_index];
+                            reference = &reference->get_array_ref().data()[array_index];
                         }
                         else
                         {

@@ -34,6 +34,8 @@ namespace cppdatalib
         class parser : public core::stream_parser
         {
             std::unique_ptr<char []> buffer;
+            bool delimiter_required;
+            char chr;
 
         private:
             // Opening quote should already be read
@@ -111,22 +113,27 @@ namespace cppdatalib
             parser(core::istream_handle input)
                 : core::stream_parser(input)
                 , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
-            {}
-
-            core::stream_input &convert(core::stream_handler &writer)
             {
-                bool delimiter_required = false, get_char = true;
+                reset();
+            }
+
+            void reset()
+            {
+                delimiter_required = false;
+                stream() >> std::skipws;
+            }
+
+        protected:
+            void write_one_()
+            {
                 char chr;
 
-                stream() >> std::skipws;
-                while (get_char? (stream() >> chr, stream().good()): true)
+                if (stream() >> chr, stream().good())
                 {
-                    get_char = true;
-
                     if (delimiter_required)
                     {
-                        if (writer.nesting_depth() == 0)
-                            break;
+                        if (get_output()->nesting_depth() == 0)
+                            throw core::error("JSON - unexpected end of stream");
                         else if (!strchr(",:]}", chr))
                             throw core::error("JSON - expected ',' separating array or object entries");
                     }
@@ -135,56 +142,57 @@ namespace cppdatalib
                     {
                         case 'n':
                             if (!core::stream_starts_with(stream(), "ull")) throw core::error("JSON - expected 'null' value");
-                            writer.write(core::null_t());
+                            get_output()->write(core::null_t());
                             delimiter_required = true;
                             break;
                         case 't':
                             if (!core::stream_starts_with(stream(), "rue")) throw core::error("JSON - expected 'true' value");
-                            writer.write(true);
+                            get_output()->write(true);
                             delimiter_required = true;
                             break;
                         case 'f':
                             if (!core::stream_starts_with(stream(), "alse")) throw core::error("JSON - expected 'false' value");
-                            writer.write(false);
+                            get_output()->write(false);
                             delimiter_required = true;
                             break;
                         case '"':
-                            read_string(stream(), writer);
+                            read_string(stream(), *get_output());
                             delimiter_required = true;
                             break;
                         case ',':
-                            if (writer.current_container_size() == 0 || writer.container_key_was_just_parsed())
+                            if (get_output()->current_container_size() == 0 || get_output()->container_key_was_just_parsed())
                                 throw core::error("JSON - invalid ',' does not separate array or object entries");
-                            stream() >> chr; get_char = false; // Peek ahead
+                            stream() >> chr; // Peek ahead
                             if (!stream() || chr == ',' || chr == ']' || chr == '}')
                                 throw core::error("JSON - invalid ',' does not separate array or object entries");
+                            stream().unget();
                             delimiter_required = false;
                             break;
                         case ':':
-                            if (!writer.container_key_was_just_parsed())
+                            if (!get_output()->container_key_was_just_parsed())
                                 throw core::error("JSON - invalid ':' does not separate a key and value pair");
                             delimiter_required = false;
                             break;
                         case '[':
-                            writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                            get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
                             delimiter_required = false;
                             break;
                         case ']':
-                            writer.end_array(core::array_t());
+                            get_output()->end_array(core::array_t());
                             delimiter_required = true;
                             break;
                         case '{':
-                            writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
+                            get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size);
                             delimiter_required = false;
                             break;
                         case '}':
-                            writer.end_object(core::object_t());
+                            get_output()->end_object(core::object_t());
                             delimiter_required = true;
                             break;
                         default:
                             if (isdigit(chr) || chr == '-')
                             {
-                                if (writer.current_container() == core::object && !writer.container_key_was_just_parsed()) // This is the key?
+                                if (get_output()->current_container() == core::object && !get_output()->container_key_was_just_parsed()) // This is the key?
                                     throw core::error("JSON - invalid number cannot be used as an object key");
 
                                 bool is_float = false;
@@ -196,10 +204,8 @@ namespace cppdatalib
                                     buffer.push_back(c);
                                     is_float = c == '.' || tolower(c) == 'e';
                                 }
-                                get_char = false;
+                                stream().unget();
                                 delimiter_required = true;
-                                if (c != EOF)
-                                    chr = c;
 
                                 if (!is_float)
                                 {
@@ -210,7 +216,7 @@ namespace cppdatalib
                                         temp_stream >> value;
                                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                                         {
-                                            writer.write(value);
+                                            get_output()->write(value);
                                             break; // break switch
                                         }
                                     }
@@ -222,7 +228,7 @@ namespace cppdatalib
                                         temp_stream >> value;
                                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                                         {
-                                            writer.write(value);
+                                            get_output()->write(value);
                                             break; // break switch
                                         }
                                     }
@@ -236,26 +242,21 @@ namespace cppdatalib
                                     temp_stream >> value;
                                     if (!temp_stream.fail() && temp_stream.get() == EOF)
                                     {
-                                        writer.write(value);
+                                        get_output()->write(value);
                                         break; // break switch
                                     }
                                 }
 
                                 // Revert to bignum
-                                writer.write(core::value(buffer, core::bignum));
+                                get_output()->write(core::value(buffer, core::bignum));
                             }
                             else
                                 throw core::error("JSON - expected value");
                             break;
                     }
                 }
-
-                if (!delimiter_required)
-                    throw core::error("JSON - expected value");
-                else if (writer.nesting_depth())
+                else
                     throw core::error("JSON - unexpected end of stream");
-
-                return *this;
             }
         };
 

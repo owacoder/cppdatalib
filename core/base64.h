@@ -27,6 +27,8 @@
 
 #include "ostream.h"
 
+// TODO: ensure formats using base64::write or base64::decode don't perform dumb concatenation
+
 namespace cppdatalib
 {
     namespace base64

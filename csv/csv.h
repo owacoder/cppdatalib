@@ -227,40 +227,54 @@ namespace cppdatalib
             }
 
             options opts;
+            bool comma_just_parsed = true;
+            bool newline_just_parsed = true;
 
         public:
-            parser(core::istream_handle input, options opts = convert_fields_by_deduction) : stream_parser(input), opts(opts) {}
-
-            core::stream_input &convert(core::stream_handler &writer)
+            parser(core::istream_handle input, options opts = convert_fields_by_deduction)
+                : stream_parser(input)
+                , opts(opts)
             {
-                const bool parse_as_strings = opts == convert_all_fields_as_strings;
+                reset();
+            }
+
+            void set_parse_method(options opts) {this->opts = opts;}
+
+            void reset()
+            {
+                comma_just_parsed = newline_just_parsed = true;
+            }
+
+        protected:
+            void write_one_()
+            {
+                bool parse_as_strings = opts == convert_all_fields_as_strings;
                 int chr;
-                bool comma_just_parsed = true;
-                bool newline_just_parsed = true;
 
-                writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                if (!busy())
+                    get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
 
-                while (chr = stream().get(), chr != EOF)
+                if (chr = stream().get(), chr != EOF)
                 {
                     if (newline_just_parsed)
                     {
-                        writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
                         newline_just_parsed = false;
                     }
 
                     switch (chr)
                     {
                         case '"':
-                            read_quoted_string(writer, parse_as_strings);
+                            read_quoted_string(*get_output(), parse_as_strings);
                             comma_just_parsed = false;
                             break;
                         case ',':
                             if (comma_just_parsed)
                             {
                                 if (parse_as_strings)
-                                    writer.write(core::string_t());
+                                    get_output()->write(core::string_t());
                                 else // parse by deduction of types, assume `,,` means null instead of empty string
-                                    writer.write(core::null_t());
+                                    get_output()->write(core::null_t());
                             }
                             comma_just_parsed = true;
                             break;
@@ -268,18 +282,18 @@ namespace cppdatalib
                             if (comma_just_parsed)
                             {
                                 if (parse_as_strings)
-                                    writer.write(core::string_t());
+                                    get_output()->write(core::string_t());
                                 else // parse by deduction of types, assume `,,` means null instead of empty string
-                                    writer.write(core::null_t());
+                                    get_output()->write(core::null_t());
                             }
                             comma_just_parsed = newline_just_parsed = true;
-                            writer.end_array(core::array_t());
+                            get_output()->end_array(core::array_t());
                             break;
                         default:
                             if (!isspace(chr))
                             {
                                 stream().unget();
-                                read_string(writer, parse_as_strings);
+                                read_string(*get_output(), parse_as_strings);
                                 comma_just_parsed = false;
                             }
                             break;
@@ -291,17 +305,16 @@ namespace cppdatalib
                     if (comma_just_parsed)
                     {
                         if (parse_as_strings)
-                            writer.write(core::string_t());
+                            get_output()->write(core::string_t());
                         else // parse by deduction of types, assume `,,` means null instead of empty string
-                            writer.write(core::null_t());
+                            get_output()->write(core::null_t());
                     }
 
-                    writer.end_array(core::array_t());
+                    get_output()->end_array(core::array_t());
                 }
 
-                writer.end_array(core::array_t());
-
-                return *this;
+                if (chr == EOF)
+                    get_output()->end_array(core::array_t());
             }
         };
 

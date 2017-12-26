@@ -94,7 +94,7 @@ namespace cppdatalib
                     references.top()->push_back(v);
                 else if (!is_key && current_container() == object)
                 {
-                    references.top()->add_member(keys.top()) = v;
+                    references.top()->add_member(keys.top(), v);
                     keys.pop();
                 }
                 else
@@ -118,7 +118,7 @@ namespace cppdatalib
                 if (!is_key && current_container() == array)
                 {
                     references.top()->push_back(core::null_t());
-                    references.push(&references.top()->get_array_ref().back());
+                    references.push(&references.top()->get_array_ref().data().back());
                 }
                 else if (!is_key && current_container() == object)
                 {
@@ -224,14 +224,26 @@ namespace cppdatalib
         inline stream_input &operator>>(stream_input &input, value &output)
         {
             value_builder builder(output);
-            builder.begin();
             input.convert(builder);
-            builder.end();
             return input;
         }
 
         // Convert directly from parser to value
+        inline void operator>>(stream_input &&input, value &output)
+        {
+            value_builder builder(output);
+            input.convert(builder);
+        }
+
+        // Convert directly from parser to value
         inline value &operator<<(value &output, stream_input &input)
+        {
+            input >> output;
+            return output;
+        }
+
+        // Convert directly from parser to value
+        inline value &operator<<(value &output, stream_input &&input)
         {
             input >> output;
             return output;

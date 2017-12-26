@@ -35,78 +35,73 @@ namespace cppdatalib
 {
     namespace core
     {
-        class stream_filter_base : public stream_handler
-        {
-        protected:
-            core::stream_handler &output;
-
-        public:
-            stream_filter_base(core::stream_handler &output)
-                : output(output)
-            {}
-            stream_filter_base(const stream_filter_base &f)
-                : output(f.output)
-            {
-                assert(("cppdatalib::core::stream_filter_base(const stream_filter_base &) - attempted to copy a stream_filter_base while active" && !f.active()));
-            }
-            stream_filter_base(stream_filter_base &&f)
-                : output(f.output)
-            {
-                assert(("cppdatalib::core::stream_filter_base(stream_filter_base &&) - attempted to move a stream_filter_base while active" && !f.active()));
-            }
-
-            bool requires_prefix_string_size() const {return output.requires_prefix_string_size();}
-            bool requires_prefix_array_size() const {return output.requires_prefix_array_size();}
-            bool requires_prefix_object_size() const {return output.requires_prefix_object_size();}
-            bool requires_string_buffering() const {return output.requires_string_buffering();}
-            bool requires_array_buffering() const {return output.requires_array_buffering();}
-            bool requires_object_buffering() const {return output.requires_object_buffering();}
-
-        protected:
-            void begin_() {output.begin();}
-            void end_() {output.end();}
-
-            bool write_(const value &v, bool is_key)
-            {
-                (void) is_key;
-                output.write(v);
-                return true;
-            }
-
-            void begin_array_(const value &v, int_t size, bool)
-            {
-                output.begin_array(v, size);
-            }
-            void end_array_(const value &v, bool)
-            {
-                output.end_array(v);
-            }
-
-            void begin_object_(const value &v, int_t size, bool)
-            {
-                output.begin_object(v, size);
-            }
-            void end_object_(const value &v, bool)
-            {
-                output.end_object(v);
-            }
-
-            void begin_string_(const value &v, int_t size, bool)
-            {
-                output.begin_string(v, size);
-            }
-            void string_data_(const value &v, bool)
-            {
-                output.append_to_string(v);
-            }
-            void end_string_(const value &v, bool)
-            {
-                output.end_string(v);
-            }
-        };
-
         namespace impl
         {
+            class stream_filter_base : public stream_handler
+            {
+            protected:
+                core::stream_handler &output;
+
+            public:
+                stream_filter_base(core::stream_handler &output)
+                    : output(output)
+                {}
+                stream_filter_base(const stream_filter_base &f)
+                    : output(f.output)
+                {
+                    assert(("cppdatalib::impl::stream_filter_base(const stream_filter_base &) - attempted to copy a stream_filter_base while active" && !f.active()));
+                }
+                stream_filter_base(stream_filter_base &&f)
+                    : output(f.output)
+                {
+                    assert(("cppdatalib::impl::stream_filter_base(stream_filter_base &&) - attempted to move a stream_filter_base while active" && !f.active()));
+                }
+
+                unsigned int required_features() const {return output.required_features();}
+
+            protected:
+                void begin_() {output.begin();}
+                void end_() {output.end();}
+
+                bool write_(const value &v, bool is_key)
+                {
+                    (void) is_key;
+                    output.write(v);
+                    return true;
+                }
+
+                void begin_array_(const value &v, int_t size, bool)
+                {
+                    output.begin_array(v, size);
+                }
+                void end_array_(const value &v, bool)
+                {
+                    output.end_array(v);
+                }
+
+                void begin_object_(const value &v, int_t size, bool)
+                {
+                    output.begin_object(v, size);
+                }
+                void end_object_(const value &v, bool)
+                {
+                    output.end_object(v);
+                }
+
+                void begin_string_(const value &v, int_t size, bool)
+                {
+                    output.begin_string(v, size);
+                }
+                void string_data_(const value &v, bool)
+                {
+                    output.append_to_string(v);
+                }
+                void end_string_(const value &v, bool)
+                {
+                    output.end_string(v);
+                }
+            };
+
             template<core::type from, core::type to>
             struct stream_filter_converter
             {
@@ -212,7 +207,7 @@ namespace cppdatalib
                                         throw core::error("cppdatalib::core::stream_filter_converter - cannot convert 'array' to 'object' with odd number of elements");
 
                                     for (size_t i = 0; i < value.size(); i += 2)
-                                        obj.add_member(value[i]) = value[i+1];
+                                        obj.add_member(value[i], value[i+1]);
 
                                     value = obj;
                                     break;
@@ -235,8 +230,8 @@ namespace cppdatalib
 
                                     for (auto const &it: value.get_object_unchecked())
                                     {
-                                        arr.push_back(it.first);
-                                        arr.push_back(it.second);
+                                        arr.data().push_back(it.first);
+                                        arr.data().push_back(it.second);
                                     }
 
                                     value.set_array(arr);
@@ -258,7 +253,7 @@ namespace cppdatalib
             buffer_objects = 0x04
         };
 
-        class buffer_filter : public core::stream_filter_base
+        class buffer_filter : public impl::stream_filter_base
         {
         protected:
             core::value cache_val;
@@ -289,12 +284,19 @@ namespace cppdatalib
                 , nesting_level(f.nesting_level)
             {}
 
-            bool requires_prefix_string_size() const {return flags & buffer_strings? false: stream_filter_base::requires_prefix_string_size();}
-            bool requires_prefix_array_size() const {return flags & buffer_arrays? false: stream_filter_base::requires_prefix_array_size();}
-            bool requires_prefix_object_size() const {return flags & buffer_objects? false: stream_filter_base::requires_prefix_object_size();}
-            bool requires_string_buffering() const {return flags & buffer_strings? false: stream_filter_base::requires_string_buffering();}
-            bool requires_array_buffering() const {return flags & buffer_arrays? false: stream_filter_base::requires_array_buffering();}
-            bool requires_object_buffering() const {return flags & buffer_objects? false: stream_filter_base::requires_object_buffering();}
+            unsigned int required_features() const
+            {
+                unsigned int mask_out = 0;
+
+                if (flags & buffer_strings)
+                    mask_out |= requires_prefix_string_size | requires_buffered_strings;
+                if (flags & buffer_arrays)
+                    mask_out |= requires_prefix_array_size | requires_buffered_arrays;
+                if (flags & buffer_objects)
+                    mask_out |= requires_prefix_object_size | requires_buffered_objects;
+
+                return stream_filter_base::required_features() & ~mask_out;
+            }
 
         protected:
             // Called when this filter is done buffering. This function should write the value to the output stream.
@@ -459,13 +461,13 @@ namespace cppdatalib
         public:
             automatic_buffer_filter(core::stream_handler &output)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(
-                                    (output.requires_prefix_array_size() || output.requires_array_buffering()? buffer_arrays: 0) |
-                                    (output.requires_prefix_object_size() || output.requires_object_buffering()? buffer_objects: 0) |
-                                    (output.requires_prefix_string_size() || output.requires_string_buffering()? buffer_strings: 0)))
+                                    (output.required_features() & (stream_handler::requires_prefix_array_size | stream_handler::requires_buffered_arrays)? buffer_arrays: 0) |
+                                    (output.required_features() & (stream_handler::requires_prefix_object_size | stream_handler::requires_buffered_objects)? buffer_objects: 0) |
+                                    (output.required_features() & (stream_handler::requires_prefix_string_size | stream_handler::requires_buffered_strings)? buffer_strings: 0)))
             {}
         };
 
-        class tee_filter : public core::stream_filter_base
+        class tee_filter : public impl::stream_filter_base
         {
         protected:
             core::stream_handler &output2;
@@ -477,12 +479,7 @@ namespace cppdatalib
                 , output2(output2)
             {}
 
-            bool requires_prefix_string_size() const {return stream_filter_base::requires_prefix_string_size() || output2.requires_prefix_string_size();}
-            bool requires_prefix_array_size() const {return stream_filter_base::requires_prefix_array_size() || output2.requires_prefix_array_size();}
-            bool requires_prefix_object_size() const {return stream_filter_base::requires_prefix_object_size() || output2.requires_prefix_object_size();}
-            bool requires_string_buffering() const {return stream_filter_base::requires_string_buffering() || output2.requires_string_buffering();}
-            bool requires_array_buffering() const {return stream_filter_base::requires_array_buffering() || output2.requires_array_buffering();}
-            bool requires_object_buffering() const {return stream_filter_base::requires_object_buffering() || output2.requires_object_buffering();}
+            unsigned int required_features() const {return stream_filter_base::required_features() | output2.required_features();}
 
         protected:
             void begin_() {stream_filter_base::begin_(); output2.begin();}
@@ -624,7 +621,7 @@ namespace cppdatalib
         };
 
         template<core::type measure = core::real>
-        class mean_filter : public core::stream_filter_base
+        class mean_filter : public impl::stream_filter_base
         {
             size_t samples;
             core::real_t sum, product, inverted_sum;
@@ -632,6 +629,10 @@ namespace cppdatalib
         public:
             mean_filter(core::stream_handler &output)
                 : stream_filter_base(output)
+                , samples(0)
+                , sum(0)
+                , product(0)
+                , inverted_sum(0)
             {}
 
             core::real_t get_mean(mean_filter_flag mean_type) const
@@ -687,37 +688,170 @@ namespace cppdatalib
             typedef core::mean_filter<measure> base;
 
             core::value samples;
+            core::real_t variance_;
+            bool calculated;
 
         public:
             dispersion_filter(core::stream_handler &output)
                 : base(output)
+                , calculated(false)
             {}
 
-            core::real_t get_variance() const
+            core::real_t get_variance()
             {
-                core::real_t variance_ = 0.0;
-
-                if (samples.is_array())
+                if (!calculated && samples.is_array())
+                {
+                    variance_ = 0.0;
                     for (auto const &sample: samples.get_array_unchecked())
                         variance_ += pow(sample.as_real() - base::get_arithmetic_mean(), 2.0);
+                    calculated = true;
+                }
 
                 return variance_ / base::sample_size();
             }
 
-            core::real_t get_standard_deviation() const {return sqrt(get_variance());}
+            core::real_t get_standard_deviation() {return sqrt(get_variance());}
 
         protected:
             void begin_()
             {
                 base::begin_();
                 samples.set_null();
+                calculated = false;
             }
 
             bool write_(const value &v, bool is_key)
             {
                 base::write_(v, is_key);
                 if (v.get_type() == measure)
-                    samples.push_back(v.as_real());
+                {
+                    samples.push_back(v);
+                    calculated = false;
+                }
+                return true;
+            }
+        };
+
+        template<core::type measure = core::real>
+        class median_filter : public impl::stream_filter_base
+        {
+            core::value samples;
+            bool sorted;
+
+        public:
+            median_filter(core::stream_handler &output)
+                : stream_filter_base(output)
+                , sorted(false)
+            {}
+
+            core::value get_median()
+            {
+                using namespace std;
+
+                if (!sorted && samples.is_array())
+                {
+                    sort(samples.get_array_ref().begin().data(), samples.get_array_ref().end().data());
+                    sorted = true;
+                }
+
+                if (samples.array_size() == 0) // No samples
+                    return core::null_t();
+                else if (samples.array_size() & 1) // Odd number of samples
+                    return samples.element(samples.array_size() / 2);
+                else // Even number of samples
+                    return (samples.element(samples.array_size() / 2 - 1).as_real() +
+                            samples.element(samples.array_size() / 2).as_real()) / 2;
+            }
+
+            size_t sample_size() const
+            {
+                return samples.size();
+            }
+
+        protected:
+            void begin_()
+            {
+                stream_filter_base::begin_();
+                samples.set_null();
+                sorted = false;
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                stream_filter_base::write_(v, is_key);
+                if (v.get_type() == measure)
+                {
+                    samples.push_back(v);
+                    sorted = false;
+                }
+                return true;
+            }
+        };
+
+        template<core::type measure = core::real>
+        class mode_filter : public impl::stream_filter_base
+        {
+            core::value samples;
+            core::value modes;
+            bool calculated;
+
+        public:
+            mode_filter(core::stream_handler &output)
+                : stream_filter_base(output)
+                , calculated(false)
+            {}
+
+            const core::value &get_modes()
+            {
+                using namespace std;
+
+                if (!calculated)
+                {
+                    core::uint_t max_frequency = 1;
+                    modes.set_null();
+
+                    if (samples.is_object())
+                    {
+                        for (const auto &item: samples.get_object_unchecked())
+                            max_frequency = std::max(item.second.get_uint_unchecked(), max_frequency); // Don't worry about get_uint_unchecked, we know all values are unsigned integers
+
+                        for (const auto &item: samples.get_object_unchecked())
+                        {
+                            if (item.second.get_uint_unchecked() == max_frequency)
+                                modes.push_back(item.first);
+                        }
+
+                        if (modes.size() == samples.size())
+                            modes.set_null();
+                    }
+
+                    calculated = true;
+                }
+
+                return modes;
+            }
+
+            size_t sample_size() const
+            {
+                return samples.size();
+            }
+
+        protected:
+            void begin_()
+            {
+                stream_filter_base::begin_();
+                samples.set_null();
+                calculated = false;
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                stream_filter_base::write_(v, is_key);
+                if (v.get_type() == measure)
+                {
+                    samples.member(v).get_uint_ref() += 1;
+                    calculated = false;
+                }
                 return true;
             }
         };
@@ -739,15 +873,17 @@ namespace cppdatalib
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
+                using namespace std;
+
                 if (v.get_type() == core::array)
                 {
                     core::value sorted;
 
                     sorted = v;
                     if (direction == ascending_sort)
-                        std::sort(sorted.get_array_unchecked().begin(), sorted.get_array_unchecked().end());
+                        sort(sorted.get_array_ref().begin(), sorted.get_array_ref().end());
                     else
-                        std::sort(sorted.get_array_unchecked().rbegin(), sorted.get_array_unchecked().rend());
+                        sort(sorted.get_array_ref().data().rbegin(), sorted.get_array_ref().data().rend());
 
                     buffer_filter::write_buffered_value_(sorted, is_key);
                 }
@@ -773,11 +909,11 @@ namespace cppdatalib
             {
                 core::value map_;
 
-                if ((v.get_type() == core::array && v.array_size() > column_names.array_size())
+                if ((v.is_array() && v.array_size() > column_names.array_size())
                         || column_names.array_size() == 0) // Not enough column names to cover all attributes!!
                     throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
 
-                if (v.get_type() == core::array)
+                if (v.is_array())
                     for (size_t i = 0; i < column_names.array_size(); ++i)
                     {
                         if (i >= v.size() && fail_on_missing_column)
@@ -791,7 +927,7 @@ namespace cppdatalib
             }
         };
 
-        class duplicate_key_check_filter : public core::stream_filter_base
+        class duplicate_key_check_filter : public impl::stream_filter_base
         {
             class layer
             {

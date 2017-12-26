@@ -3,6 +3,7 @@
 #define CPPDATALIB_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
+#define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 #include "cppdatalib.h"
 
 struct vt100
@@ -96,8 +97,6 @@ struct vt100
     const char * const bg_white = "\033[47m";
 };
 
-using namespace cppdatalib;
-
 template<typename T>
 std::ostream &operator<<(std::ostream &strm, const std::vector<T> &value)
 {
@@ -128,20 +127,20 @@ bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, bool
     size_t failed = 0;
 
     std::cout << "Testing " << name << "... " << vt.yellow << "0%" << std::flush;
-    std::cout << vt.black;
+    std::cout << vt.attr_reset;
 
     for (const auto &test: tests)
     {
         if (compare(test.second, actual(test.first)))
         {
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << std::flush;
             std::cout << vt.red;
             std::cout << "Test " << (current+1) << " FAILED!\n";
             std::cout << "\tInput: " << test.first << "\n";
             std::cout << "\tExpected output: " << test.second << "\n";
             std::cout << "\tActual output: " << actual(test.first) << std::endl;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
             if (bail_early)
                 return false;
             ++failed;
@@ -150,24 +149,24 @@ bool Test(const char *name, const TestData<F, S> &tests, ResultCode actual, bool
         if (current * 100 / tests.size() > percent)
         {
             percent = current * 100 / tests.size();
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << vt.yellow << percent << "%" << std::flush;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
         }
         ++current;
     }
 
     if (!failed)
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.green << "done." << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
     else
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.red << "done. (" << failed << " failed out of " << tests.size() << ")" << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
 
     return failed;
@@ -184,20 +183,20 @@ bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actua
     uintmax_t failed = 0;
 
     std::cout << "Testing " << name << "... " << vt.yellow << "0%" << std::flush;
-    std::cout << vt.black;
+    std::cout << vt.attr_reset;
 
     for (const auto &test: tests)
     {
         if (compare(test.first, actual(test.second)))
         {
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << std::flush;
             std::cout << vt.red;
             std::cout << "Test " << (current+1) << " FAILED!\n";
             std::cout << "\tInput: " << test.second << "\n";
             std::cout << "\tExpected output: " << test.first << "\n";
             std::cout << "\tActual output: " << actual(test.second) << std::endl;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
             if (bail_early)
                 return false;
             ++failed;
@@ -206,24 +205,24 @@ bool ReverseTest(const char *name, const TestData<F, S> &tests, ResultCode actua
         if (current * 100 / tests.size() > percent)
         {
             percent = current * 100 / tests.size();
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << vt.yellow << percent << "%" << std::flush;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
         }
         ++current;
     }
 
     if (!failed)
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.green << "done." << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
     else
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.red << "done. (" << failed << " failed out of " << tests.size() << ")" << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
 
     return failed;
@@ -240,20 +239,20 @@ bool TestRange(const char *name, uintmax_t tests, ExpectedCode expected, ResultC
     uintmax_t failed = 0;
 
     std::cout << "Testing " << name << "... " << vt.yellow << "0%" << std::flush;
-    std::cout << vt.black;
+    std::cout << vt.attr_reset;
 
     for (uintmax_t test = 0; test < tests; ++test)
     {
         if (compare(expected(test), actual(test)))
         {
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << std::flush;
             std::cout << vt.red;
             std::cout << "Test " << (test+1) << " FAILED!\n";
             std::cout << "\tInput: " << test << "\n";
             std::cout << "\tExpected output: " << expected(test) << "\n";
             std::cout << "\tActual output: " << actual(test) << std::endl;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
             if (bail_early)
                 return false;
             ++failed;
@@ -262,23 +261,23 @@ bool TestRange(const char *name, uintmax_t tests, ExpectedCode expected, ResultC
         if (test * 100 / tests > percent)
         {
             percent = test * 100 / tests;
-            std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+            std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
             std::cout << "Testing " << name << "... " << vt.yellow << percent << "%" << std::flush;
-            std::cout << vt.black;
+            std::cout << vt.attr_reset;
         }
     }
 
     if (!failed)
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.green << "done." << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
     else
     {
-        std::cout << vt.erase_line << vt.move_cursor_home << vt.black;
+        std::cout << vt.erase_line << vt.move_cursor_home << vt.attr_reset;
         std::cout << "Testing " << name << "... " << vt.red << "done. (" << failed << " failed out of " << tests << ")" << std::endl;
-        std::cout << vt.black;
+        std::cout << vt.attr_reset;
     }
 
     return failed;
@@ -340,13 +339,16 @@ TestData<std::string> bencode_tests = {
 
 struct hex_string : public std::string
 {
-    using std::string::string;
+    hex_string() {}
+    hex_string(const char *s) : std::string(s) {}
+    hex_string(const char *s, size_t size) : std::string(s, size) {}
+    hex_string(const std::string &str) : std::string(str) {}
 };
 
 std::ostream &operator<<(std::ostream &ostr, const hex_string &str)
 {
-    core::ostream_handle wrap(ostr);
-    hex::debug_write(wrap, str);
+    cppdatalib::core::ostream_handle wrap(ostr);
+    cppdatalib::hex::debug_write(wrap, str);
     return ostr;
 }
 
@@ -408,33 +410,144 @@ int readme_simple_test3()
     return 0;
 }
 
+struct point
+{
+    int x, y;
+};
+
+#include "adapters/qt.h"
+#include "adapters/poco.h"
+#include "adapters/etl.h"
+
+template<>
+class cast_to_cppdatalib<point>
+{
+    const point &bind;
+public:
+    cast_to_cppdatalib(const point &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::object_t{{"x", bind.x}, {"y", bind.y}};}
+};
+
+template<>
+struct cast_from_cppdatalib<point>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator point() const
+    {
+        point p;
+        p.x = bind["x"];
+        p.y = bind["y"];
+        return p;
+    }
+};
+
+#include <QDebug>
+
+int readme_simple_test4()
+{
+    using namespace cppdatalib;             // Parent namespace
+    using namespace json;                   // Format namespace
+
+    core::value my_value, m2;               // Global cross-format value class
+    core::value_builder builder(my_value);
+
+    std::stack<int, std::vector<int>> stack;
+    stack.push(0);
+    stack.push(1);
+
+    try {
+        json::parser p(std::cin);
+        json::stream_writer w(std::cout);
+
+        p.begin(builder);
+        do
+            p.write_one();                  // Read in to core::value from STDIN as JSON
+        while (p.busy());
+        p.end();
+        p >> my_value >> m2;
+
+        core::value_parser vp(my_value);
+        vp.begin(w);
+        do
+            vp.write_one();
+        while (vp.busy());
+        vp.end();
+
+        std::multimap<const char *, int> map = {{"x", 1}, {"y", 2}};
+        m2 = stack;
+        m2 = map;
+        point p2 = point();
+        p2.x = 9;
+        m2 = p2;
+        p2 = m2;
+        p2.x += 1000;
+        m2 = p2;
+        /*m2 = QVector<int>() << 1 << 2;
+        QVector<int> n = m2;*/
+        QVariant v = m2;
+        m2 = v;
+        w << m2;                // Write core::value out to STDOUT as JSON
+    } catch (core::error e) {
+        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+    }
+
+    return 0;
+}
+
 int main()
 {
-    return readme_simple_test3();
+    cppdatalib::core::value xyz;
+    std::tuple<int, int, std::string, QVector<QString>> tuple;
+    QStringList value = {"value", ""};
+    xyz = std::make_tuple(0, 1.5, "hello", value, "stranger");
+    std::cout << xyz << std::endl;
+    tuple = xyz;
+    xyz = tuple;
+    std::cout << xyz << std::endl;
+    std::array<int, 3> stdarr = xyz;
+    xyz = stdarr;
+    std::cout << xyz << std::endl;
+
+    std::cout << sizeof(cppdatalib::core::value) << std::endl;
+
+    cppdatalib::core::stream_handler dummy;
+    cppdatalib::core::median_filter<cppdatalib::core::uinteger> median(dummy);
+    cppdatalib::core::mode_filter<cppdatalib::core::uinteger> mode(median);
+    cppdatalib::core::range_filter<cppdatalib::core::uinteger> range(mode);
+    cppdatalib::core::dispersion_filter<cppdatalib::core::uinteger> dispersal(range);
+
+    dispersal << cppdatalib::core::array_t{2, 0, 1, 2, 3, 4, 4};
+
+    std::cout << median.get_median() << std::endl;
+    std::cout << mode.get_modes() << std::endl;
+    std::cout << range.get_max() << std::endl;
+    std::cout << dispersal.get_arithmetic_mean() << std::endl << dispersal.get_standard_deviation() << std::endl;
+
+    //return readme_simple_test4();
 
     vt100 vt;
     std::cout << vt.attr_bright;
 
-    std::cout << sizeof(core::value) << std::endl;
-
-    Test("base64_encode", base64_encode_tests, base64::encode);
-    ReverseTest("base64_decode", base64_encode_tests, base64::decode);
-    Test("debug_hex_encode", debug_hex_encode_tests, hex::debug_encode);
-    Test("hex_encode", hex_encode_tests, hex::encode);
+    Test("base64_encode", base64_encode_tests, cppdatalib::base64::encode);
+    ReverseTest("base64_decode", base64_encode_tests, cppdatalib::base64::decode);
+    Test("debug_hex_encode", debug_hex_encode_tests, cppdatalib::hex::debug_encode);
+    Test("hex_encode", hex_encode_tests, cppdatalib::hex::encode);
 #if 0
-    TestRange("float_from_ieee_754", UINT32_MAX, core::float_cast_from_ieee_754,
-              core::float_from_ieee_754, true, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
+    TestRange("float_from_ieee_754", UINT32_MAX, cppdatalib::core::float_cast_from_ieee_754,
+              cppdatalib::core::float_from_ieee_754, true, [](const auto &f, const auto &s){return f != s && !isnan(f) && !isnan(s);});
     TestRange("float_to_ieee_754", UINT32_MAX, [](const auto &f){return f;},
-              [](const auto &f){return core::float_to_ieee_754(core::float_cast_from_ieee_754(f));}, true,
-              [](const auto &f, const auto &s){return f != s && !isnan(core::float_from_ieee_754(f)) && !isnan(core::float_from_ieee_754(s));});
+              [](const auto &f){return core::float_to_ieee_754(cppdatalib::core::float_cast_from_ieee_754(f));}, true,
+              [](const auto &f, const auto &s){return f != s && !isnan(cppdatalib::core::float_from_ieee_754(f)) && !isnan(cppdatalib::core::float_from_ieee_754(s));});
 #endif
     try
     {
-        Test("JSON", json_tests, [](const auto &test){return json::to_json(json::from_json(test));}, false);
-        Test("Bencode", bencode_tests, [](const auto &test){return bencode::to_bencode(bencode::from_bencode(test));}, false);
-        Test("MessagePack", message_pack_tests, [](const auto &test){return hex_string(message_pack::to_message_pack(message_pack::from_message_pack(test)));}, false);
+        Test("JSON", json_tests, [](const auto &test){return cppdatalib::json::to_json(cppdatalib::json::from_json(test));}, false);
+        Test("Bencode", bencode_tests, [](const auto &test){return cppdatalib::bencode::to_bencode(cppdatalib::bencode::from_bencode(test));}, false);
+        Test("MessagePack", message_pack_tests, [](const auto &test) -> hex_string {return hex_string(cppdatalib::message_pack::to_message_pack(cppdatalib::message_pack::from_message_pack(test)));}, false);
     }
-    catch (core::error e)
+    catch (cppdatalib::core::error e)
     {
         std::cout << e.what() << std::endl;
     }
