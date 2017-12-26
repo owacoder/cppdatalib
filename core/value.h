@@ -188,149 +188,14 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ARRAY_T
         typedef CPPDATALIB_ARRAY_T array_t;
 #else
+        // TODO: evidently undefined behavior to instantiate container holding incomplete type
         typedef std::vector<value> array_t;
 #endif
 
-// TODO: FAST_IO_OBJECT is not fast at all. Fix?
-//#define CPPDATALIB_FAST_IO_OBJECT
-
 #ifdef CPPDATALIB_OBJECT_T
         typedef CPPDATALIB_OBJECT_T object_t;
-#elif defined(CPPDATALIB_FAST_IO_OBJECT)
-        template<typename K, typename V>
-        class fast_object
-        {
-        public:
-            typedef K key_type;
-            typedef V mapped_type;
-            typedef std::pair<K, V> value_type;
-            typedef value_type &reference;
-            typedef const value_type &const_reference;
-            typedef value_type *pointer;
-            typedef const value_type *const_pointer;
-            typedef typename std::list<value_type>::iterator iterator;
-            typedef typename std::list<value_type>::const_iterator const_iterator;
-            typedef typename std::list<value_type>::reverse_iterator reverse_iterator;
-            typedef typename std::list<value_type>::const_reverse_iterator const_reverse_iterator;
-            typedef typename std::list<value_type>::difference_type difference_type;
-            typedef typename std::list<value_type>::size_type size_type;
-            typedef std::less<value> key_compare;
-            struct value_compare
-            {
-                bool operator()(const value_type &l, const value_type &r) const
-                {
-                    return l.first < r.first;
-                }
-
-                bool operator()(const value_type &l, const key_type &r) const
-                {
-                    return l.first < r;
-                }
-
-                bool operator()(const key_type &l, const value_type &r) const
-                {
-                    return l < r.first;
-                }
-            };
-
-            key_compare key_comp() const {return key_compare();}
-            value_compare value_comp() const {return value_compare();}
-
-            iterator begin() {return d_.begin();}
-            const_iterator begin() const {return d_.begin();}
-            iterator end() {return d_.end();}
-            const_iterator end() const {return d_.end();}
-
-            reverse_iterator rbegin() {return d_.rbegin();}
-            const_reverse_iterator rbegin() const {return d_.rbegin();}
-            reverse_iterator rend() {return d_.rend();}
-            const_reverse_iterator rend() const {return d_.rend();}
-
-            const_iterator cbegin() const {return d_.cbegin();}
-            const_iterator cend() const {return d_.cend();}
-            const_reverse_iterator crbegin() const {return d_.crbegin();}
-            const_reverse_iterator crend() const {return d_.crend();}
-
-            bool empty() const {return d_.empty();}
-            size_type size() const {return d_.size();}
-            size_type max_size() const {return d_.max_size();}
-
-            iterator insert(const value_type &val)
-            {
-                return d_.insert(upper_bound(val.first), val);
-            }
-            template<typename P> iterator insert(P &&val)
-            {
-                return d_.insert(upper_bound(val.first), val);
-            }
-
-            // TODO: accelerate placement insert (use hint)
-            iterator insert(const_iterator insert, const value_type &val)
-            {
-                (void) insert;
-                return this->insert(val);
-            }
-            template<typename P> iterator insert(const_iterator insert, P &&val)
-            {
-                (void) insert;
-                return this->insert(val);
-            }
-
-            size_type count(const key_type &k) const
-            {
-                size_type n = 0;
-                const_iterator it = find(k);
-                while (it != end() && it->first == k)
-                    ++n, ++it;
-                return n;
-            }
-
-            void clear() {d_.clear();}
-
-            iterator find(const key_type &k)
-            {
-                auto it = std::lower_bound(d_.begin(), d_.end(), k, value_compare());
-                if (it == end() || k < it->first)
-                    return end();
-                return it;
-            }
-
-            const_iterator find(const key_type &k) const
-            {
-                auto it = std::lower_bound(d_.cbegin(), d_.cend(), k, value_compare());
-                if (it == end() || k < it->first)
-                    return end();
-                return it;
-            }
-
-            iterator lower_bound(const key_type &k) {return std::lower_bound(d_.begin(), d_.end(), k, value_compare());}
-            const_iterator lower_bound(const key_type &k) const {return std::lower_bound(d_.begin(), d_.end(), k, value_compare());}
-            iterator upper_bound(const key_type &k) {return std::upper_bound(d_.begin(), d_.end(), k, value_compare());}
-            const_iterator upper_bound(const key_type &k) const {return std::upper_bound(d_.begin(), d_.end(), k, value_compare());}
-
-            iterator erase(const_iterator position) {return d_.erase(position);}
-            size_type erase(const key_type &k)
-            {
-                size_type n = 0;
-                iterator first = find(k);
-                iterator last = first;
-
-                while (last != end() && last->first == k)
-                    ++last, ++n;
-
-                if (first != last)
-                    d_.erase(first, last);
-
-                return n;
-            }
-            iterator erase(const_iterator first, const_iterator last) {return d_.erase(first, last);}
-
-        private:
-            std::list<value_type> d_;
-        };
-
-        typedef fast_object<value, value> object_t;
 #else
+        // TODO: evidently undefined behavior to instantiate container holding incomplete type
         typedef std::multimap<value, value> object_t;
 #endif
 
@@ -1002,13 +867,11 @@ namespace cppdatalib
                     case real: new (&real_) real_t(std::move(other.real_)); break;
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: new (&str_) string_t(std::move(other.str_)); break;
-                    case array: new (&arr_) array_t(std::move(other.arr_)); break;
-                    case object: new (&obj_) object_t(std::move(other.obj_)); break;
 #else
-                    case string: new (&str_) string_t*(); str_ = new string_t(std::move(*other.str_)); break;
-                    case array: new (&arr_) array_t*(); arr_ = new array_t(std::move(*other.arr_)); break;
-                    case object: new (&obj_) object_t*(); obj_ = new object_t(std::move(*other.obj_)); break;
+                    case string: new (&ptr_) string_t*(); ptr_ = new string_t(std::move(other.str_ref_())); break;
 #endif
+                    case array: new (&ptr_) array_t*(); ptr_ = new array_t(std::move(other.arr_ref_())); break;
+                    case object: new (&ptr_) object_t*(); ptr_ = new object_t(std::move(other.obj_ref_())); break;
                     default: break;
                 }
                 type_ = other.type_;
@@ -1046,9 +909,13 @@ namespace cppdatalib
                         case integer: swap(int_, other.int_); break;
                         case uinteger: swap(uint_, other.uint_); break;
                         case real: swap(real_, other.real_); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                         case string: swap(str_, other.str_); break;
-                        case array: swap(arr_, other.arr_); break;
-                        case object: swap(obj_, other.obj_); break;
+#else
+                        case string: swap(ptr_, other.ptr_); break;
+#endif
+                        case array:
+                        case object: swap(ptr_, other.ptr_); break;
                         default: break;
                     }
                 }
@@ -1256,11 +1123,7 @@ namespace cppdatalib
             // (They're defined as `const` members in the std::map implementation)
             void mutable_clear() const
             {
-#ifdef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                typedef string_t *string_t_ptr;
-                typedef array_t *array_t_ptr;
-                typedef object_t *object_t_ptr;
-#endif
+                typedef void *ptr;
 
                 switch (type_)
                 {
@@ -1270,13 +1133,11 @@ namespace cppdatalib
                     case real: real_.~real_t(); break;
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: str_.~string_t(); break;
-                    case array: arr_.~array_t(); break;
-                    case object: obj_.~object_t(); break;
 #else
-                    case string: delete str_; str_.~string_t_ptr(); break;
-                    case array: delete arr_; arr_.~array_t_ptr(); break;
-                    case object: delete obj_; obj_.~object_t_ptr(); break;
+                    case string: delete reinterpret_cast<string_t*>(ptr_); ptr_.~ptr(); break;
 #endif
+                    case array: delete reinterpret_cast<array_t*>(ptr_); ptr_.~ptr(); break;
+                    case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
                     default: break;
                 }
                 type_ = null;
@@ -1303,13 +1164,11 @@ namespace cppdatalib
                     case real: new (&real_) real_t(); break;
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: new (&str_) string_t(); break;
-                    case array: new (&arr_) array_t(); break;
-                    case object: new (&obj_) object_t(); break;
 #else
-                    case string: new (&str_) string_t*(); str_ = new string_t(); break;
-                    case array: new (&arr_) array_t*(); arr_ = new array_t(); break;
-                    case object: new (&obj_) object_t*(); obj_ = new object_t(); break;
+                    case string: new (&ptr_) string_t*(); ptr_ = new string_t(); break;
 #endif
+                    case array: new (&ptr_) array_t*(); ptr_ = new array_t(); break;
+                    case object: new (&ptr_) object_t*(); ptr_ = new object_t(); break;
                     default: break;
                 }
                 type_ = new_type;
@@ -1354,7 +1213,7 @@ namespace cppdatalib
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 new (&str_) string_t(args...);
 #else
-                new (&str_) string_t*(); str_ = new string_t(args...);
+                new (&ptr_) string_t*(); ptr_ = new string_t(args...);
 #endif
                 type_ = string;
                 subtype_ = new_subtype;
@@ -1363,11 +1222,7 @@ namespace cppdatalib
             template<typename... Args>
             void array_init(subtype_t new_subtype, Args... args)
             {
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                new (&arr_) array_t(args...);
-#else
-                new (&arr_) array_t*(); arr_ = new array_t(args...);
-#endif
+                new (&ptr_) array_t*(); ptr_ = new array_t(args...);
                 type_ = array;
                 subtype_ = new_subtype;
             }
@@ -1375,22 +1230,14 @@ namespace cppdatalib
             template<typename... Args>
             void object_init(subtype_t new_subtype, Args... args)
             {
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                new (&obj_) object_t(args...);
-#else
-                new (&obj_) object_t*(); obj_ = new object_t(args...);
-#endif
+                new (&ptr_) object_t*(); ptr_ = new object_t(args...);
                 type_ = object;
                 subtype_ = new_subtype;
             }
 
             void deinit()
             {
-#ifdef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                typedef string_t *string_t_ptr;
-                typedef array_t *array_t_ptr;
-                typedef object_t *object_t_ptr;
-#endif
+                typedef void *ptr;
 
                 switch (type_)
                 {
@@ -1400,13 +1247,11 @@ namespace cppdatalib
                     case real: real_.~real_t(); break;
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                     case string: str_.~string_t(); break;
-                    case array: arr_.~array_t(); break;
-                    case object: obj_.~object_t(); break;
 #else
-                    case string: delete str_; str_.~string_t_ptr(); break;
-                    case array: delete arr_; arr_.~array_t_ptr(); break;
-                    case object: delete obj_; obj_.~object_t_ptr(); break;
+                    case string: delete reinterpret_cast<string_t*>(ptr_); ptr_.~ptr(); break;
 #endif
+                    case array: delete reinterpret_cast<array_t*>(ptr_); ptr_.~ptr(); break;
+                    case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
                     default: break;
                 }
                 type_ = null;
@@ -1522,45 +1367,29 @@ namespace cppdatalib
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 return str_;
 #else
-                return *str_;
+                return *reinterpret_cast<string_t *>(ptr_);
 #endif
             }
             const string_t &str_ref_() const {
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 return str_;
 #else
-                return *str_;
+                return *reinterpret_cast<const string_t *>(ptr_);
 #endif
             }
 
             array_t &arr_ref_() {
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                return arr_;
-#else
-                return *arr_;
-#endif
+                return *reinterpret_cast<array_t *>(ptr_);
             }
             const array_t &arr_ref_() const {
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                return arr_;
-#else
-                return *arr_;
-#endif
+                return *reinterpret_cast<const array_t *>(ptr_);
             }
 
             object_t &obj_ref_() {
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                return obj_;
-#else
-                return *obj_;
-#endif
+                return *reinterpret_cast<object_t *>(ptr_);
             }
             const object_t &obj_ref_() const {
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                return obj_;
-#else
-                return *obj_;
-#endif
+                return *reinterpret_cast<const object_t *>(ptr_);
             }
 
             union
@@ -1571,13 +1400,8 @@ namespace cppdatalib
                 real_t real_;
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 string_t str_;
-                mutable array_t arr_; // Mutable to provide editable traversal access to const destructor
-                mutable object_t obj_; // Mutable to provide editable traversal access to const destructor
-#else
-                string_t *str_;
-                mutable array_t *arr_; // Mutable to provide editable traversal access to const destructor
-                mutable object_t *obj_; // Mutable to provide editable traversal access to const destructor
 #endif
+                mutable void *ptr_; // Mutable to provide editable traversal access to const destructor
             };
             mutable type type_; // Mutable to provide editable traversal access to const destructor
             subtype_t subtype_;
