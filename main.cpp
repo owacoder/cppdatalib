@@ -417,6 +417,7 @@ struct point
 
 #include "adapters/qt.h"
 #include "adapters/poco.h"
+#include "adapters/etl.h"
 
 template<>
 class cast_to_cppdatalib<point>

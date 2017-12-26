@@ -32,9 +32,18 @@
  */
 
 #include "etl/src/array.h"
+#include "etl/src/bitset.h"
+#include "etl/src/deque.h"
+#include "etl/src/vector.h"
+#include "etl/src/list.h"
+#include "etl/src/forward_list.h"
+#include "etl/src/intrusive_list.h"
+#include "etl/src/intrusive_forward_list.h"
+#include "etl/src/queue.h"
+#include "etl/src/stack.h"
 
 /*
- *  TODO: implement conversions for maps, sets, intrusive_queue and intrusive_stack, strings, optional, and variant
+ *  TODO: implement conversions for maps, sets, intrusive_queue and intrusive_stack, priority_queue, strings, optional, and variant
  */
 
 // -------
@@ -258,11 +267,11 @@ public:
 // ----------------
 
 template<typename... Ts>
-class cast_array_template_to_cppdatalib<etl::intrusive_list, Ts...>
+class cast_template_to_cppdatalib<etl::intrusive_list, Ts...>
 {
     const etl::intrusive_list<Ts...> &bind;
 public:
-    cast_array_template_to_cppdatalib(const etl::intrusive_list<Ts...> &bind) : bind(bind) {}
+    cast_template_to_cppdatalib(const etl::intrusive_list<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
@@ -277,11 +286,11 @@ public:
 // ------------------------
 
 template<typename... Ts>
-class cast_array_template_to_cppdatalib<etl::intrusive_forward_list, Ts...>
+class cast_template_to_cppdatalib<etl::intrusive_forward_list, Ts...>
 {
     const etl::intrusive_forward_list<Ts...> &bind;
 public:
-    cast_array_template_to_cppdatalib(const etl::intrusive_forward_list<Ts...> &bind) : bind(bind) {}
+    cast_template_to_cppdatalib(const etl::intrusive_forward_list<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
@@ -362,45 +371,6 @@ public:
     operator etl::stack<T, N>() const
     {
         etl::stack<T, N> result{};
-        if (bind.is_array())
-            for (const auto &item: bind.get_array_unchecked())
-                result.push(item.operator T());
-        return result;
-    }
-};
-
-// ----------------
-//  priority_queue
-// ----------------
-
-template<typename T, size_t N>
-class cast_array_template_to_cppdatalib<etl::priority_queue, T, N>
-{
-    etl::priority_queue<T, N> bind;
-public:
-    cast_array_template_to_cppdatalib(etl::priority_queue<T, N> bind) : bind(bind) {}
-    operator cppdatalib::core::value() const
-    {
-        using namespace std;
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        while (!bind.empty())
-        {
-            result.push_back(cppdatalib::core::value(bind.top()));
-            bind.pop();
-        }
-        return result;
-    }
-};
-
-template<typename T, size_t N>
-class cast_array_template_from_cppdatalib<etl::priority_queue, T, N>
-{
-    const cppdatalib::core::value &bind;
-public:
-    cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator etl::priority_queue<T, N>() const
-    {
-        etl::priority_queue<T, N> result{};
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
                 result.push(item.operator T());
