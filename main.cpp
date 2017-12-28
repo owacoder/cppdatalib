@@ -1,5 +1,7 @@
 #include <iostream>
 
+//#include "adapters/stl.h"
+
 #define CPPDATALIB_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
@@ -417,7 +419,9 @@ struct point
 
 #include "adapters/qt.h"
 #include "adapters/poco.h"
+#include "adapters/boost.h"
 #include "adapters/etl.h"
+#include "adapters/stl.h"
 
 template<>
 class cast_to_cppdatalib<point>
