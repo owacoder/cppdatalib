@@ -72,7 +72,7 @@ public:
     operator etl::string<N>() const
     {
         etl::string<N> result;
-        std::string stdstr = bind.as_string();
+        cppdatalib::core::string_t stdstr = bind.as_string();
         result.append(stdstr.c_str(), std::min(stdstr.size(), N));
         return result;
     }
