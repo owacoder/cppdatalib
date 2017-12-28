@@ -1,5 +1,5 @@
 /*
- * mariadb.h
+ * mysql.h
  *
  * Copyright © 2017 Oliver Adams
  *
@@ -22,10 +22,10 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef CPPDATALIB_MARIADB_H
-#define CPPDATALIB_MARIADB_H
+#ifndef CPPDATALIB_MYSQL_H
+#define CPPDATALIB_MYSQL_H
 
-#ifdef CPPDATALIB_ENABLE_MARIADB
+#ifdef CPPDATALIB_ENABLE_MYSQL
 
 #include "../core/core.h"
 #include <mysql/mysql.h>
@@ -652,6 +652,6 @@ namespace cppdatalib
     }
 }
 
-#endif // CPPDATALIB_BUILD_MARIADB
+#endif // CPPDATALIB_ENABLE_MYSQL
 
-#endif // CPPDATALIB_MARIADB_H
+#endif // CPPDATALIB_MYSQL_H

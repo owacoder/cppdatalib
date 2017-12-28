@@ -1,6 +1,3 @@
-#ifndef CPPDATALIB_ETL_H
-#define CPPDATALIB_ETL_H
-
 /*
  * etl.h
  *
@@ -30,6 +27,9 @@
  * or copyright holder(s) of this file in any capacity, and do not endorse this
  * software nor the authorship and existence of this file.
  */
+
+#ifndef CPPDATALIB_ETL_H
+#define CPPDATALIB_ETL_H
 
 #include "etl/src/array.h"
 #include "etl/src/bitset.h"
