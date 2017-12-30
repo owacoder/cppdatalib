@@ -820,7 +820,7 @@ namespace cppdatalib
 #endif
             array_t() {}
             array_t(const container_type &data) : m_data(data) {}
-            array_t(std::initializer_list<typename container_type::value_type> il) : m_data{il} {}
+            array_t(std::initializer_list<typename container_type::value_type> il) : m_data(il) {}
             template<typename... Ts>
             array_t(Ts&&... args) : m_data(std::forward<Ts>(args)...) {}
 
@@ -872,7 +872,7 @@ namespace cppdatalib
 #endif
             object_t() {}
             object_t(const container_type &data) : m_data(data) {}
-            object_t(std::initializer_list<typename container_type::value_type> il) : m_data{il} {}
+            object_t(std::initializer_list<typename container_type::value_type> il) : m_data(il) {}
             template<typename... Ts>
             object_t(Ts&&... args) : m_data(std::forward<Ts>(args)...) {}
 
