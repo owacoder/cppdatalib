@@ -31,18 +31,18 @@
 #ifndef CPPDATALIB_ETL_H
 #define CPPDATALIB_ETL_H
 
-#include "etl/src/array.h"
-#include "etl/src/bitset.h"
-#include "etl/src/deque.h"
-#include "etl/src/vector.h"
-#include "etl/src/list.h"
-#include "etl/src/forward_list.h"
-#include "etl/src/intrusive_list.h"
-#include "etl/src/intrusive_forward_list.h"
-#include "etl/src/queue.h"
-#include "etl/src/stack.h"
-#include "etl/src/optional.h"
-#include "etl/src/cstring.h"
+#include <etl/src/array.h>
+#include <etl/src/bitset.h>
+#include <etl/src/deque.h>
+#include <etl/src/vector.h>
+#include <etl/src/list.h>
+#include <etl/src/forward_list.h>
+#include <etl/src/intrusive_list.h>
+#include <etl/src/intrusive_forward_list.h>
+#include <etl/src/queue.h>
+#include <etl/src/stack.h>
+#include <etl/src/optional.h>
+#include <etl/src/cstring.h>
 
 #include "../core/value_builder.h"
 

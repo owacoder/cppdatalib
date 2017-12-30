@@ -152,11 +152,11 @@ public:
 // Read implicitly defined with boost::container::vector conversion (small_vector inherits vector)
 
 template<typename T, size_t N, typename... Ts>
-class cast_template_from_cppdatalib<boost::container::small_vector, T, N, Ts...>
+class cast_array_template_from_cppdatalib<boost::container::small_vector, T, N, Ts...>
 {
     const cppdatalib::core::value &bind;
 public:
-    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator boost::container::small_vector<T, N, Ts...>() const
     {
         boost::container::small_vector<T, N, Ts...> result;
@@ -196,8 +196,9 @@ public:
     {
         boost::container::slist<T, Ts...> result;
         if (bind.is_array())
-            for (auto it = bind.get_array_unchecked().data().rbegin(); it != bind.get_array_unchecked().data().rend(); ++it)
-                result.push_front(it->operator T());
+            for (const auto &item: bind.get_array_unchecked())
+                result.push_front(item.operator T());
+        result.reverse();
         return result;
     }
 };
