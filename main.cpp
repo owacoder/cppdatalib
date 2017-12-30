@@ -520,13 +520,14 @@ int main()
 
     std::cout << sizeof(cppdatalib::core::value) << std::endl;
 
-    cppdatalib::core::stream_handler dummy;
+    cppdatalib::core::dump::stream_writer dummy(std::cout, 2);
     cppdatalib::core::median_filter<cppdatalib::core::uinteger> median(dummy);
     cppdatalib::core::mode_filter<cppdatalib::core::uinteger> mode(median);
     cppdatalib::core::range_filter<cppdatalib::core::uinteger> range(mode);
     cppdatalib::core::dispersion_filter<cppdatalib::core::uinteger> dispersal(range);
+    cppdatalib::core::array_sort_filter<cppdatalib::core::descending_sort> sorter(dispersal);
 
-    dispersal << cppdatalib::core::array_t{2, 0, 1, 2, 3, 4, 4};
+    sorter << cppdatalib::core::array_t{2, 0, 1, 2, 3, 4, 4};
 
     std::cout << median.get_median() << std::endl;
     std::cout << mode.get_modes() << std::endl;

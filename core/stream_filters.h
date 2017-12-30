@@ -881,9 +881,9 @@ namespace cppdatalib
 
                     sorted = v;
                     if (direction == ascending_sort)
-                        sort(sorted.get_array_ref().begin(), sorted.get_array_ref().end());
+                        sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end());
                     else
-                        sort(sorted.get_array_ref().data().rbegin(), sorted.get_array_ref().data().rend());
+                        sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end(), std::greater<core::value>());
 
                     buffer_filter::write_buffered_value_(sorted, is_key);
                 }
