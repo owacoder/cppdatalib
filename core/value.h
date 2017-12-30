@@ -76,13 +76,13 @@ namespace cppdatalib {
 }
 
 template<typename T> class cast_to_cppdatalib;
-template<template<size_t> class Template, size_t N> struct cast_sized_template_to_cppdatalib;
+template<template<size_t, typename...> class Template, size_t N, typename... Ts> struct cast_sized_template_to_cppdatalib;
 template<template<typename...> class Template, typename... Ts> struct cast_template_to_cppdatalib;
-template<template<typename, size_t> class Template, typename T, size_t N> struct cast_array_template_to_cppdatalib;
+template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts> struct cast_array_template_to_cppdatalib;
 template<typename T> class cast_from_cppdatalib;
-template<template<size_t> class Template, size_t N> struct cast_sized_template_from_cppdatalib;
+template<template<size_t, typename...> class Template, size_t N, typename... Ts> struct cast_sized_template_from_cppdatalib;
 template<template<typename...> class Template, typename... Ts> struct cast_template_from_cppdatalib;
-template<template<typename, size_t> class Template, typename T, size_t N> struct cast_array_template_from_cppdatalib;
+template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts> struct cast_array_template_from_cppdatalib;
 
 namespace cppdatalib
 {
@@ -332,15 +332,15 @@ namespace cppdatalib
             {
                 assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v));
             }
-            template<template<typename, size_t> class Template, typename T, size_t N>
-            value(const Template<T, N> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+            value(const Template<T, N, Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
-                assign(*this, cast_array_template_to_cppdatalib<Template, T, N>(v));
+                assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v));
             }
-            template<template<size_t> class Template, size_t N>
-            value(const Template<N> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+            value(const Template<N, Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
-                assign(*this, cast_sized_template_to_cppdatalib<Template, N>(v));
+                assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v));
             }
 
             ~value();
@@ -506,11 +506,11 @@ namespace cppdatalib
             template<template<typename...> class Template, typename... Ts>
             operator Template<Ts...>() const {return cast_template_from_cppdatalib<Template, Ts...>(*this);}
 
-            template<template<typename, size_t> class Template, typename T, size_t N>
-            operator Template<T, N>() const {return cast_array_template_from_cppdatalib<Template, T, N>(*this);}
+            template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+            operator Template<T, N, Ts...>() const {return cast_array_template_from_cppdatalib<Template, T, N, Ts...>(*this);}
 
-            template<template<size_t> class Template, size_t N>
-            operator Template<N>() const {return cast_sized_template_from_cppdatalib<Template, N>(*this);}
+            template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+            operator Template<N, Ts...>() const {return cast_sized_template_from_cppdatalib<Template, N, Ts...>(*this);}
 
         private:
             // WARNING: DO NOT CALL mutable_clear() anywhere but the destructor!
@@ -1712,20 +1712,20 @@ public:
     operator cppdatalib::core::value() const {return Template<Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
 };
 
-template<template<typename, size_t> class Template, typename T, size_t N>
+template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
 struct cast_array_template_to_cppdatalib
 {
 public:
-    cast_array_template_to_cppdatalib(const Template<T, N> &) {}
-    operator cppdatalib::core::value() const {return Template<T, N>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    cast_array_template_to_cppdatalib(const Template<T, N, Ts...> &) {}
+    operator cppdatalib::core::value() const {return Template<T, N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
 };
 
-template<template<size_t> class Template, size_t N>
+template<template<size_t, typename...> class Template, size_t N, typename... Ts>
 struct cast_sized_template_to_cppdatalib
 {
 public:
-    cast_sized_template_to_cppdatalib(const Template<N> &) {}
-    operator cppdatalib::core::value() const {return Template<N>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    cast_sized_template_to_cppdatalib(const Template<N, Ts...> &) {}
+    operator cppdatalib::core::value() const {return Template<N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
 };
 
 template<typename T>
@@ -1743,20 +1743,20 @@ public:
     operator Template<Ts...>() const {return Template<Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
 };
 
-template<template<typename, size_t> class Template, typename T, size_t N>
+template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
 struct cast_array_template_from_cppdatalib
 {
 public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &) {}
-    operator Template<T, N>() const {return Template<T, N>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator Template<T, N, Ts...>() const {return Template<T, N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
 };
 
-template<template<size_t> class Template, size_t N>
+template<template<size_t, typename...> class Template, size_t N, typename... Ts>
 struct cast_sized_template_from_cppdatalib
 {
 public:
     cast_sized_template_from_cppdatalib(const cppdatalib::core::value &) {}
-    operator Template<N>() const {return Template<N>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator Template<N, Ts...>() const {return Template<N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
 };
 
 template<>

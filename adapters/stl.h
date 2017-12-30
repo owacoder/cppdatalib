@@ -533,8 +533,8 @@ public:
     {
         std::forward_list<T, Ts...> result;
         if (bind.is_array())
-            for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
+            for (auto it = bind.get_array_unchecked().data().rbegin(); it != bind.get_array_unchecked().data().rend(); ++it)
+                result.push_front(it->operator T());
         return result;
     }
 };

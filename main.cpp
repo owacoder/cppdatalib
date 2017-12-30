@@ -457,6 +457,10 @@ int readme_simple_test4()
     core::value my_value, m2;               // Global cross-format value class
     core::value_builder builder(my_value);
 
+    m2 = std::array<int, 3>{0, 1, 4};
+    std::array<int, 2> axx = m2;
+    m2 = axx;
+
     std::stack<int, std::vector<int>> stack;
     stack.push(0);
     stack.push(1);
