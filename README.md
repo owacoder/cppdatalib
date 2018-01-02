@@ -8,11 +8,14 @@ A header-only, C++11 data conversion library
 
 cppdatalib offers implementations of several different serialization formats designed for hierarchical data (and some that aren't).
 cppdatalib is able to easily convert to and from a standard internal representation. Adapters also exist to integrate smoothly with
-the following external frameworks:
+the following frameworks:
 
+   - [Boost.Compute](http://www.boost.org/doc/libs/1_66_0/libs/compute/doc/html/index.html)
+   - [Boost.Container](http://www.boost.org/doc/libs/1_66_0/doc/html/container.html)
    - [Qt](https://www.qt.io/)
    - [POCO](https://pocoproject.org/)
    - [ETL](https://www.etlcpp.com/home.html)
+   - The C++ STL
 
 Supported formats include
 
