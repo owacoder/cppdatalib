@@ -93,12 +93,14 @@ namespace cppdatalib
                         // Dereference
                         if (reference->is_object())
                         {
-                            if (reference->is_member(path_node))
-                                reference = reference->member_ptr(path_node);
-                            else if (throw_on_errors)
-                                throw core::error("JSON Pointer - Attempted to dereference non-existent member in object");
-                            else
-                                return NULL;
+                            reference = reference->member_ptr(path_node);
+                            if (!reference)
+                            {
+                                if (throw_on_errors)
+                                    throw core::error("JSON Pointer - Attempted to dereference non-existent member in object");
+                                else
+                                    return NULL;
+                            }
                         }
                         else if (reference->is_array())
                         {
