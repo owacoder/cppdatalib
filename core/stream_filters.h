@@ -248,6 +248,7 @@ namespace cppdatalib
 
         enum buffer_filter_flags
         {
+            buffer_none = 0x00,
             buffer_strings = 0x01,
             buffer_arrays = 0x02,
             buffer_objects = 0x04
@@ -666,6 +667,9 @@ namespace cppdatalib
 
             bool write_(const value &v, bool is_key)
             {
+                if (v.is_object() || v.is_array())
+                    return false;
+
                 (void) is_key;
                 if (v.get_type() == measure)
                 {
@@ -722,6 +726,9 @@ namespace cppdatalib
 
             bool write_(const value &v, bool is_key)
             {
+                if (v.is_object() || v.is_array())
+                    return false;
+
                 base::write_(v, is_key);
                 if (v.get_type() == measure)
                 {
@@ -778,6 +785,9 @@ namespace cppdatalib
 
             bool write_(const value &v, bool is_key)
             {
+                if (v.is_object() || v.is_array())
+                    return false;
+
                 stream_filter_base::write_(v, is_key);
                 if (v.get_type() == measure)
                 {
@@ -846,6 +856,9 @@ namespace cppdatalib
 
             bool write_(const value &v, bool is_key)
             {
+                if (v.is_object() || v.is_array())
+                    return false;
+
                 stream_filter_base::write_(v, is_key);
                 if (v.get_type() == measure)
                 {
@@ -877,9 +890,8 @@ namespace cppdatalib
 
                 if (v.get_type() == core::array)
                 {
-                    core::value sorted;
+                    core::value sorted = v;
 
-                    sorted = v;
                     if (direction == ascending_sort)
                         sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end());
                     else

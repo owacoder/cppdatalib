@@ -419,9 +419,10 @@ struct point
 
 #include "adapters/qt.h"
 #include "adapters/poco.h"
-#include "adapters/boost.h"
+#include "adapters/boost_container.h"
 #include "adapters/etl.h"
 #include "adapters/stl.h"
+#include "adapters/boost_compute.h"
 
 template<>
 class cast_to_cppdatalib<point>
@@ -504,8 +505,31 @@ int readme_simple_test4()
     return 0;
 }
 
+#include <boost/compute.hpp>
+
 int main()
 {
+    boost::compute::device device = boost::compute::system::default_device();
+    boost::compute::context ctx(device);
+    boost::compute::command_queue queue(ctx, device);
+
+    boost::compute::vector<float> vec(3100000, ctx);
+    cppdatalib::core::value compute_v;
+
+    compute_v = cppdatalib::core::array_t();
+    for (size_t i = 0; i < vec.size(); ++i)
+        compute_v.push_back(i);
+    vec = cppdatalib::core::userdata_cast(compute_v, queue);
+
+    boost::compute::transform(vec.begin(),
+                              vec.end(),
+                              vec.begin(),
+                              boost::compute::sqrt<float>(),
+                              queue);
+
+    compute_v = cppdatalib::core::userdata_cast(vec, queue);
+    //std::cout << compute_v << std::endl;
+
     cppdatalib::core::value xyz;
     std::tuple<int, int, std::string, QVector<QString>> tuple;
     QStringList value = {"value", ""};
@@ -525,7 +549,7 @@ int main()
     cppdatalib::core::mode_filter<cppdatalib::core::uinteger> mode(median);
     cppdatalib::core::range_filter<cppdatalib::core::uinteger> range(mode);
     cppdatalib::core::dispersion_filter<cppdatalib::core::uinteger> dispersal(range);
-    cppdatalib::core::array_sort_filter<cppdatalib::core::descending_sort> sorter(dispersal);
+    cppdatalib::core::array_sort_filter<> sorter(dispersal);
 
     sorter << cppdatalib::core::array_t{2, 0, 1, 2, 3, 4, 4};
 
