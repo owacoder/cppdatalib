@@ -306,9 +306,12 @@ Enable/Disable flags are listed below:
    - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
    - `CPPDATALIB_DISABLE_FAST_IO_GCOUNT` - Disables calculation of `gcount()` in the fast input classes. This removes the `gcount()` function altogether. This flag only has an effect if `CPPDATALIB_ENABLE_FAST_INPUT` is defined
    - `CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE` - Trims value sizes down to optimize space for large numeric arrays. This theoretically slows down string values somewhat, but saves space
+   - `CPPDATALIB_ENABLE_BOOST_COMPUTE` - Enables the [Boost.Compute](http://www.boost.org/doc/libs/1_66_0/libs/compute/doc/html/index.html) adapters, to smoothly integrate with Boost.Compute types. The Boost source tree must be in the include path
+   - `CPPDATALIB_ENABLE_BOOST_CONTAINER` - Enables the [Boost.Container](http://www.boost.org/doc/libs/1_66_0/doc/html/container.html) adapters, to smoothly integrate with Boost.Container types. The Boost source tree must be in the include path
    - `CPPDATALIB_ENABLE_QT` - Enables the [Qt](https://www.qt.io/) adapters, to smoothly integrate with the most common Qt types. The Qt source tree must be in the include path
    - `CPPDATALIB_ENABLE_POCO` - Enables the [POCO](https://pocoproject.org/) adapters, to smoothly integrate with POCO types. The "Poco" source tree must be in the include path
    - `CPPDATALIB_ENABLE_ETL` - Enables the [ETL](https://www.etlcpp.com/home.html) adapters, to smoothly integrate with ETL types. The "etl" source tree must be in the include path
+   - `CPPDATALIB_ENABLE_STL` - Enables the STL adapters, to smoothly integrate with all STL types
 
 Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.
 

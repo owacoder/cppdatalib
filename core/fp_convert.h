@@ -132,7 +132,7 @@ namespace cppdatalib
                 exp += 13;
 
             // Bias significand so we can extract it as an integer
-            f *= std::exp2(11 + exp); // exp will actually be negative here, so this is effectively a subtraction
+            f *= std::exp2(static_cast<float>(11 + exp)); // exp will actually be negative here, so this is effectively a subtraction
             result |= static_cast<uint16_t>(std::round(f)) & 0x3ff;
 
             return result;
@@ -213,7 +213,7 @@ namespace cppdatalib
                 exp += 125;
 
             // Bias significand so we can extract it as an integer
-            f *= std::exp2(24 + exp); // exp will actually be negative here, so this is effectively a subtraction
+            f *= std::exp2(static_cast<float>(24 + exp)); // exp will actually be negative here, so this is effectively a subtraction
             result |= static_cast<uint32_t>(std::round(f)) & 0x7fffff;
 
             return result;
@@ -279,7 +279,7 @@ namespace cppdatalib
                 //  for a normalized number. Denormalized numbers only have a leading 0.)
 
                 result = std::ldexp(static_cast<double>(mantissa | (normal << exponent_offset)),
-                                    exp - exponent_offset - 1022 /* sic: the bias is adjusted for the following subtraction */ - normal);
+                                    static_cast<int>(exp - exponent_offset - 1022 /* sic: the bias is adjusted for the following subtraction */ - normal));
             }
 
             return f >> sign_offset? -result: result;

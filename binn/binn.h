@@ -288,7 +288,7 @@ namespace cppdatalib
                                 break;
                             }
                             case uint32: get_output()->write(integer); break;
-                            case single_float: get_output()->write(static_cast<core::real_t>(core::float_from_ieee_754(integer))); break;
+                            case single_float: get_output()->write(static_cast<core::real_t>(core::float_from_ieee_754(static_cast<uint32_t>(integer)))); break;
                             default: get_output()->write(core::value(integer, core::user + element_subtype)); break;
                         }
                         break;
@@ -340,9 +340,9 @@ namespace cppdatalib
                             if (stream().fail())
                                 throw core::error("Binn - unexpected end of string");
                             // Set string in string_type to preserve the subtype
-                            string_type.set_string(core::string_t(buffer.get(), buffer_size));
+                            string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                             get_output()->append_to_string(string_type);
-                            size -= buffer_size;
+                            size -= static_cast<size_t>(buffer_size);
                         }
                         string_type.set_string("");
                         get_output()->end_string(string_type);
@@ -371,9 +371,9 @@ namespace cppdatalib
                             if (stream().fail())
                                 throw core::error("Binn - unexpected end of string");
                             // Set string in string_type to preserve the subtype
-                            string_type.set_string(core::string_t(buffer.get(), buffer_size));
+                            string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                             get_output()->append_to_string(string_type);
-                            size -= buffer_size;
+                            size -= static_cast<size_t>(buffer_size);
                         }
                         string_type.set_string("");
                         get_output()->end_string(string_type);
@@ -447,7 +447,7 @@ namespace cppdatalib
                         *written = 1 + 3 * (size < 128);
 
                     if (size < 128)
-                        return stream.put(size);
+                        return stream.put(static_cast<char>(size));
 
                     return stream.put(((size >> 24) & 0xff) | 0x80)
                                  .put((size >> 16) & 0xff)
@@ -529,7 +529,7 @@ namespace cppdatalib
                                         // since there is nothing to show that the data should be read as a floating point number)
                                         // To prevent the loss of data, the subtype is discarded and the value stays the same
 
-                                        if (core::float_from_ieee_754(core::float_to_ieee_754(arg->get_real_unchecked())) != arg->get_real_unchecked() && !std::isnan(arg->get_real_unchecked()))
+                                        if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(arg->get_real_unchecked()))) != arg->get_real_unchecked() && !std::isnan(arg->get_real_unchecked()))
                                             size.top() += 4; // requires more than 32-bit float to losslessly encode
                                     }
 
@@ -670,7 +670,7 @@ namespace cppdatalib
                         out = ~out + 1;
                     out &= INT32_MAX;
 
-                    stream().put(out >> 24)
+                    stream().put(static_cast<char>(out >> 24))
                                  .put((out >> 16) & 0xff)
                                  .put((out >>  8) & 0xff)
                                  .put(out & 0xff);
@@ -695,14 +695,14 @@ namespace cppdatalib
 
                     if (v.get_int_unchecked() >= INT8_MIN && v.get_int_unchecked() <= INT8_MAX)
                         write_type(stream(), byte, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int8)
-                                .put(out);
+                                .put(static_cast<char>(out));
                     else if (v.get_int_unchecked() >= INT16_MIN && v.get_int_unchecked() <= INT16_MAX)
                         write_type(stream(), word, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int16)
-                                .put(out >> 8)
+                                .put(static_cast<char>(out >> 8))
                                 .put(out & 0xff);
                     else if (v.get_int_unchecked() >= INT32_MIN && v.get_int_unchecked() <= INT32_MAX)
                         write_type(stream(), dword, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) int32)
-                                .put(out >> 24)
+                                .put(static_cast<char>(out >> 24))
                                 .put((out >> 16) & 0xff)
                                 .put((out >> 8) & 0xff)
                                 .put(out & 0xff);
@@ -723,14 +723,14 @@ namespace cppdatalib
 
                     if (v.get_uint_unchecked() <= UINT8_MAX)
                         write_type(stream(), byte, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint8)
-                                .put(out);
+                                .put(static_cast<char>(out));
                     else if (v.get_uint_unchecked() <= UINT16_MAX)
                         write_type(stream(), word, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint16)
-                                .put(out >> 8)
+                                .put(static_cast<char>(out >> 8))
                                 .put(out & 0xff);
                     else if (v.get_uint_unchecked() <= UINT32_MAX)
                         write_type(stream(), dword, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) uint32)
-                                .put(out >> 24)
+                                .put(static_cast<char>(out >> 24))
                                 .put((out >> 16) & 0xff)
                                 .put((out >> 8) & 0xff)
                                 .put(out & 0xff);
@@ -756,11 +756,11 @@ namespace cppdatalib
             {
                 uint64_t out;
 
-                if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real_unchecked())) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
+                if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
                 {
-                    out = core::float_to_ieee_754(v.get_real_unchecked());
+                    out = core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()));
                     write_type(stream(), dword, single_float)
-                            .put(out >> 24)
+                            .put(static_cast<char>(out >> 24))
                             .put((out >> 16) & 0xff)
                             .put((out >> 8) & 0xff)
                             .put(out & 0xff);
@@ -790,7 +790,7 @@ namespace cppdatalib
                     if (size > 255)
                         throw core::error("Binn - object key is larger than limit of 255 bytes");
 
-                    stream().put(size);
+                    stream().put(static_cast<char>(size));
                     return;
                 }
 

@@ -2,6 +2,7 @@
 #define CPPDATALIB_STL_H
 
 #include <string>
+#include <array>
 #include <vector>
 #include <list>
 #include <forward_list>

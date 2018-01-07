@@ -417,12 +417,7 @@ struct point
     int x, y;
 };
 
-#include "adapters/qt.h"
-#include "adapters/poco.h"
-#include "adapters/boost_container.h"
-#include "adapters/etl.h"
 #include "adapters/stl.h"
-#include "adapters/boost_compute.h"
 
 template<>
 class cast_to_cppdatalib<point>
@@ -447,8 +442,6 @@ public:
         return p;
     }
 };
-
-#include <QDebug>
 
 int readme_simple_test4()
 {
@@ -493,10 +486,6 @@ int readme_simple_test4()
         p2 = m2;
         p2.x += 1000;
         m2 = p2;
-        /*m2 = QVector<int>() << 1 << 2;
-        QVector<int> n = m2;*/
-        QVariant v = m2;
-        m2 = v;
         w << m2;                // Write core::value out to STDOUT as JSON
     } catch (core::error e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
@@ -505,9 +494,11 @@ int readme_simple_test4()
     return 0;
 }
 
+#ifdef CPPDATALIB_ENABLE_BOOST_COMPUTE
+#include "adapters/boost_compute.h"
 #include <boost/compute.hpp>
 
-int main()
+void test_boost_compute()
 {
     boost::compute::device device = boost::compute::system::default_device();
     boost::compute::context ctx(device);
@@ -529,18 +520,28 @@ int main()
 
     compute_v = cppdatalib::core::userdata_cast(vec, queue);
     //std::cout << compute_v << std::endl;
+}
+#endif
 
+#ifdef CPPDATALIB_ENABLE_QT
+void test_qt()
+{
+	std::tuple<int, int, std::string, QVector<QString>> tuple;
+	QStringList value = { "value", "" };
+	xyz = std::make_tuple(0, 1.5, "hello", value, "stranger");
+	std::cout << xyz << std::endl;
+	tuple = xyz;
+	xyz = tuple;
+	std::cout << xyz << std::endl;
+	std::array<int, 3> stdarr = xyz;
+	xyz = stdarr;
+	std::cout << xyz << std::endl;
+}
+#endif
+
+int main()
+{
     cppdatalib::core::value xyz;
-    std::tuple<int, int, std::string, QVector<QString>> tuple;
-    QStringList value = {"value", ""};
-    xyz = std::make_tuple(0, 1.5, "hello", value, "stranger");
-    std::cout << xyz << std::endl;
-    tuple = xyz;
-    xyz = tuple;
-    std::cout << xyz << std::endl;
-    std::array<int, 3> stdarr = xyz;
-    xyz = stdarr;
-    std::cout << xyz << std::endl;
 
     std::cout << sizeof(cppdatalib::core::value) << std::endl;
 
@@ -563,6 +564,7 @@ int main()
     vt100 vt;
     std::cout << vt.attr_bright;
 
+#if 0
     Test("base64_encode", base64_encode_tests, cppdatalib::base64::encode);
     ReverseTest("base64_decode", base64_encode_tests, cppdatalib::base64::decode);
     Test("debug_hex_encode", debug_hex_encode_tests, cppdatalib::hex::debug_encode);
@@ -584,6 +586,11 @@ int main()
     {
         std::cout << e.what() << std::endl;
     }
+#endif
     std::cout << vt.attr_reset;
+
+#ifdef CPPDATALIB_MSVC
+	system("pause");
+#endif
     return 0;
 }

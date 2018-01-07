@@ -179,9 +179,9 @@ namespace cppdatalib
                             if (stream().fail())
                                 throw core::error("MessagePack - unexpected end of string");
                             // Set string in string_type to preserve the subtype
-                            string_type.set_string(core::string_t(buffer.get(), buffer_size));
+                            string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                             get_output()->append_to_string(string_type);
-                            size -= buffer_size;
+                            size -= static_cast<size_t>(buffer_size);
                         }
                         string_type.set_string("");
                         get_output()->end_string(string_type);
@@ -274,9 +274,9 @@ namespace cppdatalib
                             if (stream().fail())
                                 throw core::error("MessagePack - unexpected end of string");
                             // Set string in string_type to preserve the subtype
-                            string_type.set_string(core::string_t(buffer.get(), buffer_size));
+                            string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                             get_output()->append_to_string(string_type);
-                            size -= buffer_size;
+                            size -= static_cast<size_t>(buffer_size);
                         }
                         string_type.set_string("");
                         get_output()->end_string(string_type);
@@ -327,19 +327,19 @@ namespace cppdatalib
                 core::ostream &write_int(core::ostream &stream, core::uint_t i)
                 {
                     if (i <= UINT8_MAX / 2)
-                        return stream.put(i);
+                        return stream.put(static_cast<char>(i));
                     else if (i <= UINT8_MAX)
-                        return stream.put(0xcc).put(i);
+                        return stream.put(static_cast<unsigned char>(0xcc)).put(static_cast<char>(i));
                     else if (i <= UINT16_MAX)
-                        return stream.put(0xcd).put(i >> 8).put(i & 0xff);
+                        return stream.put(static_cast<unsigned char>(0xcd)).put(static_cast<char>(i >> 8)).put(i & 0xff);
                     else if (i <= UINT32_MAX)
-                        return stream.put(0xce)
-                                .put(i >> 24)
+                        return stream.put(static_cast<unsigned char>(0xce))
+                                .put(static_cast<char>(i >> 24))
                                 .put((i >> 16) & 0xff)
                                 .put((i >> 8) & 0xff)
                                 .put(i & 0xff);
                     else
-                        return stream.put(0xcf)
+                        return stream.put(static_cast<unsigned char>(0xcf))
                                 .put((i >> 56) & 0xff)
                                 .put((i >> 48) & 0xff)
                                 .put((i >> 40) & 0xff)
@@ -355,19 +355,19 @@ namespace cppdatalib
                     if (i >= 0)
                     {
                         if (i <= UINT8_MAX / 2)
-                            return stream.put(i);
+                            return stream.put(static_cast<char>(i));
                         else if (i <= UINT8_MAX)
-                            return stream.put(0xcc).put(i);
+                            return stream.put(static_cast<unsigned char>(0xcc)).put(static_cast<char>(i));
                         else if (i <= UINT16_MAX)
-                            return stream.put(0xcd).put(i >> 8).put(i & 0xff);
+                            return stream.put(static_cast<unsigned char>(0xcd)).put(static_cast<char>(i >> 8)).put(i & 0xff);
                         else if (i <= UINT32_MAX)
-                            return stream.put(0xce)
-                                    .put(i >> 24)
+                            return stream.put(static_cast<unsigned char>(0xce))
+                                    .put(static_cast<char>(i >> 24))
                                     .put((i >> 16) & 0xff)
                                     .put((i >> 8) & 0xff)
                                     .put(i & 0xff);
                         else
-                            return stream.put(0xcf)
+                            return stream.put(static_cast<unsigned char>(0xcf))
                                     .put((i >> 56) & 0xff)
                                     .put((i >> 48) & 0xff)
                                     .put((i >> 40) & 0xff)
@@ -395,17 +395,17 @@ namespace cppdatalib
                         if (i <= 31)
                             return stream.put(0xe0 + (temp & 0x1f));
                         else if (i <= INT8_MAX)
-                            return stream.put(0xd0).put(0x80 | (temp & 0xff));
+                            return stream.put(static_cast<unsigned char>(0xd0)).put(0x80 | (temp & 0xff));
                         else if (i <= INT16_MAX)
-                            return stream.put(0xd1).put(0x80 | ((temp >> 8) & 0xff)).put(temp & 0xff);
+                            return stream.put(static_cast<unsigned char>(0xd1)).put(0x80 | ((temp >> 8) & 0xff)).put(temp & 0xff);
                         else if (i <= INT32_MAX)
-                            return stream.put(0xd2)
+                            return stream.put(static_cast<unsigned char>(0xd2))
                                     .put(0x80 | ((temp >> 24) & 0xff))
                                     .put((temp >> 16) & 0xff)
                                     .put((temp >> 8) & 0xff)
                                     .put(temp & 0xff);
                         else
-                            return stream.put(0xd3)
+                            return stream.put(static_cast<unsigned char>(0xd3))
                                     .put(0x80 | (temp >> 56))
                                     .put((temp >> 48) & 0xff)
                                     .put((temp >> 40) & 0xff)
@@ -419,11 +419,11 @@ namespace cppdatalib
 
                 core::ostream &write_float(core::ostream &stream, core::real_t f)
                 {
-                    if (core::float_from_ieee_754(core::float_to_ieee_754(f)) == f || std::isnan(f))
+                    if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(f))) == f || std::isnan(f))
                     {
-                        uint32_t temp = core::float_to_ieee_754(f);
+                        uint32_t temp = core::float_to_ieee_754(static_cast<float>(f));
 
-                        return stream.put(0xca)
+                        return stream.put(static_cast<unsigned char>(0xca))
                                 .put((temp >> 24) & 0xff)
                                 .put((temp >> 16) & 0xff)
                                 .put((temp >> 8) & 0xff)
@@ -433,7 +433,7 @@ namespace cppdatalib
                     {
                         uint64_t temp = core::double_to_ieee_754(f);
 
-                        return stream.put(0xcb)
+                        return stream.put(static_cast<unsigned char>(0xcb))
                                 .put(temp >> 56)
                                 .put((temp >> 48) & 0xff)
                                 .put((temp >> 40) & 0xff)
@@ -451,14 +451,14 @@ namespace cppdatalib
                     if (subtype == core::blob || subtype == core::clob)
                     {
                         if (str_size <= UINT8_MAX)
-                            return stream.put(0xc4).put(str_size);
+                            return stream.put(static_cast<unsigned char>(0xc4)).put(static_cast<char>(str_size));
                         else if (str_size <= UINT16_MAX)
-                            return stream.put(0xc5)
-                                    .put(str_size >> 8)
+                            return stream.put(static_cast<unsigned char>(0xc5))
+                                    .put(static_cast<char>(str_size >> 8))
                                     .put(str_size & 0xff);
                         else if (str_size <= UINT32_MAX)
-                            return stream.put(0xc6)
-                                    .put(str_size >> 24)
+                            return stream.put(static_cast<unsigned char>(0xc6))
+                                    .put(static_cast<char>(str_size >> 24))
                                     .put((str_size >> 16) & 0xff)
                                     .put((str_size >> 8) & 0xff)
                                     .put(str_size & 0xff);
@@ -469,16 +469,16 @@ namespace cppdatalib
                     else
                     {
                         if (str_size <= 31)
-                            return stream.put(0xa0 + str_size);
+                            return stream.put(static_cast<char>(0xa0 + str_size));
                         else if (str_size <= UINT8_MAX)
-                            return stream.put(0xd9).put(str_size);
+                            return stream.put(static_cast<unsigned char>(0xd9)).put(static_cast<char>(str_size));
                         else if (str_size <= UINT16_MAX)
-                            return stream.put(0xda)
-                                    .put(str_size >> 8)
+                            return stream.put(static_cast<unsigned char>(0xda))
+                                    .put(static_cast<char>(str_size >> 8))
                                     .put(str_size & 0xff);
                         else if (str_size <= UINT32_MAX)
-                            return stream.put(0xdb)
-                                    .put(str_size >> 24)
+                            return stream.put(static_cast<unsigned char>(0xdb))
+                                    .put(static_cast<char>(str_size >> 24))
                                     .put((str_size >> 16) & 0xff)
                                     .put((str_size >> 8) & 0xff)
                                     .put(str_size & 0xff);
@@ -502,7 +502,7 @@ namespace cppdatalib
             bool requires_prefix_string_size() const {return true;}
 
         protected:
-            void null_(const core::value &) {stream().put(0xc0);}
+            void null_(const core::value &) {stream().put(static_cast<unsigned char>(0xc0));}
             void bool_(const core::value &v) {stream().put(0xc2 + v.get_bool_unchecked());}
             void integer_(const core::value &v) {write_int(stream(), v.get_int_unchecked());}
             void uinteger_(const core::value &v) {write_int(stream(), v.get_uint_unchecked());}
@@ -511,8 +511,10 @@ namespace cppdatalib
             {
                 if (size == unknown_size)
                     throw core::error("MessagePack - 'string' value does not have size specified");
+				else if (size > UINT32_MAX)
+					throw core::error("MessagePack - 'string' value is too large");
 
-                write_string_size(stream(), size, v.get_subtype());
+                write_string_size(stream(), static_cast<size_t>(size), v.get_subtype());
             }
             void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
 
@@ -521,12 +523,12 @@ namespace cppdatalib
                 if (size == unknown_size)
                     throw core::error("MessagePack - 'array' value does not have size specified");
                 else if (size <= 15)
-                    stream().put(0x90 + size);
+                    stream().put(static_cast<char>(0x90 + size));
                 else if (size <= UINT16_MAX)
-                    stream().put(0xdc).put(size >> 8).put(size & 0xff);
+                    stream().put(static_cast<unsigned char>(0xdc)).put(static_cast<char>(size >> 8)).put(size & 0xff);
                 else if (size <= UINT32_MAX)
-                    stream().put(0xdd)
-                            .put(size >> 24)
+                    stream().put(static_cast<unsigned char>(0xdd))
+                            .put(static_cast<char>(size >> 24))
                             .put((size >> 16) & 0xff)
                             .put((size >> 8) & 0xff)
                             .put(size & 0xff);
@@ -539,12 +541,12 @@ namespace cppdatalib
                 if (size == unknown_size)
                     throw core::error("MessagePack - 'object' value does not have size specified");
                 else if (size <= 15)
-                    stream().put(0x80 + size);
+                    stream().put(static_cast<char>(0x80 + size));
                 else if (size <= UINT16_MAX)
-                    stream().put(0xde).put(size >> 8).put(size & 0xff);
+                    stream().put(static_cast<unsigned char>(0xde)).put(static_cast<char>(size >> 8)).put(size & 0xff);
                 else if (size <= UINT32_MAX)
-                    stream().put(0xdf)
-                            .put(size >> 24)
+                    stream().put(static_cast<unsigned char>(0xdf))
+                            .put(static_cast<char>(size >> 24))
                             .put((size >> 16) & 0xff)
                             .put((size >> 8) & 0xff)
                             .put(size & 0xff);

@@ -50,28 +50,6 @@ namespace cppdatalib {
     namespace core
     {
         class value;
-        namespace impl
-        {
-            template<size_t size, typename T, typename... Ts>
-            struct unpack : unpack<size-1, Ts...> {};
-
-            template<typename T, typename... Ts>
-            struct unpack<0, T, Ts...> {typedef T type;};
-
-            template<typename... Ts>
-            struct unpack_first {typedef typename unpack<1, Ts...>::type type;};
-
-            template<typename...>
-            constexpr auto is_template_helper() {return 0;}
-            template<template<typename...> class T, typename...>
-            constexpr auto is_template_helper() {return 1;}
-
-            template<typename T> struct is_template
-            {
-                typedef T type;
-                static const int value = is_template_helper<T>();
-            };
-        }
     }
 }
 
@@ -487,7 +465,7 @@ namespace cppdatalib
             value &operator[](size_t pos);
             value element(size_t pos) const;
             value &element(size_t pos);
-            void erase_element(int_t pos);
+            void erase_element(size_t pos);
 
             // The following are convenience conversion functions
             bool_t get_bool(bool_t default_ = false) const {return is_bool()? bool_: default_;}
@@ -668,7 +646,7 @@ namespace cppdatalib
                         {
                             case boolean: set_bool(int_ != 0); break;
                             case uinteger: set_uint(int_ > 0? int_: 0); break;
-                            case real: set_real(int_); break;
+                            case real: set_real(static_cast<real_t>(int_)); break;
                             case string: set_string(std::to_string(int_)); break;
                             default: *this = default_value; break;
                         }
@@ -680,7 +658,7 @@ namespace cppdatalib
                         {
                             case boolean: set_bool(uint_ != 0); break;
                             case integer: set_int(uint_ <= INT64_MAX? uint_: 0); break;
-                            case real: set_real(uint_); break;
+                            case real: set_real(static_cast<real_t>(uint_)); break;
                             case string: set_string(std::to_string(uint_)); break;
                             default: *this = default_value; break;
                         }
@@ -691,8 +669,8 @@ namespace cppdatalib
                         switch (new_type)
                         {
                             case boolean: set_bool(real_ != 0.0); break;
-                            case integer: set_int((real_ >= INT64_MIN && real_ <= INT64_MAX)? trunc(real_): 0); break;
-                            case uinteger: set_uint((real_ >= 0 && real_ <= UINT64_MAX)? trunc(real_): 0); break;
+                            case integer: set_int((real_ >= INT64_MIN && real_ <= INT64_MAX)? static_cast<int_t>(trunc(real_)): 0); break;
+                            case uinteger: set_uint((real_ >= 0 && real_ <= UINT64_MAX)? static_cast<uint_t>(trunc(real_)): 0); break;
                             case string:
                             {
                                 std::ostringstream str;
@@ -858,8 +836,9 @@ namespace cppdatalib
             }
         }
 
-        struct array_t
+        class array_t
         {
+		public:
 #ifdef CPPDATALIB_ARRAY_T
             typedef CPPDATALIB_ARRAY_T container_type;
 #else
@@ -894,12 +873,15 @@ namespace cppdatalib
             container_type m_data;
         };
 
-        struct array_iterator_t : public impl::iterator_t<array_t::iterator, typename array_t::container_type::value_type>
+        class array_iterator_t : public impl::iterator_t<array_t::iterator, typename array_t::container_type::value_type>
         {
+		public:
             using impl::iterator_t<array_t::iterator, typename array_t::container_type::value_type>::iterator_t;
         };
-        struct array_const_iterator_t : public impl::const_iterator_t<array_t::const_iterator, const typename array_t::container_type::value_type>
+
+        class array_const_iterator_t : public impl::const_iterator_t<array_t::const_iterator, const typename array_t::container_type::value_type>
         {
+		public:
             using impl::const_iterator_t<array_t::const_iterator, const typename array_t::container_type::value_type>::const_iterator_t;
         };
 
@@ -910,8 +892,9 @@ namespace cppdatalib
         array_const_iterator_t array_t::cbegin() const {return m_data.cbegin();}
         array_const_iterator_t array_t::cend() const {return m_data.cend();}
 
-        struct object_t
+        class object_t
         {
+		public:
 #ifdef CPPDATALIB_OBJECT_T
             typedef CPPDATALIB_OBJECT_T container_type;
 #else
@@ -946,12 +929,14 @@ namespace cppdatalib
             container_type m_data;
         };
 
-        struct object_iterator_t : public impl::iterator_t<object_t::iterator, typename object_t::container_type::value_type>
+        class object_iterator_t : public impl::iterator_t<object_t::iterator, typename object_t::container_type::value_type>
         {
+		public:
             using impl::iterator_t<object_t::iterator, typename object_t::container_type::value_type>::iterator_t;
         };
-        struct object_const_iterator_t : public impl::const_iterator_t<object_t::const_iterator, typename object_t::container_type::value_type>
+        class object_const_iterator_t : public impl::const_iterator_t<object_t::const_iterator, typename object_t::container_type::value_type>
         {
+		public:
             using impl::const_iterator_t<object_t::const_iterator, typename object_t::container_type::value_type>::const_iterator_t;
         };
 
@@ -1647,7 +1632,7 @@ namespace cppdatalib
                 arr_ref_().data().insert(arr_ref_().end().data(), pos - arr_ref_().size() + 1, core::null_t());
             return arr_ref_().data()[pos];
         }
-        void value::erase_element(int_t pos) {if (is_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
+        void value::erase_element(size_t pos) {if (is_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
 
         array_t value::get_array(const array_t &default_) const {return is_array()? arr_ref_(): default_;}
         object_t value::get_object(const object_t &default_) const {return is_object()? obj_ref_(): default_;}
@@ -2170,7 +2155,7 @@ class cast_from_cppdatalib<float>
     const cppdatalib::core::value &bind;
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator float() const {return bind.as_real();}
+    operator float() const {return static_cast<float>(bind.as_real());}
 };
 
 template<>

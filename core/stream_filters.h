@@ -28,6 +28,7 @@
 #include "value_builder.h"
 #include <set> // For duplicate_key_check_filter
 #include <algorithm> // For sorting and specialty filters
+#include <functional> // For sorting
 
 #include <cassert>
 
@@ -895,7 +896,7 @@ namespace cppdatalib
                     if (direction == ascending_sort)
                         sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end());
                     else
-                        sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end(), std::greater<core::value>());
+						sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end(), std::greater<cppdatalib::core::value>());
 
                     buffer_filter::write_buffered_value_(sorted, is_key);
                 }

@@ -42,6 +42,14 @@
 #include "message_pack/message_pack.h"
 #include "mysql/mysql.h"
 
+#ifdef CPPDATALIB_ENABLE_BOOST_COMPUTE
+#include "adapters/boost_compute.h"
+#endif
+
+#ifdef CPPDATALIB_ENABLE_BOOST_CONTAINER
+#include "adapters/boost_container.h"
+#endif
+
 #ifdef CPPDATALIB_ENABLE_QT
 #include "adapters/qt.h"
 #endif
@@ -52,6 +60,10 @@
 
 #ifdef CPPDATALIB_ENABLE_ETL
 #include "adapters/etl.h"
+#endif
+
+#ifdef CPPDATALIB_ENABLE_STL
+#include "adapters/stl.h"
 #endif
 
 #endif // CPPDATALIB_H

@@ -163,7 +163,7 @@ namespace cppdatalib
                     throw core::error("UBJSON - invalid floating-point specifier found in input");
 
                 if (specifier == 'd')
-                    r = core::float_from_ieee_754(temp);
+                    r = core::float_from_ieee_754(static_cast<uint32_t>(temp));
                 else
                     r = core::double_from_ieee_754(temp);
 
@@ -197,7 +197,7 @@ namespace cppdatalib
                         stream().read(buffer.get(), buffer_size);
                         if (stream().fail())
                             throw core::error("UBJSON - expected high-precision number value after type specifier");
-                        writer.append_to_string(core::string_t(buffer.get(), buffer_size));
+                        writer.append_to_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                         size -= buffer_size;
                     }
                     writer.end_string(core::value(core::string_t(), core::bignum));
@@ -216,7 +216,7 @@ namespace cppdatalib
                         stream().read(buffer.get(), buffer_size);
                         if (stream().fail())
                             throw core::error("UBJSON - expected string value after type specifier");
-                        writer.append_to_string(core::string_t(buffer.get(), buffer_size));
+                        writer.append_to_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                         size -= buffer_size;
                     }
                     writer.end_string(core::string_t());
@@ -431,7 +431,7 @@ namespace cppdatalib
                     if (force_bits == 0 && (i >= 0 && i <= UINT8_MAX))
                     {
                         stream << (add_specifier? "U": "");
-                        stream.put(i);
+                        stream.put(static_cast<char>(i));
                     }
                     else if (force_bits <= 1 && (i >= INT8_MIN && i < 0))
                     {
@@ -445,7 +445,7 @@ namespace cppdatalib
                         if (i < 0)
                             t = 0x8000u | ((~std::abs(i) & 0xffffu) + 1);
                         else
-                            t = i;
+                            t = static_cast<uint16_t>(i);
 
                         stream << (add_specifier? "I": "");
                         stream.put(t >> 8).put(t & 0xff);
@@ -457,7 +457,7 @@ namespace cppdatalib
                         if (i < 0)
                             t = 0x80000000u | ((~std::abs(i) & 0xffffffffu) + 1);
                         else
-                            t = i;
+                            t = static_cast<uint32_t>(i);
 
                         stream << (add_specifier? "l": "");
                         stream.put(t >> 24)
@@ -496,9 +496,9 @@ namespace cppdatalib
                     if (force_bits == std::string::npos)
                         force_bits = 0;
 
-                    if (force_bits == 0 && (core::float_from_ieee_754(core::float_to_ieee_754(f)) == f || std::isnan(f)))
+                    if (force_bits == 0 && (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(f))) == f || std::isnan(f)))
                     {
-                        uint32_t t = core::float_to_ieee_754(f);
+                        uint32_t t = core::float_to_ieee_754(static_cast<float>(f));
 
                         stream << (add_specifier? "d": "");
                         stream.put(t >> 24)
@@ -545,7 +545,7 @@ namespace cppdatalib
             void integer_(const core::value &v) {write_int(stream(), v.get_int_unchecked(), true);}
             void uinteger_(const core::value &v)
             {
-                if (v.get_uint_unchecked() > std::numeric_limits<core::int_t>::max())
+                if (v.get_uint_unchecked() > static_cast<core::uint_t>(std::numeric_limits<core::int_t>::max()))
                     throw core::error("UBJSON - 'integer' value is out of range of output format");
                 write_int(stream(), v.get_uint_unchecked(), true);
             }
