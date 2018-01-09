@@ -639,6 +639,9 @@ namespace cppdatalib
 
             core::real_t get_mean(mean_filter_flag mean_type) const
             {
+                if (samples == 0)
+                    return NAN;
+
                 switch (mean_type)
                 {
                     case arithmetic_mean: return sum / samples;
@@ -680,7 +683,10 @@ namespace cppdatalib
 
                     sum += value;
                     product *= value;
-                    inverted_sum += 1.0 / value;
+                    if (value == 0.0)
+                        inverted_sum = INFINITY;
+                    else
+                        inverted_sum += 1.0 / value;
                 }
                 output.write(v);
                 return true;

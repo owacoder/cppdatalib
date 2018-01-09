@@ -284,12 +284,7 @@ namespace cppdatalib
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
             template<typename... Ts>
-            value(std::initializer_list<Ts...> v, subtype_t subtype = core::normal)
-            {
-                array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(element);
-            }
+            value(std::initializer_list<Ts...> v, subtype_t subtype = core::normal);
             // Template constructor for simple type
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
             value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
@@ -601,20 +596,10 @@ namespace cppdatalib
             }
 
             template<typename... Args>
-            void array_init(subtype_t new_subtype, Args... args)
-            {
-                new (&ptr_) array_t*(); ptr_ = new array_t(args...);
-                type_ = array;
-                subtype_ = new_subtype;
-            }
+            void array_init(subtype_t new_subtype, Args... args);
 
             template<typename... Args>
-            void object_init(subtype_t new_subtype, Args... args)
-            {
-                new (&ptr_) object_t*(); ptr_ = new object_t(args...);
-                type_ = object;
-                subtype_ = new_subtype;
-            }
+            void object_init(subtype_t new_subtype, Args... args);
 
             void deinit();
 
@@ -976,6 +961,30 @@ namespace cppdatalib
             bool traversed_key_already;
             bool frozen;
         };
+
+        template<typename... Ts>
+        value::value(std::initializer_list<Ts...> v, subtype_t subtype)
+        {
+            array_init(subtype, core::array_t());
+            for (auto const &element: v)
+                push_back(element);
+        }
+
+        template<typename... Args>
+        void value::array_init(subtype_t new_subtype, Args... args)
+        {
+            new (&ptr_) array_t*(); ptr_ = new array_t(args...);
+            type_ = array;
+            subtype_ = new_subtype;
+        }
+
+        template<typename... Args>
+        void value::object_init(subtype_t new_subtype, Args... args)
+        {
+            new (&ptr_) object_t*(); ptr_ = new object_t(args...);
+            type_ = object;
+            subtype_ = new_subtype;
+        }
 
         // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
         // If return value is non-zero, processing continues, otherwise processing aborts immediately

@@ -35,7 +35,6 @@ namespace cppdatalib
         {
             std::unique_ptr<char []> buffer;
             bool delimiter_required;
-            char chr;
 
         private:
             // Opening quote should already be read
