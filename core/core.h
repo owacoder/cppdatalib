@@ -25,6 +25,10 @@
 #ifndef CPPDATALIB_CORE_CORE_H
 #define CPPDATALIB_CORE_CORE_H
 
+#ifdef _MSC_VER
+# define CPPDATALIB_MSVC
+#endif
+
 #include "base64.h"
 #include "hex.h"
 #include "fp_convert.h"

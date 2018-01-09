@@ -1,6 +1,3 @@
-#ifndef CPPDATALIB_ETL_H
-#define CPPDATALIB_ETL_H
-
 /*
  * etl.h
  *
@@ -31,23 +28,55 @@
  * software nor the authorship and existence of this file.
  */
 
-#include "etl/src/array.h"
-#include "etl/src/bitset.h"
-#include "etl/src/deque.h"
-#include "etl/src/vector.h"
-#include "etl/src/list.h"
-#include "etl/src/forward_list.h"
-#include "etl/src/intrusive_list.h"
-#include "etl/src/intrusive_forward_list.h"
-#include "etl/src/queue.h"
-#include "etl/src/stack.h"
-#include "etl/src/optional.h"
+#ifndef CPPDATALIB_ETL_H
+#define CPPDATALIB_ETL_H
 
-#include "../core/value.h"
+#include <etl/src/array.h>
+#include <etl/src/bitset.h>
+#include <etl/src/deque.h>
+#include <etl/src/vector.h>
+#include <etl/src/list.h>
+#include <etl/src/forward_list.h>
+#include <etl/src/intrusive_list.h>
+#include <etl/src/intrusive_forward_list.h>
+#include <etl/src/queue.h>
+#include <etl/src/stack.h>
+#include <etl/src/optional.h>
+#include <etl/src/cstring.h>
+
+#include "../core/value_builder.h"
 
 /*
- *  TODO: implement conversions for maps, sets, intrusive_queue and intrusive_stack, priority_queue, strings, optional, and variant
+ *  TODO: implement conversions for maps, sets, intrusive_queue and intrusive_stack, and priority_queue
  */
+
+// --------
+//  string
+// --------
+
+template<size_t N>
+class cast_sized_template_to_cppdatalib<etl::string, N>
+{
+    const etl::string<N> &bind;
+public:
+    cast_sized_template_to_cppdatalib(const etl::string<N> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::string_t(bind.c_str(), bind.size());}
+};
+
+template<size_t N>
+class cast_sized_template_from_cppdatalib<etl::string, N>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_sized_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator etl::string<N>() const
+    {
+        etl::string<N> result;
+        cppdatalib::core::string_t stdstr = bind.as_string();
+        result.append(stdstr.c_str(), std::min(stdstr.size(), N));
+        return result;
+    }
+};
 
 // ----------
 //  optional

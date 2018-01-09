@@ -42,7 +42,7 @@
 
 #include <Poco/Tuple.h>
 
-#include "../core/value.h"
+#include "../core/value_builder.h"
 
 // ----------
 //  Optional

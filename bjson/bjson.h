@@ -1,3 +1,27 @@
+/*
+ * bjson.h
+ *
+ * Copyright © 2017 Oliver Adams
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the “Software”), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
 #ifndef CPPDATALIB_BJSON_H
 #define CPPDATALIB_BJSON_H
 
@@ -37,14 +61,14 @@ namespace cppdatalib
                     else if (size >= UINT8_MAX)
                     {
                         buffer[0] = initial_type + 1;
-                        buffer[1] = size >> 8;
+                        buffer[1] = static_cast<char>(size >> 8);
                         buffer[2] = size & 0xff;
                         buffer_size = 3;
                     }
                     else
                     {
                         buffer[0] = initial_type;
-                        buffer[1] = size;
+                        buffer[1] = static_cast<char>(size);
                         buffer_size = 2;
                     }
 
@@ -123,7 +147,7 @@ namespace cppdatalib
                                         // since there is nothing to show that the data should be read as a floating point number)
                                         // To prevent the loss of data, the subtype is discarded and the value stays the same
 
-                                        if (core::float_from_ieee_754(core::float_to_ieee_754(arg->get_real_unchecked())) != arg->get_real_unchecked() && !std::isnan(arg->get_real_unchecked()))
+                                        if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(arg->get_real_unchecked()))) != arg->get_real_unchecked() && !std::isnan(arg->get_real_unchecked()))
                                             size.top() += 4; // requires more than 32-bit float to losslessly encode
                                     }
 
@@ -238,7 +262,7 @@ namespace cppdatalib
                 }
                 else if (v.get_int_unchecked() <= 1)
                 {
-                    stream().put(26 + v.get_uint_unchecked()); // Shortcut 0 and 1
+                    stream().put(static_cast<char>(26 + v.get_uint_unchecked())); // Shortcut 0 and 1
                     return;
                 }
                 else /* positive integer */
@@ -251,7 +275,7 @@ namespace cppdatalib
             {
                 if (v.get_uint_unchecked() <= 1)
                 {
-                    stream().put(26 + v.get_uint_unchecked()); // Shortcut 0 and 1
+                    stream().put(static_cast<char>(26 + v.get_uint_unchecked())); // Shortcut 0 and 1
                     return;
                 }
 
@@ -262,14 +286,14 @@ namespace cppdatalib
             {
                 uint64_t out;
 
-                if (core::float_from_ieee_754(core::float_to_ieee_754(v.get_real_unchecked())) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
+                if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
                 {
-                    out = core::float_to_ieee_754(v.get_real_unchecked());
+                    out = core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()));
                     stream().put(14)
                             .put(out & 0xff)
                             .put((out >> 8) & 0xff)
                             .put((out >> 16) & 0xff)
-                            .put(out >> 24);
+                            .put(static_cast<char>(out >> 24));
                 }
                 else
                 {

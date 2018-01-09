@@ -70,7 +70,11 @@ namespace cppdatalib
                                     code = (code << 4) | pos;
                                 }
 
-                                std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+#ifdef CPPDATALIB_MSVC
+								std::wstring_convert<std::codecvt_utf8<unsigned int>, unsigned int> utf8;
+#else
+								std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+#endif
                                 std::string bytes = utf8.to_bytes(code);
 
                                 memcpy(write, bytes.c_str(), bytes.size());
@@ -92,7 +96,11 @@ namespace cppdatalib
                                         code = (code << 3) | (c - '0');
                                     }
 
-                                    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+#ifdef CPPDATALIB_MSVC
+									std::wstring_convert<std::codecvt_utf8<unsigned int>, unsigned int> utf8;
+#else
+									std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
+#endif
                                     std::string bytes = utf8.to_bytes(code);
 
                                     memcpy(write, bytes.c_str(), bytes.size());

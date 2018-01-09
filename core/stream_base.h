@@ -731,19 +731,19 @@ namespace cppdatalib
                                 switch (arg->get_type())
                                 {
                                     case boolean:
-                                        compare = -(arg->get_bool_unchecked() < arg2->get_bool_unchecked());
+                                        compare = (arg->get_bool_unchecked() < arg2->get_bool_unchecked());
                                         break;
                                     case integer:
-                                        compare = -(arg->get_int_unchecked() < arg2->get_int_unchecked());
+                                        compare = (arg->get_int_unchecked() < arg2->get_int_unchecked());
                                         break;
                                     case uinteger:
-                                        compare = -(arg->get_uint_unchecked() < arg2->get_uint_unchecked());
+                                        compare = (arg->get_uint_unchecked() < arg2->get_uint_unchecked());
                                         break;
                                     case real:
-                                        compare = -(arg->get_real_unchecked() < arg2->get_real_unchecked());
+                                        compare = (arg->get_real_unchecked() < arg2->get_real_unchecked());
                                         break;
                                     case string:
-                                        compare = -(arg->get_string_unchecked() < arg2->get_string_unchecked());
+                                        compare = (arg->get_string_unchecked() < arg2->get_string_unchecked());
                                         break;
                                     case array:
                                     case object:
@@ -751,6 +751,9 @@ namespace cppdatalib
                                     default:
                                         break;
                                 }
+
+								// Invert true cases above to -1 instead
+								compare = -compare;
                             }
                         }
                     }

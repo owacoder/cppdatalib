@@ -99,7 +99,7 @@ namespace cppdatalib
                                 stream().read(buffer.get(), buffer_size);
                                 if (stream().fail())
                                     throw core::error("Bencode - unexpected end of string");
-                                get_output()->append_to_string(core::string_t(buffer.get(), buffer_size));
+                                get_output()->append_to_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                                 size -= buffer_size;
                             }
                             get_output()->end_string(core::string_t());
