@@ -20,7 +20,7 @@
 #include <stack>
 #include <queue>
 
-#ifdef CPPDATALIB_CPP17
+#if __cplusplus >= 201703L
 #include <variant>
 #include <optional>
 #include <any>
@@ -379,7 +379,7 @@ public:
     }
 };
 
-#ifdef CPPDATALIB_CPP17
+#if __cplusplus >= 201703L
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::optional, Ts...>
 {
@@ -776,7 +776,7 @@ public:
     }
 };
 
-#ifdef CPPDATALIB_CPP17
+#if __cplusplus >= 201703L
 template<typename... Ts>
 class cast_template_from_cppdatalib<std::optional, Ts...>
 {
