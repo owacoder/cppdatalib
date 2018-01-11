@@ -474,7 +474,7 @@ namespace cppdatalib
             static const unsigned int provides_prefix_object_size = 0x02;
             static const unsigned int provides_prefix_string_size = 0x04;
 
-            // The following functions should be reimplemented to return true if the parser ALWAYS provides the entire value
+            // The following values should return true if the parser ALWAYS provides the entire value
             // (for each respective type) in the begin_xxx() and end_xxx() functions. (or uses the write() function exclusively,
             // which requires the entire value anyway)
             static const unsigned int provides_buffered_arrays = 0x08;
