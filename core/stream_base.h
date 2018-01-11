@@ -104,6 +104,10 @@ namespace cppdatalib
             static const unsigned int requires_buffered_objects = 0x10;
             static const unsigned int requires_buffered_strings = 0x20;
 
+            // The following value must be set (in `required_features()`) if the output format requires
+            // an element to be written in a single write() call
+            static const unsigned int requires_single_write = 0x7f;
+
             stream_handler() : active_(false), is_key_(false)
             {
                 nested_scopes.push_back(scope_data(null));
@@ -480,6 +484,9 @@ namespace cppdatalib
             static const unsigned int provides_buffered_arrays = 0x08;
             static const unsigned int provides_buffered_objects = 0x10;
             static const unsigned int provides_buffered_strings = 0x20;
+
+            // The following value should return true if the parser ALWAYS provides the entire value as a single write() call
+            static const unsigned int provides_single_write = 0x7f;
 
             stream_input() : output(NULL) {}
             stream_input(core::stream_handler &output) : output(&output) {}
