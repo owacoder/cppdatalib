@@ -288,6 +288,8 @@ namespace cppdatalib
 
                     if ((row = mysql_fetch_row(result)) != NULL)
                     {
+                        unsigned long *lengths = mysql_fetch_lengths(result);
+
                         get_output()->begin_array(core::array_t(), columns);
 
                         for (unsigned int i = 0; i < columns; ++i)
@@ -296,8 +298,7 @@ namespace cppdatalib
                                 get_output()->write(core::null_t());
                             else
                             {
-                                // TODO: doesn't support binary row values with embedded NUL characters
-                                core::value value(row[i]);
+                                core::value value(core::string_t(row[i], lengths[i]));
                                 const core::string_t &column_type = metadata[i]["datatype"].get_string_ref();
 
                                 impl::convert_string(value, column_type);
