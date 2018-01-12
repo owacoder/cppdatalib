@@ -12,9 +12,10 @@ the following frameworks:
 
    - [Boost.Compute](http://www.boost.org/doc/libs/1_66_0/libs/compute/doc/html/index.html)
    - [Boost.Container](http://www.boost.org/doc/libs/1_66_0/doc/html/container.html)
-   - [Qt](https://www.qt.io/)
-   - [POCO](https://pocoproject.org/)
+   - [Boost.DynamicBitset](http://www.boost.org/doc/libs/1_66_0/libs/dynamic_bitset/dynamic_bitset.html)
    - [ETL](https://www.etlcpp.com/home.html)
+   - [POCO](https://pocoproject.org/)
+   - [Qt](https://www.qt.io/)
    - The C++ STL
 
 Supported formats include
