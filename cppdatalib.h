@@ -40,7 +40,7 @@
 #include "xls/xml.h"
 #include "netstrings/netstrings.h"
 #include "message_pack/message_pack.h"
-#include "mysql/mysql.h"
+#include "mysql/sql_mysql.h"
 
 #ifdef CPPDATALIB_ENABLE_BOOST_COMPUTE
 #include "adapters/boost_compute.h"

@@ -469,6 +469,9 @@ namespace cppdatalib
         private:
             core::stream_handler *output;
 
+        protected:
+            size_t initial_nesting_level;
+
         public:
             static const unsigned int provides_none = 0x00;
 
@@ -488,8 +491,8 @@ namespace cppdatalib
             // The following value should return true if the parser ALWAYS provides the entire value as a single write() call
             static const unsigned int provides_single_write = 0x7f;
 
-            stream_input() : output(NULL) {}
-            stream_input(core::stream_handler &output) : output(&output) {}
+            stream_input() : output(NULL), initial_nesting_level(0) {}
+            stream_input(core::stream_handler &output) : output(&output), initial_nesting_level(output.nesting_depth()) {}
             virtual ~stream_input() {}
 
             // Resets the input class to start parsing a new stream (NOTE: should NOT attempt to seek to the beginning of the stream!)
@@ -499,10 +502,17 @@ namespace cppdatalib
             virtual unsigned int features() const {return provides_none;}
 
             // Returns false if nothing is being parsed, true if in the middle of parsing
-            virtual bool busy() const {return output && output->nesting_depth() > 0;}
+            virtual bool busy() const {return output && output->nesting_depth() > initial_nesting_level;}
 
             // Sets the current output handler (does nothing if set while `busy()`)
-            void set_output(core::stream_handler &output) {if (!busy()) this->output = &output;}
+            void set_output(core::stream_handler &output)
+            {
+                if (!busy())
+                {
+                    this->output = &output;
+                    initial_nesting_level = output.nesting_depth();
+                }
+            }
 
             // Returns the current output handler, or NULL if not set.
             const core::stream_handler *get_output() const {return output;}

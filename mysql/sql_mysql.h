@@ -32,7 +32,7 @@
 
 namespace cppdatalib
 {
-    namespace mariadb
+    namespace mysql
     {
         namespace impl
         {
@@ -152,6 +152,12 @@ namespace cppdatalib
             std::string table;
             bool escaped;
 
+            // Read-specific info
+            MYSQL_RES *result;
+            std::string query;
+            MYSQL_ROW row;
+            unsigned int columns;
+
         public:
             table_parser(MYSQL *connection,
                    const std::string &db,
@@ -160,7 +166,9 @@ namespace cppdatalib
                 , db(db)
                 , table(table)
                 , escaped(false)
+                , result(NULL)
             {}
+            ~table_parser() {if (result) mysql_free_result(result);}
 
             void connect(const char *host,
                          const char *user,
@@ -173,9 +181,7 @@ namespace cppdatalib
                     throw core::error("MySQL - could not connect to specified database");
             }
 
-            bool provides_prefix_string_size() const {return true;}
-            bool provides_prefix_object_size() const {return true;}
-            bool provides_prefix_array_size() const {return true;}
+            unsigned int features() const {return provides_prefix_string_size;}
 
             const core::value &refresh_metadata()
             {
@@ -242,71 +248,79 @@ namespace cppdatalib
             // Returns the table metadata from the previous convert() or refresh_metadata() operation
             const core::value &get_metadata() const {return metadata;}
 
-            core::stream_input &convert(core::stream_handler &writer)
+            void reset()
             {
-                MYSQL_RES *result = NULL;
+                if (result)
+                    mysql_free_result(result);
+                result = NULL;
+                query.clear();
+                row = NULL;
+                columns = 0;
+            }
 
-                writer.begin_array(core::array_t(), core::stream_handler::unknown_size);
-
+        protected:
+            void write_one_()
+            {
                 try
                 {
-                    std::string query;
-                    MYSQL_ROW row;
-
-                    refresh_metadata();
-
-                    //
-                    // `SELECT` all data out of the specified table
-                    //
-                    query = "SELECT * FROM " + table;
-                    if (mysql_real_query(mysql, query.c_str(), query.length()))
+                    if (result == NULL)
                     {
-                        std::cerr << mysql_error(mysql) << std::endl;
-                        throw core::error("MySQL - SELECT * FROM table query failed");
+                        refresh_metadata();
+
+                        //
+                        // `SELECT` all data out of the specified table
+                        //
+                        query = "SELECT * FROM " + table;
+                        if (mysql_real_query(mysql, query.c_str(), query.length()))
+                        {
+                            std::cerr << mysql_error(mysql) << std::endl;
+                            throw core::error("MySQL - SELECT * FROM table query failed");
+                        }
+
+                        result = mysql_use_result(mysql);
+                        if (result == NULL)
+                            throw core::error("MySQL - an error occured while attempting to use the query result");
+
+                        columns = mysql_num_fields(result);
+
+                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
                     }
 
-                    result = mysql_use_result(mysql);
-                    if (result == NULL)
-                        throw core::error("MySQL - an error occured while attempting to use the query result");
-
-                    unsigned int columns = mysql_num_fields(result);
-
-                    while ((row = mysql_fetch_row(result)) != NULL)
+                    if ((row = mysql_fetch_row(result)) != NULL)
                     {
-                        writer.begin_array(core::array_t(), columns);
+                        get_output()->begin_array(core::array_t(), columns);
 
                         for (unsigned int i = 0; i < columns; ++i)
                         {
                             if (row[i] == NULL)
-                                writer.write(core::null_t());
+                                get_output()->write(core::null_t());
                             else
                             {
                                 // TODO: doesn't support binary row values with embedded NUL characters
                                 core::value value(row[i]);
-                                const core::string_t &column_type = metadata[i]["datatype"].get_string();
+                                const core::string_t &column_type = metadata[i]["datatype"].get_string_ref();
 
                                 impl::convert_string(value, column_type);
 
-                                writer.write(value);
+                                get_output()->write(value);
                             }
                         }
 
-                        writer.end_array(core::array_t());
+                        get_output()->end_array(core::array_t());
                     }
+                    else
+                    {
+                        mysql_free_result(result);
+                        result = NULL;
 
-                    mysql_free_result(result);
-                    result = NULL;
-                }
-                catch (core::error)
-                {
+                        get_output()->end_array(core::array_t());
+                    }
+                } catch (core::error) {
                     if (result)
                         mysql_free_result(result);
+                    result = NULL;
                     throw;
                 }
-
-                writer.end_array(core::array_t());
-
-                return *this;
             }
         };
 
@@ -320,13 +334,24 @@ namespace cppdatalib
             std::string db;
             bool escaped;
 
+            MYSQL_RES *result;
+            std::string query;
+            MYSQL_ROW row;
+            size_t tableidx;
+            table_parser tbl_parser;
+
         public:
             parser(MYSQL *connection,
                    const std::string &db)
                 : mysql(connection)
                 , db(db)
                 , escaped(false)
+                , result(NULL)
+                , row(NULL)
+                , tableidx(-1)
+                , tbl_parser(mysql, db, "")
             {}
+            ~parser() {if (result) mysql_free_result(result);}
 
             void connect(const char *host,
                          const char *user,
@@ -339,9 +364,7 @@ namespace cppdatalib
                     throw core::error("MySQL - could not connect to specified database");
             }
 
-            bool provides_prefix_string_size() const {return true;}
-            bool provides_prefix_object_size() const {return true;}
-            bool provides_prefix_array_size() const {return true;}
+            unsigned int features() const {return provides_prefix_string_size;}
 
             // Refreshes the metadata to the current state of the table
             const core::value &refresh_metadata()
@@ -405,70 +428,84 @@ namespace cppdatalib
                 return result;
             }
 
-            core::stream_input &convert(core::stream_handler &writer)
+            void reset()
             {
-                MYSQL_RES *result = NULL;
+                if (result)
+                    mysql_free_result(result);
+                result = NULL;
+                query.clear();
+                row = NULL;
+                tableidx = -1;
+                tbl_parser.reset();
+            }
 
-                writer.begin_object(core::object_t(), core::stream_handler::unknown_size);
-
+        protected:
+            void write_one_()
+            {
                 try
                 {
-                    std::string query;
-                    MYSQL_ROW row;
-
-                    if (!escaped)
+                    if (!busy())
                     {
-                        db = impl::escape(mysql, db);
-                        escaped = true;
+                        if (!escaped)
+                        {
+                            db = impl::escape(mysql, db);
+                            escaped = true;
+                        }
+
+                        //
+                        // `SHOW TABLES` to get the types of the data
+                        //
+                        query = "SHOW TABLES";
+                        if (mysql_real_query(mysql, query.c_str(), query.length()))
+                        {
+                            std::cerr << mysql_error(mysql) << std::endl;
+                            throw core::error("MySQL - SHOW TABLES query failed");
+                        }
+
+                        result = mysql_use_result(mysql);
+                        if (result == NULL)
+                            throw core::error("MySQL - an error occured while attempting to use the query result");
+
+                        unsigned int columns = mysql_num_fields(result);
+                        if (columns < 1)
+                            throw core::error("MySQL - invalid response while attempting to get table names");
+
+                        metadata.set_null();
+                        while ((row = mysql_fetch_row(result)) != NULL)
+                            metadata.add_member(row[0]? row[0]: "");
+
+                        mysql_free_result(result);
+                        result = NULL;
+
+                        get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size);
                     }
 
-                    //
-                    // `SHOW TABLES` to get the types of the data
-                    //
-                    query = "SHOW TABLES";
-                    if (mysql_real_query(mysql, query.c_str(), query.length()))
+                    if (tbl_parser.busy())
+                        tbl_parser.write_one();
+                    else
                     {
-                        std::cerr << mysql_error(mysql) << std::endl;
-                        throw core::error("MySQL - SHOW TABLES query failed");
+                        if (++tableidx >= metadata.object_size()) // At end of table list?
+                            get_output()->end_object(core::object_t());
+                        else // Read next table
+                        {
+                            auto it = metadata.get_object_ref().data().begin();
+                            std::advance(it, tableidx);
+                            std::string table = it->first.as_string();
+
+                            tbl_parser = table_parser(mysql, db, table);
+
+                            tbl_parser.set_output(*get_output());
+                            get_output()->write(table);
+
+                            tbl_parser.write_one();
+                        }
                     }
-
-                    result = mysql_use_result(mysql);
-                    if (result == NULL)
-                        throw core::error("MySQL - an error occured while attempting to use the query result");
-
-                    unsigned int columns = mysql_num_fields(result);
-                    if (columns < 1)
-                        throw core::error("MySQL - invalid response while attempting to get table names");
-
-                    metadata.set_null();
-                    while ((row = mysql_fetch_row(result)) != NULL)
-                        metadata.add_member(row[0]? row[0]: "");
-
-                    mysql_free_result(result);
-                    result = NULL;
-
-                    for (auto &table: metadata.get_object())
-                    {
-                        table_parser tparser(mysql, db, table.first.as_string());
-
-                        // Read table to writer
-                        writer.write(table.first.as_string());
-                        tparser >> writer;
-
-                        // Store metadata of table
-                        table.second = tparser.get_metadata();
-                    }
-                }
-                catch (core::error)
-                {
+                } catch (core::error) {
                     if (result)
                         mysql_free_result(result);
+                    result = NULL;
                     throw;
                 }
-
-                writer.end_object(core::object_t());
-
-                return *this;
             }
         };
 
@@ -532,22 +569,25 @@ namespace cppdatalib
 
                 result += "CREATE TABLE " + table + " (";
                 column_names = "(";
-                for (auto column = metadata.get_array().cbegin(); column != metadata.get_array().cend(); ++column)
+                if (metadata.is_array())
                 {
-                    if (column != metadata.get_array().cbegin())
+                    for (auto column = metadata.get_array_unchecked().cbegin(); column != metadata.get_array_unchecked().cend(); ++column)
                     {
-                        result += ", ";
-                        column_names += ", ";
+                        if (column != metadata.get_array_unchecked().cbegin())
+                        {
+                            result += ", ";
+                            column_names += ", ";
+                        }
+
+                        result += impl::escape(mysql, column->member("name").as_string()) + " " + impl::escape(mysql, column->member("datatype").as_string());
+                        if (column->member("required").as_bool())
+                            result += " NOT";
+                        result += " NULL";
+                        if (column->is_member("default") && !column->member("default").is_null())
+                            result += " " + impl::escape(mysql, column->member("default").as_string());
+
+                        column_names += impl::escape(mysql, column->member("name").as_string());
                     }
-
-                    result += impl::escape(mysql, column->member("name").as_string()) + " " + impl::escape(mysql, column->member("datatype").as_string());
-                    if (column->member("required").as_bool())
-                        result += " NOT";
-                    result += " NULL";
-                    if (column->is_member("default") && !column->member("default").is_null())
-                        result += " " + impl::escape(mysql, column->member("default").as_string());
-
-                    column_names += impl::escape(mysql, column->member("name").as_string());
                 }
                 result += ")";
                 column_names += ")";
