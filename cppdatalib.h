@@ -50,6 +50,10 @@
 #include "adapters/boost_container.h"
 #endif
 
+#ifdef CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
+#include "adapters/boost_dynamic_bitset.h"
+#endif
+
 #ifdef CPPDATALIB_ENABLE_QT
 #include "adapters/qt.h"
 #endif
