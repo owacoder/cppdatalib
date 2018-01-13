@@ -237,12 +237,12 @@ namespace cppdatalib
 
             unsigned int features() const {return provides_prefix_string_size;}
 
-            void reset()
+        protected:
+            void reset_()
             {
                 containers = decltype(containers)();
             }
 
-        protected:
             void write_one_()
             {
                 const char valid_types[] = "ZTFUiIlLdDCHS[{";

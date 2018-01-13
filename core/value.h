@@ -278,9 +278,9 @@ namespace cppdatalib
             value(const object_t &v, subtype_t subtype = core::normal);
             value(object_t &&v, subtype_t subtype = core::normal);
             template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-            value(T v, subtype_t subtype = core::normal) {int_init(subtype, v);}
-            template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
+            template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+            value(T v, subtype_t subtype = core::normal) {int_init(subtype, v);}
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
             value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
             template<typename... Ts>

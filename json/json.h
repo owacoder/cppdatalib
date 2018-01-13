@@ -120,13 +120,13 @@ namespace cppdatalib
                 reset();
             }
 
-            void reset()
+        protected:
+            void reset_()
             {
                 delimiter_required = false;
                 stream() >> std::skipws;
             }
 
-        protected:
             void write_one_()
             {
                 char chr;

@@ -240,12 +240,12 @@ namespace cppdatalib
 
             void set_parse_method(options opts) {this->opts = opts;}
 
-            void reset()
+        protected:
+            void reset_()
             {
                 comma_just_parsed = newline_just_parsed = true;
             }
 
-        protected:
             void write_one_()
             {
                 bool parse_as_strings = opts == convert_all_fields_as_strings;

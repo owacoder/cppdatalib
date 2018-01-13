@@ -26,7 +26,7 @@
 #include <any>
 #endif
 
-#include "../core/value_builder.h"
+#include "../core/value_parser.h"
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::basic_string, char, Ts...>
@@ -36,6 +36,31 @@ public:
     cast_template_to_cppdatalib(const std::basic_string<char, Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::string_t(bind.c_str(), bind.size());}
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::basic_string, char, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::basic_string<char, Ts...> *bind;
+
+    public:
+        template_parser(const std::basic_string<char, Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {}
+
+        void write_one_()
+        {
+            get_output()->write(core::value(*bind));
+        }
+    };
+}}
 
 template<typename T, size_t N>
 class cast_array_template_to_cppdatalib<std::array, T, N>
@@ -187,6 +212,8 @@ public:
     }
 };
 
+// TODO: implement generic_parser helper specialization for std::valarray
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::valarray, Ts...>
 {
@@ -283,6 +310,49 @@ public:
     }
 };
 
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::map, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::map<Ts...> *bind;
+        decltype(bind->begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const std::map<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind->begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::object_t(), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind->end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::multimap, Ts...>
 {
@@ -299,6 +369,49 @@ public:
     }
 };
 
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::multimap, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::multimap<Ts...> *bind;
+        decltype(bind->begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const std::multimap<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind->begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::object_t(), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind->end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::unordered_map, Ts...>
 {
@@ -308,12 +421,56 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
+        result.set_subtype(cppdatalib::core::hash);
         for (const auto &item: bind)
             result.add_member(cppdatalib::core::value(item.first),
                               cppdatalib::core::value(item.second));
         return result;
     }
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::unordered_map, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::unordered_map<Ts...> *bind;
+        decltype(bind->begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const std::unordered_map<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind->begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::value(core::object_t(), core::hash), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind->end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::unordered_multimap, Ts...>
@@ -324,12 +481,56 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
+        result.set_subtype(cppdatalib::core::hash);
         for (const auto &item: bind)
             result.add_member(cppdatalib::core::value(item.first),
                               cppdatalib::core::value(item.second));
         return result;
     }
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::unordered_multimap, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::unordered_multimap<Ts...> *bind;
+        decltype(bind->begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const std::unordered_multimap<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind->begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::value(core::object_t(), core::hash), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind->end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::pair, Ts...>
@@ -339,6 +540,45 @@ public:
     cast_template_to_cppdatalib(const std::pair<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::array_t{cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)};}
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::pair, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::pair<Ts...> *bind;
+        size_t idx;
+
+    public:
+        template_parser(const std::pair<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {idx = 0;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_array(core::array_t(), 2);
+                compose_parser(bind->first);
+            }
+            else if (++idx == 1)
+            {
+                compose_parser(bind->second);
+                write_next();
+            }
+            else
+                get_output()->end_array(core::array_t());
+        }
+    };
+}}
+
+// TODO: implement generic_parser helper specialization for std::tuple
 
 namespace cppdatalib
 {
@@ -380,6 +620,8 @@ public:
 };
 
 #if __cplusplus >= 201703L
+// TODO: implement generic_parser helper specialization for std::optional
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::optional, Ts...>
 {
@@ -393,6 +635,8 @@ public:
         return cppdatalib::core::null_t();
     }
 };
+
+// TODO: implement generic_parser helper specialization for std::variant
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::variant, Ts...>

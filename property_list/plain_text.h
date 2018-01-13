@@ -142,15 +142,15 @@ namespace cppdatalib
                 , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
             {
                 reset();
-            }
+            }            
 
-            void reset()
+        protected:
+            void reset_()
             {
                 delimiter_required = false;
                 stream() >> std::skipws;
             }
 
-        protected:
             void write_one_()
             {
                 const std::string hex = "0123456789ABCDEF";

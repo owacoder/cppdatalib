@@ -248,7 +248,8 @@ namespace cppdatalib
             // Returns the table metadata from the previous convert() or refresh_metadata() operation
             const core::value &get_metadata() const {return metadata;}
 
-            void reset()
+        protected:
+            void reset_()
             {
                 if (result)
                     mysql_free_result(result);
@@ -258,7 +259,6 @@ namespace cppdatalib
                 columns = 0;
             }
 
-        protected:
             void write_one_()
             {
                 try
@@ -429,7 +429,8 @@ namespace cppdatalib
                 return result;
             }
 
-            void reset()
+        protected:
+            void reset_()
             {
                 if (result)
                     mysql_free_result(result);
@@ -440,7 +441,6 @@ namespace cppdatalib
                 tbl_parser.reset();
             }
 
-        protected:
             void write_one_()
             {
                 try

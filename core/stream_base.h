@@ -468,6 +468,7 @@ namespace cppdatalib
         {
         private:
             core::stream_handler *output;
+            bool mReset; // Whether the input has just been reset()
 
         protected:
             size_t initial_nesting_level;
@@ -491,12 +492,19 @@ namespace cppdatalib
             // The following value should return true if the parser ALWAYS provides the entire value as a single write() call
             static const unsigned int provides_single_write = 0x7f;
 
-            stream_input() : output(NULL), initial_nesting_level(0) {}
-            stream_input(core::stream_handler &output) : output(&output), initial_nesting_level(output.nesting_depth()) {}
+            stream_input() : output(NULL), mReset(false), initial_nesting_level(0) {}
+            stream_input(core::stream_handler &output) : output(&output), mReset(false), initial_nesting_level(output.nesting_depth()) {}
             virtual ~stream_input() {}
 
             // Resets the input class to start parsing a new stream (NOTE: should NOT attempt to seek to the beginning of the stream!)
-            virtual void reset() = 0;
+            void reset()
+            {
+                reset_();
+                mReset = true;
+            }
+
+            // Returns whether the input is in its initial state (just reset)
+            bool was_just_reset() const {return mReset;}
 
             // Returns all the features provided by this class
             virtual unsigned int features() const {return provides_none;}
@@ -542,7 +550,10 @@ namespace cppdatalib
             stream_input &write_one()
             {
                 if (output)
+                {
                     write_one_();
+                    mReset = false;
+                }
                 else
                     throw core::error("cppdatalib::core::stream_input - attempted to parse without output specified");
                 return *this;
@@ -559,7 +570,7 @@ namespace cppdatalib
                         output->begin();
 
                     reset();
-                    do {write_one_();} while (busy());
+                    do {write_one_(); mReset = false;} while (busy());
 
                     if (!active)
                         output->end();
@@ -596,6 +607,9 @@ namespace cppdatalib
             // Basically, as long as any single invocation of this function writes SOMETHING to `output`, it is acceptable.
             // Read states should be stored as class members, not in this function, and should be resettable with `reset()`.
             virtual void write_one_() = 0;
+
+            // Resets the input class to start parsing a new stream (NOTE: if input reads from a stream, reset_() should NOT attempt to seek to the beginning of the stream!)
+            virtual void reset_() = 0;
         };
 
         class stream_parser : public stream_input

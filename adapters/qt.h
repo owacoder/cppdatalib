@@ -51,7 +51,7 @@
 #include <QDateTime>
 #include <QUuid>
 
-#include "../core/value_builder.h"
+#include "../core/value_parser.h"
 
 // -------
 //  QPair
@@ -74,6 +74,43 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator QPair<T1, T2>() const {return QPair<T1, T2>{bind.element(0).operator T1(), bind.element(1).operator T2()};}
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<QPair, Ts...> : public generic_stream_input
+    {
+    protected:
+        const QPair<Ts...> *bind;
+        size_t idx;
+
+    public:
+        template_parser(const QPair<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {idx = 0;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_array(core::array_t(), 2);
+                compose_parser(bind->first);
+            }
+            else if (++idx == 1)
+            {
+                compose_parser(bind->second);
+                write_next();
+            }
+            else
+                get_output()->end_array(core::array_t());
+        }
+    };
+}}
 
 // ------------
 //  QByteArray
@@ -514,6 +551,49 @@ public:
     }
 };
 
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<QMap, Ts...> : public generic_stream_input
+    {
+    protected:
+        const QMap<Ts...> *bind;
+        decltype(bind->begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const QMap<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind->begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::object_t(), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind->end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
+
 // -----------
 //  QMultiMap
 // -----------
@@ -550,6 +630,49 @@ public:
     }
 };
 
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<QMultiMap, Ts...> : public generic_stream_input
+    {
+    protected:
+        const QMultiMap<Ts...> *bind;
+        decltype(bind->begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const QMultiMap<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind->begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::object_t(), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind->end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
+
 // -------
 //  QHash
 // -------
@@ -563,6 +686,7 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
+        result.set_subtype(cppdatalib::core::hash);
         for (auto it = bind.begin(); it != bind.end(); ++it)
             result.add_member(cppdatalib::core::value(it.key()),
                               cppdatalib::core::value(it.value()));
@@ -586,6 +710,49 @@ public:
     }
 };
 
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<QHash, Ts...> : public generic_stream_input
+    {
+    protected:
+        const QHash<Ts...> *bind;
+        decltype(bind->begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const QHash<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind->begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::value(core::object_t(), core::hash), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind->end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
+
 // ------------
 //  QMultiHash
 // ------------
@@ -599,6 +766,7 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
+        result.set_subtype(cppdatalib::core::hash);
         for (auto it = bind.begin(); it != bind.end(); ++it)
             result.add_member(cppdatalib::core::value(it.key()),
                               cppdatalib::core::value(it.value()));
@@ -622,9 +790,54 @@ public:
     }
 };
 
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<QMultiHash, Ts...> : public generic_stream_input
+    {
+    protected:
+        const QMultiHash<Ts...> *bind;
+        decltype(bind->begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const QMultiHash<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(&bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind->begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::value(core::object_t(), core::hash), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind->end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
+
 // ----------
 //  QVariant
 // ----------
+
+// TODO: implement generic_parser helper specialization for QVariant
 
 template<>
 class cast_to_cppdatalib<QVariant>

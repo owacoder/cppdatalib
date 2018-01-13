@@ -277,6 +277,8 @@ public:
 //  flat_map
 // ----------
 
+// TODO: implement generic_parser helper specialization for boost::container::flat_map
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<boost::container::flat_map, Ts...>
 {
@@ -349,6 +351,8 @@ public:
 //  map
 // -----
 
+// TODO: implement generic_parser helper specialization for boost::container::map
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<boost::container::map, Ts...>
 {
@@ -420,6 +424,8 @@ public:
 // --------
 //  string
 // --------
+
+// TODO: implement generic_parser helper specialization for boost::container::basic_string
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<boost::container::basic_string, char, Ts...>

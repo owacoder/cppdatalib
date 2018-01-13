@@ -48,6 +48,8 @@
 //  Optional
 // ----------
 
+// TODO: implement generic_parser helper specialization for Poco::Optional
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<Poco::Optional, Ts...>
 {
@@ -81,6 +83,8 @@ public:
 //  Nullable
 // ----------
 
+// TODO: implement generic_parser helper specialization for Poco::Nullable
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<Poco::Nullable, Ts...>
 {
@@ -113,6 +117,8 @@ public:
 // ---------
 //  HashMap
 // ---------
+
+// TODO: implement generic_parser helper specialization for Poco::HashMap
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<Poco::HashMap, Ts...>
@@ -152,6 +158,8 @@ public:
 //  LinearHashTable
 // -----------------
 
+// TODO: implement generic_parser helper specialization for Poco::LinearHashTable
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<Poco::LinearHashTable, Ts...>
 {
@@ -186,6 +194,8 @@ public:
 // -------
 //  Tuple
 // -------
+
+// TODO: implement generic_parser helper specialization for Poco::Tuple
 
 namespace cppdatalib
 {
@@ -274,6 +284,8 @@ public:
 //  Dynamic::Pair
 // ---------------
 
+// TODO: implement generic_parser helper specialization for Poco::Dynamic::Pair
+
 template<typename... Ts>
 class cast_template_to_cppdatalib<Poco::Dynamic::Pair, Ts...>
 {
@@ -298,6 +310,8 @@ public:
 // ---------------
 //  Dynamic::List
 // ---------------
+
+// TODO: implement generic_parser helper specialization for Poco::Dynamic::List
 
 template<>
 class cast_to_cppdatalib<Poco::Dynamic::List>
@@ -334,6 +348,8 @@ public:
 //  Dynamic::Deque
 // ----------------
 
+// TODO: implement generic_parser helper specialization for Poco::Dynamic::Deque
+
 template<>
 class cast_to_cppdatalib<Poco::Dynamic::Deque>
 {
@@ -369,6 +385,8 @@ public:
 //  Dynamic::Vector
 // -----------------
 
+// TODO: implement generic_parser helper specialization for Poco::Dynamic::Vector
+
 template<>
 class cast_to_cppdatalib<Poco::Dynamic::Vector>
 {
@@ -403,6 +421,8 @@ public:
 // -----------------
 //  Dynamic::Struct
 // -----------------
+
+// TODO: implement generic_parser helper specialization for Poco::Dynamic::Struct
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<Poco::Dynamic::Struct, Ts...>
@@ -440,6 +460,8 @@ public:
 // --------------
 //  Dynamic::Var
 // --------------
+
+// TODO: implement generic_parser helper specialization for Poco::Dynamic::Var
 
 template<>
 class cast_to_cppdatalib<Poco::Dynamic::Var>

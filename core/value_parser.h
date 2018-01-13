@@ -51,13 +51,13 @@ namespace cppdatalib
                                                   provides_prefix_object_size |
                                                   provides_prefix_string_size;}
 
-            void reset()
+        protected:
+            void reset_()
             {
                 references = decltype(references)();
                 p = bind;
             }
 
-        protected:
             void write_one_()
             {
                 if (!references.empty() || p != NULL)
@@ -117,6 +117,265 @@ namespace cppdatalib
                 }
             }
         };
+
+        // Forward-declare generic_parser
+        class generic_parser;
+
+        // Base class for all generic parser helper classes
+        struct generic_stream_input : public core::stream_input
+        {
+        private:
+            generic_parser * const master_parser;
+
+        public:
+            generic_stream_input(generic_parser &parser) : master_parser(&parser) {}
+
+        protected:
+            template<typename ForItem>
+            void compose_parser(const ForItem &item);
+
+            void write_next();
+        };
+
+        // Parser for a generic scalar type. Can be specialized for different scalar types
+        template<typename T>
+        class type_parser : public generic_stream_input
+        {
+        protected:
+            const T &bind;
+
+        public:
+            type_parser(const T &bind, generic_parser &parser)
+                : generic_stream_input(parser)
+                , bind(bind)
+            {
+                reset();
+            }
+
+            unsigned int features() const {return provides_buffered_arrays |
+                                                  provides_buffered_objects |
+                                                  provides_buffered_strings |
+                                                  provides_prefix_array_size |
+                                                  provides_prefix_object_size |
+                                                  provides_prefix_string_size;}
+
+        protected:
+            void reset_() {}
+
+            void write_one_()
+            {
+                get_output()->write(core::value(bind));
+            }
+        };
+
+        // Parser for a generic template type. Assumes template type is an array type
+        // supporting begin(), end(), and size().
+        // Can be specialized for different functionality
+        template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+        class sized_template_parser : public generic_stream_input
+        {
+        protected:
+            const Template<N, Ts...> *bind;
+            decltype(bind->begin()) iterator;
+
+        public:
+            sized_template_parser(const Template<N, Ts...> &bind, generic_parser &parser)
+                : generic_stream_input(parser)
+                , bind(&bind)
+            {
+                reset();
+            }
+
+        protected:
+            void reset_() {iterator = bind->begin();}
+
+            void write_one_();
+        };
+
+        // Parser for a generic template type. Assumes template type is an array type
+        // supporting begin(), end(), and size().
+        // Can be specialized for different functionality
+        template<template<typename...> class Template, typename... Ts>
+        class template_parser : public generic_stream_input
+        {
+        protected:
+            const Template<Ts...> *bind;
+            decltype(bind->begin()) iterator;
+
+        public:
+            template_parser(const Template<Ts...> &bind, generic_parser &parser)
+                : generic_stream_input(parser)
+                , bind(&bind)
+            {
+                reset();
+            }
+
+        protected:
+            void reset_() {iterator = bind->begin();}
+
+            void write_one_();
+        };
+
+        // Parser for a generic template type. Assumes template type is an array type
+        // supporting begin(), end(), and size().
+        // Can be specialized for different functionality
+        template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+        class array_template_parser : public generic_stream_input
+        {
+        protected:
+            const Template<T, N, Ts...> *bind;
+            decltype(bind->begin()) iterator;
+
+        public:
+            array_template_parser(const Template<T, N, Ts...> &bind, generic_parser &parser)
+                : generic_stream_input(parser)
+                , bind(&bind)
+            {
+                reset();
+            }
+
+        protected:
+            void reset_() {iterator = bind->begin();}
+
+            void write_one_();
+        };
+
+        namespace impl
+        {
+            class impl_generic_parser
+            {
+                std::unique_ptr<core::stream_input> input;
+
+            public:
+                template<typename T>
+                impl_generic_parser(const T &bind, core::stream_handler &output, generic_parser &parser)
+                {
+                    input = std::make_unique<type_parser<T>>(bind, parser);
+                    input->set_output(output);
+                }
+
+                template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+                impl_generic_parser(const Template<N, Ts...> &bind, core::stream_handler &output, generic_parser &parser)
+                {
+                    input = std::make_unique<sized_template_parser<Template, N, Ts...>>(bind, parser);
+                    input->set_output(output);
+                }
+
+                template<template<typename...> class Template, typename... Ts>
+                impl_generic_parser(const Template<Ts...> &bind, core::stream_handler &output, generic_parser &parser)
+                {
+                    input = std::make_unique<template_parser<Template, Ts...>>(bind, parser);
+                    input->set_output(output);
+                }
+
+                template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+                impl_generic_parser(const Template<T, N, Ts...> &bind, core::stream_handler &output, generic_parser &parser)
+                {
+                    input = std::make_unique<array_template_parser<Template, T, N, Ts...>>(bind, parser);
+                    input->set_output(output);
+                }
+
+                core::stream_input &parser() {return *input;}
+            };
+        }
+
+        // Generic parser type, pass it a value of any type and it will be parsed to the specified output handler
+        class generic_parser : public core::stream_input
+        {
+            std::stack<impl::impl_generic_parser, std::vector<impl::impl_generic_parser>> stack;
+
+        public:
+            template<typename ForItem>
+            generic_parser(const ForItem &bind, core::stream_handler &output) : core::stream_input(output)
+            {
+                stack.push(impl::impl_generic_parser(bind, output, *this));
+            }
+
+            template<typename ForItem>
+            void compose_parser(const ForItem &bind)
+            {
+                stack.push(impl::impl_generic_parser(bind, *get_output(), *this));
+            }
+
+        protected:
+            void reset_()
+            {
+                while (stack.size() > 1) stack.pop();
+                stack.top().parser().reset();
+            }
+
+            void write_one_()
+            {
+                if (!stack.top().parser().was_just_reset() && !stack.top().parser().busy() && stack.size() > 1)
+                    stack.pop();
+                stack.top().parser().write_one();
+            }
+        };
+
+        template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+        void sized_template_parser<Template, N, Ts...>::write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_array(core::array_t(), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(*iterator++);
+            }
+            else if (iterator != bind->end())
+            {
+                compose_parser(*iterator++);
+                write_next();
+            }
+            else
+                get_output()->end_array(core::array_t());
+        }
+
+        template<template<typename...> class Template, typename... Ts>
+        void template_parser<Template, Ts...>::write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_array(core::array_t(), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(*iterator++);
+            }
+            else if (iterator != bind->end())
+            {
+                compose_parser(*iterator++);
+                write_next();
+            }
+            else
+                get_output()->end_array(core::array_t());
+        }
+
+        template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+        void array_template_parser<Template, T, N, Ts...>::write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_array(core::array_t(), bind->size());
+                if (iterator != bind->end())
+                    compose_parser(*iterator++);
+            }
+            else if (iterator != bind->end())
+            {
+                compose_parser(*iterator++);
+                write_next();
+            }
+            else
+                get_output()->end_array(core::array_t());
+        }
+
+        template<typename ForItem>
+        void generic_stream_input::compose_parser(const ForItem &item)
+        {
+            master_parser->compose_parser(item);
+        }
+
+        void generic_stream_input::write_next()
+        {
+            master_parser->write_one();
+        }
     }
 }
 

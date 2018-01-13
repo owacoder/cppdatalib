@@ -43,11 +43,11 @@ namespace cppdatalib
                 reset();
             }
 
-            void reset() {}
-
             unsigned int features() const {return provides_prefix_string_size;}
 
         protected:
+            void reset_() {}
+
             void write_one_()
             {
                 int chr;

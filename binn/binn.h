@@ -125,17 +125,17 @@ namespace cppdatalib
                 reset();
             }
 
-            void reset()
-            {
-                containers = decltype(containers)();
-                written = false;
-            }
-
             unsigned int features() const {return provides_prefix_array_size |
                                                   provides_prefix_object_size |
                                                   provides_prefix_string_size;}
 
         protected:
+            void reset_()
+            {
+                containers = decltype(containers)();
+                written = false;
+            }
+
             void write_one_()
             {
                 int chr;
