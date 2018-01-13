@@ -459,6 +459,12 @@ namespace cppdatalib
             return v;
         }
 
+        inline core::value operator "" _json(const char *stream, size_t size)
+        {
+            core::istring_wrapper_stream wrap(std::string(stream, size));
+            return from_json(wrap);
+        }
+
         inline std::string to_json(const core::value &v)
         {
             core::ostringstream stream;

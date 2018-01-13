@@ -164,6 +164,12 @@ namespace cppdatalib
             return v;
         }
 
+        inline core::value operator "" _bencode(const char *stream, size_t size)
+        {
+            core::istring_wrapper_stream wrap(std::string(stream, size));
+            return from_bencode(wrap);
+        }
+
         inline std::string to_bencode(const core::value &v)
         {
             core::ostringstream stream;

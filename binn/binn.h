@@ -846,6 +846,12 @@ namespace cppdatalib
             return v;
         }
 
+        inline core::value operator "" _binn(const char *stream, size_t size)
+        {
+            core::istring_wrapper_stream wrap(std::string(stream, size));
+            return from_binn(wrap);
+        }
+
         inline std::string to_binn(const core::value &v)
         {
             core::ostringstream stream;

@@ -576,6 +576,12 @@ namespace cppdatalib
             return v;
         }
 
+        inline core::value operator "" _ubjson(const char *stream, size_t size)
+        {
+            core::istring_wrapper_stream wrap(std::string(stream, size));
+            return from_ubjson(wrap);
+        }
+
         inline std::string to_ubjson(const core::value &v)
         {
             core::ostringstream stream;
