@@ -250,28 +250,28 @@ namespace cppdatalib
                 template<typename T>
                 impl_generic_parser(const T &bind, core::stream_handler &output, generic_parser &parser)
                 {
-                    input = std::make_unique<type_parser<T>>(bind, parser);
+                    input = std::unique_ptr<type_parser<T>>(new type_parser<T>(bind, parser));
                     input->set_output(output);
                 }
 
                 template<template<size_t, typename...> class Template, size_t N, typename... Ts>
                 impl_generic_parser(const Template<N, Ts...> &bind, core::stream_handler &output, generic_parser &parser)
                 {
-                    input = std::make_unique<sized_template_parser<Template, N, Ts...>>(bind, parser);
+                    input = std::unique_ptr<sized_template_parser<Template, N, Ts...>>(new sized_template_parser<Template, N, Ts...>(bind, parser));
                     input->set_output(output);
                 }
 
                 template<template<typename...> class Template, typename... Ts>
                 impl_generic_parser(const Template<Ts...> &bind, core::stream_handler &output, generic_parser &parser)
                 {
-                    input = std::make_unique<template_parser<Template, Ts...>>(bind, parser);
+                    input = std::unique_ptr<template_parser<Template, Ts...>>(new template_parser<Template, Ts...>(bind, parser));
                     input->set_output(output);
                 }
 
                 template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
                 impl_generic_parser(const Template<T, N, Ts...> &bind, core::stream_handler &output, generic_parser &parser)
                 {
-                    input = std::make_unique<array_template_parser<Template, T, N, Ts...>>(bind, parser);
+                    input = std::unique_ptr<array_template_parser<Template, T, N, Ts...>>(new array_template_parser<Template, T, N, Ts...>(bind, parser));
                     input->set_output(output);
                 }
 
