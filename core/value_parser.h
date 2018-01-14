@@ -128,7 +128,7 @@ namespace cppdatalib
             generic_parser * const master_parser;
 
         public:
-            generic_stream_input(generic_parser &parser) : master_parser(&parser) {}
+            generic_stream_input(generic_parser &parser);
 
         protected:
             template<typename ForItem>
@@ -289,6 +289,7 @@ namespace cppdatalib
             generic_parser(const ForItem &bind, core::stream_handler &output) : core::stream_input(output)
             {
                 stack.push(impl::impl_generic_parser(bind, output, *this));
+                reset();
             }
 
             template<typename ForItem>
@@ -365,6 +366,11 @@ namespace cppdatalib
             else
                 get_output()->end_array(core::array_t());
         }
+
+        generic_stream_input::generic_stream_input(generic_parser &parser)
+            : core::stream_input(*parser.get_output())
+            , master_parser(&parser)
+        {}
 
         template<typename ForItem>
         void generic_stream_input::compose_parser(const ForItem &item)

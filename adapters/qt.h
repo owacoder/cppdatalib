@@ -80,13 +80,13 @@ namespace cppdatalib { namespace core {
     class template_parser<QPair, Ts...> : public generic_stream_input
     {
     protected:
-        const QPair<Ts...> *bind;
+        const QPair<Ts...> &bind;
         size_t idx;
 
     public:
         template_parser(const QPair<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
@@ -99,11 +99,11 @@ namespace cppdatalib { namespace core {
             if (was_just_reset())
             {
                 get_output()->begin_array(core::array_t(), 2);
-                compose_parser(bind->first);
+                compose_parser(bind.first);
             }
             else if (++idx == 1)
             {
-                compose_parser(bind->second);
+                compose_parser(bind.second);
                 write_next();
             }
             else
@@ -556,30 +556,30 @@ namespace cppdatalib { namespace core {
     class template_parser<QMap, Ts...> : public generic_stream_input
     {
     protected:
-        const QMap<Ts...> *bind;
-        decltype(bind->begin()) iterator;
+        const QMap<Ts...> bind;
+        decltype(bind.begin()) iterator;
         bool parsingKey;
 
     public:
         template_parser(const QMap<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
 
     protected:
-        void reset_() {iterator = bind->begin(); parsingKey = true;}
+        void reset_() {iterator = bind.begin(); parsingKey = true;}
 
         void write_one_()
         {
             if (was_just_reset())
             {
-                get_output()->begin_object(core::object_t(), bind->size());
-                if (iterator != bind->end())
+                get_output()->begin_object(core::object_t(), bind.size());
+                if (iterator != bind.end())
                     compose_parser(iterator->first);
             }
-            else if (iterator != bind->end())
+            else if (iterator != bind.end())
             {
                 if (parsingKey)
                     compose_parser(iterator->second);
@@ -635,27 +635,27 @@ namespace cppdatalib { namespace core {
     class template_parser<QMultiMap, Ts...> : public generic_stream_input
     {
     protected:
-        const QMultiMap<Ts...> *bind;
-        decltype(bind->begin()) iterator;
+        const QMultiMap<Ts...> bind;
+        decltype(bind.begin()) iterator;
         bool parsingKey;
 
     public:
         template_parser(const QMultiMap<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
 
     protected:
-        void reset_() {iterator = bind->begin(); parsingKey = true;}
+        void reset_() {iterator = bind.begin(); parsingKey = true;}
 
         void write_one_()
         {
             if (was_just_reset())
             {
-                get_output()->begin_object(core::object_t(), bind->size());
-                if (iterator != bind->end())
+                get_output()->begin_object(core::object_t(), bind.size());
+                if (iterator != bind.end())
                     compose_parser(iterator->first);
             }
             else if (iterator != bind->end())
@@ -715,14 +715,14 @@ namespace cppdatalib { namespace core {
     class template_parser<QHash, Ts...> : public generic_stream_input
     {
     protected:
-        const QHash<Ts...> *bind;
-        decltype(bind->begin()) iterator;
+        const QHash<Ts...> bind;
+        decltype(bind.begin()) iterator;
         bool parsingKey;
 
     public:
         template_parser(const QHash<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
@@ -735,10 +735,10 @@ namespace cppdatalib { namespace core {
             if (was_just_reset())
             {
                 get_output()->begin_object(core::value(core::object_t(), core::hash), bind->size());
-                if (iterator != bind->end())
+                if (iterator != bind.end())
                     compose_parser(iterator->first);
             }
-            else if (iterator != bind->end())
+            else if (iterator != bind.end())
             {
                 if (parsingKey)
                     compose_parser(iterator->second);
@@ -795,30 +795,30 @@ namespace cppdatalib { namespace core {
     class template_parser<QMultiHash, Ts...> : public generic_stream_input
     {
     protected:
-        const QMultiHash<Ts...> *bind;
-        decltype(bind->begin()) iterator;
+        const QMultiHash<Ts...> bind;
+        decltype(bind.begin()) iterator;
         bool parsingKey;
 
     public:
         template_parser(const QMultiHash<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
 
     protected:
-        void reset_() {iterator = bind->begin(); parsingKey = true;}
+        void reset_() {iterator = bind.begin(); parsingKey = true;}
 
         void write_one_()
         {
             if (was_just_reset())
             {
                 get_output()->begin_object(core::value(core::object_t(), core::hash), bind->size());
-                if (iterator != bind->end())
+                if (iterator != bind.end())
                     compose_parser(iterator->first);
             }
-            else if (iterator != bind->end())
+            else if (iterator != bind.end())
             {
                 if (parsingKey)
                     compose_parser(iterator->second);

@@ -551,6 +551,9 @@ namespace cppdatalib
             {
                 if (output)
                 {
+                    // If just reset, fix nesting depth (it may have changed since this parser was created)
+                    if (mReset)
+                        initial_nesting_level = output->nesting_depth();
                     write_one_();
                     mReset = false;
                 }
@@ -570,7 +573,13 @@ namespace cppdatalib
                         output->begin();
 
                     reset();
-                    do {write_one_(); mReset = false;} while (busy());
+
+                    // fix nesting depth (it may have changed since this parser was created)
+                    initial_nesting_level = output->nesting_depth();
+                    write_one_();
+                    mReset = false;
+
+                    while (busy()) write_one_();
 
                     if (!active)
                         output->end();

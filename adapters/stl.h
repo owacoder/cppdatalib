@@ -42,12 +42,12 @@ namespace cppdatalib { namespace core {
     class template_parser<std::basic_string, char, Ts...> : public generic_stream_input
     {
     protected:
-        const std::basic_string<char, Ts...> *bind;
+        const std::basic_string<char, Ts...> bind;
 
     public:
         template_parser(const std::basic_string<char, Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
@@ -57,7 +57,7 @@ namespace cppdatalib { namespace core {
 
         void write_one_()
         {
-            get_output()->write(core::value(*bind));
+            get_output()->write(core::value(bind));
         }
     };
 }}
@@ -212,8 +212,6 @@ public:
     }
 };
 
-// TODO: implement generic_parser helper specialization for std::valarray
-
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::valarray, Ts...>
 {
@@ -228,6 +226,40 @@ public:
         return result;
     }
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::valarray, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::valarray<Ts...> &bind;
+        size_t idx;
+
+    public:
+        template_parser(const std::valarray<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {idx = 0;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+                get_output()->begin_array(core::array_t(), bind.size());
+            else if (idx != bind.size())
+            {
+                compose_parser(bind[idx++]);
+                write_next();
+            }
+            else
+                get_output()->end_array(core::array_t());
+        }
+    };
+}}
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::initializer_list, Ts...>
@@ -315,30 +347,30 @@ namespace cppdatalib { namespace core {
     class template_parser<std::map, Ts...> : public generic_stream_input
     {
     protected:
-        const std::map<Ts...> *bind;
-        decltype(bind->begin()) iterator;
+        const std::map<Ts...> bind;
+        decltype(bind.begin()) iterator;
         bool parsingKey;
 
     public:
         template_parser(const std::map<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
 
     protected:
-        void reset_() {iterator = bind->begin(); parsingKey = true;}
+        void reset_() {iterator = bind.begin(); parsingKey = true;}
 
         void write_one_()
         {
             if (was_just_reset())
             {
                 get_output()->begin_object(core::object_t(), bind->size());
-                if (iterator != bind->end())
+                if (iterator != bind.end())
                     compose_parser(iterator->first);
             }
-            else if (iterator != bind->end())
+            else if (iterator != bind.end())
             {
                 if (parsingKey)
                     compose_parser(iterator->second);
@@ -374,14 +406,14 @@ namespace cppdatalib { namespace core {
     class template_parser<std::multimap, Ts...> : public generic_stream_input
     {
     protected:
-        const std::multimap<Ts...> *bind;
-        decltype(bind->begin()) iterator;
+        const std::multimap<Ts...> bind;
+        decltype(bind.begin()) iterator;
         bool parsingKey;
 
     public:
         template_parser(const std::multimap<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
@@ -394,10 +426,10 @@ namespace cppdatalib { namespace core {
             if (was_just_reset())
             {
                 get_output()->begin_object(core::object_t(), bind->size());
-                if (iterator != bind->end())
+                if (iterator != bind.end())
                     compose_parser(iterator->first);
             }
-            else if (iterator != bind->end())
+            else if (iterator != bind.end())
             {
                 if (parsingKey)
                     compose_parser(iterator->second);
@@ -434,30 +466,30 @@ namespace cppdatalib { namespace core {
     class template_parser<std::unordered_map, Ts...> : public generic_stream_input
     {
     protected:
-        const std::unordered_map<Ts...> *bind;
-        decltype(bind->begin()) iterator;
+        const std::unordered_map<Ts...> bind;
+        decltype(bind.begin()) iterator;
         bool parsingKey;
 
     public:
         template_parser(const std::unordered_map<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
 
     protected:
-        void reset_() {iterator = bind->begin(); parsingKey = true;}
+        void reset_() {iterator = bind.begin(); parsingKey = true;}
 
         void write_one_()
         {
             if (was_just_reset())
             {
                 get_output()->begin_object(core::value(core::object_t(), core::hash), bind->size());
-                if (iterator != bind->end())
+                if (iterator != bind.end())
                     compose_parser(iterator->first);
             }
-            else if (iterator != bind->end())
+            else if (iterator != bind.end())
             {
                 if (parsingKey)
                     compose_parser(iterator->second);
@@ -494,30 +526,30 @@ namespace cppdatalib { namespace core {
     class template_parser<std::unordered_multimap, Ts...> : public generic_stream_input
     {
     protected:
-        const std::unordered_multimap<Ts...> *bind;
-        decltype(bind->begin()) iterator;
+        const std::unordered_multimap<Ts...> bind;
+        decltype(bind.begin()) iterator;
         bool parsingKey;
 
     public:
         template_parser(const std::unordered_multimap<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
 
     protected:
-        void reset_() {iterator = bind->begin(); parsingKey = true;}
+        void reset_() {iterator = bind.begin(); parsingKey = true;}
 
         void write_one_()
         {
             if (was_just_reset())
             {
-                get_output()->begin_object(core::value(core::object_t(), core::hash), bind->size());
-                if (iterator != bind->end())
+                get_output()->begin_object(core::value(core::object_t(), core::hash), bind.size());
+                if (iterator != bind.end())
                     compose_parser(iterator->first);
             }
-            else if (iterator != bind->end())
+            else if (iterator != bind.end())
             {
                 if (parsingKey)
                     compose_parser(iterator->second);
@@ -546,13 +578,13 @@ namespace cppdatalib { namespace core {
     class template_parser<std::pair, Ts...> : public generic_stream_input
     {
     protected:
-        const std::pair<Ts...> *bind;
+        const std::pair<Ts...> bind;
         size_t idx;
 
     public:
         template_parser(const std::pair<Ts...> &bind, generic_parser &parser)
             : generic_stream_input(parser)
-            , bind(&bind)
+            , bind(bind)
         {
             reset();
         }
@@ -565,11 +597,11 @@ namespace cppdatalib { namespace core {
             if (was_just_reset())
             {
                 get_output()->begin_array(core::array_t(), 2);
-                compose_parser(bind->first);
+                compose_parser(bind.first);
             }
             else if (++idx == 1)
             {
-                compose_parser(bind->second);
+                compose_parser(bind.second);
                 write_next();
             }
             else
@@ -577,8 +609,6 @@ namespace cppdatalib { namespace core {
         }
     };
 }}
-
-// TODO: implement generic_parser helper specialization for std::tuple
 
 namespace cppdatalib
 {
@@ -593,6 +623,11 @@ namespace cppdatalib
                 push_back(const std::tuple<Ts...> &tuple, core::array_t &result) : push_back<tuple_size - 1>(tuple, result) {
                     result.data().push_back(cppdatalib::core::value(std::get<tuple_size - 1>(tuple)));
                 }
+
+                template<typename T, typename... Ts>
+                push_back(const std::tuple<Ts...> &tuple, std::vector<T> &result, core::stream_handler &handler) : push_back<tuple_size - 1>(tuple, result, handler) {
+                    result.emplace_back(std::get<tuple_size - 1>(tuple), handler);
+                }
             };
 
             template<>
@@ -600,6 +635,9 @@ namespace cppdatalib
             {
                 template<typename... Ts>
                 push_back(const std::tuple<Ts...> &, core::array_t &) {}
+
+                template<typename T, typename... Ts>
+                push_back(const std::tuple<Ts...> &, std::vector<T> &, core::stream_handler &) {}
             };
         }
     }
@@ -619,9 +657,44 @@ public:
     }
 };
 
-#if __cplusplus >= 201703L
-// TODO: implement generic_parser helper specialization for std::optional
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::tuple, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::tuple<Ts...> bind;
+        std::vector<generic_parser> parsers;
+        decltype(parsers.begin()) iterator;
 
+    public:
+        template_parser(const std::tuple<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_()
+        {
+            parsers.clear();
+            cppdatalib::core::impl::push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind, parsers, *get_output());
+            iterator = parsers.begin();
+        }
+
+        void write_one_()
+        {
+            if (was_just_reset())
+                get_output()->begin_array(core::array_t(), parsers.size());
+            else if (iterator != parsers.end() && (iterator->was_just_reset() || iterator->busy() || ++iterator != parsers.end()))
+                iterator->write_one();
+            else
+                get_output()->end_array(core::array_t());
+        }
+    };
+}}
+
+#if __cplusplus >= 201703L
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::optional, Ts...>
 {
@@ -636,7 +709,39 @@ public:
     }
 };
 
-// TODO: implement generic_parser helper specialization for std::variant
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::optional, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::optional<Ts...> &bind;
+
+    public:
+        template_parser(const std::optional<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                if (bind)
+                    get_output()->write(core::null_t());
+                else
+                {
+                    compose_parser(*bind);
+                    write_next();
+                }
+            }
+        }
+    };
+}}
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::variant, Ts...>
@@ -651,6 +756,40 @@ public:
         return cppdatalib::core::value(std::get<bind.index()>(bind));
     }
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<std::variant, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::variant<Ts...> &bind;
+
+    public:
+        template_parser(const std::variant<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                if (bind.valueless_by_exception())
+                    get_output()->write(core::null_t());
+                else
+                {
+                    compose_parser(std::get<bind.index()>(bind));
+                    write_next();
+                }
+            }
+        }
+    };
+}}
 #endif
 
 template<typename... Ts>
