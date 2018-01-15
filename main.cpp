@@ -1259,8 +1259,45 @@ void test_sql()
 }
 #endif
 
+#include "experimental/decision_trees.h"
+
 int main()
 {
+    cppdatalib::core::value data;
+    cppdatalib::core::value results;
+
+    try
+    {
+        data.push_back(cppdatalib::core::object_t{{"size", "M"}, {"shape", "brick"}, {"color", "blue"}});
+        results.push_back(true);
+        data.push_back(cppdatalib::core::object_t{{"size", "S"}, {"shape", "wedge"}, {"color", "red"}});
+        results.push_back(false);
+        data.push_back(cppdatalib::core::object_t{{"size", "L"}, {"shape", "wedge"}, {"color", "red"}});
+        results.push_back(false);
+        data.push_back(cppdatalib::core::object_t{{"size", "S"}, {"shape", "sphere"}, {"color", "red"}});
+        results.push_back(true);
+        data.push_back(cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "green"}});
+        results.push_back(true);
+        data.push_back(cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "red"}});
+        results.push_back(false);
+        data.push_back(cppdatalib::core::object_t{{"size", "L"}, {"shape", "sphere"}, {"color", "green"}});
+        results.push_back(true);
+        data.push_back(cppdatalib::core::object_t{{"size", "M"}, {"shape", "pillar"}, {"color", "red"}});
+        results.push_back(true);
+
+        auto tree = cppdatalib::experimental::make_decision_tree(data.get_array(), cppdatalib::core::array_t{"size", "shape", "color"}, results.get_array());
+        std::cout << tree << std::endl;
+
+        std::cout << "looking for {size: L, shape: pillar, color: blue} in tree: " << std::endl;
+        std::cout << cppdatalib::experimental::test_decision_tree(tree, cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "blue"}}) << std::endl;
+    } catch (cppdatalib::core::error e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
+
     using namespace cppdatalib;
     using namespace json;
     boost::dynamic_bitset<> b;
@@ -1268,13 +1305,14 @@ int main()
     cppdatalib::core::value yx = b;
     yx = R"({"my string":""})"_json;
 
-    std::vector<unsigned int> myvec = {0, 3, 6, 442, 4021, (unsigned int) -1};
-    cppdatalib::core::dump::stream_writer out(std::cout, 2);
-    cppdatalib::core::generic_parser parser(myvec, out);
-    parser.convert();
+    std::tuple<unsigned int, const char *> myvec{44, "hello"};
+    cppdatalib::core::dump::stream_writer(std::cout, 2) <<
+    cppdatalib::core::generic_parser(myvec);
     std::cout << std::endl;
     std::cout << yx << std::endl;
     b = yx;
+
+
 
     return 0;
 
