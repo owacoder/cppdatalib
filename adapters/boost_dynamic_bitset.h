@@ -33,7 +33,7 @@
 
 #include <boost/dynamic_bitset.hpp>
 
-#include "../core/value_builder.h"
+#include "../core/value_parser.h"
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<boost::dynamic_bitset, Ts...>
@@ -67,5 +67,36 @@ public:
         return result;
     }
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<boost::dynamic_bitset, Ts...> : public generic_stream_input
+    {
+    protected:
+        const boost::dynamic_bitset<Ts...> &bind;
+        size_t idx;
+
+    public:
+        template_parser(const boost::dynamic_bitset<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {idx = 0;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+                get_output()->begin_array(core::array_t(), bind.size());
+            else if (idx != bind.size())
+                get_output()->write(bool(bind[idx++]));
+            else
+                get_output()->end_array(core::array_t());
+        }
+    };
+}}
 
 #endif // CPPDATALIB_BOOST_DYNAMIC_BITSET_H

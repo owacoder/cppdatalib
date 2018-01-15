@@ -44,7 +44,7 @@
 #include <boost/container/set.hpp>
 #include <boost/container/string.hpp>
 
-#include "../core/value_builder.h"
+#include "../core/value_parser.h"
 
 // --------
 //  vector
@@ -277,8 +277,6 @@ public:
 //  flat_map
 // ----------
 
-// TODO: implement generic_parser helper specialization for boost::container::flat_map
-
 template<typename... Ts>
 class cast_template_to_cppdatalib<boost::container::flat_map, Ts...>
 {
@@ -311,6 +309,49 @@ public:
         return result;
     }
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<boost::container::flat_map, Ts...> : public generic_stream_input
+    {
+    protected:
+        const boost::container::flat_map<Ts...> bind;
+        decltype(bind.begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const boost::container::flat_map<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind.begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::object_t(), bind->size());
+                if (iterator != bind.end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind.end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
 
 // ----------
 //  flat_set
@@ -351,8 +392,6 @@ public:
 //  map
 // -----
 
-// TODO: implement generic_parser helper specialization for boost::container::map
-
 template<typename... Ts>
 class cast_template_to_cppdatalib<boost::container::map, Ts...>
 {
@@ -385,6 +424,49 @@ public:
         return result;
     }
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<boost::container::map, Ts...> : public generic_stream_input
+    {
+    protected:
+        const boost::container::map<Ts...> bind;
+        decltype(bind.begin()) iterator;
+        bool parsingKey;
+
+    public:
+        template_parser(const boost::container::map<Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {iterator = bind.begin(); parsingKey = true;}
+
+        void write_one_()
+        {
+            if (was_just_reset())
+            {
+                get_output()->begin_object(core::object_t(), bind->size());
+                if (iterator != bind.end())
+                    compose_parser(iterator->first);
+            }
+            else if (iterator != bind.end())
+            {
+                if (parsingKey)
+                    compose_parser(iterator->second);
+                else
+                    compose_parser((iterator++)->first);
+                parsingKey = !parsingKey;
+                write_next();
+            }
+            else
+                get_output()->end_object(core::object_t());
+        }
+    };
+}}
 
 // -----
 //  set
@@ -425,8 +507,6 @@ public:
 //  string
 // --------
 
-// TODO: implement generic_parser helper specialization for boost::container::basic_string
-
 template<typename... Ts>
 class cast_template_to_cppdatalib<boost::container::basic_string, char, Ts...>
 {
@@ -448,5 +528,30 @@ public:
         return boost::container::basic_string<char, Ts...>(str.c_str(), str.size());
     }
 };
+
+namespace cppdatalib { namespace core {
+    template<typename... Ts>
+    class template_parser<boost::container::basic_string, char, Ts...> : public generic_stream_input
+    {
+    protected:
+        const boost::container::basic_string<char, Ts...> bind;
+
+    public:
+        template_parser(const boost::container::basic_string<char, Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {}
+
+        void write_one_()
+        {
+            get_output()->write(core::value(bind));
+        }
+    };
+}}
 
 #endif // CPPDATALIB_BOOST_CONTAINER_H
