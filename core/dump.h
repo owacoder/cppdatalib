@@ -177,9 +177,12 @@ namespace cppdatalib
                 void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
                 void real_(const core::value &v)
                 {
-                    if (!std::isfinite(v.get_real_unchecked()))
-                        throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
-                    stream() << v.get_real_unchecked();
+                    if (std::isinf(v.get_real_unchecked()))
+                        stream() << (v.get_real_unchecked() < 0? "-": "") << "infinity";
+                    else if (std::isnan(v.get_real_unchecked()))
+                        stream() << "NaN";
+                    else
+                        stream() << v.get_real_unchecked();
                 }
                 void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
                 void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
