@@ -625,8 +625,13 @@ namespace cppdatalib
                 }
 
                 template<typename T, typename... Ts>
-                push_back(const std::tuple<Ts...> &tuple, std::vector<T> &result, core::stream_handler &handler) : push_back<tuple_size - 1>(tuple, result, handler) {
-                    result.emplace_back(std::get<tuple_size - 1>(tuple), handler);
+                push_back(const std::tuple<Ts...> &tuple, std::vector<T> &result, core::stream_handler &output) : push_back<tuple_size - 1>(tuple, result, output) {
+                    result.emplace_back(std::get<tuple_size - 1>(tuple), output);
+                }
+
+                template<typename T, typename... Ts>
+                push_back(const std::tuple<Ts...> &tuple, std::vector<T> &result) : push_back<tuple_size - 1>(tuple, result) {
+                    result.emplace_back(std::get<tuple_size - 1>(tuple));
                 }
             };
 
@@ -638,6 +643,9 @@ namespace cppdatalib
 
                 template<typename T, typename... Ts>
                 push_back(const std::tuple<Ts...> &, std::vector<T> &, core::stream_handler &) {}
+
+                template<typename T, typename... Ts>
+                push_back(const std::tuple<Ts...> &, std::vector<T> &) {}
             };
         }
     }
@@ -675,10 +683,19 @@ namespace cppdatalib { namespace core {
         }
 
     protected:
+        void output_changed_()
+        {
+            for (auto &parser: parsers)
+                parser.set_output(*get_output());
+        }
+
         void reset_()
         {
             parsers.clear();
-            cppdatalib::core::impl::push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind, parsers, *get_output());
+            if (get_output() == NULL)
+                cppdatalib::core::impl::push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind, parsers);
+            else
+                cppdatalib::core::impl::push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind, parsers, *get_output());
             iterator = parsers.begin();
         }
 

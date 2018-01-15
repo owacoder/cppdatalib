@@ -248,31 +248,35 @@ namespace cppdatalib
 
             public:
                 template<typename T>
-                impl_generic_parser(const T &bind, core::stream_handler &output, generic_parser &parser)
+                impl_generic_parser(const T &bind, core::stream_handler *output, generic_parser &parser)
                 {
                     input = std::unique_ptr<type_parser<T>>(new type_parser<T>(bind, parser));
-                    input->set_output(output);
+                    if (output != nullptr)
+                        input->set_output(*output);
                 }
 
                 template<template<size_t, typename...> class Template, size_t N, typename... Ts>
-                impl_generic_parser(const Template<N, Ts...> &bind, core::stream_handler &output, generic_parser &parser)
+                impl_generic_parser(const Template<N, Ts...> &bind, core::stream_handler *output, generic_parser &parser)
                 {
                     input = std::unique_ptr<sized_template_parser<Template, N, Ts...>>(new sized_template_parser<Template, N, Ts...>(bind, parser));
-                    input->set_output(output);
+                    if (output != nullptr)
+                        input->set_output(*output);
                 }
 
                 template<template<typename...> class Template, typename... Ts>
-                impl_generic_parser(const Template<Ts...> &bind, core::stream_handler &output, generic_parser &parser)
+                impl_generic_parser(const Template<Ts...> &bind, core::stream_handler *output, generic_parser &parser)
                 {
                     input = std::unique_ptr<template_parser<Template, Ts...>>(new template_parser<Template, Ts...>(bind, parser));
-                    input->set_output(output);
+                    if (output != nullptr)
+                        input->set_output(*output);
                 }
 
                 template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
-                impl_generic_parser(const Template<T, N, Ts...> &bind, core::stream_handler &output, generic_parser &parser)
+                impl_generic_parser(const Template<T, N, Ts...> &bind, core::stream_handler *output, generic_parser &parser)
                 {
                     input = std::unique_ptr<array_template_parser<Template, T, N, Ts...>>(new array_template_parser<Template, T, N, Ts...>(bind, parser));
-                    input->set_output(output);
+                    if (output != nullptr)
+                        input->set_output(*output);
                 }
 
                 core::stream_input &parser() {return *input;}
@@ -282,34 +286,47 @@ namespace cppdatalib
         // Generic parser type, pass it a value of any type and it will be parsed to the specified output handler
         class generic_parser : public core::stream_input
         {
-            std::stack<impl::impl_generic_parser, std::vector<impl::impl_generic_parser>> stack;
+            std::vector<impl::impl_generic_parser> stack;
 
         public:
             template<typename ForItem>
+            generic_parser(const ForItem &bind)
+            {
+                stack.push_back(impl::impl_generic_parser(bind, nullptr, *this));
+                reset();
+            }
+
+            template<typename ForItem>
             generic_parser(const ForItem &bind, core::stream_handler &output) : core::stream_input(output)
             {
-                stack.push(impl::impl_generic_parser(bind, output, *this));
+                stack.push_back(impl::impl_generic_parser(bind, &output, *this));
                 reset();
             }
 
             template<typename ForItem>
             void compose_parser(const ForItem &bind)
             {
-                stack.push(impl::impl_generic_parser(bind, *get_output(), *this));
+                stack.push_back(impl::impl_generic_parser(bind, get_output(), *this));
             }
 
         protected:
+            void output_changed_()
+            {
+                for (auto &parser: stack)
+                    parser.parser().set_output(*get_output());
+            }
+
             void reset_()
             {
-                while (stack.size() > 1) stack.pop();
-                stack.top().parser().reset();
+                while (stack.size() > 1) stack.pop_back();
+                stack.back().parser().reset();
             }
 
             void write_one_()
             {
-                if (!stack.top().parser().was_just_reset() && !stack.top().parser().busy() && stack.size() > 1)
-                    stack.pop();
-                stack.top().parser().write_one();
+                if (!stack.back().parser().was_just_reset() && !stack.back().parser().busy() && stack.size() > 1)
+                    stack.pop_back();
+                stack.back().parser().write_one();
             }
         };
 
@@ -368,9 +385,11 @@ namespace cppdatalib
         }
 
         generic_stream_input::generic_stream_input(generic_parser &parser)
-            : core::stream_input(*parser.get_output())
-            , master_parser(&parser)
-        {}
+            : master_parser(&parser)
+        {
+            if (parser.get_output())
+                set_output(*parser.get_output());
+        }
 
         template<typename ForItem>
         void generic_stream_input::compose_parser(const ForItem &item)

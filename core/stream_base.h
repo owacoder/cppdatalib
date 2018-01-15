@@ -517,8 +517,11 @@ namespace cppdatalib
             {
                 if (!busy())
                 {
+                    const bool changed = &output != this->output;
                     this->output = &output;
                     initial_nesting_level = output.nesting_depth();
+                    if (changed)
+                        output_changed_();
                 }
             }
 
@@ -599,6 +602,10 @@ namespace cppdatalib
             }
 
         protected:
+            // Called when output changes, allows parser to reset any external output references needed
+            // Note that get_output() always returns non-NULL when this function is executing!
+            virtual void output_changed_() {}
+
             // Performs one minimal parse step with specified output and then returns.
             // Note that this "minimal parse step" is rather vague, but that's okay.
             // It can be any combination of the following, from preferred to not-so-preferred:
@@ -615,9 +622,12 @@ namespace cppdatalib
             //
             // Basically, as long as any single invocation of this function writes SOMETHING to `output`, it is acceptable.
             // Read states should be stored as class members, not in this function, and should be resettable with `reset()`.
+            //
+            // Note that get_output() always returns non-NULL when this function is executing!
             virtual void write_one_() = 0;
 
             // Resets the input class to start parsing a new stream (NOTE: if input reads from a stream, reset_() should NOT attempt to seek to the beginning of the stream!)
+            // Note that get_output() may return NULL when this function is executing!
             virtual void reset_() = 0;
         };
 
