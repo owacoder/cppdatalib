@@ -1145,7 +1145,7 @@ namespace cppdatalib
                 tuple_push_back(const core::array_t &list, std::tuple<Ts...> &result) : tuple_push_back<tuple_size - 1>(list, result) {
                     typedef typename std::tuple_element<tuple_size-1, std::tuple<Ts...>>::type element_type;
                     if (tuple_size <= list.size()) // If the list contains enough elements, assign it
-                        std::get<tuple_size-1>(result) = list.data()[tuple_size - 1].operator element_type();
+                        std::get<tuple_size-1>(result) = list[tuple_size - 1].operator element_type();
                     else // Otherwise, clear the tuple's element value
                         std::get<tuple_size-1>(result) = element_type{};
                 }

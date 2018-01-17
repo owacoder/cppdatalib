@@ -563,6 +563,95 @@ namespace cppdatalib
             }
         };
 
+        template<core::type measure, typename Viewer>
+        view_filter<measure, Viewer> make_view_filter(core::stream_handler &output, Viewer v)
+        {
+            return view_filter<measure, Viewer>(output, v);
+        }
+
+        class object_keys_to_array_filter : public impl::stream_filter_base
+        {
+            size_t m_is_key;
+
+        public:
+            object_keys_to_array_filter(core::stream_handler &output)
+                : impl::stream_filter_base(output)
+            {}
+
+        protected:
+            void begin_() {
+                impl::stream_filter_base::begin_();
+                output.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                m_is_key = 0;
+            }
+            void end_()
+            {
+                output.end_array(core::array_t());
+                impl::stream_filter_base::end_();
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                if (m_is_key || is_key)
+                    return output.write(v);
+                return false;
+            }
+
+            void begin_array_(const value &v, int_t size, bool is_key)
+            {
+                if (m_is_key || is_key)
+                {
+                    ++m_is_key;
+                    output.begin_array(v, size);
+                }
+            }
+            void end_array_(const value &v, bool)
+            {
+                if (m_is_key)
+                {
+                    --m_is_key;
+                    output.end_array(v);
+                }
+            }
+
+            void begin_object_(const value &v, int_t size, bool is_key)
+            {
+                if (!m_is_key && !is_key)
+                    output.begin_array(core::array_t(), size);
+                else
+                {
+                    ++m_is_key;
+                    output.begin_object(v, size);
+                }
+            }
+            void end_object_(const value &v, bool)
+            {
+                if (!m_is_key)
+                    output.end_array(core::array_t());
+                else
+                {
+                    --m_is_key;
+                    output.end_object(v);
+                }
+            }
+
+            void begin_string_(const value &v, int_t size, bool is_key)
+            {
+                if (m_is_key || is_key)
+                    output.begin_string(v, size);
+            }
+            void string_data_(const value &v, bool is_key)
+            {
+                if (m_is_key || is_key)
+                    output.append_to_string(v);
+            }
+            void end_string_(const value &v, bool is_key)
+            {
+                if (m_is_key || is_key)
+                    output.end_string(v);
+            }
+        };
+
         template<core::type measure = core::real>
         class range_filter : public core::buffer_filter
         {
@@ -911,13 +1000,13 @@ namespace cppdatalib
             }
         };
 
-        class table_to_array_of_maps_filter : public core::buffer_filter
+        class table_to_array_of_objects_filter : public core::buffer_filter
         {
             core::value column_names;
             bool fail_on_missing_column;
 
         public:
-            table_to_array_of_maps_filter(core::stream_handler &output, const core::value &column_names, bool fail_on_missing_column = false)
+            table_to_array_of_objects_filter(core::stream_handler &output, const core::value &column_names, bool fail_on_missing_column = false)
                 : core::buffer_filter(output, buffer_arrays, 1)
                 , column_names(column_names)
                 , fail_on_missing_column(fail_on_missing_column)
@@ -1061,6 +1150,41 @@ namespace cppdatalib
             }
         };
 
+        template<typename Selecter>
+        class select_from_array_filter : public core::buffer_filter
+        {
+            Selecter select;
+
+        public:
+            select_from_array_filter(core::stream_handler &output, Selecter s = Selecter())
+                : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects), 1)
+                , select(s)
+            {}
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                if (select(v))
+                    buffer_filter::write_buffered_value_(v, is_key);
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                if (nesting_depth() == 0)
+                    return false;
+
+                if (select(v))
+                    return buffer_filter::write_(v, is_key);
+                return true; // The value was handled, so don't keep processing it
+            }
+        };
+
+        template<typename Selecter>
+        select_from_array_filter<Selecter> make_select_from_array_filter(core::stream_handler &output, Selecter s)
+        {
+            return select_from_array_filter<Selecter>(output, s);
+        }
+
         template<core::type from, core::type to>
         class converter_filter : public core::buffer_filter
         {
@@ -1138,6 +1262,12 @@ namespace cppdatalib
             }
         };
 
+        template<core::type measure, typename Converter>
+        custom_converter_filter<measure, Converter> make_custom_converter_filter(core::stream_handler &output, Converter c)
+        {
+            return custom_converter_filter<measure, Converter>(output, c);
+        }
+
         // TODO: Currently, conversions from arrays and objects are not supported.
         //       This is because conversion of arrays and objects would require a cache of the entire stream,
         //       and conversion of scalar values would then not operate properly.
@@ -1170,6 +1300,12 @@ namespace cppdatalib
                 return buffer_filter::write_(copy, is_key);
             }
         };
+
+        template<typename Converter>
+        generic_converter_filter<Converter> make_generic_converter_filter(core::stream_handler &output, Converter c)
+        {
+            return generic_converter_filter<Converter>(output, c);
+        }
     }
 }
 

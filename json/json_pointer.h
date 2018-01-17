@@ -126,7 +126,7 @@ namespace cppdatalib
                                     return NULL;
                             }
 
-                            reference = &reference->get_array_unchecked().data()[static_cast<size_t>(array_index)];
+                            reference = &reference->get_array_unchecked()[static_cast<size_t>(array_index)];
                         }
                         else
                         {
@@ -262,7 +262,7 @@ namespace cppdatalib
                             }
 
                             parent = reference;
-                            reference = &reference->get_array_ref().data()[static_cast<size_t>(array_index)];
+                            reference = &reference->get_array_ref()[static_cast<size_t>(array_index)];
                         }
                         else
                         {

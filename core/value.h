@@ -841,6 +841,9 @@ namespace cppdatalib
             bool empty() const {return m_data.empty();}
             size_t size() const {return m_data.size();}
 
+            const value &operator[](size_t idx) const {return m_data[idx];}
+            value &operator[](size_t idx) {return m_data[idx];}
+
             array_iterator_t begin();
             array_const_iterator_t begin() const;
             array_iterator_t end();
@@ -1633,13 +1636,13 @@ namespace cppdatalib
         void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(v);}
         value value::operator[](size_t pos) const {return element(pos);}
         value &value::operator[](size_t pos) {return element(pos);}
-        value value::element(size_t pos) const {return is_array() && pos < arr_ref_().size()? arr_ref_().data()[pos]: value();}
+        value value::element(size_t pos) const {return is_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
         value &value::element(size_t pos)
         {
             clear(array);
             if (arr_ref_().size() <= pos)
                 arr_ref_().data().insert(arr_ref_().end().data(), pos - arr_ref_().size() + 1, core::null_t());
-            return arr_ref_().data()[pos];
+            return arr_ref_()[pos];
         }
         void value::erase_element(size_t pos) {if (is_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
 

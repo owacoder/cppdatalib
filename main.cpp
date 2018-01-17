@@ -1259,7 +1259,28 @@ void test_sql()
 }
 #endif
 
+void test_select()
+{
+    using json_writer = cppdatalib::json::stream_writer;
+
+    namespace cdlcore = cppdatalib::core;
+
+    cppdatalib::core::value data;
+
+    auto lambda = [](const cppdatalib::core::value &v) {return v.is_bool();};
+
+    data.push_back(true);//cppdatalib::core::object_t{{"size", cppdatalib::core::null_t()}, {"shape", "weird"}, {0, -1}, {cppdatalib::core::object_t{{"object", 1}}, 1}});
+    data.push_back(false);//cppdatalib::core::object_t{{"size", cppdatalib::core::null_t()}, {"shape", "weird"}, {0, -1}, {cppdatalib::core::object_t{{"object", 1}}, 1}});
+    data.push_back(true);
+    data.push_back(false);
+
+    json_writer json(std::cout);
+    data >> cdlcore::make_select_from_array_filter(json, lambda);
+    //cppdatalib::core::object_keys_to_array_filter(json) << data;
+}
+
 #include "experimental/decision_trees.h"
+#include "experimental/algorithm.h"
 
 int main()
 {
@@ -1282,14 +1303,12 @@ int main()
         results.push_back(false);
         data.push_back(cppdatalib::core::object_t{{"size", "L"}, {"shape", "sphere"}, {"color", "green"}});
         results.push_back(true);
-        data.push_back(cppdatalib::core::object_t{{"size", "M"}, {"shape", "pillar"}, {"color", "red"}});
-        results.push_back(true);
 
         auto tree = cppdatalib::experimental::make_decision_tree(data.get_array(), cppdatalib::core::array_t{"size", "shape", "color"}, results.get_array());
         std::cout << tree << std::endl;
 
-        std::cout << "looking for {size: L, shape: pillar, color: blue} in tree: " << std::endl;
-        std::cout << cppdatalib::experimental::test_decision_tree(tree, cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "blue"}}) << std::endl;
+        std::cout << "looking for {size: L, shape: block, color: blue} in tree: " << std::endl;
+        std::cout << cppdatalib::experimental::test_decision_tree(tree, cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "blue"}}, true) << std::endl;
     } catch (cppdatalib::core::error e)
     {
         std::cerr << e.what() << std::endl;

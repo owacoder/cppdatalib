@@ -249,7 +249,7 @@ namespace cppdatalib
                 tuple_push_back(const core::array_t &list, Poco::Tuple<Ts...> &result) : tuple_push_back<tuple_size - 1>(list, result) {
                     typedef typename Poco::TypeGetter<tuple_size - 1, typename Poco::Tuple<Ts...>::Type>::HeadType element_type;
                     if (tuple_size <= list.size()) // If the list contains enough elements, assign it
-                        result.set<tuple_size - 1>(list.data()[tuple_size - 1].operator element_type());
+                        result.set<tuple_size - 1>(list[tuple_size - 1].operator element_type());
                     else // Otherwise, clear the tuple's element value
                         result.set<tuple_size - 1>(element_type{});
                 }

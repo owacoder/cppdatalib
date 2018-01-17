@@ -53,29 +53,33 @@ cppdatalib offers a variety of filters that can be applied to stream handlers. T
    - `view_filter`<br/>
      Applies a view function to every element of the specified type. Essentially the same as `custom_converter_filter`, but can't edit the value and is more efficient.
    - `range_filter`<br/>
-     Pass-through filter that computes the maximum and minimum values of the specified type, as well as the midpoint (only applicable for numeric values)
+     Pass-through filter that computes the maximum and minimum values of the specified type, as well as the midpoint (the midpoint is only applicable for numeric values, but the min and max can be computed for any type)
    - `mean_filter`<br/>
      Pass-through filter that computes the arithmetic, geometric, and harmonic means of numeric values
    - `dispersal_filter`<br/>
      Pass-through filter that computes the variance and standard deviation of numeric values (subclass of `mean_filter`, so both central tendency and dispersal can be calculated with this class)
    - `array_sort_filter`<br/>
      Sorts all arrays deeper than the specified nesting level (or all arrays, if 0 is specified), in either ascending or descending order
-   - `table_to_array_of_maps_filter`<br/>
-     Converts a table to an array of maps, using an external column-name list. Also supports converting single-dimension arrays to object-wrapped values with specified column key
+   - `select_from_array_filter`<br/>
+     Selects values from an array using the user-specified selection functor. The selection functor should return either true/non-zero, if the value should be included in the output, or false/zero otherwise
+   - `object_keys_to_array_filter`<br/>
+     Extracts keys of objects in the input stream. Keys are written in arrays as rows of an output table. The table lists objects in the order they were found, and the rows list keys (in ascending order) in an array. Complex object keys are permitted, including those which contain/are objects themselves
+   - `table_to_array_of_objects_filter`<br/>
+     Converts a table to an array of objects, using an external column-name list. Also supports converting single-dimension arrays to object-wrapped values with specified column key
    - `duplicate_key_check_filter`<br/>
      Ensures the input stream only provides unique keys in objects. This filter supports complex keys, including nested objects
    - `converter_filter`<br/>
      Converts from one internal type to another, for example, all integers to strings. This filter has built-in conversions
    - `custom_converter_filter`<br/>
-     Converts the specified internal type, using the user-specified converter function. This filter supports varying output types, including the same type as the input
+     Converts the specified internal type, using the user-specified converter functor. This filter supports varying output types, including the same type as the input
    - `generic_converter_filter`<br/>
-     Sends all scalar values to a user-specified function for conversion. Arrays and objects cannot be converted with this filter
+     Sends all scalar values to a user-specified functor for conversion. Arrays and objects cannot be converted with this filter
 
 Filters can be assigned on top of other filters. How many filters are permitted is limited only by the runtime environment.
 
 ### Large Data
 
-cppdatalib supports streaming with a small memory footprint. Most conversions require no buffering or minimal buffering. Also, there is no limit to the nesting depth of arrays or objects. This makes cppdatalib much more suitable for large datasets.
+cppdatalib supports streaming with a small memory footprint. Most conversions require no buffering or minimal buffering. Also, there is no limit to the nesting depth of arrays or objects (misnomer: technically, there *is* a limit, it's just imposed by available memory and the addressable memory space). This makes cppdatalib much more suitable for large datasets.
 
 ## Usage
 
