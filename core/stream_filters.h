@@ -572,6 +572,7 @@ namespace cppdatalib
         class object_keys_to_array_filter : public impl::stream_filter_base
         {
             size_t m_is_key;
+            bool in_object;
 
         public:
             object_keys_to_array_filter(core::stream_handler &output)
@@ -583,6 +584,7 @@ namespace cppdatalib
                 impl::stream_filter_base::begin_();
                 output.begin_array(core::array_t(), core::stream_handler::unknown_size);
                 m_is_key = 0;
+                in_object = false;
             }
             void end_()
             {
@@ -616,9 +618,12 @@ namespace cppdatalib
 
             void begin_object_(const value &v, int_t size, bool is_key)
             {
-                if (!m_is_key && !is_key)
+                if (!in_object) // If not handling an object, start one
+                {
                     output.begin_array(core::array_t(), size);
-                else
+                    in_object = true;
+                }
+                else if (m_is_key || is_key) // If handling an object, and this is part of a key, add it
                 {
                     ++m_is_key;
                     output.begin_object(v, size);
@@ -626,9 +631,12 @@ namespace cppdatalib
             }
             void end_object_(const value &v, bool)
             {
-                if (!m_is_key)
+                if (!m_is_key) // If not in the middle of an object, end it
+                {
                     output.end_array(core::array_t());
-                else
+                    in_object = false;
+                }
+                else // Otherwise, we're in the middle of a key, so finish the object
                 {
                     --m_is_key;
                     output.end_object(v);
@@ -1170,7 +1178,7 @@ namespace cppdatalib
 
             bool write_(const value &v, bool is_key)
             {
-                if (nesting_depth() == 0)
+                if (current_container() != core::array)
                     return false;
 
                 if (select(v))
