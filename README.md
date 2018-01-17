@@ -16,7 +16,7 @@ the following frameworks:
    - [ETL](https://www.etlcpp.com/home.html)
    - [POCO](https://pocoproject.org/)
    - [Qt](https://www.qt.io/)
-   - The C++ STL
+   - The C++ (03/11/14/17) STL
 
 Supported formats include
 
@@ -33,6 +33,10 @@ Supported formats include
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
    - [BJSON](http://bjson.org/) (write-only)
    - [Netstrings](https://en.wikipedia.org/wiki/Netstring) (write-only)
+
+Language formats include
+
+   - Lisp (write-only)
 
 ### Planned formats
 
@@ -354,6 +358,12 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - Object keys are limited to 255 characters or fewer.
        - Custom subtypes for `null`, `bool`, `int`, `string`, and `array` are supported, as long as they are at least equal to the value of `core::user`.
    
+   - MySQL supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `blob`, `bignum`, `date`, `time`, and `datetime` are supported.
+       - MySQL datatypes `ENUM` and `SET` are not supported natively, although they are extracted as raw strings.
+       - Due to a limitation with the MySQL C API, it is not possible to read a table/db and write to another table/db at the same time. An intermediate representation is required (i.e. parse table to core::value, then output core::value to the table/db).
+
    - XML property lists support `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`s are **not** supported.
@@ -399,3 +409,8 @@ If a format-defined limit is reached, such as an object key length limit, an err
      Notes:
        - No subtypes are supported.
        - Type information is lost when converting to Netstrings.
+
+   - Lisp supports `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - No subtypes are supported.
+       - Numerical metadata is lost when converting to Lisp.
