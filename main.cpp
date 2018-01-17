@@ -540,116 +540,6 @@ void test_qt()
 }
 #endif
 
-// Simple insertion sort.
-// Iterator must be bidirectional, but does not need to be random-access
-// Elements must be less-than comparable and have swap(element, element) defined
-template<typename Iterator>
-void insertion_sort(Iterator begin, Iterator end)
-{
-    using namespace std;
-    auto i = begin;
-
-    if (begin == end)
-        return;
-
-    for (++i; i != end; ++i) {
-        auto j = i;
-        auto j_1 = j; // To be set to j - 1 later
-
-        while (j != begin) {
-            --j_1;
-            if (!(*j_1 < *j))
-                break;
-
-            swap(*j_1, *j);
-            --j;
-        }
-    }
-}
-
-// Simple insertion sort.
-// Iterator must be bidirectional, but does not need to be random-access
-// Elements must have swap(element, element) defined
-// `compare` is used to sort elements
-template<typename Iterator, typename Predicate>
-void insertion_sort(Iterator begin, Iterator end, Predicate compare)
-{
-    using namespace std;
-    auto i = begin;
-
-    if (begin == end)
-        return;
-
-    for (++i; i != end; ++i) {
-        auto j = i;
-        auto j_1 = j; // To be set to j - 1 later
-
-        while (j != begin) {
-            --j_1;
-            if (!compare(*j_1, *j))
-                break;
-
-            swap(*j_1, *j);
-            --j;
-        }
-    }
-}
-
-// Simple selection sort.
-// Iterator must be bidirectional, but does not need to be random-access
-// Elements be less-than comparable and must have swap(element, element) defined
-template<typename Iterator>
-void selection_sort(Iterator begin, Iterator end)
-{
-    using namespace std;
-    auto i = begin;
-    auto last = end;
-
-    if (begin == end)
-        return;
-
-    for (--last; i != last; ++i) {
-        auto least = i;
-        auto j = least;
-
-        for (++j; j != end; ++j) {
-            if (*j < *least)
-                least = j;
-        }
-
-        if (i != least)
-            swap(*i, *least);
-    }
-}
-
-// Simple selection sort.
-// Iterator must be bidirectional, but does not need to be random-access
-// Elements must have swap(element, element) defined
-// `compare` is used to sort elements
-template<typename Iterator, typename Predicate>
-void selection_sort(Iterator begin, Iterator end, Predicate compare)
-{
-    using namespace std;
-    auto i = begin;
-    auto last = end;
-
-    if (begin == end)
-        return;
-
-    for (--last; i != last; ++i) {
-        auto least = i;
-        auto j = least;
-
-        for (++j; j != end; ++j) {
-            if (compare(*j, *least))
-                least = j;
-        }
-
-        if (i != least)
-            swap(*i, *least);
-    }
-}
-
 /*
  *  Key must have operator<() and operator==() defined, as well as the addition and subtraction operators
  *  Key also must be castable to DiffType and size_t (casting to size_t will only ever occur if <value of key> <= SIZE_MAX)
@@ -1282,6 +1172,8 @@ void test_select()
 #include "experimental/decision_trees.h"
 #include "experimental/algorithm.h"
 
+#include "languages/languages.h"
+
 int main()
 {
     cppdatalib::core::value data;
@@ -1309,6 +1201,8 @@ int main()
 
         std::cout << "looking for {size: L, shape: block, color: blue} in tree: " << std::endl;
         std::cout << cppdatalib::experimental::test_decision_tree(tree, cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "blue"}}, true) << std::endl;
+
+        data >> cppdatalib::langs::lisp::stream_writer(std::cout);
     } catch (cppdatalib::core::error e)
     {
         std::cerr << e.what() << std::endl;
