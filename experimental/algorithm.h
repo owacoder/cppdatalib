@@ -73,7 +73,7 @@ namespace cppdatalib
                     v1[j + 1] = std::min(deletion_cost, std::min(insertion_cost, substitute_cost));
                 }
 
-                memcpy(v0.get(), v1.get(), (rhs_size + 1) * sizeof(size_t));
+                v0.swap(v1);
             }
 
             result = v0[rhs_size];
