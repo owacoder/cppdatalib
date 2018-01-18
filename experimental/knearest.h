@@ -32,6 +32,15 @@ namespace cppdatalib
 {
     namespace experimental
     {
+        // distance(): calculates the distance between two tuples, by using measure()
+        // type R: R is the type to use for distance calculations (using a floating-point type will give the most accurate results)
+        // type Distance: Distance is a functor that takes two `const cppdatalib::core::value &` references and returns the distance
+        // between them. Note that the arguments to be measured can be of any type, or NULL if tuple keys mismatch (i.e. keys that are found in one tuple, but not both)
+        // A simple measure function for numbers could be subtraction (the sign is not important)
+        //
+        // Currently, array and object distances are calculated by the Euclidean distance
+        //
+        // Returns the distance between the two tuples as a cppdatalib::core::value constructed from type R
         template<typename R, typename Distance>
         core::value distance(const core::value &test_tuple, const core::value &dataset_tuple, Distance measure)
         {
@@ -101,6 +110,23 @@ namespace cppdatalib
                 return static_cast<R>(measure(test_tuple, dataset_tuple));
         }
 
+        // k_nearest_neighbor_classify(): determines the most likely match for test_tuple, given a dataset (array) and the results-set (results)
+        // type R: R is the type to use for distance calculations (using a floating-point type will give the most accurate results)
+        //
+        // test_tuple: specifies the tuple or element to test. This can be any type (even a scalar) but should match the entries in the dataset
+        // array: specifies the training dataset. Elements can be of any type, but if they are complex (arrays or objects), with more than one dimension, the dataset should be normalized (standardized distance)
+        // results: specifies the results of the training dataset. Each entry is the resulting classification of the respective entry in the dataset. Classifications can be of any type
+        // k: specifies how many neighbors to examine in classification. Greater k takes a much longer time to run. k = 0 returns an empty classification set
+        // If k is larger than the dataset size, it will be clamped at the size of the training dataset
+        // measure: a functor that takes two `const cppdatalib::core::value &` references and returns the distance
+        // A simple measure function for numbers could be subtraction (the sign is not important)
+        // between them. Note that the arguments to be measured can be of any type, or NULL if tuple keys mismatch (i.e. keys that are found in one tuple, but not both)
+        //
+        // Currently, array and object distances are calculated by the Euclidean distance
+        //
+        // Returns an object. Keys are distinct classifications (which need not be strings),
+        // and values are percentages of respective classifications found in the k nearest elements, but normalized between 0 and 1 as a real number
+        // The result is guaranteed to contain all classifications from the nearest k neighbors
         template<typename R, typename Distance>
         core::value k_nearest_neighbor_classify(const core::value &test_tuple, const core::array_t &array, const core::array_t &results, size_t k, Distance measure)
         {
@@ -132,6 +158,29 @@ namespace cppdatalib
             return result;
         }
 
+        // k_nearest_neighbor_classify_weighted(): determines the most likely match for test_tuple, given a dataset (array) and the results-set (results)
+        // type R: R is the type to use for distance calculations (using a floating-point type will give the most accurate results)
+        //
+        // test_tuple: specifies the tuple or element to test. This can be any type (even a scalar) but should match the entries in the dataset
+        // array: specifies the training dataset. Elements can be of any type, but if they are complex (arrays or objects), with more than one dimension, the dataset should be normalized (standardized distance)
+        // results: specifies the results of the training dataset. Each entry is the resulting classification of the respective entry in the dataset. Classifications can be of any type
+        // k: specifies how many neighbors to examine in classification. Greater k takes a much longer time to run. k = 0 returns an empty classification set
+        // If k is larger than the dataset size, it will be clamped at the size of the training dataset
+        // measure: a functor that takes two `const cppdatalib::core::value &` references and returns the distance
+        // between them. Note that the arguments to be measured can be of any type, or NULL if tuple keys mismatch (i.e. keys that are found in one tuple, but not both)
+        // A simple measure function for numbers could be subtraction (the sign is not important)
+        // weight: a functor that takes one `const R &` and returns the weight associated with that difference. A simple weight function could be `return 1.0 / value;`, giving precedence to closer nodes
+        // The scaling of the weight function is not important, but the results will be normalized based on the sum of weights of the k closest nodes. Keep this in mind
+        // when creating a weight function. Also, a value of +-INFINITY from a weight function indicates 100% confidence of classification accuracy (e.g. the values are equal), where a value
+        // of 0 from a weight function indicates 0% confidence of classification accuracy. If the weight function just returns 0 for all distances, the calculation decays to a normal unweighted KNN search
+        //
+        // Currently, array and object distances are calculated by the Euclidean distance
+        //
+        // Returns an object. Keys are distinct classifications (which need not be strings),
+        // and values are percentages of respective *weighted* classifications found in the k nearest elements, but normalized between 0 and 1 as a real number
+        // Values closer to 1 indicate a higher confidence that the chosen class is correct. Values *at* 1 specify 100% confidence, but note that this could still be wrong (depending on the training)
+        // Probabilities found that are equal to 0 are removed from the output, even if they are included in the k nearest neighbors
+        // (i.e. there is no guarantee that all classifications from the nearest k neighbors are included in the results)
         template<typename R, typename Distance, typename Weight>
         core::value k_nearest_neighbor_classify_weighted(const core::value &test_tuple, const core::array_t &array, const core::array_t &results, size_t k, Distance measure, Weight weight)
         {
