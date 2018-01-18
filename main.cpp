@@ -1171,10 +1171,10 @@ void test_select()
 
 #include "experimental/decision_trees.h"
 #include "experimental/algorithm.h"
-
+#include "experimental/knearest.h"
 #include "languages/languages.h"
 
-int main()
+void test_decision_tree()
 {
     cppdatalib::core::value data;
     cppdatalib::core::value results;
@@ -1202,12 +1202,80 @@ int main()
         std::cout << "looking for {size: L, shape: block, color: blue} in tree: " << std::endl;
         std::cout << cppdatalib::experimental::test_decision_tree(tree, cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "blue"}}, true) << std::endl;
 
-        data >> cppdatalib::langs::lisp::stream_writer(std::cout);
+        data >> cppdatalib::lang::lisp::stream_writer(std::cout);
     } catch (cppdatalib::core::error e)
     {
         std::cerr << e.what() << std::endl;
-        return 1;
     }
+}
+
+#include <fstream>
+
+void make_k_nearest()
+{
+    std::ofstream out;
+
+    out.open("/shared/Test_Data/knearest_test.json");
+
+    using namespace cppdatalib::json;
+    cppdatalib::core::value data;
+    cppdatalib::core::value results;
+
+    for (size_t i = 0; i < rand() % 100; ++i)
+    {
+        data.push_back(cppdatalib::core::object_t{{"A", rand()}, {"B", rand()}});
+        results.push_back(rand() % 4);
+    }
+
+    cppdatalib::json::pretty_stream_writer(out, 2) << cppdatalib::core::object_t{{"data", data}, {"results", results}};
+}
+
+void test_k_nearest()
+{
+    std::ifstream in;
+
+    in.open("/shared/Test_Data/knearest_test.json");
+
+    cppdatalib::core::value data, value;
+    data << cppdatalib::json::parser(in);
+
+    std::cout << "\n";
+
+    while (true)
+    {
+        auto distance = [](const cppdatalib::core::value &lhs, const cppdatalib::core::value &rhs)
+        {
+            return lhs.as_int() - rhs.as_int();
+        };
+
+        size_t k;
+
+        std::cout << "Enter desired value of k: " << std::flush;
+        std::cin >> k;
+        std::cout << "Enter your tuple to test in JSON format: " << std::flush;
+        cppdatalib::json::parser(std::cin) >> value;
+
+        std::cout << "Classification: ";
+        cppdatalib::core::dump::stream_writer(std::cout, 2) << cppdatalib::experimental::k_nearest_neighbor_classify<size_t, decltype(distance)>(
+                                                                    value,
+                                                                    data["data"].as_array(),
+                                                                    data["results"].as_array(),
+                                                                    k,
+                                                                    distance);
+    }
+
+    std::cout << data << std::endl;
+}
+
+#include <ctime>
+
+int main()
+{
+    srand(std::time(NULL));
+
+    test_decision_tree();
+    //make_k_nearest();
+    test_k_nearest();
 
     return 0;
 

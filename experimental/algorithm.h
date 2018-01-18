@@ -64,20 +64,16 @@ namespace cppdatalib
         //
         // Iterators must satisfy the forward-iterator requirements
         // Distance should be a functor that takes two iterator values and returns the distance between them
-        template<typename R, typename Distance, template<typename...> class List, typename... Args>
-        R euclidean(const List<Args...> &lhs, const List<Args...> &rhs, Distance distance)
+        template<typename R, typename Distance, typename Iterator>
+        R euclidean(Iterator lhs, Iterator rhs, size_t size, Distance distance)
         {
             using namespace std;
 
             R result = 0;
-            size_t size = std::min(lhs.size(), rhs.size());
 
-            auto lIt = lhs.begin();
-            auto rIt = rhs.begin();
-
-            for (size_t idx = 0; idx < size; ++idx, ++lIt, ++rIt)
+            for (size_t idx = 0; idx < size; ++idx, ++lhs, ++rhs)
             {
-                R temp = distance(*lIt, *rIt);
+                R temp = distance(*lhs, *rhs);
                 result += temp * temp;
             }
 
@@ -266,7 +262,7 @@ namespace cppdatalib
         void selection_sort(Iterator begin, Iterator end)
         {
             std::less<decltype(*begin)> less;
-            selection_sort<Iterator, decltype(less)>(begin, end, less);
+            selection_sort(begin, end, less);
         }
 
         // n_selection_sort(): simple selection sort, only sorting the first min(N, end-begin) elements (if N is zero, nothing is sorted)
@@ -277,7 +273,7 @@ namespace cppdatalib
         void n_selection_sort(Iterator begin, Iterator end, size_t N)
         {
             std::less<decltype(*begin)> less;
-            n_selection_sort<Iterator, decltype(less)>(begin, end, less, N);
+            n_selection_sort(begin, end, less, N);
         }
     }
 }

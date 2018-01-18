@@ -29,7 +29,7 @@
 
 namespace cppdatalib
 {
-    namespace langs
+    namespace lang
     {
         namespace lisp
         {
