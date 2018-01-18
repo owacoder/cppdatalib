@@ -1237,7 +1237,13 @@ void test_k_nearest()
     in.open("/shared/Test_Data/knearest_test.json");
 
     cppdatalib::core::value data, value;
-    data << cppdatalib::json::parser(in);
+    //data << cppdatalib::json::parser(in);
+    data["data"].push_back(cppdatalib::core::object_t{{"X", 0}, {"Y", 0}});
+    data["results"].push_back(0);
+    data["data"].push_back(cppdatalib::core::object_t{{"X", 3}, {"Y", 0}});
+    data["results"].push_back(1);
+    data["data"].push_back(cppdatalib::core::object_t{{"X", 3}, {"Y", 0}});
+    data["results"].push_back(1);
 
     std::cout << "\n";
 
@@ -1245,7 +1251,14 @@ void test_k_nearest()
     {
         auto distance = [](const cppdatalib::core::value &lhs, const cppdatalib::core::value &rhs)
         {
-            return lhs.as_int() - rhs.as_int();
+            return lhs.as_real() - rhs.as_real();
+        };
+
+        auto weight = [](double val) -> double
+        {
+            if (val == 0)
+                return INFINITY;
+            return 1.0 / val;
         };
 
         size_t k;
@@ -1256,12 +1269,13 @@ void test_k_nearest()
         cppdatalib::json::parser(std::cin) >> value;
 
         std::cout << "Classification: ";
-        cppdatalib::core::dump::stream_writer(std::cout, 2) << cppdatalib::experimental::k_nearest_neighbor_classify<size_t, decltype(distance)>(
+        cppdatalib::core::dump::stream_writer(std::cout, 2) << cppdatalib::experimental::k_nearest_neighbor_classify_weighted<double>(
                                                                     value,
                                                                     data["data"].as_array(),
                                                                     data["results"].as_array(),
                                                                     k,
-                                                                    distance);
+                                                                    distance,
+                                                                    weight);
     }
 
     std::cout << data << std::endl;

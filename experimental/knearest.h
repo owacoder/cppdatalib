@@ -105,7 +105,7 @@ namespace cppdatalib
         core::value k_nearest_neighbor_classify(const core::value &test_tuple, const core::array_t &array, const core::array_t &results, size_t k, Distance measure)
         {
             if (array.size() != results.size())
-                throw core::error("cppdatalib::experimental::k_nearest_neighbor - sample and result arrays are not the same size");
+                throw core::error("cppdatalib::experimental::k_nearest_neighbor_classify - sample and result arrays are not the same size");
 
             // Limit k to dataset size
             if (array.size() < k)
@@ -116,23 +116,88 @@ namespace cppdatalib
             for (size_t idx = 0; idx < array.size(); ++idx)
                 distances.push_back(core::object_t{{"distance", distance<R, Distance>(test_tuple, array[idx], measure)}, {"index", idx}});
 
-            auto lambda = [](const core::value &lhs, const core::value &rhs){return lhs["distance"].as_real() < rhs["distance"].as_real();};
+            auto lambda = [](const core::value &lhs, const core::value &rhs){return lhs["distance"].operator R() < rhs["distance"].operator R();};
 
             // Sort to find the k closest points
-            n_selection_sort(distances.get_array_ref().data().begin(),
-                             distances.get_array_ref().data().end(),
+            n_selection_sort(distances.get_array_ref().begin(),
+                             distances.get_array_ref().end(),
                              lambda,
                              k);
 
-            // Accumulate number of hits for each class
+            // Accumulate probabilities for each class
             core::value result = core::object_t();
             for (size_t idx = 0; idx < k; ++idx)
-                result.member(results[distances[idx]["index"].as_uint()]).get_uint_ref() += 1;
+                result.member(results[distances[idx]["index"].as_uint()]).get_real_ref() += 1.0 / k;
 
-            // Transform number of hits into probabilities
-            core::object_t &ref = result.get_object_ref();
-            for (auto &item: ref)
-                item.second = item.second.as_real() / k;
+            return result;
+        }
+
+        template<typename R, typename Distance, typename Weight>
+        core::value k_nearest_neighbor_classify_weighted(const core::value &test_tuple, const core::array_t &array, const core::array_t &results, size_t k, Distance measure, Weight weight)
+        {
+            using namespace std;
+
+            if (array.size() != results.size())
+                throw core::error("cppdatalib::experimental::k_nearest_neighbor_classify_weighted - sample and result arrays are not the same size");
+
+            // Limit k to dataset size
+            if (array.size() < k)
+                k = array.size();
+
+            // Generate list of distances, with indexes tied to them
+            core::value distances;
+            for (size_t idx = 0; idx < array.size(); ++idx)
+                distances.push_back(core::object_t{{"distance", distance<R, Distance>(test_tuple, array[idx], measure)}, {"index", idx}});
+
+            auto lambda = [](const core::value &lhs, const core::value &rhs){return lhs["distance"].operator R() < rhs["distance"].operator R();};
+
+            // Sort to find the k closest points
+            n_selection_sort(distances.get_array_ref().begin(),
+                             distances.get_array_ref().end(),
+                             lambda,
+                             k);
+
+            // Accumulate weights for each class
+            core::value result = core::object_t();
+            for (size_t idx = 0; idx < k; ++idx)
+            {
+                R temp_distance = distances[idx]["distance"].operator R();
+                result.member(results[distances[idx]["index"].as_uint()]).get_real_ref() += weight(temp_distance);
+            }
+
+            std::cout << result << std::endl;
+
+            // Find total weight
+            core::real_t total_weight = 0;
+            for (const auto &item: result.get_object_unchecked())
+                total_weight += item.second.as_real();
+
+            // If total weight is infinite, we have an exact match (or more than one, if we have an unusual weight function)
+            // Remove other possibilities from result
+            if (isinf(total_weight))
+            {
+                core::value new_result = core::object_t();
+
+                for (const auto &item: result.get_object_unchecked())
+                    if (isinf(item.second.as_real()))
+                        new_result.member(item.first) = 1.0;
+
+                return new_result;
+            }
+            // If total weight is zero, we have no idea what should match (we MUST have an unusual weight function!)
+            // Everything is equally likely, so we decay to normal KNN search
+            else if (total_weight == 0)
+            {
+                result = core::object_t();
+                for (size_t idx = 0; idx < k; ++idx)
+                    result.member(results[distances[idx]["index"].as_uint()]).get_real_ref() += 1.0 / k;
+            }
+            else
+            {
+                // Normalize weights to probabilities
+                for (auto &item: result.get_object_ref())
+                    item.second.get_real_ref() /= total_weight;
+            }
 
             return result;
         }

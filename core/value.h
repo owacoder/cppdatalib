@@ -802,6 +802,9 @@ namespace cppdatalib
                 iterator_t<IteratorType, PointedTo> &operator++() {++it; return *this;}
                 iterator_t<IteratorType, PointedTo> operator++(int) {iterator_t<IteratorType, PointedTo> temp(*this); ++it; return temp;}
 
+                iterator_t<IteratorType, PointedTo> &operator--() {--it; return *this;}
+                iterator_t<IteratorType, PointedTo> operator--(int) {iterator_t<IteratorType, PointedTo> temp(*this); --it; return temp;}
+
                 PointedTo &operator*() {return *it;}
                 PointedTo *operator->() {return it.operator->();}
 
