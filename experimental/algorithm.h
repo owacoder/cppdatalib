@@ -59,7 +59,7 @@ namespace cppdatalib
             return sqrt(result);
         }
 
-        // euclidean(): returns the euclidean distance between two points in N-dimensional space
+        // euclidean(): returns the Euclidean distance between two points in N-dimensional space
         // The number of dimensions is specified by the number of entries in lhs and rhs
         //
         // Iterators must satisfy the forward-iterator requirements
@@ -78,6 +78,61 @@ namespace cppdatalib
             }
 
             return sqrt(result);
+        }
+
+        // manhattan(): returns the Manhattan distance between two points in N-dimensional space
+        // The number of dimensions is specified by the number of entries in lhs and rhs
+        //
+        // Iterators must satisfy the forward-iterator requirements
+        // Distance should be a functor that takes two iterator values and returns the distance between them
+        template<typename R, typename Distance, typename Iterator>
+        R manhattan(Iterator lhs, Iterator rhs, size_t size, Distance distance)
+        {
+            using namespace std;
+
+            R result = 0;
+
+            for (size_t idx = 0; idx < size; ++idx, ++lhs, ++rhs)
+                result += abs(distance(*lhs, *rhs));
+
+            return result;
+        }
+
+        // minkowski(): returns the Minkowski distance between two points in N-dimensional space
+        // The number of dimensions is specified by the number of entries in lhs and rhs
+        // p is the exponent specifier: 1 is Manhattan, 2 is Euclidean, etc.
+        //
+        // Iterators must satisfy the forward-iterator requirements
+        // Distance should be a functor that takes two iterator values and returns the distance between them
+        template<typename R, typename Distance, typename Iterator>
+        R minkowski(Iterator lhs, Iterator rhs, size_t size, Distance distance, R p)
+        {
+            using namespace std;
+
+            R result = 0;
+
+            for (size_t idx = 0; idx < size; ++idx, ++lhs, ++rhs)
+                result += pow(abs(distance(*lhs, *rhs)), p);
+
+            return pow(result, 1.0 / p);
+        }
+
+        // chebyshev(): returns the Chebyshev distance between two points in N-dimensional space
+        // The number of dimensions is specified by the number of entries in lhs and rhs
+        //
+        // Iterators must satisfy the forward-iterator requirements
+        // Distance should be a functor that takes two iterator values and returns the distance between them
+        template<typename R, typename Distance, typename Iterator>
+        R chebyshev(Iterator lhs, Iterator rhs, size_t size, Distance distance)
+        {
+            using namespace std;
+
+            R result = 0;
+
+            for (size_t idx = 0; idx < size; ++idx, ++lhs, ++rhs)
+                result = max(result, distance(*lhs, *rhs));
+
+            return result;
         }
 
         // hamming(): returns the Hamming distance of two sequences
@@ -233,7 +288,7 @@ namespace cppdatalib
             auto i = begin;
             auto last = begin;
 
-            if (begin == last)
+            if (begin == end)
                 return;
 
             ++last;
