@@ -571,7 +571,8 @@ namespace cppdatalib
 
         class object_keys_to_array_filter : public impl::stream_filter_base
         {
-            size_t m_is_key;
+            size_t m_is_key; // Number of nested objects to write
+            size_t m_ignore_key; // Number of nested objects to ignore
             bool in_object;
 
         public:
@@ -584,6 +585,7 @@ namespace cppdatalib
                 impl::stream_filter_base::begin_();
                 output.begin_array(core::array_t(), core::stream_handler::unknown_size);
                 m_is_key = 0;
+                m_ignore_key = 0;
                 in_object = false;
             }
             void end_()
@@ -594,14 +596,14 @@ namespace cppdatalib
 
             bool write_(const value &v, bool is_key)
             {
-                if (m_is_key || is_key)
+                if (!m_ignore_key && (m_is_key || is_key))
                     return output.write(v);
                 return false;
             }
 
             void begin_array_(const value &v, int_t size, bool is_key)
             {
-                if (m_is_key || is_key)
+                if (!m_ignore_key && (m_is_key || is_key))
                 {
                     ++m_is_key;
                     output.begin_array(v, size);
@@ -609,7 +611,7 @@ namespace cppdatalib
             }
             void end_array_(const value &v, bool)
             {
-                if (m_is_key)
+                if (!m_ignore_key && m_is_key)
                 {
                     --m_is_key;
                     output.end_array(v);
@@ -623,39 +625,46 @@ namespace cppdatalib
                     output.begin_array(core::array_t(), size);
                     in_object = true;
                 }
-                else if (m_is_key || is_key) // If handling an object, and this is part of a key, add it
+                else if (!m_ignore_key && (m_is_key || is_key)) // If handling an object, and this is part of a key, add it
                 {
                     ++m_is_key;
                     output.begin_object(v, size);
                 }
+                else
+                    ++m_ignore_key;
             }
             void end_object_(const value &v, bool)
             {
-                if (!m_is_key) // If not in the middle of an object, end it
+                if (!m_ignore_key)
                 {
-                    output.end_array(core::array_t());
-                    in_object = false;
+                    if (!m_is_key) // If not in the middle of an object, end it
+                    {
+                        output.end_array(core::array_t());
+                        in_object = false;
+                    }
+                    else // Otherwise, we're in the middle of a key, so finish the object
+                    {
+                        --m_is_key;
+                        output.end_object(v);
+                    }
                 }
-                else // Otherwise, we're in the middle of a key, so finish the object
-                {
-                    --m_is_key;
-                    output.end_object(v);
-                }
+                else
+                    --m_ignore_key;
             }
 
             void begin_string_(const value &v, int_t size, bool is_key)
             {
-                if (m_is_key || is_key)
+                if (!m_ignore_key && (m_is_key || is_key))
                     output.begin_string(v, size);
             }
             void string_data_(const value &v, bool is_key)
             {
-                if (m_is_key || is_key)
+                if (!m_ignore_key && (m_is_key || is_key))
                     output.append_to_string(v);
             }
             void end_string_(const value &v, bool is_key)
             {
-                if (m_is_key || is_key)
+                if (!m_ignore_key && (m_is_key || is_key))
                     output.end_string(v);
             }
         };

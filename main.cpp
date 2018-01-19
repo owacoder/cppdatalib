@@ -1285,6 +1285,21 @@ void test_k_nearest()
 
 int main()
 {
+    cppdatalib::core::value data = cppdatalib::core::object_t{{"value", 1}, {cppdatalib::core::object_t{{cppdatalib::core::object_t{{"string", "null"}}, cppdatalib::core::object_t{{"string", "null"}}}}, cppdatalib::core::object_t{{cppdatalib::core::object_t{{"string", "null"}}, cppdatalib::core::object_t{{"string", "null"}}}}}, {"Object", cppdatalib::core::null_t()}};
+
+    try
+    {
+        cppdatalib::core::dump::stream_writer out(std::cout, 2);
+        cppdatalib::core::object_keys_to_array_filter(out) << data;
+    }
+    catch (cppdatalib::core::error e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
+
     srand(std::time(NULL));
 
     test_decision_tree();
