@@ -876,12 +876,12 @@ namespace cppdatalib
             using impl::const_iterator_t<array_t::const_iterator, const typename array_t::container_type::value_type>::const_iterator_t;
         };
 
-        array_iterator_t array_t::begin() {return m_data.begin();}
-        array_const_iterator_t array_t::begin() const {return m_data.begin();}
-        array_iterator_t array_t::end() {return m_data.end();}
-        array_const_iterator_t array_t::end() const {return m_data.end();}
-        array_const_iterator_t array_t::cbegin() const {return m_data.cbegin();}
-        array_const_iterator_t array_t::cend() const {return m_data.cend();}
+        inline array_iterator_t array_t::begin() {return m_data.begin();}
+        inline array_const_iterator_t array_t::begin() const {return m_data.begin();}
+        inline array_iterator_t array_t::end() {return m_data.end();}
+        inline array_const_iterator_t array_t::end() const {return m_data.end();}
+        inline array_const_iterator_t array_t::cbegin() const {return m_data.cbegin();}
+        inline array_const_iterator_t array_t::cend() const {return m_data.cend();}
 
         class object_t
         {
@@ -931,12 +931,12 @@ namespace cppdatalib
             using impl::const_iterator_t<object_t::const_iterator, typename object_t::container_type::value_type>::const_iterator_t;
         };
 
-        object_iterator_t object_t::begin() {return m_data.begin();}
-        object_const_iterator_t object_t::begin() const {return m_data.begin();}
-        object_iterator_t object_t::end() {return m_data.end();}
-        object_const_iterator_t object_t::end() const {return m_data.end();}
-        object_const_iterator_t object_t::cbegin() const {return m_data.cbegin();}
-        object_const_iterator_t object_t::cend() const {return m_data.cend();}
+        inline object_iterator_t object_t::begin() {return m_data.begin();}
+        inline object_const_iterator_t object_t::begin() const {return m_data.begin();}
+        inline object_iterator_t object_t::end() {return m_data.end();}
+        inline object_const_iterator_t object_t::end() const {return m_data.end();}
+        inline object_const_iterator_t object_t::cbegin() const {return m_data.cbegin();}
+        inline object_const_iterator_t object_t::cend() const {return m_data.cend();}
 
         struct value::traversal_reference
         {
@@ -1489,12 +1489,12 @@ namespace cppdatalib
             }
         }
 
-        value::value(const array_t &v, subtype_t subtype) {array_init(subtype, v);}
-        value::value(array_t &&v, subtype_t subtype) {array_init(subtype, std::move(v));}
-        value::value(const object_t &v, subtype_t subtype) {object_init(subtype, v);}
-        value::value(object_t &&v, subtype_t subtype) {object_init(subtype, std::move(v));}
+        inline value::value(const array_t &v, subtype_t subtype) {array_init(subtype, v);}
+        inline value::value(array_t &&v, subtype_t subtype) {array_init(subtype, std::move(v));}
+        inline value::value(const object_t &v, subtype_t subtype) {object_init(subtype, v);}
+        inline value::value(object_t &&v, subtype_t subtype) {object_init(subtype, std::move(v));}
 
-        value::value(value &&other)
+        inline value::value(value &&other)
         {
             switch (other.type_)
             {
@@ -1515,7 +1515,7 @@ namespace cppdatalib
             subtype_ = other.subtype_;
         }
 
-        value::~value()
+        inline value::~value()
         {
             if ((type_ == array && arr_ref_().size() > 0) ||
                 (type_ == object && obj_ref_().size() > 0))
@@ -1523,7 +1523,7 @@ namespace cppdatalib
             deinit();
         }
 
-        value &value::operator=(value &&other)
+        inline value &value::operator=(value &&other)
         {
             clear(other.type_);
             switch (other.type_)
@@ -1541,20 +1541,20 @@ namespace cppdatalib
             return *this;
         }
 
-        size_t value::size() const {return is_array()? arr_ref_().size(): is_object()? obj_ref_().size(): is_string()? str_ref_().size(): 0;}
-        size_t value::array_size() const {return is_array()? arr_ref_().size(): 0;}
-        size_t value::object_size() const {return is_object()? obj_ref_().size(): 0;}
+        inline size_t value::size() const {return is_array()? arr_ref_().size(): is_object()? obj_ref_().size(): is_string()? str_ref_().size(): 0;}
+        inline size_t value::array_size() const {return is_array()? arr_ref_().size(): 0;}
+        inline size_t value::object_size() const {return is_object()? obj_ref_().size(): 0;}
 
-        void value::set_array(const array_t &v) {clear(array); arr_ref_() = v;}
-        void value::set_object(const object_t &v) {clear(object); obj_ref_() = v;}
-        void value::set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ref_() = v; subtype_ = subtype;}
-        void value::set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ref_() = v; subtype_ = subtype;}
+        inline void value::set_array(const array_t &v) {clear(array); arr_ref_() = v;}
+        inline void value::set_object(const object_t &v) {clear(object); obj_ref_() = v;}
+        inline void value::set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ref_() = v; subtype_ = subtype;}
+        inline void value::set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ref_() = v; subtype_ = subtype;}
 
-        value value::operator[](cstring_t key) const {return member(key);}
-        value &value::operator[](cstring_t key) {return member(key);}
-        value value::operator[](const string_t &key) const {return member(key);}
-        value &value::operator[](const string_t &key) {return member(key);}
-        value value::member(const value &key) const
+        inline value value::operator[](cstring_t key) const {return member(key);}
+        inline value &value::operator[](cstring_t key) {return member(key);}
+        inline value value::operator[](const string_t &key) const {return member(key);}
+        inline value &value::operator[](const string_t &key) {return member(key);}
+        inline value value::member(const value &key) const
         {
             if (is_object())
             {
@@ -1564,7 +1564,7 @@ namespace cppdatalib
             }
             return value();
         }
-        value &value::member(const value &key)
+        inline value &value::member(const value &key)
         {
             clear(object);
             auto it = obj_ref_().data().lower_bound(key);
@@ -1573,7 +1573,7 @@ namespace cppdatalib
             it = obj_ref_().data().insert(it, {key, null_t()});
             return it->second;
         }
-        const value *value::member_ptr(const value &key) const
+        inline const value *value::member_ptr(const value &key) const
         {
             if (is_object())
             {
@@ -1583,86 +1583,86 @@ namespace cppdatalib
             }
             return NULL;
         }
-        bool_t value::is_member(cstring_t key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        bool_t value::is_member(const string_t &key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        bool_t value::is_member(const value &key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        size_t value::member_count(cstring_t key) const {return is_object()? obj_ref_().data().count(key): 0;}
-        size_t value::member_count(const string_t &key) const {return is_object()? obj_ref_().data().count(key): 0;}
-        size_t value::member_count(const value &key) const {return is_object()? obj_ref_().data().count(key): 0;}
-        void value::erase_member(cstring_t key) {if (is_object()) obj_ref_().data().erase(key);}
-        void value::erase_member(const string_t &key) {if (is_object()) obj_ref_().data().erase(key);}
-        void value::erase_member(const value &key) {if (is_object()) obj_ref_().data().erase(key);}
+        inline bool_t value::is_member(cstring_t key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        inline bool_t value::is_member(const string_t &key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        inline bool_t value::is_member(const value &key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        inline size_t value::member_count(cstring_t key) const {return is_object()? obj_ref_().data().count(key): 0;}
+        inline size_t value::member_count(const string_t &key) const {return is_object()? obj_ref_().data().count(key): 0;}
+        inline size_t value::member_count(const value &key) const {return is_object()? obj_ref_().data().count(key): 0;}
+        inline void value::erase_member(cstring_t key) {if (is_object()) obj_ref_().data().erase(key);}
+        inline void value::erase_member(const string_t &key) {if (is_object()) obj_ref_().data().erase(key);}
+        inline void value::erase_member(const value &key) {if (is_object()) obj_ref_().data().erase(key);}
 
-        value &value::add_member(const value &key)
+        inline value &value::add_member(const value &key)
         {
             clear(object);
             return obj_ref_().data().insert(std::make_pair(key, null_t()))->second;
         }
-        value &value::add_member(value &&key)
+        inline value &value::add_member(value &&key)
         {
             clear(object);
             return obj_ref_().data().insert(std::make_pair(std::move(key), null_t()))->second;
         }
-        value &value::add_member(const value &key, const value &val)
+        inline value &value::add_member(const value &key, const value &val)
         {
             clear(object);
             return obj_ref_().data().insert(std::make_pair(key, val))->second;
         }
-        value &value::add_member(value &&key, value &&val)
+        inline value &value::add_member(value &&key, value &&val)
         {
             clear(object);
             return obj_ref_().data().insert(std::make_pair(std::move(key), std::move(val)))->second;
         }
 
-        value &value::add_member_at_end(const value &key)
+        inline value &value::add_member_at_end(const value &key)
         {
             clear(object);
             return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(key, null_t()))->second;
         }
-        value &value::add_member_at_end(value &&key)
+        inline value &value::add_member_at_end(value &&key)
         {
             clear(object);
             return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(std::move(key), null_t()))->second;
         }
-        value &value::add_member_at_end(const value &key, const value &val)
+        inline value &value::add_member_at_end(const value &key, const value &val)
         {
             clear(object);
             return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(key, val))->second;
         }
-        value &value::add_member_at_end(value &&key, value &&val)
+        inline value &value::add_member_at_end(value &&key, value &&val)
         {
             clear(object);
             return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(std::move(key), std::move(val)))->second;
         }
 
-        void value::push_back(const value &v) {clear(array); arr_ref_().data().push_back(v);}
-        void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(v);}
-        value value::operator[](size_t pos) const {return element(pos);}
-        value &value::operator[](size_t pos) {return element(pos);}
-        value value::element(size_t pos) const {return is_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
-        value &value::element(size_t pos)
+        inline void value::push_back(const value &v) {clear(array); arr_ref_().data().push_back(v);}
+        inline void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(v);}
+        inline value value::operator[](size_t pos) const {return element(pos);}
+        inline value &value::operator[](size_t pos) {return element(pos);}
+        inline value value::element(size_t pos) const {return is_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
+        inline value &value::element(size_t pos)
         {
             clear(array);
             if (arr_ref_().size() <= pos)
                 arr_ref_().data().insert(arr_ref_().end().data(), pos - arr_ref_().size() + 1, core::null_t());
             return arr_ref_()[pos];
         }
-        void value::erase_element(size_t pos) {if (is_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
+        inline void value::erase_element(size_t pos) {if (is_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
 
-        array_t value::get_array(const array_t &default_) const {return is_array()? arr_ref_(): default_;}
-        object_t value::get_object(const object_t &default_) const {return is_object()? obj_ref_(): default_;}
-        array_t value::get_array() const {return is_array()? arr_ref_(): array_t();}
-        object_t value::get_object() const {return is_object()? obj_ref_(): object_t();}
+        inline array_t value::get_array(const array_t &default_) const {return is_array()? arr_ref_(): default_;}
+        inline object_t value::get_object(const object_t &default_) const {return is_object()? obj_ref_(): default_;}
+        inline array_t value::get_array() const {return is_array()? arr_ref_(): array_t();}
+        inline object_t value::get_object() const {return is_object()? obj_ref_(): object_t();}
 
-        array_t value::as_array(const array_t &default_) const {return value(*this).convert_to(array, default_).arr_ref_();}
-        object_t value::as_object(const object_t &default_) const {return value(*this).convert_to(object, default_).obj_ref_();}
-        array_t value::as_array() const {return value(*this).convert_to(array, array_t()).arr_ref_();}
-        object_t value::as_object() const {return value(*this).convert_to(object, object_t()).obj_ref_();}
+        inline array_t value::as_array(const array_t &default_) const {return value(*this).convert_to(array, default_).arr_ref_();}
+        inline object_t value::as_object(const object_t &default_) const {return value(*this).convert_to(object, default_).obj_ref_();}
+        inline array_t value::as_array() const {return value(*this).convert_to(array, array_t()).arr_ref_();}
+        inline object_t value::as_object() const {return value(*this).convert_to(object, object_t()).obj_ref_();}
 
-        array_t &value::convert_to_array() {return convert_to(array, array_t()).arr_ref_();}
-        object_t &value::convert_to_object() {return convert_to(object, object_t()).obj_ref_();}
+        inline array_t &value::convert_to_array() {return convert_to(array, array_t()).arr_ref_();}
+        inline object_t &value::convert_to_object() {return convert_to(object, object_t()).obj_ref_();}
 
-        void value::mutable_clear() const
+        inline void value::mutable_clear() const
         {
             typedef void *ptr;
 
@@ -1684,7 +1684,7 @@ namespace cppdatalib
             type_ = null;
         }
 
-        void value::init(type new_type, subtype_t new_subtype)
+        inline void value::init(type new_type, subtype_t new_subtype)
         {
             switch (new_type)
             {
@@ -1705,7 +1705,7 @@ namespace cppdatalib
             subtype_ = new_subtype;
         }
 
-        void value::deinit()
+        inline void value::deinit()
         {
             typedef void *ptr;
 
@@ -1767,7 +1767,7 @@ namespace cppdatalib
             return cppdatalib::core::value(val, subtype);
         }
 
-        const value &cast(const value &val)
+        inline const value &cast(const value &val)
         {
             return val;
         }
@@ -1797,7 +1797,7 @@ namespace cppdatalib
         }
     }
 
-    void swap(core::value &l, core::value &r) {l.swap(r);}
+    inline void swap(core::value &l, core::value &r) {l.swap(r);}
 }
 
 template<typename T>

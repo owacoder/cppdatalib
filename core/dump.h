@@ -220,7 +220,7 @@ namespace cppdatalib
             };
         }
 
-        std::ostream &operator<<(std::ostream &o, const value &v)
+        inline std::ostream &operator<<(std::ostream &o, const value &v)
         {
             core::ostream_handle wrap(o);
             dump::stream_writer writer(wrap, 2);

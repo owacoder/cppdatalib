@@ -384,7 +384,7 @@ namespace cppdatalib
                 get_output()->end_array(core::array_t());
         }
 
-        generic_stream_input::generic_stream_input(generic_parser &parser)
+        inline generic_stream_input::generic_stream_input(generic_parser &parser)
             : master_parser(&parser)
         {
             if (parser.get_output())
@@ -397,7 +397,7 @@ namespace cppdatalib
             master_parser->compose_parser(item);
         }
 
-        void generic_stream_input::write_next()
+        inline void generic_stream_input::write_next()
         {
             master_parser->write_one();
         }

@@ -645,7 +645,7 @@ namespace cppdatalib
         };
 
         // Convert directly from parser to serializer
-        stream_handler &operator<<(stream_handler &output, stream_input &input)
+        inline stream_handler &operator<<(stream_handler &output, stream_input &input)
         {
             if (output.required_features() & ~input.features())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
@@ -656,7 +656,7 @@ namespace cppdatalib
         }
 
         // Convert directly from parser to serializer
-        stream_handler &operator<<(stream_handler &output, stream_input &&input)
+        inline stream_handler &operator<<(stream_handler &output, stream_input &&input)
         {
             if (output.required_features() & ~input.features())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
@@ -667,7 +667,7 @@ namespace cppdatalib
         }
 
         // Convert directly from parser to serializer
-        void operator<<(stream_handler &&output, stream_input &input)
+        inline void operator<<(stream_handler &&output, stream_input &input)
         {
             if (output.required_features() & ~input.features())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
@@ -676,7 +676,7 @@ namespace cppdatalib
         }
 
         // Convert directly from parser to rvalue serializer
-        void operator<<(stream_handler &&output, stream_input &&input)
+        inline void operator<<(stream_handler &&output, stream_input &&input)
         {
             if (output.required_features() & ~input.features())
                 throw core::error("cppdatalib::stream_handler::operator<<() - output requires features the input doesn't provide. Using cppdatalib::core::automatic_buffer_filter on the output stream may fix this problem.");
@@ -685,27 +685,27 @@ namespace cppdatalib
         }
 
         // Convert directly from parser to serializer
-        stream_input &operator>>(stream_input &input, stream_handler &output)
+        inline stream_input &operator>>(stream_input &input, stream_handler &output)
         {
             output << input;
             return input;
         }
 
         // Convert directly from parser to serializer
-        stream_input &operator>>(stream_input &input, stream_handler &&output)
+        inline stream_input &operator>>(stream_input &input, stream_handler &&output)
         {
             output << input;
             return input;
         }
 
         // Convert directly from parser to serializer
-        void operator>>(stream_input &&input, stream_handler &output)
+        inline void operator>>(stream_input &&input, stream_handler &output)
         {
             output << input;
         }
 
         // Convert directly from parser to rvalue serializer
-        void operator>>(stream_input &&input, stream_handler &&output)
+        inline void operator>>(stream_input &&input, stream_handler &&output)
         {
             output << input;
         }
