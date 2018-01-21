@@ -290,6 +290,11 @@ namespace cppdatalib
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (!v.is_string())
+                    throw error("cppdatalib::core::stream_handler - attempted to begin string with non-string value");
+#endif
+
                 if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
@@ -311,6 +316,8 @@ namespace cppdatalib
 #ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
                 if (nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::core::stream_handler - attempted to append to string that was never begun");
+                else if (!v.is_string())
+                    throw error("cppdatalib::core::stream_handler - attempted to append non-string value to string");
 #endif
 
                 string_data_(v, is_key_);
@@ -323,6 +330,8 @@ namespace cppdatalib
 #ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
                 if (nested_scopes.back().get_type() != string)
                     throw error("cppdatalib::core::stream_handler - attempted to end string that was never begun");
+                else if (!v.is_string())
+                    throw error("cppdatalib::core::stream_handler - attempted to end string with non-string value");
 #endif
 
                 if (is_key_)
@@ -353,6 +362,11 @@ namespace cppdatalib
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (!v.is_array())
+                    throw error("cppdatalib::core::stream_handler - attempted to begin array with non-array value");
+#endif
+
                 if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
@@ -374,6 +388,8 @@ namespace cppdatalib
 #ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
                 if (nested_scopes.back().get_type() != array)
                     throw error("cppdatalib::core::stream_handler - attempted to end array that was never begun");
+                else if (!v.is_array())
+                    throw error("cppdatalib::core::stream_handler - attempted to end array with non-array value");
 #endif
 
                 if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
@@ -405,6 +421,11 @@ namespace cppdatalib
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (!v.is_object())
+                    throw error("cppdatalib::core::stream_handler - attempted to begin object with non-object value");
+#endif
+
                 if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
@@ -428,6 +449,8 @@ namespace cppdatalib
                     throw error("cppdatalib::core::stream_handler - attempted to end object that was never begun");
                 else if (nested_scopes.back().key_was_parsed())
                     throw error("cppdatalib::core::stream_handler - attempted to end object before final value was written");
+                else if (!v.is_object())
+                    throw error("cppdatalib::core::stream_handler - attempted to end object with non-object value");
 #endif
 
                 if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
