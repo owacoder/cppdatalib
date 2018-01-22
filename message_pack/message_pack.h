@@ -27,8 +27,6 @@
 
 #include "../core/core.h"
 
-// TODO: Refactor into stream_parser API
-
 namespace cppdatalib
 {
     namespace message_pack
@@ -497,9 +495,7 @@ namespace cppdatalib
         public:
             stream_writer(core::ostream_handle output) : stream_writer_base(output) {}
 
-            bool requires_prefix_array_size() const {return true;}
-            bool requires_prefix_object_size() const {return true;}
-            bool requires_prefix_string_size() const {return true;}
+            unsigned int required_features() const {return requires_prefix_array_size | requires_prefix_object_size | requires_prefix_string_size;}
 
         protected:
             void null_(const core::value &) {stream().put(static_cast<unsigned char>(0xc0));}

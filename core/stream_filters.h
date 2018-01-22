@@ -1017,6 +1017,48 @@ namespace cppdatalib
             }
         };
 
+        class array_of_objects_to_object_of_arrays_filter : public core::buffer_filter
+        {
+            bool fail_on_extra_column;
+
+        public:
+            array_of_objects_to_object_of_arrays_filter(core::stream_handler &output, bool fail_on_extra_column = false)
+                : core::buffer_filter(output, buffer_arrays)
+                , fail_on_extra_column(fail_on_extra_column)
+            {}
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                core::value map_ = core::object_t();
+
+                if (v.is_array())
+                {
+                    size_t i = 0;
+
+                    for (const auto &element: v.get_array_unchecked())
+                    {
+                        if (element.is_object())
+                        {
+                            for (const auto &pair: element.get_object_unchecked())
+                            {
+                                core::value &ref = map_.member(pair.first);
+                                if (fail_on_extra_column && ref.array_size() + 1 < i)
+                                    throw core::error("cppdatalib::core::array_of_objects_to_object_of_arrays_filter - extra column found in array entry");
+                                ref[i] = pair.second;
+                            }
+                        }
+                        else
+                            throw core::error("cppdatalib::core::array_of_objects_to_object_of_arrays_filter - array entry is not an object");
+
+                        ++i;
+                    }
+                }
+
+                buffer_filter::write_buffered_value_(map_, is_key);
+            }
+        };
+
         class table_to_array_of_objects_filter : public core::buffer_filter
         {
             core::value column_names;
@@ -1036,13 +1078,13 @@ namespace cppdatalib
 
                 if ((v.is_array() && v.array_size() > column_names.array_size())
                         || column_names.array_size() == 0) // Not enough column names to cover all attributes!!
-                    throw core::error("cppdatalib::core::table_to_array_of_maps_filter - not enough column names provided for specified data");
+                    throw core::error("cppdatalib::core::table_to_array_of_objects_filter - not enough column names provided for specified data");
 
                 if (v.is_array())
                     for (size_t i = 0; i < column_names.array_size(); ++i)
                     {
                         if (i >= v.size() && fail_on_missing_column)
-                            throw core::error("cppdatalib::core::table_to_array_of_maps_filter - missing column entry in table row");
+                            throw core::error("cppdatalib::core::table_to_array_of_objects_filter - missing column entry in table row");
                         map_.add_member(column_names[i], i < v.size()? v[i]: core::value(core::null_t()));
                     }
                 else

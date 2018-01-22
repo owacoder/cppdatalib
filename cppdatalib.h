@@ -41,6 +41,7 @@
 #include "netstrings/netstrings.h"
 #include "message_pack/message_pack.h"
 #include "mysql/sql_mysql.h"
+#include "raw/uint8.h"
 
 #ifdef CPPDATALIB_ENABLE_BOOST_COMPUTE
 #include "adapters/boost_compute.h"
