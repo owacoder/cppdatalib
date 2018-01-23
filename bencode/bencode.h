@@ -118,6 +118,8 @@ namespace cppdatalib
 
             bool requires_prefix_string_size() const {return true;}
 
+            std::string name() const {return "cppdatalib::bencode::stream_writer";}
+
         protected:
             void begin_key_(const core::value &v)
             {

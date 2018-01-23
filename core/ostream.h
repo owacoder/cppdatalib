@@ -163,47 +163,39 @@ namespace cppdatalib
                 char digits[std::numeric_limits<T>::max_exponent10 + 10];
                 char *p = digits;
 
-                std::snprintf(p, sizeof(digits), "%.*g", (int) precision_, (double) val);
+                if (typeid(T) == typeid(long double))
+                    std::snprintf(p, sizeof(digits), "%.*Lg", (int) precision_, (long double) val);
+                else
+                    std::snprintf(p, sizeof(digits), "%.*g", (int) precision_, (double) val);
 
                 return write_formatted_string(p);
             }
         };
 
-        template<>
-        ostream &ostream::write_formatted_real(long double val)
-        {
-            char digits[std::numeric_limits<long double>::max_exponent10 + 10];
-            char *p = digits;
+        inline ostream &operator<<(ostream &out, char ch) {return out.write_formatted_char(ch);}
+        inline ostream &operator<<(ostream &out, signed char ch) {return out.write_formatted_char(ch);}
+        inline ostream &operator<<(ostream &out, unsigned char ch) {return out.write_formatted_char(ch);}
 
-            std::snprintf(p, sizeof(digits), "%.*Lg", (int) precision_, val);
+        inline ostream &operator<<(ostream &out, const char *s) {return out.write_formatted_string(s);}
+        inline ostream &operator<<(ostream &out, const std::string &s) {return out.write_formatted_string(s.c_str(), s.size());}
 
-            return write_formatted_string(p);
-        }
+        inline ostream &operator<<(ostream &out, bool val) {return out.write_formatted_bool(val);}
 
-        ostream &operator<<(ostream &out, char ch) {return out.write_formatted_char(ch);}
-        ostream &operator<<(ostream &out, signed char ch) {return out.write_formatted_char(ch);}
-        ostream &operator<<(ostream &out, unsigned char ch) {return out.write_formatted_char(ch);}
+        inline ostream &operator<<(ostream &out, signed short val) {return out.write_formatted_signed_int(val);}
+        inline ostream &operator<<(ostream &out, signed int val) {return out.write_formatted_signed_int(val);}
+        inline ostream &operator<<(ostream &out, signed long val) {return out.write_formatted_signed_int(val);}
+        inline ostream &operator<<(ostream &out, signed long long val) {return out.write_formatted_signed_int(val);}
 
-        ostream &operator<<(ostream &out, const char *s) {return out.write_formatted_string(s);}
-        ostream &operator<<(ostream &out, const std::string &s) {return out.write_formatted_string(s.c_str(), s.size());}
+        inline ostream &operator<<(ostream &out, unsigned short val) {return out.write_formatted_unsigned_int(val);}
+        inline ostream &operator<<(ostream &out, unsigned int val) {return out.write_formatted_unsigned_int(val);}
+        inline ostream &operator<<(ostream &out, unsigned long val) {return out.write_formatted_unsigned_int(val);}
+        inline ostream &operator<<(ostream &out, unsigned long long val) {return out.write_formatted_unsigned_int(val);}
 
-        ostream &operator<<(ostream &out, bool val) {return out.write_formatted_bool(val);}
+        inline ostream &operator<<(ostream &out, float val) {return out.write_formatted_real(val);}
+        inline ostream &operator<<(ostream &out, double val) {return out.write_formatted_real(val);}
+        inline ostream &operator<<(ostream &out, long double val) {return out.write_formatted_real(val);}
 
-        ostream &operator<<(ostream &out, signed short val) {return out.write_formatted_signed_int(val);}
-        ostream &operator<<(ostream &out, signed int val) {return out.write_formatted_signed_int(val);}
-        ostream &operator<<(ostream &out, signed long val) {return out.write_formatted_signed_int(val);}
-        ostream &operator<<(ostream &out, signed long long val) {return out.write_formatted_signed_int(val);}
-
-        ostream &operator<<(ostream &out, unsigned short val) {return out.write_formatted_unsigned_int(val);}
-        ostream &operator<<(ostream &out, unsigned int val) {return out.write_formatted_unsigned_int(val);}
-        ostream &operator<<(ostream &out, unsigned long val) {return out.write_formatted_unsigned_int(val);}
-        ostream &operator<<(ostream &out, unsigned long long val) {return out.write_formatted_unsigned_int(val);}
-
-        ostream &operator<<(ostream &out, float val) {return out.write_formatted_real(val);}
-        ostream &operator<<(ostream &out, double val) {return out.write_formatted_real(val);}
-        ostream &operator<<(ostream &out, long double val) {return out.write_formatted_real(val);}
-
-        ostream &operator<<(ostream &out, std::streambuf *buf)
+        inline ostream &operator<<(ostream &out, std::streambuf *buf)
         {
             if (!buf)
                 return out;
@@ -218,14 +210,14 @@ namespace cppdatalib
             return out;
         }
 
-        ostream &operator<<(ostream &out, std::ios &(*pf)(std::ios &))
+        inline ostream &operator<<(ostream &out, std::ios &(*pf)(std::ios &))
         {
             (void) pf;
             throw core::error("cppdatalib::core::ostream - stream manipulator applied to output stream is not supported");
             return out;
         }
 
-        ostream &operator<<(ostream &out, std::ostream &(*pf)(std::ostream &))
+        inline ostream &operator<<(ostream &out, std::ostream &(*pf)(std::ostream &))
         {
             if (pf == static_cast<std::ostream & (*)(std::ostream &)>(std::endl))
             {
@@ -242,7 +234,7 @@ namespace cppdatalib
             return out;
         }
 
-        ostream &operator<<(ostream &out, std::ios_base &(*pf)(std::ios_base &))
+        inline ostream &operator<<(ostream &out, std::ios_base &(*pf)(std::ios_base &))
         {
             if (pf == std::boolalpha)
                 out.fmtflags_ |= ostream::boolalpha;

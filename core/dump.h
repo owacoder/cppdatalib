@@ -143,6 +143,8 @@ namespace cppdatalib
 
                 size_t indent() {return indent_width;}
 
+                std::string name() const {return "cppdatalib::dump::stream_writer";}
+
             protected:
                 void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG); stream() << "=== CORE DUMP ===\n";}
                 void end_() {stream() << "\n=== END CORE DUMP ===\n";}

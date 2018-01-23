@@ -313,6 +313,8 @@ namespace cppdatalib
         public:
             stream_writer(core::ostream_handle output) : stream_writer_base(output) {}
 
+            std::string name() const {return "cppdatalib::json::stream_writer";}
+
         protected:
             void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
 
@@ -381,6 +383,8 @@ namespace cppdatalib
             {}
 
             size_t indent() {return indent_width;}
+
+            std::string name() const {return "cppdatalib::json::pretty_stream_writer";}
 
         protected:
             void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG);}

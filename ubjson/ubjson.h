@@ -531,7 +531,9 @@ namespace cppdatalib
         public:
             stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
-            bool requires_prefix_string_size() const {return true;}
+            unsigned int required_features() const {return requires_prefix_string_size;}
+
+            std::string name() const {return "cppdatalib::ubjson::stream_writer";}
 
         protected:
             void begin_key_(const core::value &v)

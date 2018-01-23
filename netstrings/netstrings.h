@@ -141,9 +141,9 @@ namespace cppdatalib
         public:
             stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
-            bool requires_prefix_string_size() const {return true;}
-            bool requires_array_buffering() const {return true;}
-            bool requires_object_buffering() const {return true;}
+            unsigned int required_features() const {return requires_prefix_array_size | requires_prefix_object_size | requires_prefix_string_size;}
+
+            std::string name() const {return "cppdatalib::netstrings::stream_writer";}
 
         protected:
             void null_(const core::value &) {stream().write("0:,", 3);}

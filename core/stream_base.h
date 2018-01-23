@@ -121,6 +121,12 @@ namespace cppdatalib
             // Returns all the features required by this handler
             virtual unsigned int required_features() const {return requires_none;}
 
+            // Returns the user-friendly name of this output format
+            virtual std::string pretty_name() const {return name();}
+
+            // Returns the name of this output format
+            virtual std::string name() const = 0;
+
             // Returns true if this handler is active (i.e. `begin()` has been called but `end()` has not)
             bool active() const {return active_;}
 

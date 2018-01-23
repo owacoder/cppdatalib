@@ -27,6 +27,9 @@
 
 #include "stream_base.h"
 #include <list>
+#include <climits>
+#include <cstddef>
+#include <cstdio>
 
 #include <cassert>
 
@@ -57,6 +60,16 @@ namespace cppdatalib
             }
 
             const core::value &value() const {return v;}
+
+            std::string name() const
+            {
+                const size_t size = sizeof(ptrdiff_t) * CHAR_BIT;
+                char n[size+1];
+
+                snprintf(n, size, "%p", &v);
+
+                return std::string("cppdatalib::core::value_builder(") + n + ")";
+            }
 
         protected:
             // begin_() clears the bound value to null and pushes a reference to it

@@ -270,9 +270,27 @@ namespace cppdatalib
             value(int_t v, subtype_t subtype = core::normal) {int_init(subtype, v);}
             value(uint_t v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
             value(real_t v, subtype_t subtype = core::normal) {real_init(subtype, v);}
-            value(cstring_t v, subtype_t subtype = core::normal) {string_init(subtype, v);}
-            value(const string_t &v, subtype_t subtype = core::normal) {string_init(subtype, v);}
-            value(string_t &&v, subtype_t subtype = core::normal) {string_init(subtype, std::move(v));}
+            value(cstring_t v, subtype_t subtype = core::normal)
+            {
+                if (*v)
+                    string_init(subtype, v);
+                else
+                    init(string, subtype);
+            }
+            value(const string_t &v, subtype_t subtype = core::normal)
+            {
+                if (!v.empty())
+                    string_init(subtype, v);
+                else
+                    init(string, subtype);
+            }
+            value(string_t &&v, subtype_t subtype = core::normal)
+            {
+                if (!v.empty())
+                    string_init(subtype, std::move(v));
+                else
+                    init(string, subtype);
+            }
             value(const array_t &v, subtype_t subtype = core::normal);
             value(array_t &&v, subtype_t subtype = core::normal);
             value(const object_t &v, subtype_t subtype = core::normal);
@@ -360,7 +378,7 @@ namespace cppdatalib
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                         case string: swap(str_, other.str_); break;
 #else
-                        case string: swap(ptr_, other.ptr_); break;
+                        case string:
 #endif
                         case array:
                         case object: swap(ptr_, other.ptr_); break;
@@ -379,7 +397,7 @@ namespace cppdatalib
             size_t size() const;
             size_t array_size() const;
             size_t object_size() const;
-            size_t string_size() const {return is_string()? str_ref_().size(): 0;}
+            size_t string_size() const {return is_nonempty_string()? str_ref_().size(): 0;}
 
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
@@ -389,6 +407,17 @@ namespace cppdatalib
             bool_t is_string() const {return type_ == string;}
             bool_t is_array() const {return type_ == array;}
             bool_t is_object() const {return type_ == object;}
+
+            bool_t is_nonempty_string() const
+            {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                return type_ == string;
+#else
+                return type_ == string && ptr_ != nullptr;
+#endif
+            }
+            bool_t is_nonempty_array() const {return type_ == array && ptr_ != nullptr;}
+            bool_t is_nonempty_object() const {return type_ == object && ptr_ != nullptr;}
 
             // The following seven functions exhibit UNDEFINED BEHAVIOR if the value is not the requested type
             bool_t get_bool_unchecked() const {return bool_;}
@@ -595,11 +624,19 @@ namespace cppdatalib
                 subtype_ = new_subtype;
             }
 
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+            void create_string();
+#endif
+
             template<typename... Args>
             void array_init(subtype_t new_subtype, Args... args);
 
+            void create_array();
+
             template<typename... Args>
             void object_init(subtype_t new_subtype, Args... args);
+
+            void create_object();
 
             void deinit();
 
@@ -708,34 +745,14 @@ namespace cppdatalib
                 return *this;
             }
 
-            string_t &str_ref_() {
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                return str_;
-#else
-                return *reinterpret_cast<string_t *>(ptr_);
-#endif
-            }
-            const string_t &str_ref_() const {
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                return str_;
-#else
-                return *reinterpret_cast<const string_t *>(ptr_);
-#endif
-            }
+            string_t &str_ref_();
+            const string_t &str_ref_() const;
 
-            array_t &arr_ref_() {
-                return *reinterpret_cast<array_t *>(ptr_);
-            }
-            const array_t &arr_ref_() const {
-                return *reinterpret_cast<const array_t *>(ptr_);
-            }
+            array_t &arr_ref_();
+            const array_t &arr_ref_() const;
 
-            object_t &obj_ref_() {
-                return *reinterpret_cast<object_t *>(ptr_);
-            }
-            const object_t &obj_ref_() const {
-                return *reinterpret_cast<const object_t *>(ptr_);
-            }
+            object_t &obj_ref_();
+            const object_t &obj_ref_() const;
 
             union
             {
@@ -971,9 +988,14 @@ namespace cppdatalib
         template<typename... Ts>
         value::value(std::initializer_list<Ts...> v, subtype_t subtype)
         {
-            array_init(subtype, core::array_t());
-            for (auto const &element: v)
-                push_back(element);
+            if (v.begin() != v.end())
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(element);
+            }
+            else
+                init(array, subtype);
         }
 
         template<typename... Args>
@@ -1489,10 +1511,34 @@ namespace cppdatalib
             }
         }
 
-        inline value::value(const array_t &v, subtype_t subtype) {array_init(subtype, v);}
-        inline value::value(array_t &&v, subtype_t subtype) {array_init(subtype, std::move(v));}
-        inline value::value(const object_t &v, subtype_t subtype) {object_init(subtype, v);}
-        inline value::value(object_t &&v, subtype_t subtype) {object_init(subtype, std::move(v));}
+        inline value::value(const array_t &v, subtype_t subtype)
+        {
+            if (!v.empty())
+                array_init(subtype, v);
+            else
+                init(array, subtype);
+        }
+        inline value::value(array_t &&v, subtype_t subtype)
+        {
+            if (!v.empty())
+                array_init(subtype, std::move(v));
+            else
+                init(array, subtype);
+        }
+        inline value::value(const object_t &v, subtype_t subtype)
+        {
+            if (!v.empty())
+                object_init(subtype, v);
+            else
+                init(object, subtype);
+        }
+        inline value::value(object_t &&v, subtype_t subtype)
+        {
+            if (!v.empty())
+                object_init(subtype, std::move(v));
+            else
+                init(object, subtype);
+        }
 
         inline value::value(value &&other)
         {
@@ -1505,10 +1551,22 @@ namespace cppdatalib
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 case string: new (&str_) string_t(std::move(other.str_)); break;
 #else
-                case string: new (&ptr_) string_t*(); ptr_ = new string_t(std::move(other.str_ref_())); break;
+                case string:
+                    new (&ptr_) string_t*();
+                    ptr_ = other.ptr_;
+                    other.ptr_ = nullptr;
+                    break;
 #endif
-                case array: new (&ptr_) array_t*(); ptr_ = new array_t(std::move(other.arr_ref_())); break;
-                case object: new (&ptr_) object_t*(); ptr_ = new object_t(std::move(other.obj_ref_())); break;
+                case array:
+                    new (&ptr_) array_t*();
+                    ptr_ = other.ptr_;
+                    other.ptr_ = nullptr;
+                    break;
+                case object:
+                    new (&ptr_) object_t*();
+                    ptr_ = other.ptr_;
+                    other.ptr_ = nullptr;
+                    break;
                 default: break;
             }
             type_ = other.type_;
@@ -1523,8 +1581,54 @@ namespace cppdatalib
             deinit();
         }
 
+        inline string_t &value::str_ref_() {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+            return str_;
+#else
+            if (ptr_ == nullptr)
+            {
+                new (&ptr_) string_t*();
+                ptr_ = new string_t();
+            }
+            return *reinterpret_cast<string_t *>(ptr_);
+#endif
+        }
+        inline const string_t &value::str_ref_() const {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+            return str_;
+#else
+            if (ptr_ == nullptr)
+                ptr_ = new string_t();
+            return *reinterpret_cast<const string_t *>(ptr_);
+#endif
+        }
+
+        inline array_t &value::arr_ref_() {
+            if (ptr_ == nullptr)
+                ptr_ = new array_t();
+            return *reinterpret_cast<array_t *>(ptr_);
+        }
+        inline const array_t &value::arr_ref_() const {
+            if (ptr_ == nullptr)
+                ptr_ = new object_t();
+            return *reinterpret_cast<const array_t *>(ptr_);
+        }
+
+        inline object_t &value::obj_ref_() {
+            if (ptr_ == nullptr)
+                ptr_ = new object_t();
+            return *reinterpret_cast<object_t *>(ptr_);
+        }
+        inline const object_t &value::obj_ref_() const {
+            if (ptr_ == nullptr)
+                ptr_ = new object_t();
+            return *reinterpret_cast<const object_t *>(ptr_);
+        }
+
         inline value &value::operator=(value &&other)
         {
+            using namespace std;
+
             clear(other.type_);
             switch (other.type_)
             {
@@ -1532,18 +1636,45 @@ namespace cppdatalib
                 case integer: int_ = std::move(other.int_); break;
                 case uinteger: uint_ = std::move(other.uint_); break;
                 case real: real_ = std::move(other.real_); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 case string: str_ref_() = std::move(other.str_ref_()); break;
-                case array: arr_ref_() = std::move(other.arr_ref_()); break;
-                case object: obj_ref_() = std::move(other.obj_ref_()); break;
+#else
+                case string:
+#endif
+                case array:
+                case object:
+                    ptr_ = other.ptr_;
+                    other.ptr_ = nullptr;
+                    break;
                 default: break;
             }
             subtype_ = other.subtype_;
             return *this;
         }
 
-        inline size_t value::size() const {return is_array()? arr_ref_().size(): is_object()? obj_ref_().size(): is_string()? str_ref_().size(): 0;}
-        inline size_t value::array_size() const {return is_array()? arr_ref_().size(): 0;}
-        inline size_t value::object_size() const {return is_object()? obj_ref_().size(): 0;}
+        inline size_t value::size() const
+        {
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+            if (is_string())
+                return str_ref_().size();
+            else if (ptr_ == nullptr)
+                return 0;
+#else
+            if (ptr_ == nullptr)
+                return 0;
+            else if (is_string())
+                return str_ref_().size();
+#endif
+
+            if (is_array())
+                return arr_ref_().size();
+            else if (is_object())
+                return obj_ref_().size();
+
+            return 0;
+        }
+        inline size_t value::array_size() const {return is_nonempty_array()? arr_ref_().size(): 0;}
+        inline size_t value::object_size() const {return is_nonempty_object()? obj_ref_().size(): 0;}
 
         inline void value::set_array(const array_t &v) {clear(array); arr_ref_() = v;}
         inline void value::set_object(const object_t &v) {clear(object); obj_ref_() = v;}
@@ -1556,7 +1687,7 @@ namespace cppdatalib
         inline value &value::operator[](const string_t &key) {return member(key);}
         inline value value::member(const value &key) const
         {
-            if (is_object())
+            if (is_nonempty_object())
             {
                 auto it = obj_ref_().data().find(key);
                 if (it != obj_ref_().end())
@@ -1575,7 +1706,7 @@ namespace cppdatalib
         }
         inline const value *value::member_ptr(const value &key) const
         {
-            if (is_object())
+            if (is_nonempty_object())
             {
                 auto it = obj_ref_().data().find(key);
                 if (it != obj_ref_().end())
@@ -1583,15 +1714,15 @@ namespace cppdatalib
             }
             return NULL;
         }
-        inline bool_t value::is_member(cstring_t key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        inline bool_t value::is_member(const string_t &key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        inline bool_t value::is_member(const value &key) const {return is_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        inline size_t value::member_count(cstring_t key) const {return is_object()? obj_ref_().data().count(key): 0;}
-        inline size_t value::member_count(const string_t &key) const {return is_object()? obj_ref_().data().count(key): 0;}
-        inline size_t value::member_count(const value &key) const {return is_object()? obj_ref_().data().count(key): 0;}
-        inline void value::erase_member(cstring_t key) {if (is_object()) obj_ref_().data().erase(key);}
-        inline void value::erase_member(const string_t &key) {if (is_object()) obj_ref_().data().erase(key);}
-        inline void value::erase_member(const value &key) {if (is_object()) obj_ref_().data().erase(key);}
+        inline bool_t value::is_member(cstring_t key) const {return is_nonempty_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        inline bool_t value::is_member(const string_t &key) const {return is_nonempty_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        inline bool_t value::is_member(const value &key) const {return is_nonempty_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        inline size_t value::member_count(cstring_t key) const {return is_nonempty_object()? obj_ref_().data().count(key): 0;}
+        inline size_t value::member_count(const string_t &key) const {return is_nonempty_object()? obj_ref_().data().count(key): 0;}
+        inline size_t value::member_count(const value &key) const {return is_nonempty_object()? obj_ref_().data().count(key): 0;}
+        inline void value::erase_member(cstring_t key) {if (is_nonempty_object()) obj_ref_().data().erase(key);}
+        inline void value::erase_member(const string_t &key) {if (is_nonempty_object()) obj_ref_().data().erase(key);}
+        inline void value::erase_member(const value &key) {if (is_nonempty_object()) obj_ref_().data().erase(key);}
 
         inline value &value::add_member(const value &key)
         {
@@ -1639,7 +1770,7 @@ namespace cppdatalib
         inline void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(v);}
         inline value value::operator[](size_t pos) const {return element(pos);}
         inline value &value::operator[](size_t pos) {return element(pos);}
-        inline value value::element(size_t pos) const {return is_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
+        inline value value::element(size_t pos) const {return is_nonempty_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
         inline value &value::element(size_t pos)
         {
             clear(array);
@@ -1647,12 +1778,12 @@ namespace cppdatalib
                 arr_ref_().data().insert(arr_ref_().end().data(), pos - arr_ref_().size() + 1, core::null_t());
             return arr_ref_()[pos];
         }
-        inline void value::erase_element(size_t pos) {if (is_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
+        inline void value::erase_element(size_t pos) {if (is_nonempty_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
 
         inline array_t value::get_array(const array_t &default_) const {return is_array()? arr_ref_(): default_;}
         inline object_t value::get_object(const object_t &default_) const {return is_object()? obj_ref_(): default_;}
-        inline array_t value::get_array() const {return is_array()? arr_ref_(): array_t();}
-        inline object_t value::get_object() const {return is_object()? obj_ref_(): object_t();}
+        inline array_t value::get_array() const {return is_nonempty_array()? arr_ref_(): array_t();}
+        inline object_t value::get_object() const {return is_nonempty_object()? obj_ref_(): object_t();}
 
         inline array_t value::as_array(const array_t &default_) const {return value(*this).convert_to(array, default_).arr_ref_();}
         inline object_t value::as_object(const object_t &default_) const {return value(*this).convert_to(object, default_).obj_ref_();}
@@ -1695,10 +1826,10 @@ namespace cppdatalib
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 case string: new (&str_) string_t(); break;
 #else
-                case string: new (&ptr_) string_t*(); ptr_ = new string_t(); break;
+                case string: new (&ptr_) string_t*(); ptr_ = nullptr; break;
 #endif
-                case array: new (&ptr_) array_t*(); ptr_ = new array_t(); break;
-                case object: new (&ptr_) object_t*(); ptr_ = new object_t(); break;
+                case array: new (&ptr_) array_t*(); ptr_ = nullptr; break;
+                case object: new (&ptr_) object_t*(); ptr_ = nullptr; break;
                 default: break;
             }
             type_ = new_type;

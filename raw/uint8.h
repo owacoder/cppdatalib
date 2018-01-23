@@ -63,6 +63,8 @@ namespace cppdatalib
 
             unsigned int required_features() const {return requires_prefix_array_size | requires_prefix_object_size | requires_prefix_string_size;}
 
+            std::string name() const {return "cppdatalib::raw::uint8_stream_writer";}
+
         protected:
             void null_(const core::value &) {stream().put(0x00);}
             void bool_(const core::value &v) {stream().put(v.get_bool_unchecked());}

@@ -350,6 +350,8 @@ namespace cppdatalib
         public:
             row_writer(core::ostream_handle output, char separator = ',') : stream_writer_base(output), separator(separator) {}
 
+            std::string name() const {return "cppdatalib::csv::row_writer";}
+
         protected:
             void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
 
@@ -377,6 +379,8 @@ namespace cppdatalib
 
         public:
             stream_writer(core::ostream_handle output, char separator = ',') : stream_writer_base(output), separator(separator) {}
+
+            std::string name() const {return "cppdatalib::csv::stream_writer";}
 
         protected:
             void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}

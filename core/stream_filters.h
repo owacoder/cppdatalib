@@ -300,6 +300,18 @@ namespace cppdatalib
                 return stream_filter_base::required_features() & ~mask_out;
             }
 
+            std::string name() const
+            {
+                std::string n = "cppdatalib::core::buffer_filter(" + output.name();
+                if (flags & buffer_strings)
+                    n += ", buffer_strings";
+                if (flags & buffer_arrays)
+                    n += ", buffer_arrays";
+                if (flags & buffer_objects)
+                    n += ", buffer_objects";
+                return n + ")";
+            }
+
         protected:
             // Called when this filter is done buffering. This function should write the value to the output stream.
             // The default implementation is just a pass-through to the output, as you can see.
@@ -467,6 +479,11 @@ namespace cppdatalib
                                     (output.required_features() & (stream_handler::requires_prefix_object_size | stream_handler::requires_buffered_objects)? buffer_objects: 0) |
                                     (output.required_features() & (stream_handler::requires_prefix_string_size | stream_handler::requires_buffered_strings)? buffer_strings: 0)))
             {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::automatic_buffer_filter(" + output.name() + ")";
+            }
         };
 
         class tee_filter : public impl::stream_filter_base
@@ -482,6 +499,11 @@ namespace cppdatalib
             {}
 
             unsigned int required_features() const {return stream_filter_base::required_features() | output2.required_features();}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::tee_filter(" + output.name() + ", " + output2.name() + ")";
+            }
 
         protected:
             void begin_() {stream_filter_base::begin_(); output2.begin();}
@@ -547,6 +569,11 @@ namespace cppdatalib
                 , view(v)
             {}
 
+            std::string name() const
+            {
+                return "cppdatalib::core::view_filter(" + output.name() + ")";
+            }
+
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
@@ -579,6 +606,11 @@ namespace cppdatalib
             object_keys_to_array_filter(core::stream_handler &output)
                 : impl::stream_filter_base(output)
             {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::object_keys_to_array_filter(" + output.name() + ")";
+            }
 
         protected:
             void begin_() {
@@ -699,6 +731,11 @@ namespace cppdatalib
             const core::value &get_min() const {return min_;}
             core::value get_midpoint() const {return (core::real_t(max_) + core::real_t(min_)) / 2.0;}
 
+            std::string name() const
+            {
+                return "cppdatalib::core::range_filter(" + output.name() + ")";
+            }
+
         protected:
             void begin_()
             {
@@ -766,6 +803,11 @@ namespace cppdatalib
                 return samples;
             }
 
+            std::string name() const
+            {
+                return "cppdatalib::core::mean_filter(" + output.name() + ")";
+            }
+
         protected:
             void begin_()
             {
@@ -829,6 +871,11 @@ namespace cppdatalib
 
             core::real_t get_standard_deviation() {return sqrt(get_variance());}
 
+            std::string name() const
+            {
+                return "cppdatalib::core::dispersion_filter(" + base::output.name() + ")";
+            }
+
         protected:
             void begin_()
             {
@@ -886,6 +933,11 @@ namespace cppdatalib
             size_t sample_size() const
             {
                 return samples.size();
+            }
+
+            std::string name() const
+            {
+                return "cppdatalib::core::median_filter(" + output.name() + ")";
             }
 
         protected:
@@ -959,6 +1011,11 @@ namespace cppdatalib
                 return samples.size();
             }
 
+            std::string name() const
+            {
+                return "cppdatalib::core::mode_filter(" + output.name() + ")";
+            }
+
         protected:
             void begin_()
             {
@@ -996,6 +1053,11 @@ namespace cppdatalib
                 : core::buffer_filter(output, buffer_arrays, nesting_level)
             {}
 
+            std::string name() const
+            {
+                return "cppdatalib::core::array_sort_filter(" + output.name() + ")";
+            }
+
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
@@ -1026,6 +1088,11 @@ namespace cppdatalib
                 : core::buffer_filter(output, buffer_arrays)
                 , fail_on_extra_column(fail_on_extra_column)
             {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::array_of_objects_to_object_of_arrays_filter(" + output.name() + ")";
+            }
 
         protected:
             void write_buffered_value_(const value &v, bool is_key)
@@ -1070,6 +1137,11 @@ namespace cppdatalib
                 , column_names(column_names)
                 , fail_on_missing_column(fail_on_missing_column)
             {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::table_to_array_of_objects_filter(" + output.name() + ")";
+            }
 
         protected:
             void write_buffered_value_(const value &v, bool is_key)
@@ -1130,6 +1202,11 @@ namespace cppdatalib
 
         public:
             duplicate_key_check_filter(core::stream_handler &output) : stream_filter_base(output) {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::duplicate_key_check_filter(" + output.name() + ")";
+            }
 
         protected:
             void begin_() {stream_filter_base::begin_(); layers.clear();}
@@ -1220,6 +1297,11 @@ namespace cppdatalib
                 , select(s)
             {}
 
+            std::string name() const
+            {
+                return "cppdatalib::core::select_from_array_filter(" + output.name() + ")";
+            }
+
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
@@ -1258,6 +1340,11 @@ namespace cppdatalib
                                                                          (from == core::object? buffer_objects: 0)))
             {}
 
+            std::string name() const
+            {
+                return "cppdatalib::core::converter_filter(" + output.name() + ")";
+            }
+
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
@@ -1295,6 +1382,11 @@ namespace cppdatalib
                                                                          (from == core::object? buffer_objects: 0)))
                 , convert(c)
             {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::custom_converter_filter(" + output.name() + ")";
+            }
 
         protected:
             void write_buffered_value_(const value &v, bool is_key)
@@ -1343,6 +1435,11 @@ namespace cppdatalib
                 : buffer_filter(output, buffer_strings)
                 , convert(c)
             {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::generic_converter_filter(" + output.name() + ")";
+            }
 
         protected:
             void write_buffered_value_(const value &v, bool is_key)

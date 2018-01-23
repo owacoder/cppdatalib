@@ -38,7 +38,7 @@ namespace cppdatalib
             public:
                 stream_writer(core::ostream_handle output) : core::stream_writer(output) {}
 
-                bool requires_prefix_string_size() const {return true;}
+                std::string name() const {return "cppdatalib::lang::lisp::stream_writer";}
 
             protected:
                 void begin_key_(const core::value &)

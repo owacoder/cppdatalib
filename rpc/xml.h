@@ -73,6 +73,8 @@ namespace cppdatalib
         public:
             stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
+            std::string name() const {return "cppdatalib::xml_rpc::stream_writer";}
+
         protected:
             void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
 

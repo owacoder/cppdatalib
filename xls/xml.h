@@ -71,6 +71,8 @@ namespace cppdatalib
         public:
             table_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
+            std::string name() const {return "cppdatalib::xml_xls::table_writer";}
+
         protected:
             void begin_() {stream() << "<Table>"; stream().precision(CPPDATALIB_REAL_DIG);}
             void end_() {stream() << "</Table>";}
@@ -135,7 +137,7 @@ namespace cppdatalib
             std::string worksheet_name;
 
         public:
-            worksheet_writer(core::ostream &output, const std::string &worksheet_name) : table_writer(output), worksheet_name(worksheet_name) {}
+            worksheet_writer(core::ostream_handle output, const std::string &worksheet_name) : table_writer(output), worksheet_name(worksheet_name) {}
 
         protected:
             void begin_()
@@ -160,7 +162,7 @@ namespace cppdatalib
         class workbook_writer : public worksheet_writer
         {
         public:
-            workbook_writer(core::ostream &output, const std::string &worksheet_name) : worksheet_writer(output, worksheet_name) {}
+            workbook_writer(core::ostream_handle output, const std::string &worksheet_name) : worksheet_writer(output, worksheet_name) {}
 
         protected:
             void begin_()
@@ -187,7 +189,7 @@ namespace cppdatalib
         class document_writer : public workbook_writer
         {
         public:
-            document_writer(core::ostream &output, const std::string &worksheet_name) : workbook_writer(output, worksheet_name) {}
+            document_writer(core::ostream_handle output, const std::string &worksheet_name) : workbook_writer(output, worksheet_name) {}
 
         protected:
             void begin_()

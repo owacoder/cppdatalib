@@ -543,6 +543,8 @@ namespace cppdatalib
                 , escaped(false)
             {}
 
+            std::string name() const {return "cppdatalib::mysql::table_writer";}
+
             void connect(const char *host,
                          const char *user,
                          const char *passwd,

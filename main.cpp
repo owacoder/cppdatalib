@@ -1285,6 +1285,22 @@ void test_k_nearest()
 
 int main()
 {
+    try
+    {
+        std::tuple<unsigned int> f777{48};
+        cppdatalib::raw::uint8_stream_writer w(std::cout);
+        cppdatalib::core::automatic_buffer_filter f(w);
+        cppdatalib::core::generic_parser p(f777);
+        std::cout << f.name() << std::endl;
+        f << p;
+    }
+    catch (cppdatalib::core::error e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
+
+    return 0;
+
     cppdatalib::core::value data = cppdatalib::core::object_t{{"value", 1}, {cppdatalib::core::object_t{{cppdatalib::core::object_t{{"string", "null"}}, cppdatalib::core::object_t{{"string", "null"}}}}, cppdatalib::core::object_t{{cppdatalib::core::object_t{{"string", "null"}}, cppdatalib::core::object_t{{"string", "null"}}}}}, {"Object", cppdatalib::core::null_t()}};
 
     try
@@ -1321,8 +1337,6 @@ int main()
     std::cout << std::endl;
     std::cout << yx << std::endl;
     b = yx;
-
-
 
     return 0;
 

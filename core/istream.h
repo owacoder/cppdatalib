@@ -50,7 +50,7 @@ namespace cppdatalib
 
             struct sentry
             {
-                sentry(istream &stream, bool skipws = false)
+                sentry(istream &stream, bool skipws = false) : last(0)
                 {
                     if (skipws && !stream.flags_)
                         skip_spaces(stream);
@@ -493,25 +493,25 @@ namespace cppdatalib
             }
         };
 
-        istream &operator>>(istream &in, char &ch) {return in.read_formatted_char(ch);}
-        istream &operator>>(istream &in, signed char &ch) {return in.read_formatted_char(ch);}
-        istream &operator>>(istream &in, unsigned char &ch) {return in.read_formatted_char(ch);}
+        inline istream &operator>>(istream &in, char &ch) {return in.read_formatted_char(ch);}
+        inline istream &operator>>(istream &in, signed char &ch) {return in.read_formatted_char(ch);}
+        inline istream &operator>>(istream &in, unsigned char &ch) {return in.read_formatted_char(ch);}
 
-        istream &operator>>(istream &in, signed short &val) {return in.read_formatted_signed_int(val);}
-        istream &operator>>(istream &in, signed int &val) {return in.read_formatted_signed_int(val);}
-        istream &operator>>(istream &in, signed long &val) {return in.read_formatted_signed_int(val);}
-        istream &operator>>(istream &in, signed long long &val) {return in.read_formatted_signed_int(val);}
+        inline istream &operator>>(istream &in, signed short &val) {return in.read_formatted_signed_int(val);}
+        inline istream &operator>>(istream &in, signed int &val) {return in.read_formatted_signed_int(val);}
+        inline istream &operator>>(istream &in, signed long &val) {return in.read_formatted_signed_int(val);}
+        inline istream &operator>>(istream &in, signed long long &val) {return in.read_formatted_signed_int(val);}
 
-        istream &operator>>(istream &in, unsigned short &val) {return in.read_formatted_unsigned_int(val);}
-        istream &operator>>(istream &in, unsigned int &val) {return in.read_formatted_unsigned_int(val);}
-        istream &operator>>(istream &in, unsigned long &val) {return in.read_formatted_unsigned_int(val);}
-        istream &operator>>(istream &in, unsigned long long &val) {return in.read_formatted_unsigned_int(val);}
+        inline istream &operator>>(istream &in, unsigned short &val) {return in.read_formatted_unsigned_int(val);}
+        inline istream &operator>>(istream &in, unsigned int &val) {return in.read_formatted_unsigned_int(val);}
+        inline istream &operator>>(istream &in, unsigned long &val) {return in.read_formatted_unsigned_int(val);}
+        inline istream &operator>>(istream &in, unsigned long long &val) {return in.read_formatted_unsigned_int(val);}
 
-        istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, strtof);}
-        istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, strtod);}
-        istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, strtold);}
+        inline istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, strtof);}
+        inline istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, strtod);}
+        inline istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, strtold);}
 
-        istream &operator>>(istream &in, std::streambuf *buf)
+        inline istream &operator>>(istream &in, std::streambuf *buf)
         {
             istream::streamsize read = 0;
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
@@ -544,7 +544,7 @@ namespace cppdatalib
             return in;
         }
 
-        istream &operator>>(istream &in, std::ios_base &(*pf)(std::ios_base &))
+        inline istream &operator>>(istream &in, std::ios_base &(*pf)(std::ios_base &))
         {
             if (pf == std::skipws)
                 in.skip_ws = true;
