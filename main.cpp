@@ -7,6 +7,7 @@
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
 #define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 #define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
+#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
 #include "cppdatalib.h"
 
 struct vt100
@@ -1287,12 +1288,15 @@ int main()
 {
     try
     {
-        std::tuple<unsigned int> f777{48};
-        cppdatalib::raw::uint8_stream_writer w(std::cout);
+        const char tuple[3] = "my";
+        cppdatalib::json::stream_writer w(std::cout);
         cppdatalib::core::automatic_buffer_filter f(w);
-        cppdatalib::core::generic_parser p(f777);
+        cppdatalib::core::generic_parser p(1);
         std::cout << f.name() << std::endl;
         f << p;
+        std::cout << cppdatalib::core::value(tuple);
+        //tuple = cppdatalib::core::value(f777);
+        w.stream() << std::endl;
     }
     catch (cppdatalib::core::error e)
     {

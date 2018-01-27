@@ -42,7 +42,7 @@ namespace cppdatalib { namespace core {
     class template_parser<std::basic_string, char, Ts...> : public generic_stream_input
     {
     protected:
-        const std::basic_string<char, Ts...> bind;
+        const std::basic_string<char, Ts...> &bind;
 
     public:
         template_parser(const std::basic_string<char, Ts...> &bind, generic_parser &parser)
@@ -61,6 +61,143 @@ namespace cppdatalib { namespace core {
         }
     };
 }}
+
+template<typename T, typename... Ts>
+class cast_template_to_cppdatalib<std::unique_ptr, T, Ts...>
+{
+    const std::unique_ptr<T, Ts...> &bind;
+public:
+    cast_template_to_cppdatalib(const std::unique_ptr<T, Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (!bind)
+            return cppdatalib::core::null_t();
+        return *bind;
+    }
+};
+
+namespace cppdatalib { namespace core {
+    template<typename T, typename... Ts>
+    class template_parser<std::unique_ptr, T, Ts...> : public generic_stream_input
+    {
+    protected:
+        const std::unique_ptr<T, Ts...> &bind;
+
+    public:
+        template_parser(const std::unique_ptr<T, Ts...> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {}
+
+        void write_one_()
+        {
+            if (bind)
+            {
+                compose_parser(*bind);
+                write_next();
+            }
+            else
+                get_output()->write(core::value());
+        }
+    };
+}}
+
+template<typename T>
+class cast_template_to_cppdatalib<std::shared_ptr, T>
+{
+    const std::shared_ptr<T> &bind;
+public:
+    cast_template_to_cppdatalib(const std::shared_ptr<T> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (!bind)
+            return cppdatalib::core::null_t();
+        return *bind;
+    }
+};
+
+namespace cppdatalib { namespace core {
+    template<typename T>
+    class template_parser<std::shared_ptr, T> : public generic_stream_input
+    {
+    protected:
+        const std::shared_ptr<T> &bind;
+
+    public:
+        template_parser(const std::shared_ptr<T> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {}
+
+        void write_one_()
+        {
+            if (bind)
+            {
+                compose_parser(*bind);
+                write_next();
+            }
+            else
+                get_output()->write(core::value());
+        }
+    };
+}}
+
+#ifndef CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
+template<typename T>
+class cast_template_to_cppdatalib<std::weak_ptr, T>
+{
+    const std::weak_ptr<T> &bind;
+public:
+    cast_template_to_cppdatalib(const std::weak_ptr<T> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (!bind)
+            return cppdatalib::core::null_t();
+        return *bind;
+    }
+};
+
+namespace cppdatalib { namespace core {
+    template<typename T>
+    class template_parser<std::weak_ptr, T> : public generic_stream_input
+    {
+    protected:
+        const std::weak_ptr<T> &bind;
+
+    public:
+        template_parser(const std::weak_ptr<T> &bind, generic_parser &parser)
+            : generic_stream_input(parser)
+            , bind(bind)
+        {
+            reset();
+        }
+
+    protected:
+        void reset_() {}
+
+        void write_one_()
+        {
+            if (bind)
+            {
+                compose_parser(*bind);
+                write_next();
+            }
+            else
+                get_output()->write(core::value());
+        }
+    };
+}}
+#endif
 
 template<typename T, size_t N>
 class cast_array_template_to_cppdatalib<std::array, T, N>
@@ -347,7 +484,7 @@ namespace cppdatalib { namespace core {
     class template_parser<std::map, Ts...> : public generic_stream_input
     {
     protected:
-        const std::map<Ts...> bind;
+        const std::map<Ts...> &bind;
         decltype(bind.begin()) iterator;
         bool parsingKey;
 
@@ -406,7 +543,7 @@ namespace cppdatalib { namespace core {
     class template_parser<std::multimap, Ts...> : public generic_stream_input
     {
     protected:
-        const std::multimap<Ts...> bind;
+        const std::multimap<Ts...> &bind;
         decltype(bind.begin()) iterator;
         bool parsingKey;
 
@@ -466,7 +603,7 @@ namespace cppdatalib { namespace core {
     class template_parser<std::unordered_map, Ts...> : public generic_stream_input
     {
     protected:
-        const std::unordered_map<Ts...> bind;
+        const std::unordered_map<Ts...> &bind;
         decltype(bind.begin()) iterator;
         bool parsingKey;
 
@@ -526,7 +663,7 @@ namespace cppdatalib { namespace core {
     class template_parser<std::unordered_multimap, Ts...> : public generic_stream_input
     {
     protected:
-        const std::unordered_multimap<Ts...> bind;
+        const std::unordered_multimap<Ts...> &bind;
         decltype(bind.begin()) iterator;
         bool parsingKey;
 
@@ -578,7 +715,7 @@ namespace cppdatalib { namespace core {
     class template_parser<std::pair, Ts...> : public generic_stream_input
     {
     protected:
-        const std::pair<Ts...> bind;
+        const std::pair<Ts...> &bind;
         size_t idx;
 
     public:
@@ -670,7 +807,7 @@ namespace cppdatalib { namespace core {
     class template_parser<std::tuple, Ts...> : public generic_stream_input
     {
     protected:
-        const std::tuple<Ts...> bind;
+        const std::tuple<Ts...> &bind;
         std::vector<generic_parser> parsers;
         decltype(parsers.begin()) iterator;
 
@@ -819,6 +956,30 @@ public:
     {
         cppdatalib::core::string_t str = bind.as_string();
         return std::basic_string<char, Ts...>(str.c_str(), str.size());
+    }
+};
+
+template<typename T, typename... Ts>
+class cast_template_from_cppdatalib<std::unique_ptr, T, Ts...>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::unique_ptr<T, Ts...>() const
+    {
+        return new T(bind.operator T());
+    }
+};
+
+template<typename T>
+class cast_template_from_cppdatalib<std::shared_ptr, T>
+{
+    const cppdatalib::core::value &bind;
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::shared_ptr<T>() const
+    {
+        return new T(bind.operator T());
     }
 };
 

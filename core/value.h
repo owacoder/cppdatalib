@@ -190,6 +190,7 @@ namespace cppdatalib
             friend stream_handler &operator<<(stream_handler &output, const value &input);
             friend void operator<<(stream_handler &&output, const value &input);
             static value &assign(value &dst, const value &src);
+            static value &assign(value &dst, value &&src);
 
         public:
             struct traversal_ancestry_finder
@@ -303,6 +304,18 @@ namespace cppdatalib
             value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
             template<typename... Ts>
             value(std::initializer_list<Ts...> v, subtype_t subtype = core::normal);
+#ifndef CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
+            // Template constructor for pointer
+            template<typename T>
+            value(const T *v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            {
+                if (v)
+                    assign(*this, cppdatalib::core::value(*v));
+            }
+#endif
+            // Template constructor for simple array
+            template<typename T, size_t N>
+            value(const T (&v)[N], subtype_t subtype = core::normal);
             // Template constructor for simple type
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
             value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
@@ -992,7 +1005,20 @@ namespace cppdatalib
             {
                 array_init(subtype, core::array_t());
                 for (auto const &element: v)
-                    push_back(element);
+                    push_back(value(element));
+            }
+            else
+                init(array, subtype);
+        }
+
+        template<typename T, size_t N>
+        value::value(const T (&v)[N], subtype_t subtype)
+        {
+            if (N)
+            {
+                array_init(subtype, core::array_t());
+                for (size_t i = 0; i < N; ++i)
+                    push_back(value(v[i]));
             }
             else
                 init(array, subtype);
@@ -1575,8 +1601,8 @@ namespace cppdatalib
 
         inline value::~value()
         {
-            if ((type_ == array && arr_ref_().size() > 0) ||
-                (type_ == object && obj_ref_().size() > 0))
+            if ((is_nonempty_array() && arr_ref_().size() > 0) ||
+                (is_nonempty_object() && obj_ref_().size() > 0))
                 traverse(traverse_node_null, traverse_node_mutable_clear);
             deinit();
         }
@@ -1625,51 +1651,22 @@ namespace cppdatalib
             return *reinterpret_cast<const object_t *>(ptr_);
         }
 
-        inline value &value::operator=(value &&other)
-        {
-            using namespace std;
-
-            clear(other.type_);
-            switch (other.type_)
-            {
-                case boolean: bool_ = std::move(other.bool_); break;
-                case integer: int_ = std::move(other.int_); break;
-                case uinteger: uint_ = std::move(other.uint_); break;
-                case real: real_ = std::move(other.real_); break;
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                case string: str_ref_() = std::move(other.str_ref_()); break;
-#else
-                case string:
-#endif
-                case array:
-                case object:
-                    ptr_ = other.ptr_;
-                    other.ptr_ = nullptr;
-                    break;
-                default: break;
-            }
-            subtype_ = other.subtype_;
-            return *this;
-        }
+        inline value &value::operator=(value &&other) {return assign(*this, std::move(other));}
 
         inline size_t value::size() const
         {
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
             if (is_string())
                 return str_ref_().size();
-            else if (ptr_ == nullptr)
-                return 0;
 #else
-            if (ptr_ == nullptr)
-                return 0;
-            else if (is_string())
-                return str_ref_().size();
+            if (is_string())
+                return ptr_ == nullptr? 0: str_ref_().size();
 #endif
 
             if (is_array())
-                return arr_ref_().size();
+                return ptr_ == nullptr? 0: arr_ref_().size();
             else if (is_object())
-                return obj_ref_().size();
+                return ptr_ == nullptr? 0: obj_ref_().size();
 
             return 0;
         }
@@ -2013,6 +2010,15 @@ public:
 };
 
 template<>
+class cast_to_cppdatalib<char>
+{
+    unsigned char bind;
+public:
+    cast_to_cppdatalib(char bind) : bind(bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(1, bind));}
+};
+
+template<>
 class cast_to_cppdatalib<signed short>
 {
     signed short bind;
@@ -2154,6 +2160,44 @@ class cast_to_cppdatalib<cppdatalib::core::object_t>
 public:
     cast_to_cppdatalib(const cppdatalib::core::object_t &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+};
+
+template<typename T>
+class cast_to_cppdatalib<T *>
+{
+    const T *bind;
+public:
+    cast_to_cppdatalib(const T *bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (bind)
+            return *bind;
+        return cppdatalib::core::null_t();
+    }
+};
+
+template<size_t N>
+class cast_to_cppdatalib<char[N]>
+{
+    const char *bind;
+public:
+    cast_to_cppdatalib(const char (&bind)[N]) : bind(&bind) {}
+    operator cppdatalib::core::value() const {return cppdatalib::core::string_t(bind, N);}
+};
+
+template<typename T, size_t N>
+class cast_to_cppdatalib<T[N]>
+{
+    const T *bind;
+public:
+    cast_to_cppdatalib(const T (&bind)[N]) : bind(&bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result = cppdatalib::core::array_t();
+        for (size_t i = 0; i < N; ++i)
+            result.push_back(bind[i]);
+        return result;
+    }
 };
 
 template<>

@@ -189,6 +189,33 @@ namespace cppdatalib
             }
         }
 
+        inline value &value::assign(value &dst, value &&src)
+        {
+            using namespace std;
+
+            dst.clear(src.get_type());
+            switch (src.get_type())
+            {
+                case boolean: dst.bool_ = std::move(src.bool_); break;
+                case integer: dst.int_ = std::move(src.int_); break;
+                case uinteger: dst.uint_ = std::move(src.uint_); break;
+                case real: dst.real_ = std::move(src.real_); break;
+#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                case string: dst.str_ref_() = std::move(src.str_ref_()); break;
+#else
+                case string:
+#endif
+                case array:
+                case object:
+                    dst.ptr_ = src.ptr_;
+                    dst.ptr_ = nullptr;
+                    break;
+                default: break;
+            }
+            dst.subtype_ = src.get_subtype();
+            return dst;
+        }
+
         // Convert directly from value to serializer
         inline stream_handler &operator<<(stream_handler &output, const value &input)
         {
