@@ -1222,7 +1222,7 @@ void make_k_nearest()
     cppdatalib::core::value data;
     cppdatalib::core::value results;
 
-    for (size_t i = 0; i < rand() % 100; ++i)
+    for (size_t i = 0; i < static_cast<size_t>(rand() % 100); ++i)
     {
         data.push_back(cppdatalib::core::object_t{{"A", rand()}, {"B", rand()}});
         results.push_back(rand() % 4);
