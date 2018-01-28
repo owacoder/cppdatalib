@@ -7,7 +7,7 @@
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
 #define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 #define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
-#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
+//#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
 #include "cppdatalib.h"
 
 struct vt100
@@ -1288,13 +1288,16 @@ int main()
 {
     try
     {
-        const char tuple[3] = "my";
+        const char tuple[] = "2093";
         cppdatalib::json::stream_writer w(std::cout);
         cppdatalib::core::automatic_buffer_filter f(w);
-        cppdatalib::core::generic_parser p(1);
+        int i = 1;
+        cppdatalib::core::generic_parser p(i);
         std::cout << f.name() << std::endl;
         f << p;
         std::cout << cppdatalib::core::value(tuple);
+        std::unique_ptr<int, std::default_delete<int>> s = cppdatalib::core::value(tuple);
+        std::cout << *s << std::endl;
         //tuple = cppdatalib::core::value(f777);
         w.stream() << std::endl;
     }

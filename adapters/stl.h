@@ -967,7 +967,7 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator std::unique_ptr<T, Ts...>() const
     {
-        return new T(bind.operator T());
+        return std::unique_ptr<T, Ts...>(new T(bind.operator T()));
     }
 };
 
@@ -979,7 +979,7 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator std::shared_ptr<T>() const
     {
-        return new T(bind.operator T());
+        return std::shared_ptr<T>(new T(bind.operator T()));
     }
 };
 
