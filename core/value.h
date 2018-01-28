@@ -304,6 +304,8 @@ namespace cppdatalib
             value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
             template<typename... Ts>
             value(std::initializer_list<Ts...> v, subtype_t subtype = core::normal);
+            template<typename UserData, typename... Ts>
+            value(std::initializer_list<Ts...> v, UserData userdata, subtype_t subtype = core::normal);
 #ifndef CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
             // Template constructor for pointer
             template<typename T>
@@ -312,10 +314,20 @@ namespace cppdatalib
                 if (v)
                     assign(*this, cppdatalib::core::value(*v));
             }
+            // Template constructor for pointer with supplied user data
+            template<typename T, typename UserData>
+            value(const T *v, UserData userdata, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            {
+                if (v)
+                    assign(*this, cppdatalib::core::value(*v, userdata, subtype));
+            }
 #endif
             // Template constructor for simple array
             template<typename T, size_t N>
             value(const T (&v)[N], subtype_t subtype = core::normal);
+            // Template constructor for simple array with supplied user data
+            template<typename T, size_t N, typename UserData>
+            value(const T (&v)[N], UserData userdata, subtype_t subtype);
             // Template constructor for simple type
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
             value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
@@ -399,7 +411,11 @@ namespace cppdatalib
                     }
                 }
                 else
-                    std::swap(*this, other);
+                {
+                    value temp(std::move(*this));
+                    assign(*this, std::move(other));
+                    assign(other, std::move(temp));
+                }
             }
 
             subtype_t get_subtype() const {return subtype_;}
@@ -564,6 +580,11 @@ namespace cppdatalib
 
             template<typename T>
             operator T() const {return cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this);}
+
+#ifndef CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
+            template<typename T>
+            operator T*() const {return new T(operator T());}
+#endif
 
             template<template<typename...> class Template, typename... Ts>
             operator Template<Ts...>() const {return cast_template_from_cppdatalib<Template, Ts...>(*this);}
@@ -1011,6 +1032,19 @@ namespace cppdatalib
                 init(array, subtype);
         }
 
+        template<typename UserData, typename... Ts>
+        value::value(std::initializer_list<Ts...> v, UserData userdata, subtype_t subtype)
+        {
+            if (v.begin() != v.end())
+            {
+                array_init(subtype, core::array_t());
+                for (auto const &element: v)
+                    push_back(value(element, userdata, core::normal));
+            }
+            else
+                init(array, subtype);
+        }
+
         template<typename T, size_t N>
         value::value(const T (&v)[N], subtype_t subtype)
         {
@@ -1019,6 +1053,19 @@ namespace cppdatalib
                 array_init(subtype, core::array_t());
                 for (size_t i = 0; i < N; ++i)
                     push_back(value(v[i]));
+            }
+            else
+                init(array, subtype);
+        }
+
+        template<typename T, size_t N, typename UserData>
+        value::value(const T (&v)[N], UserData userdata, subtype_t subtype)
+        {
+            if (N)
+            {
+                array_init(subtype, core::array_t());
+                for (size_t i = 0; i < N; ++i)
+                    push_back(value(v[i], userdata, core::normal));
             }
             else
                 init(array, subtype);
@@ -1566,7 +1613,7 @@ namespace cppdatalib
                 init(object, subtype);
         }
 
-        inline value::value(value &&other)
+        inline value::value(value &&other) : type_(other.type_), subtype_(other.subtype_)
         {
             switch (other.type_)
             {
@@ -1595,8 +1642,6 @@ namespace cppdatalib
                     break;
                 default: break;
             }
-            type_ = other.type_;
-            subtype_ = other.subtype_;
         }
 
         inline value::~value()
@@ -1764,7 +1809,7 @@ namespace cppdatalib
         }
 
         inline void value::push_back(const value &v) {clear(array); arr_ref_().data().push_back(v);}
-        inline void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(v);}
+        inline void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(std::move(v));}
         inline value value::operator[](size_t pos) const {return element(pos);}
         inline value &value::operator[](size_t pos) {return element(pos);}
         inline value value::element(size_t pos) const {return is_nonempty_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
