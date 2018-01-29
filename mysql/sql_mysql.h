@@ -27,6 +27,10 @@
 
 #ifdef CPPDATALIB_ENABLE_MYSQL
 
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+#error cppdatalib - the MySQL format requires that CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS be undefined
+#endif
+
 #include "../core/core.h"
 #include <mysql/mysql.h>
 

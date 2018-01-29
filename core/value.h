@@ -522,6 +522,48 @@ namespace cppdatalib
             void erase_element(size_t pos);
 
             // The following are convenience conversion functions
+#ifdef CPPDATALIB_THROW_IF_WRONG_TYPE
+            bool_t get_bool(bool_t = false) const
+            {
+                if (is_bool())
+                    return bool_;
+                throw core::error("cppdatalib::core::value - get_bool() called on non-boolean value");
+            }
+            int_t get_int(int_t = 0) const
+            {
+                if (is_int())
+                    return get_int();
+                throw core::error("cppdatalib::core::value - get_int() called on non-integer value");
+            }
+            uint_t get_uint(uint_t = 0) const
+            {
+                if (is_uint())
+                    return get_uint();
+                throw core::error("cppdatalib::core::value - get_uint() called on non-uinteger value");
+            }
+            real_t get_real(real_t = 0.0) const
+            {
+                if (is_real())
+                    return get_real();
+                throw core::error("cppdatalib::core::value - get_real() called on non-real value");
+            }
+            cstring_t get_cstring(cstring_t = "") const
+            {
+                if (is_string())
+                    return str_ref_().c_str();
+                throw core::error("cppdatalib::core::value - get_cstring() called on non-string value");
+            }
+            string_t get_string(const string_t & = string_t()) const
+            {
+                if (is_string())
+                    return is_nonempty_string()? str_ref_(): string_t();
+                throw core::error("cppdatalib::core::value - get_string() called on non-string value");
+            }
+            array_t get_array(const array_t &default_) const;
+            object_t get_object(const object_t &default_) const;
+            array_t get_array() const;
+            object_t get_object() const;
+#else
             bool_t get_bool(bool_t default_ = false) const {return is_bool()? bool_: default_;}
             int_t get_int(int_t default_ = 0) const {return is_int()? int_: default_;}
             uint_t get_uint(uint_t default_ = 0) const {return is_uint()? uint_: default_;}
@@ -532,7 +574,19 @@ namespace cppdatalib
             object_t get_object(const object_t &default_) const;
             array_t get_array() const;
             object_t get_object() const;
+#endif
 
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+            bool_t as_bool(bool_t default_ = false) const {return get_bool(default_);}
+            int_t as_int(int_t default_ = 0) const {return get_int(default_);}
+            uint_t as_uint(uint_t default_ = 0) const {return get_uint(default_);}
+            real_t as_real(real_t default_ = 0.0) const {return get_real(default_);}
+            string_t as_string(const string_t &default_ = string_t()) const {return get_string(default_);}
+            array_t as_array(const array_t &default_) const;
+            object_t as_object(const object_t &default_) const;
+            array_t as_array() const;
+            object_t as_object() const;
+#else
             bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, default_).bool_;}
             int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, default_).int_;}
             uint_t as_uint(uint_t default_ = 0) const {return value(*this).convert_to(uinteger, default_).uint_;}
@@ -552,6 +606,7 @@ namespace cppdatalib
             object_t &convert_to_object(const object_t &default_) {return convert_to(object, default_).obj_ref_();}
             array_t &convert_to_array();
             object_t &convert_to_object();
+#endif
 
             template<typename T>
             typename std::remove_cv<typename std::remove_reference<T>::type>::type
@@ -675,6 +730,7 @@ namespace cppdatalib
 
             void deinit();
 
+#ifndef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
             // TODO: ensure that all conversions are generic enough (for example, string -> bool doesn't just need to be "true")
             value &convert_to(type new_type, const value &default_value)
             {
@@ -779,6 +835,7 @@ namespace cppdatalib
 
                 return *this;
             }
+#endif
 
             string_t &str_ref_();
             const string_t &str_ref_() const;
@@ -1823,11 +1880,34 @@ namespace cppdatalib
         }
         inline void value::erase_element(size_t pos) {if (is_nonempty_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
 
+#ifdef CPPDATALIB_THROW_IF_WRONG_TYPE
+        inline array_t value::get_array(const array_t &) const {return get_array();}
+        inline object_t value::get_object(const object_t &) const {return get_object();}
+        inline array_t value::get_array() const
+        {
+            if (is_array())
+                return is_nonempty_array()? arr_ref_(): array_t();
+            throw core::error("cppdatalib::core::value - get_array() called on non-array value");
+        }
+        inline object_t value::get_object() const
+        {
+            if (is_object())
+                return is_nonempty_object()? obj_ref_(): object_t();
+            throw core::error("cppdatalib::core::value - get_object() called on non-object value");
+        }
+#else
         inline array_t value::get_array(const array_t &default_) const {return is_array()? arr_ref_(): default_;}
         inline object_t value::get_object(const object_t &default_) const {return is_object()? obj_ref_(): default_;}
         inline array_t value::get_array() const {return is_nonempty_array()? arr_ref_(): array_t();}
         inline object_t value::get_object() const {return is_nonempty_object()? obj_ref_(): object_t();}
+#endif
 
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+        inline array_t value::as_array(const array_t &default_) const {return get_array(default_);}
+        inline object_t value::as_object(const object_t &default_) const {return get_object(default_);}
+        inline array_t value::as_array() const {return get_array();}
+        inline object_t value::as_object() const {return get_object();}
+#else
         inline array_t value::as_array(const array_t &default_) const {return value(*this).convert_to(array, default_).arr_ref_();}
         inline object_t value::as_object(const object_t &default_) const {return value(*this).convert_to(object, default_).obj_ref_();}
         inline array_t value::as_array() const {return value(*this).convert_to(array, array_t()).arr_ref_();}
@@ -1835,6 +1915,7 @@ namespace cppdatalib
 
         inline array_t &value::convert_to_array() {return convert_to(array, array_t()).arr_ref_();}
         inline object_t &value::convert_to_object() {return convert_to(object, object_t()).obj_ref_();}
+#endif
 
         inline void value::mutable_clear() const
         {

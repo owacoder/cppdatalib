@@ -103,6 +103,7 @@ namespace cppdatalib
                 }
             };
 
+#ifndef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
             template<core::type from, core::type to>
             struct stream_filter_converter
             {
@@ -245,6 +246,7 @@ namespace cppdatalib
                     }
                 }
             };
+#endif // CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
         }
 
         enum buffer_filter_flags
@@ -1326,6 +1328,7 @@ namespace cppdatalib
             return select_from_array_filter<Selecter>(output, s);
         }
 
+#ifndef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
         template<core::type from, core::type to>
         class converter_filter : public core::buffer_filter
         {
@@ -1369,6 +1372,7 @@ namespace cppdatalib
                 return buffer_filter::write_(v, is_key);
             }
         };
+#endif // CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
 
         template<core::type from, typename Converter>
         class custom_converter_filter : public core::buffer_filter

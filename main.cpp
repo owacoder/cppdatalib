@@ -8,6 +8,9 @@
 #define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 #define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 //#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
+#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+#define CPPDATALIB_THROW_IF_WRONG_TYPE
+#undef CPPDATALIB_ENABLE_MYSQL
 #include "cppdatalib.h"
 
 struct vt100
@@ -1119,9 +1122,9 @@ void TestSparseArray() {
     }
 }
 
-#ifdef CPPDATALIB_ENABLE_MYSQL
 void test_sql()
 {
+#ifdef CPPDATALIB_ENABLE_MYSQL
     try
     {
         MYSQL sql, sql2;
@@ -1147,8 +1150,8 @@ void test_sql()
     {
         std::cerr << "ERROR: " << e.what() << std::endl;
     }
-}
 #endif
+}
 
 void test_select()
 {
