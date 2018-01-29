@@ -689,7 +689,7 @@ namespace cppdatalib
 
             void begin_object_(const core::value &, core::int_t, bool)
             {
-                throw core::error("MariaDB - 'object' values not allowed in output");
+                throw core::error("MySQL - 'object' values not allowed in output");
             }
         };
     }

@@ -265,6 +265,7 @@ namespace cppdatalib
             // If return value is non-zero, processing continues, otherwise processing aborts immediately
             template<typename PrefixPredicate, typename PostfixPredicate>
             void parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const;
+
             value() : type_(null), subtype_(core::normal) {}
             value(null_t, subtype_t subtype = core::normal) : type_(null), subtype_(subtype) {}
             value(bool_t v, subtype_t subtype = core::normal) {bool_init(subtype, v);}

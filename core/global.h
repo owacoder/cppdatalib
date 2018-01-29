@@ -35,7 +35,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_BUFFER_SIZE
             buffer_size = CPPDATALIB_BUFFER_SIZE
 #else
-            buffer_size = 65535
+            buffer_size = 4096
 #endif
         };
     }
