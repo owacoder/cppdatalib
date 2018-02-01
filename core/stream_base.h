@@ -44,6 +44,9 @@ namespace cppdatalib
             return true;
         }
 
+        /* The base class of all output formats that output to an output stream.
+         * All output formats should inherit this class if they write to a stream.
+         */
         class stream_writer
         {
             core::ostream_handle handle;
@@ -57,6 +60,8 @@ namespace cppdatalib
             std::ostream *std_stream() {return handle.std_stream();}
         };
 
+        /* The base class of all output formats. All output formats must inherit from this class.
+         */
         class stream_handler
         {
         protected:
@@ -500,6 +505,7 @@ namespace cppdatalib
             std::vector<scope_data> nested_scopes; // Used as a stack, but not a stack so we can peek below the top
         };
 
+        /* The base class of all input formats. All input formats must inherit from this class */
         class stream_input
         {
         private:
@@ -656,8 +662,9 @@ namespace cppdatalib
             //    3. (not-so-preferred)
             //      Write the entire value at once, even if it is a container
             //
-            // Basically, as long as any single invocation of this function writes SOMETHING to `output`, it is acceptable.
-            // Read states should be stored as class members, not in this function, and should be resettable with `reset()`.
+            // Basically, as long as repeated calls (while busy() returns true) to this function write the entire output to `get_output()`,
+            // the implementation is acceptable.
+            // Read-states should be stored as class members, not in this function, and should be resettable with `reset()`.
             //
             // Note that get_output() always returns non-NULL when this function is executing!
             virtual void write_one_() = 0;
@@ -667,6 +674,7 @@ namespace cppdatalib
             virtual void reset_() = 0;
         };
 
+        /* The base class of all input formats that read from an input stream. All input formats that read from an input stream must inherit from this class */
         class stream_parser : public stream_input
         {
             core::istream_handle handle;

@@ -37,6 +37,9 @@ namespace cppdatalib
 {
     namespace core
     {
+        /* value_builder: This class is a built-in output format to build the input in a bound `value` variable.
+         * This class is used internally to copy `value` instances. This class MUST NOT be copied while active()!!!
+         */
         class value_builder : public core::stream_handler
         {
             core::value &v;
@@ -293,7 +296,7 @@ namespace cppdatalib
         {
             value::traverse_less_than_compare_prefix prefix;
 
-            if (lhs.is_array() || lhs.is_object() || rhs.is_array() || rhs.is_object())
+            if (lhs.is_nonempty_array() || lhs.is_nonempty_object() || rhs.is_nonempty_array() || rhs.is_nonempty_object())
             {
                 value::traverse_compare_postfix postfix;
 
@@ -309,7 +312,7 @@ namespace cppdatalib
         {
             value::traverse_compare_prefix prefix;
 
-            if (lhs.is_array() || lhs.is_object() || rhs.is_array() || rhs.is_object())
+            if (lhs.is_nonempty_array() || lhs.is_nonempty_object() || rhs.is_nonempty_array() || rhs.is_nonempty_object())
             {
                 value::traverse_compare_postfix postfix;
 
@@ -325,7 +328,7 @@ namespace cppdatalib
         {
             value::traverse_equality_compare_prefix prefix;
 
-            if (lhs.is_array() || lhs.is_object() || rhs.is_array() || rhs.is_object())
+            if (lhs.is_nonempty_array() || lhs.is_nonempty_object() || rhs.is_nonempty_array() || rhs.is_nonempty_object())
             {
                 value::traverse_compare_postfix postfix;
 

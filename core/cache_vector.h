@@ -9,6 +9,11 @@ namespace cppdatalib
 {
     namespace core
     {
+        /* cache_vector_n: A vector class that stores N elements on the stack, and allocates if it needs to grow.
+         * This allows the vector to defer allocation until it grows past N elements. There should be a speed increase
+         * in using cache_vector_n over std::vector for shallow (perhaps one level deep) stack-implemented-on-a-vector usage.
+         */
+
         template<typename T, size_t N, typename Allocator = std::allocator<T>>
         class cache_vector_n
         {
