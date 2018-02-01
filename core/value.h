@@ -25,6 +25,8 @@
 #ifndef CPPDATALIB_VALUE_H
 #define CPPDATALIB_VALUE_H
 
+#include "cache_vector.h"
+
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -195,29 +197,17 @@ namespace cppdatalib
         public:
             struct traversal_ancestry_finder
             {
-                typedef std::stack<traversal_reference, std::vector<traversal_reference>> container;
+                typedef std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> container;
 
                 const container &c;
 
             public:
                 traversal_ancestry_finder(const container &c) : c(c) {}
 
-                size_t get_parent_count() const {return c.size();}
+                size_t get_parent_count() const;
 
                 // First element is direct parent, last element is ancestry root
-                std::vector<traversal_reference> get_ancestry() const
-                {
-                    std::vector<traversal_reference> result;
-                    container temp = c;
-
-                    while (!temp.empty())
-                    {
-                        result.push_back(temp.top());
-                        temp.pop();
-                    }
-
-                    return result;
-                }
+                std::vector<traversal_reference> get_ancestry() const;
             };
 
             // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
@@ -267,11 +257,32 @@ namespace cppdatalib
             void parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const;
 
             value() : type_(null), subtype_(core::normal) {}
+
             value(null_t, subtype_t subtype = core::normal) : type_(null), subtype_(subtype) {}
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(bool_t v, subtype_t subtype = core::normal) {bool_init(subtype, v);}
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(int_t v, subtype_t subtype = core::normal) {int_init(subtype, v);}
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(uint_t v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(real_t v, subtype_t subtype = core::normal) {real_init(subtype, v);}
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(cstring_t v, subtype_t subtype = core::normal)
             {
                 if (*v)
@@ -279,6 +290,10 @@ namespace cppdatalib
                 else
                     init(string, subtype);
             }
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const string_t &v, subtype_t subtype = core::normal)
             {
                 if (!v.empty())
@@ -286,6 +301,10 @@ namespace cppdatalib
                 else
                     init(string, subtype);
             }
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(string_t &&v, subtype_t subtype = core::normal)
             {
                 if (!v.empty())
@@ -293,30 +312,74 @@ namespace cppdatalib
                 else
                     init(string, subtype);
             }
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const array_t &v, subtype_t subtype = core::normal);
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(array_t &&v, subtype_t subtype = core::normal);
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const object_t &v, subtype_t subtype = core::normal);
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(object_t &&v, subtype_t subtype = core::normal);
+
             template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(T v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
+
             template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(T v, subtype_t subtype = core::normal) {int_init(subtype, v);}
+
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
+
             template<typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(std::initializer_list<Ts...> v, subtype_t subtype = core::normal);
+
             template<typename UserData, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(std::initializer_list<Ts...> v, UserData userdata, subtype_t subtype = core::normal);
+
 #ifndef CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
             // Template constructor for pointer
             template<typename T>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const T *v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 if (v)
                     assign(*this, cppdatalib::core::value(*v));
             }
+
             // Template constructor for pointer with supplied user data
             template<typename T, typename UserData>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const T *v, UserData userdata, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 if (v)
@@ -325,18 +388,33 @@ namespace cppdatalib
 #endif
             // Template constructor for simple array
             template<typename T, size_t N>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const T (&v)[N], subtype_t subtype = core::normal);
+
             // Template constructor for simple array with supplied user data
             template<typename T, size_t N, typename UserData>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const T (&v)[N], UserData userdata, subtype_t subtype);
+
             // Template constructor for simple type
             template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 assign(*this, cast_to_cppdatalib<T>(v));
             }
+
             // Template constructor for simple type with supplied user data
             template<typename T, typename UserData, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const T &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
             {
                 assign(*this, cast_to_cppdatalib<T>(v, userdata));
@@ -344,12 +422,19 @@ namespace cppdatalib
 
             // Template constructor for template type
             template<template<typename...> class Template, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const Template<Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v));
             }
+
             // Template constructor for template type with supplied user data
             template<template<typename...> class Template, typename UserData, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const Template<Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
             {
                 assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v, userdata));
@@ -357,12 +442,19 @@ namespace cppdatalib
 
             // Template constructor for sized array template type
             template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const Template<T, N, Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v));
             }
+
             // Template constructor for sized array template type with supplied user data
             template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename UserData, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const Template<T, N, Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
             {
                 assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v, userdata));
@@ -370,12 +462,19 @@ namespace cppdatalib
 
             // Template constructor for sized type
             template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const Template<N, Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
             {
                 assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v));
             }
+
             // Template constructor for sized type with supplied user data
             template<template<size_t, typename...> class Template, size_t N, typename UserData, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             value(const Template<N, Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
             {
                 assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v, userdata));
@@ -515,6 +614,8 @@ namespace cppdatalib
 
             void push_back(const value &v);
             void push_back(value &&v);
+            template<typename It>
+            void append(It begin, It end);
             value operator[](size_t pos) const;
             value &operator[](size_t pos);
             value element(size_t pos) const;
@@ -635,20 +736,35 @@ namespace cppdatalib
             Template<N, Ts...> cast(UserData userdata) const {return cast_sized_template_from_cppdatalib<Template, N, Ts...>(*this, userdata);}
 
             template<typename T>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             operator T() const {return cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this);}
 
 #ifndef CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
             template<typename T>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             operator T*() const {return new T(operator T());}
 #endif
 
             template<template<typename...> class Template, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             operator Template<Ts...>() const {return cast_template_from_cppdatalib<Template, Ts...>(*this);}
 
             template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             operator Template<T, N, Ts...>() const {return cast_array_template_from_cppdatalib<Template, T, N, Ts...>(*this);}
 
             template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
             operator Template<N, Ts...>() const {return cast_sized_template_from_cppdatalib<Template, N, Ts...>(*this);}
 
         private:
@@ -734,6 +850,8 @@ namespace cppdatalib
             // TODO: ensure that all conversions are generic enough (for example, string -> bool doesn't just need to be "true")
             value &convert_to(type new_type, const value &default_value)
             {
+                using namespace std;
+
                 if (type_ == new_type)
                     return *this;
 
@@ -757,10 +875,31 @@ namespace cppdatalib
                     {
                         switch (new_type)
                         {
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                             case boolean: set_bool(int_ != 0); break;
                             case uinteger: set_uint(int_ > 0? int_: 0); break;
                             case real: set_real(static_cast<real_t>(int_)); break;
-                            case string: set_string(std::to_string(int_)); break;
+#else
+                            case boolean:
+                                if (int_ == 0 || int_ == 1)
+                                    set_bool(int_ != 0);
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert integer to boolean results in data loss");
+                                break;
+                            case uinteger:
+                                if (int_ >= 0)
+                                    set_uint(int_);
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert integer to uinteger results in data loss");
+                                break;
+                            case real:
+                                if (static_cast<int_>(static_cast<real_t>(int_)) == int_)
+                                    set_real(static_cast<real_t>(int_));
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert integer to real results in data loss");
+                                break;
+#endif
+                            case string: set_string(to_string(int_)); break;
                             default: *this = default_value; break;
                         }
                         break;
@@ -769,10 +908,30 @@ namespace cppdatalib
                     {
                         switch (new_type)
                         {
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                             case boolean: set_bool(uint_ != 0); break;
                             case integer: set_int(uint_ <= INT64_MAX? uint_: 0); break;
                             case real: set_real(static_cast<real_t>(uint_)); break;
-                            case string: set_string(std::to_string(uint_)); break;
+#else
+                            case boolean:
+                                if (uint_ == 0 || uint_ == 1)
+                                    set_bool(uint_ != 0);
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert uinteger to boolean results in data loss");
+                                break;
+                            case integer:
+                                if (uint_ <= INT64_MAX)
+                                    set_int(uint_);
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert uinteger to integer results in data loss");
+                            case real:
+                                if (static_cast<uint_>(static_cast<real_t>(uint_)) == uint_)
+                                    set_real(static_cast<real_t>(uint_));
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert uinteger to real results in data loss");
+                                break;
+#endif
+                            case string: set_string(to_string(uint_)); break;
                             default: *this = default_value; break;
                         }
                         break;
@@ -781,9 +940,29 @@ namespace cppdatalib
                     {
                         switch (new_type)
                         {
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                             case boolean: set_bool(real_ != 0.0); break;
                             case integer: set_int((real_ >= INT64_MIN && real_ <= INT64_MAX)? static_cast<int_t>(trunc(real_)): 0); break;
                             case uinteger: set_uint((real_ >= 0 && real_ <= UINT64_MAX)? static_cast<uint_t>(trunc(real_)): 0); break;
+#else
+                            case boolean:
+                                if (real_ == 0 || real_ == 1)
+                                    set_bool(real_ != 0);
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert real to boolean results in data loss");
+                                break;
+                            case integer:
+                                if (real_ >= INT64_MIN && real_ <= INT64_MAX && trunc(real_) == real_)
+                                    set_int(real_);
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert real to integer results in data loss");
+                            case uinteger:
+                                if (real_ >= 0 && real_ <= UINT64_MAX && trunc(real_) == real_)
+                                    set_real(real_);
+                                else
+                                    throw core::error("cppdatalib::core::value - attempt to convert real to uinteger results in data loss");
+                                break;
+#endif
                             case string:
                             {
                                 std::ostringstream str;
@@ -805,8 +984,13 @@ namespace cppdatalib
                                 std::istringstream str(str_ref_());
                                 clear(integer);
                                 str >> int_;
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
                                     int_ = 0;
+#else
+                                if (!str)
+                                    throw core::error("cppdatalib::core::value - attempt to convert string to integer results in data loss");
+#endif
                                 break;
                             }
                             case uinteger:
@@ -814,8 +998,13 @@ namespace cppdatalib
                                 std::istringstream str(str_ref_());
                                 clear(uinteger);
                                 str >> uint_;
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
                                     uint_ = 0;
+#else
+                                if (!str)
+                                    throw core::error("cppdatalib::core::value - attempt to convert string to uinteger results in data loss");
+#endif
                                 break;
                             }
                             case real:
@@ -823,8 +1012,13 @@ namespace cppdatalib
                                 std::istringstream str(str_ref_());
                                 clear(real);
                                 str >> real_;
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
                                     real_ = 0.0;
+#else
+                                if (!str)
+                                    throw core::error("cppdatalib::core::value - attempt to convert string to real results in data loss");
+#endif
                                 break;
                             }
                             default: *this = default_value; break;
@@ -1049,6 +1243,12 @@ namespace cppdatalib
 
         struct value::traversal_reference
         {
+            traversal_reference()
+                : p(nullptr)
+                , traversed_key_already(false)
+                , frozen(false)
+            {}
+
             traversal_reference(const value *p, array_const_iterator_t a, object_const_iterator_t o, bool traversed_key, bool frozen = false)
                 : p(p)
                 , array(a)
@@ -1076,6 +1276,23 @@ namespace cppdatalib
             bool traversed_key_already;
             bool frozen;
         };
+
+        inline size_t value::traversal_ancestry_finder::get_parent_count() const {return c.size();}
+
+        // First element is direct parent, last element is ancestry root
+        inline std::vector<value::traversal_reference> value::traversal_ancestry_finder::get_ancestry() const
+        {
+            std::vector<value::traversal_reference> result;
+            container temp = c;
+
+            while (!temp.empty())
+            {
+                result.push_back(temp.top());
+                temp.pop();
+            }
+
+            return result;
+        }
 
         template<typename... Ts>
         value::value(std::initializer_list<Ts...> v, subtype_t subtype)
@@ -1150,41 +1367,42 @@ namespace cppdatalib
         template<typename PrefixPredicate, typename PostfixPredicate>
         void value::traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
         {
-            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> references;
             const value *p = this;
 
-            while (!references.empty() || p != NULL)
+            while (true)
             {
                 if (p != NULL)
                 {
                     if (!prefix(p, traversal_ancestry_finder(references)))
                         return;
 
-                    if (p->is_array())
+                    switch (p->get_type())
                     {
-                        references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
-                        if (!p->get_array_unchecked().empty())
-                            p = std::addressof(*references.top().array++);
-                        else
+                        case array:
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                            if (!p->get_array_unchecked().empty())
+                                p = std::addressof(*references.top().array++);
+                            else
+                                p = NULL;
+                            break;
+                        case object:
+                            references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                            if (!p->get_object_unchecked().empty())
+                                p = std::addressof(references.top().object->first);
+                            else
+                                p = NULL;
+                            break;
+                        default:
+                            references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
                             p = NULL;
-                    }
-                    else if (p->is_object())
-                    {
-                        references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
-                        if (!p->get_object_unchecked().empty())
-                            p = std::addressof(references.top().object->first);
-                        else
-                            p = NULL;
-                    }
-                    else
-                    {
-                        references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
-                        p = NULL;
+                            break;
                     }
                 }
-                else
+                else if (!references.empty())
                 {
                     const value *peek = references.top().p;
+
                     if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
                         p = std::addressof(*references.top().array++);
                     else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
@@ -1203,6 +1421,8 @@ namespace cppdatalib
                             return;
                     }
                 }
+                else
+                    break;
             }
         }
 
@@ -1212,7 +1432,7 @@ namespace cppdatalib
         template<typename Predicate>
         void value::traverse(Predicate &predicate) const
         {
-            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> references;
             const value *p = this;
 
             while (!references.empty() || p != NULL)
@@ -1274,7 +1494,7 @@ namespace cppdatalib
         template<typename PrefixPredicate, typename PostfixPredicate>
         void value::value_traverse(PrefixPredicate &prefix, PostfixPredicate &postfix) const
         {
-            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> references;
             const value *p = this;
 
             while (!references.empty() || p != NULL)
@@ -1330,7 +1550,7 @@ namespace cppdatalib
         template<typename Predicate>
         void value::value_traverse(Predicate &predicate) const
         {
-            std::stack<traversal_reference, std::vector<traversal_reference>> references;
+            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> references;
             const value *p = this;
 
             while (!references.empty() || p != NULL)
@@ -1395,8 +1615,8 @@ namespace cppdatalib
         template<typename PrefixPredicate, typename PostfixPredicate>
         void value::parallel_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
         {
-            std::stack<traversal_reference, std::vector<traversal_reference>> references;
-            std::stack<traversal_reference, std::vector<traversal_reference>> other_references;
+            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> references;
+            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> other_references;
             const value *p = this, *other_p = &other;
 
             while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
@@ -1508,8 +1728,8 @@ namespace cppdatalib
         template<typename PrefixPredicate, typename PostfixPredicate>
         void value::parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
         {
-            std::stack<traversal_reference, std::vector<traversal_reference>> references;
-            std::stack<traversal_reference, std::vector<traversal_reference>> other_references;
+            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> references;
+            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> other_references;
             const value *p = this, *other_p = &other;
 
             while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
@@ -1781,10 +2001,10 @@ namespace cppdatalib
         inline void value::set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ref_() = v; subtype_ = subtype;}
         inline void value::set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ref_() = v; subtype_ = subtype;}
 
-        inline value value::operator[](cstring_t key) const {return member(key);}
-        inline value &value::operator[](cstring_t key) {return member(key);}
-        inline value value::operator[](const string_t &key) const {return member(key);}
-        inline value &value::operator[](const string_t &key) {return member(key);}
+        inline value value::operator[](cstring_t key) const {return member(value(key));}
+        inline value &value::operator[](cstring_t key) {return member(value(key));}
+        inline value value::operator[](const string_t &key) const {return member(value(key));}
+        inline value &value::operator[](const string_t &key) {return member(value(key));}
         inline value value::member(const value &key) const
         {
             if (is_nonempty_object())
@@ -1814,14 +2034,14 @@ namespace cppdatalib
             }
             return NULL;
         }
-        inline bool_t value::is_member(cstring_t key) const {return is_nonempty_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        inline bool_t value::is_member(const string_t &key) const {return is_nonempty_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        inline bool_t value::is_member(cstring_t key) const {return is_nonempty_object() && obj_ref_().data().find(value(key)) != obj_ref_().end();}
+        inline bool_t value::is_member(const string_t &key) const {return is_nonempty_object() && obj_ref_().data().find(value(key)) != obj_ref_().end();}
         inline bool_t value::is_member(const value &key) const {return is_nonempty_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        inline size_t value::member_count(cstring_t key) const {return is_nonempty_object()? obj_ref_().data().count(key): 0;}
-        inline size_t value::member_count(const string_t &key) const {return is_nonempty_object()? obj_ref_().data().count(key): 0;}
+        inline size_t value::member_count(cstring_t key) const {return is_nonempty_object()? obj_ref_().data().count(value(key)): 0;}
+        inline size_t value::member_count(const string_t &key) const {return is_nonempty_object()? obj_ref_().data().count(value(key)): 0;}
         inline size_t value::member_count(const value &key) const {return is_nonempty_object()? obj_ref_().data().count(key): 0;}
-        inline void value::erase_member(cstring_t key) {if (is_nonempty_object()) obj_ref_().data().erase(key);}
-        inline void value::erase_member(const string_t &key) {if (is_nonempty_object()) obj_ref_().data().erase(key);}
+        inline void value::erase_member(cstring_t key) {if (is_nonempty_object()) obj_ref_().data().erase(value(key));}
+        inline void value::erase_member(const string_t &key) {if (is_nonempty_object()) obj_ref_().data().erase(value(key));}
         inline void value::erase_member(const value &key) {if (is_nonempty_object()) obj_ref_().data().erase(key);}
 
         inline value &value::add_member(const value &key)
@@ -1868,6 +2088,18 @@ namespace cppdatalib
 
         inline void value::push_back(const value &v) {clear(array); arr_ref_().data().push_back(v);}
         inline void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(std::move(v));}
+
+        template<typename It>
+        void value::append(It begin, It end)
+        {
+            clear(array);
+            if (begin != end)
+            {
+                array_t &ref = arr_ref_();
+                ref.data().insert(ref.data().end(), begin, end);
+            }
+        }
+
         inline value value::operator[](size_t pos) const {return element(pos);}
         inline value &value::operator[](size_t pos) {return element(pos);}
         inline value value::element(size_t pos) const {return is_nonempty_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}

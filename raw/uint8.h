@@ -50,7 +50,7 @@ namespace cppdatalib
                 if (was_just_reset())
                     get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
                 else if (stream() >> chr, stream().good())
-                    get_output()->write(chr & 0xff);
+                    get_output()->write(core::value(chr & 0xff));
                 else
                     get_output()->end_array(core::array_t());
             }

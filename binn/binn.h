@@ -173,7 +173,7 @@ namespace cppdatalib
                             bool negative = integer >> 31;
                             if (negative)
                                 integer = (~integer + 1) & INT32_MAX;
-                            get_output()->write(negative? -core::int_t(integer): core::int_t(integer));
+                            get_output()->write(core::value(negative? -core::int_t(integer): core::int_t(integer)));
                         }
                         else // String keys
                         {
@@ -186,7 +186,7 @@ namespace cppdatalib
                             if (stream().fail())
                                 throw core::error("Binn - unexpected end of object key");
 
-                            get_output()->write(core::string_t(key_buffer, chr));
+                            get_output()->write(core::value(core::string_t(key_buffer, chr)));
                         }
                     }
                 }
@@ -219,8 +219,8 @@ namespace cppdatalib
                         switch (element_subtype)
                         {
                             case null: get_output()->write(core::null_t()); break;
-                            case yes: get_output()->write(true); break;
-                            case no: get_output()->write(false); break;
+                            case yes: get_output()->write(core::value(true)); break;
+                            case no: get_output()->write(core::value(false)); break;
                             default: get_output()->write(core::value(core::null_t(), core::user + element_subtype)); break;
                         }
                         break;
@@ -236,10 +236,10 @@ namespace cppdatalib
                                 bool negative = chr >> 7;
                                 if (negative)
                                     chr = (~core::uint_t(chr) + 1) & INT8_MAX;
-                                get_output()->write(negative? -chr: chr);
+                                get_output()->write(core::value(negative? -chr: chr));
                                 break;
                             }
-                            case uint8: get_output()->write(core::uint_t(chr)); break;
+                            case uint8: get_output()->write(core::value(core::uint_t(chr))); break;
                             default: get_output()->write(core::value(core::uint_t(chr), core::user + element_subtype)); break;
                         }
                         break;
@@ -260,10 +260,10 @@ namespace cppdatalib
                                 bool negative = integer >> 15;
                                 if (negative)
                                     integer = (~integer + 1) & INT16_MAX;
-                                get_output()->write(negative? -core::int_t(integer): core::int_t(integer));
+                                get_output()->write(core::value(negative? -core::int_t(integer): core::int_t(integer)));
                                 break;
                             }
-                            case uint16: get_output()->write(integer); break;
+                            case uint16: get_output()->write(core::value(integer)); break;
                             default: get_output()->write(core::value(integer, core::user + element_subtype)); break;
                         }
                         break;
@@ -284,11 +284,11 @@ namespace cppdatalib
                                 bool negative = integer >> 31;
                                 if (negative)
                                     integer = (~integer + 1) & INT32_MAX;
-                                get_output()->write(negative? -core::int_t(integer): core::int_t(integer));
+                                get_output()->write(core::value(negative? -core::int_t(integer): core::int_t(integer)));
                                 break;
                             }
-                            case uint32: get_output()->write(integer); break;
-                            case single_float: get_output()->write(static_cast<core::real_t>(core::float_from_ieee_754(static_cast<uint32_t>(integer)))); break;
+                            case uint32: get_output()->write(core::value(integer)); break;
+                            case single_float: get_output()->write(core::value(static_cast<core::real_t>(core::float_from_ieee_754(static_cast<uint32_t>(integer))))); break;
                             default: get_output()->write(core::value(integer, core::user + element_subtype)); break;
                         }
                         break;
@@ -309,18 +309,18 @@ namespace cppdatalib
                                 bool negative = integer >> 63;
                                 if (negative)
                                     integer = ~integer + 1;
-                                get_output()->write(negative? -core::int_t(integer): core::int_t(integer));
+                                get_output()->write(core::value(negative? -core::int_t(integer): core::int_t(integer)));
                                 break;
                             }
-                            case uint64: get_output()->write(integer); break;
-                            case double_float: get_output()->write(core::double_from_ieee_754(integer)); break;
+                            case uint64: get_output()->write(core::value(integer)); break;
+                            case double_float: get_output()->write(core::value(core::double_from_ieee_754(integer))); break;
                             default: get_output()->write(core::value(integer, core::user + element_subtype)); break;
                         }
                         break;
                     case string:
                     {
                         uint32_t size = read_size(stream());
-                        core::value string_type = "";
+                        core::value string_type = core::value("");
 
                         switch (element_subtype)
                         {
@@ -355,7 +355,7 @@ namespace cppdatalib
                     case blob:
                     {
                         uint32_t size = read_size(stream());
-                        core::value string_type = "";
+                        core::value string_type = core::value("");
 
                         switch (element_subtype)
                         {

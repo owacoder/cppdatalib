@@ -167,7 +167,7 @@ namespace cppdatalib
                 else
                     r = core::double_from_ieee_754(temp);
 
-                writer.write(r);
+                writer.write(core::value(r));
                 return stream();
             }
 
@@ -180,7 +180,7 @@ namespace cppdatalib
                 if (specifier == 'C')
                 {
                     writer.begin_string(core::string_t(), 1);
-                    writer.write(std::string(1, c));
+                    writer.write(core::value(core::string_t(1, c)));
                     writer.end_string(core::string_t());
                 }
                 else if (specifier == 'H')
@@ -283,10 +283,10 @@ namespace cppdatalib
                         get_output()->write(core::null_t());
                         break;
                     case 'T':
-                        get_output()->write(true);
+                        get_output()->write(core::value(true));
                         break;
                     case 'F':
-                        get_output()->write(false);
+                        get_output()->write(core::value(false));
                         break;
                     case 'U':
                     case 'i':
@@ -296,7 +296,7 @@ namespace cppdatalib
                     {
                         core::int_t i;
                         read_int(i, chr);
-                        get_output()->write(i);
+                        get_output()->write(core::value(i));
                         break;
                     }
                     case 'd':

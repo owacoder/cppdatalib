@@ -121,7 +121,7 @@ namespace cppdatalib
                     throw core::error("MessagePack - unexpected end of stream, expected type specifier");
 
                 if (chr < 0x80) // Positive fixint
-                    get_output()->write(core::int_t(chr));
+                    get_output()->write(core::value(core::int_t(chr)));
                 else if (chr < 0x90) // Fixmap
                 {
                     chr &= 0xf;
@@ -143,25 +143,25 @@ namespace cppdatalib
                     if (stream().fail())
                         throw core::error("MessagePack - unexpected end of string");
 
-                    get_output()->write(core::string_t(buf, chr));
+                    get_output()->write(core::value(core::string_t(buf, chr)));
                 }
                 else if (chr >= 0xe0) // Negative fixint
-                    get_output()->write(-core::int_t((~unsigned(chr) + 1) & 0xff));
+                    get_output()->write(core::value(-core::int_t((~unsigned(chr) + 1) & 0xff)));
                 else switch (chr)
                 {
                     // Null
                     case 0xc0: get_output()->write(core::null_t()); break;
                     // Boolean false
-                    case 0xc2: get_output()->write(false); break;
+                    case 0xc2: get_output()->write(core::value(false)); break;
                     // Boolean true
-                    case 0xc3: get_output()->write(true); break;
+                    case 0xc3: get_output()->write(core::value(true)); break;
                     // Binary
                     case 0xc4:
                     case 0xc5:
                     case 0xc6:
                     {
                         uint32_t size;
-                        core::value string_type = "";
+                        core::value string_type = core::value("");
 
                         if ((chr == 0xc4 && !core::read_uint8(stream(), size)) ||
                             (chr == 0xc5 && !core::read_uint16_be(stream(), size)) ||
@@ -199,7 +199,7 @@ namespace cppdatalib
                         uint32_t flt;
                         if (!core::read_uint32_be(stream(), flt))
                             throw core::error("MessagePack - expected 'float' value");
-                        get_output()->write(core::float_from_ieee_754(flt));
+                        get_output()->write(core::value(core::float_from_ieee_754(flt)));
                         break;
                     }
                     // Double-precision floating point
@@ -208,7 +208,7 @@ namespace cppdatalib
                         uint64_t flt;
                         if (!core::read_uint64_be(stream(), flt))
                             throw core::error("MessagePack - expected 'float' value");
-                        get_output()->write(core::double_from_ieee_754(flt));
+                        get_output()->write(core::value(core::double_from_ieee_754(flt)));
                         break;
                     }
                     // Unsigned integers
@@ -223,7 +223,7 @@ namespace cppdatalib
                             (chr == 0xce && !core::read_uint32_be(stream(), val)) ||
                             (chr == 0xcf && !core::read_uint64_be(stream(), val)))
                             throw core::error("MessagePack - expected 'uinteger'");
-                        get_output()->write(val);
+                        get_output()->write(core::value(val));
                         break;
                     }
                     // Signed integers
@@ -238,7 +238,7 @@ namespace cppdatalib
                             (chr == 0xd2 && !core::read_int32_be(stream(), val)) ||
                             (chr == 0xd3 && !core::read_int64_be(stream(), val)))
                             throw core::error("MessagePack - expected 'integer'");
-                        get_output()->write(val);
+                        get_output()->write(core::value(val));
                         break;
                     }
                     // Fixext
@@ -257,7 +257,7 @@ namespace cppdatalib
                     case 0xdb:
                     {
                         uint32_t size;
-                        core::value string_type = "";
+                        core::value string_type = core::value("");
 
                         if ((chr == 0xd9 && !core::read_uint8(stream(), size)) ||
                             (chr == 0xda && !core::read_uint16_be(stream(), size)) ||

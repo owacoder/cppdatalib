@@ -60,7 +60,7 @@ namespace cppdatalib
                          buffer == "true" ||
                          buffer == "True" ||
                          buffer == "TRUE")
-                    writer.write(true);
+                    writer.write(core::value(true));
                 else if (buffer == "N" ||
                          buffer == "n" ||
                          buffer == "no" ||
@@ -72,7 +72,7 @@ namespace cppdatalib
                          buffer == "false" ||
                          buffer == "False" ||
                          buffer == "FALSE")
-                    writer.write(false);
+                    writer.write(core::value(false));
                 else
                 {
                     // Attempt to read as an integer
@@ -82,7 +82,7 @@ namespace cppdatalib
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                         {
-                            writer.write(value);
+                            writer.write(core::value(value));
                             return;
                         }
                     }
@@ -94,7 +94,7 @@ namespace cppdatalib
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                         {
-                            writer.write(value);
+                            writer.write(core::value(value));
                             return;
                         }
                     }
@@ -107,13 +107,13 @@ namespace cppdatalib
                         temp_stream >> value;
                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                         {
-                            writer.write(value);
+                            writer.write(core::value(value));
                             return;
                         }
                     }
 
                     // Revert to string
-                    writer.write(buffer);
+                    writer.write(core::value(buffer));
                 }
             }
 
@@ -272,7 +272,7 @@ namespace cppdatalib
                             if (comma_just_parsed)
                             {
                                 if (parse_as_strings)
-                                    get_output()->write(core::string_t());
+                                    get_output()->write(core::value(core::string_t()));
                                 else // parse by deduction of types, assume `,,` means null instead of empty string
                                     get_output()->write(core::null_t());
                             }
@@ -282,7 +282,7 @@ namespace cppdatalib
                             if (comma_just_parsed)
                             {
                                 if (parse_as_strings)
-                                    get_output()->write(core::string_t());
+                                    get_output()->write(core::value(core::string_t()));
                                 else // parse by deduction of types, assume `,,` means null instead of empty string
                                     get_output()->write(core::null_t());
                             }
@@ -305,7 +305,7 @@ namespace cppdatalib
                     if (comma_just_parsed)
                     {
                         if (parse_as_strings)
-                            get_output()->write(core::string_t());
+                            get_output()->write(core::value(core::string_t()));
                         else // parse by deduction of types, assume `,,` means null instead of empty string
                             get_output()->write(core::null_t());
                     }

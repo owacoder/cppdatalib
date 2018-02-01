@@ -296,7 +296,7 @@ To create a new filter, follow the guidelines for output formats, but place them
 
 ### Compile-time flags
 
-Below is a list of compile-time type adjustments supported by cppdatalib:
+Below is a list of compile-time adjustments supported by cppdatalib:
 
    - `CPPDATALIB_BOOL_T` - The underlying boolean type of the implementation. Should be able to store a true and false value. Defaults to `bool`
    - `CPPDATALIB_INT_T` - The underlying integer type of the implementation. Should be able to store a signed integral value. Defaults to `int64_t`
@@ -307,6 +307,8 @@ Below is a list of compile-time type adjustments supported by cppdatalib:
    - `CPPDATALIB_ARRAY_T` - The underlying array type of the implementation. Defaults to `std::vector<cppdatalib::core::value>`
    - `CPPDATALIB_OBJECT_T` - The underlying object type of the implementation. Defaults to `std::multimap<cppdatalib::core::value, cppdatalib::core::value>`
    - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `int16_t`
+   - `CPPDATALIB_BUFFER_SIZE` - The size of underlying buffers in the implementation. Defaults to 4096
+   - `CPPDATALIB_CACHE_SIZE` - The cache depth of traversal in the implementation. Defaults to 3
 
 Enable/Disable flags are listed below:
 
@@ -317,9 +319,12 @@ Enable/Disable flags are listed below:
    - `CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE` - Trims value sizes down to optimize space for large numeric arrays. This theoretically slows down string values somewhat, but saves space
    - `CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS` - Disables raw pointer and std::weak_ptr conversions to core::values. Note that defining this flag will not result in compile-time errors when attempting to convert a weakly-defined pointer. It will be implicitly converted to bool instead. As this may not be what you want, use at your own risk.
    - `CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS` - Disables implicit conversions between types and removes the convert_to_xxx() member functions of core::value. The as_xxx() member functions of core::value are remapped to be identical to the get_xxx() member functions. The MySQL format requires that this be undefined
-   - `CPPDATALIB_THROW_IF_WRONG_TYPE` - Makes the get_xxx() member functions of core::value throw an error if the currently stored type is not the requested type. The "default value" parameter is irrelevant if this is defined
+   - `CPPDATALIB_THROW_IF_WRONG_TYPE` - Makes the get_xxx() member functions of core::value throw an error if the currently stored type is not the requested type. The "default value" parameter is irrelevant if this is defined. Some internal library code may throw errors with this flag defined, so use at your own risk
+   - `CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS` - If defined, this flag makes all core::value constructors (except for core::null_t) and all core::value type conversion operators `explicit`. User code and future formats should compile with this flag defined, although the library is much easier to use with it undefined
+   - `CPPDATALIB_DISABLE_CONVERSION_LOSS` - If defined, this flag makes internal core::value converters throw errors if data loss would result, including loss of precision by converting to or from "real"
    - `CPPDATALIB_ENABLE_BOOST_COMPUTE` - Enables the [Boost.Compute](http://www.boost.org/doc/libs/1_66_0/libs/compute/doc/html/index.html) adapters, to smoothly integrate with Boost.Compute types. The Boost source tree must be in the include path
    - `CPPDATALIB_ENABLE_BOOST_CONTAINER` - Enables the [Boost.Container](http://www.boost.org/doc/libs/1_66_0/doc/html/container.html) adapters, to smoothly integrate with Boost.Container types. The Boost source tree must be in the include path
+   - `CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET` - Enables the [Boost.DynamicBitset](http://www.boost.org/doc/libs/1_66_0/libs/dynamic_bitset/dynamic_bitset.html) adapters, to smoothly integrate with Boost.DynamicBitset. The Boost source tree must be in the include path
    - `CPPDATALIB_ENABLE_QT` - Enables the [Qt](https://www.qt.io/) adapters, to smoothly integrate with the most common Qt types. The Qt source tree must be in the include path
    - `CPPDATALIB_ENABLE_POCO` - Enables the [POCO](https://pocoproject.org/) adapters, to smoothly integrate with POCO types. The "Poco" source tree must be in the include path
    - `CPPDATALIB_ENABLE_ETL` - Enables the [ETL](https://www.etlcpp.com/home.html) adapters, to smoothly integrate with ETL types. The "etl" source tree must be in the include path

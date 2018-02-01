@@ -119,7 +119,7 @@ namespace cppdatalib
                     if (write - buffer.get() >= core::buffer_size)
                     {
                         *write = 0;
-                        writer.append_to_string(buffer.get());
+                        writer.append_to_string(core::value(core::string_t(buffer.get(), write - buffer.get())));
                         write = buffer.get();
                     }
                 }
@@ -130,7 +130,7 @@ namespace cppdatalib
                 if (write != buffer.get())
                 {
                     *write = 0;
-                    writer.append_to_string(buffer.get());
+                    writer.append_to_string(core::value(core::string_t(buffer.get(), write - buffer.get())));
                 }
                 writer.end_string(core::string_t());
                 return stream();
@@ -209,7 +209,7 @@ namespace cppdatalib
                                 if (!stream() || (chr != 'Y' && chr != 'N'))
                                     throw core::error("Plain Text Property List - expected 'boolean' value after '<*B' in value");
 
-                                get_output()->write(chr == 'Y');
+                                get_output()->write(core::value(chr == 'Y'));
                             }
                             else if (chr == 'I')
                             {
@@ -218,7 +218,7 @@ namespace cppdatalib
                                 if (!stream())
                                     throw core::error("Plain Text Property List - expected 'integer' value after '<*I' in value");
 
-                                get_output()->write(i);
+                                get_output()->write(core::value(i));
                             }
                             else if (chr == 'R')
                             {
@@ -227,7 +227,7 @@ namespace cppdatalib
                                 if (!stream())
                                     throw core::error("Plain Text Property List - expected 'real' value after '<*R' in value");
 
-                                get_output()->write(r);
+                                get_output()->write(core::value(r));
                             }
                             else if (chr == 'D')
                             {

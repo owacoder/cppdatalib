@@ -64,7 +64,7 @@ namespace cppdatalib
                         stream() >> i;
                         if (!stream()) throw core::error("Bencode - expected 'integer' value");
 
-                        get_output()->write(i);
+                        get_output()->write(core::value(i));
                         if (stream().get() != 'e') throw core::error("Bencode - invalid 'integer' value");
                         break;
                     }

@@ -104,6 +104,8 @@ namespace cppdatalib
             };
 
 #ifndef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+            // TODO: implement conversions for when CPPDATALIB_DISABLE_CONVERSION_LOSS is defined
+
             template<core::type from, core::type to>
             struct stream_filter_converter
             {
@@ -928,8 +930,8 @@ namespace cppdatalib
                 else if (samples.array_size() & 1) // Odd number of samples
                     return samples.element(samples.array_size() / 2);
                 else // Even number of samples
-                    return (samples.element(samples.array_size() / 2 - 1).as_real() +
-                            samples.element(samples.array_size() / 2).as_real()) / 2;
+                    return cppdatalib::core::value((samples.element(samples.array_size() / 2 - 1).as_real() +
+                            samples.element(samples.array_size() / 2).as_real()) / 2);
             }
 
             size_t sample_size() const
@@ -1099,7 +1101,7 @@ namespace cppdatalib
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
-                core::value map_ = core::object_t();
+                core::value map_ = core::value(core::object_t());
 
                 if (v.is_array())
                 {

@@ -292,6 +292,7 @@ namespace cppdatalib
             // An API must call these when a long string is parsed. The number of bytes is passed in size, if possible
             // size == -1 means unknown size
             // If the length of v is equal to size, the entire string is provided
+            void begin_string(const core::string_t &v, core::int_t size) {begin_string(v, size);}
             void begin_string(const core::value &v, core::int_t size)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -315,6 +316,7 @@ namespace cppdatalib
 
                 nested_scopes.push_back(string);
             }
+            void append_to_string(const core::string_t &v) {append_to_string(value(v));}
             void append_to_string(const core::value &v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -329,6 +331,7 @@ namespace cppdatalib
                 string_data_(v, is_key_);
                 nested_scopes.back().items_ += v.string_size();
             }
+            void end_string(const core::string_t &v) {end_string(value(v));}
             void end_string(const core::value &v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -364,6 +367,7 @@ namespace cppdatalib
             // An API must call these when an array is parsed. The number of elements is passed in size, if possible
             // size == -1 means unknown size
             // If the number of elements of v is equal to size, the entire array is provided
+            void begin_array(const core::array_t &v, core::int_t size) {begin_array(value(v), size);}
             void begin_array(const core::value &v, core::int_t size)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -387,6 +391,7 @@ namespace cppdatalib
 
                 nested_scopes.push_back(array);
             }
+            void end_array(const core::array_t &v) {end_array(value(v));}
             void end_array(const core::value &v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -423,6 +428,7 @@ namespace cppdatalib
             // An API must call these when an object is parsed. The number of key/value pairs is passed in size, if possible
             // size == -1 means unknown size
             // If the number of elements of v is equal to size, the entire object is provided
+            void begin_object(const core::object_t &v, core::int_t size) {begin_object(value(v), size);}
             void begin_object(const core::value &v, core::int_t size)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -446,6 +452,7 @@ namespace cppdatalib
 
                 nested_scopes.push_back(object);
             }
+            void end_object(const core::object_t &v) {end_object(value(v));}
             void end_object(const core::value &v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());

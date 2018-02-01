@@ -95,7 +95,7 @@ namespace cppdatalib
                     if (write - buffer.get() >= core::buffer_size)
                     {
                         *write = 0;
-                        writer.append_to_string(buffer.get());
+                        writer.append_to_string(core::value(core::string_t(buffer.get(), write - buffer.get())));
                         write = buffer.get();
                     }
                 }
@@ -106,7 +106,7 @@ namespace cppdatalib
                 if (write != buffer.get())
                 {
                     *write = 0;
-                    writer.append_to_string(buffer.get());
+                    writer.append_to_string(core::value(core::string_t(buffer.get(), write - buffer.get())));
                 }
                 writer.end_string(core::string_t());
                 return stream;
@@ -150,12 +150,12 @@ namespace cppdatalib
                             break;
                         case 't':
                             if (!core::stream_starts_with(stream(), "rue")) throw core::error("JSON - expected 'true' value");
-                            get_output()->write(true);
+                            get_output()->write(core::value(true));
                             delimiter_required = true;
                             break;
                         case 'f':
                             if (!core::stream_starts_with(stream(), "alse")) throw core::error("JSON - expected 'false' value");
-                            get_output()->write(false);
+                            get_output()->write(core::value(false));
                             delimiter_required = true;
                             break;
                         case '"':
@@ -219,7 +219,7 @@ namespace cppdatalib
                                         temp_stream >> value;
                                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                                         {
-                                            get_output()->write(value);
+                                            get_output()->write(core::value(value));
                                             break; // break switch
                                         }
                                     }
@@ -231,7 +231,7 @@ namespace cppdatalib
                                         temp_stream >> value;
                                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                                         {
-                                            get_output()->write(value);
+                                            get_output()->write(core::value(value));
                                             break; // break switch
                                         }
                                     }
@@ -245,7 +245,7 @@ namespace cppdatalib
                                     temp_stream >> value;
                                     if (!temp_stream.fail() && temp_stream.get() == EOF)
                                     {
-                                        get_output()->write(value);
+                                        get_output()->write(core::value(value));
                                         break; // break switch
                                     }
                                 }

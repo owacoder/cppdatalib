@@ -101,21 +101,21 @@ namespace cppdatalib
 
                         if (arg == NULL && arg2 != NULL)
                         {
-                            change["op"] = "add";
-                            change["path"] = make_path(arg2_ancestry);
+                            change["op"] = core::value("add");
+                            change["path"] = core::value(make_path(arg2_ancestry));
                             change["value"] = *arg2;
                         }
                         else if (arg != NULL && arg2 == NULL)
                         {
-                            change["op"] = "remove";
-                            change["path"] = make_path(arg_ancestry);
+                            change["op"] = core::value("remove");
+                            change["path"] = core::value(make_path(arg_ancestry));
                         }
                         else if (arg != NULL && arg2 != NULL &&
                                  !arg->is_object() && !arg->is_array() &&
                                  !arg2->is_object() && !arg2->is_array() && *arg != *arg2)
                         {
-                            change["op"] = "replace";
-                            change["path"] = make_path(arg_ancestry);
+                            change["op"] = core::value("replace");
+                            change["path"] = core::value(make_path(arg_ancestry));
                             change["value"] = *arg2;
                         }
 

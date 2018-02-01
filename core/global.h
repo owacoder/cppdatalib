@@ -25,6 +25,10 @@
 #ifndef CPPDATALIB_GLOBAL_H
 #define CPPDATALIB_GLOBAL_H
 
+#include <cstdlib>
+#include <vector>
+#include <array>
+
 namespace cppdatalib
 {
     namespace core
@@ -33,9 +37,14 @@ namespace cppdatalib
         {
             max_utf8_code_sequence_size = 4,
 #ifdef CPPDATALIB_BUFFER_SIZE
-            buffer_size = CPPDATALIB_BUFFER_SIZE
+            buffer_size = CPPDATALIB_BUFFER_SIZE,
 #else
-            buffer_size = 4096
+            buffer_size = 4096,
+#endif
+#ifdef CPPDATALIB_CACHE_SIZE
+            cache_size = CPPDATALIB_CACHE_SIZE
+#else
+            cache_size = 3
 #endif
         };
     }

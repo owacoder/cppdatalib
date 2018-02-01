@@ -207,7 +207,7 @@ public:
     cast_array_template_to_cppdatalib(const std::array<T, N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
+        cppdatalib::core::value result = cppdatalib::core::value(cppdatalib::core::array_t());
         for (const auto &item: bind)
             result.push_back(cppdatalib::core::value(item));
         return result;
@@ -416,7 +416,7 @@ public:
     operator cppdatalib::core::value()
     {
         using namespace std;
-        cppdatalib::core::value result = cppdatalib::core::array_t();
+        cppdatalib::core::value result = cppdatalib::core::value(cppdatalib::core::array_t());
         while (!bind.empty())
         {
             result.push_back(cppdatalib::core::value(bind.top()));
@@ -530,7 +530,7 @@ public:
     cast_template_to_cppdatalib(const std::multimap<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
+        cppdatalib::core::value result = cppdatalib::core::value(cppdatalib::core::object_t());
         for (const auto &item: bind)
             result.add_member_at_end(cppdatalib::core::value(item.first),
                                      cppdatalib::core::value(item.second));

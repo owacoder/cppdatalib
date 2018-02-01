@@ -63,12 +63,12 @@ namespace cppdatalib
                     else
                         ++neg;
 
-                stats["positive"] = pos;
-                stats["negative"] = neg;
+                stats["positive"] = cppdatalib::core::value(pos);
+                stats["negative"] = cppdatalib::core::value(neg);
 
                 for (const auto &column: columns)
                 {
-                    core::value column_values = core::object_t(); // object, keys are distinct column values, values are {"positive", "negative"} tuples
+                    core::value column_values = cppdatalib::core::value(core::object_t()); // object, keys are distinct column values, values are {"positive", "negative"} tuples
                     for (size_t idx = 0; idx < array.size(); ++idx)
                     {
                         core::value &tuple = column_values.member(array[idx].member(column));
@@ -81,14 +81,17 @@ namespace cppdatalib
                     double item_entropy = 0.0, item_gain = 0.0;
                     for (auto &item: column_values.get_object_unchecked())
                     {
-                        double positive = item.second["positive"];
-                        double negative = item.second["negative"];
+                        double positive = item.second["positive"].as_real();
+                        double negative = item.second["negative"].as_real();
 
                         item_entropy += ((positive + negative) / array.size()) * igain(positive, negative);
                     }
                     item_gain = gain - item_entropy;
 
-                    stats["stats"].member(column) = core::object_t{{"entropy", item_entropy}, {"gain", item_gain}, {"values", column_values}};
+                    stats["stats"].member(column) = cppdatalib::core::value(core::object_t{
+                                                                                {cppdatalib::core::value("entropy"), cppdatalib::core::value(item_entropy)},
+                                                                                {cppdatalib::core::value("gain"), cppdatalib::core::value(item_gain)},
+                                                                                {cppdatalib::core::value("values"), cppdatalib::core::value(column_values)}});
                 }
             }
 
@@ -122,7 +125,7 @@ namespace cppdatalib
                 core::value &parent_tuple = tree.member(columns[max_gain_idx]);
                 core::value &tuple = parent_tuple["node"];
                 core::value &values = column_stats["values"];
-                parent_tuple["probability"] = stats["positive"].as_real() / array.size();
+                parent_tuple["probability"] = cppdatalib::core::value(stats["positive"].as_real() / array.size());
 
                 if (values.is_object())
                 {
@@ -130,12 +133,12 @@ namespace cppdatalib
                     {
                         if (value.second["positive"].as_uint() == 0 ||
                             value.second["negative"].as_uint() == 0)
-                            tuple.member(value.first) = value.second["positive"].as_uint() != 0;
+                            tuple.member(value.first) = cppdatalib::core::value(value.second["positive"].as_uint() != 0);
                         else
                         {
-                            core::value columns_copy = columns;
-                            core::value array_copy = core::array_t();
-                            core::value results_copy = core::array_t();
+                            core::value columns_copy = cppdatalib::core::value(columns);
+                            core::value array_copy = cppdatalib::core::value(core::array_t());
+                            core::value results_copy = cppdatalib::core::value(core::array_t());
                             size_t idx = 0;
 
                             for (const auto &item: array)
@@ -216,7 +219,7 @@ namespace cppdatalib
                     return core::null_t(); // Unknown result, since it doesn't have the column specified in the tree
 
                 // node is the pointer to the object containing possible values
-                const core::value *node = tree.get_object_unchecked().begin()->second.member_ptr("node");
+                const core::value *node = tree.get_object_unchecked().begin()->second.member_ptr(cppdatalib::core::value("node"));
                 if (!node || !node->is_object())
                     throw core::error("cppdatalib::experimental::test_decision_tree - invalid decision tree passed as parameter");
 
@@ -224,14 +227,14 @@ namespace cppdatalib
                 const core::value *member = node->member_ptr(*ref);
                 if (!member)
                 {
-                    const core::value *probability = tree.get_object_unchecked().begin()->second.member_ptr("probability");
+                    const core::value *probability = tree.get_object_unchecked().begin()->second.member_ptr(cppdatalib::core::value("probability"));
                     if (!probability)
                         throw core::error("cppdatalib::experimental::test_decision_tree - invalid decision tree passed as parameter");
 
                     core::real_t result = probability->as_real();
 
                     if (probability_result)
-                        return result;
+                        return cppdatalib::core::value(result);
 
                     return result < 0.5? core::value(false): result > 0.5? core::value(true): core::value();
                 }
@@ -241,13 +244,13 @@ namespace cppdatalib
             else if (tree.is_null())
             {
                 if (probability_result)
-                    return 0.5;
+                    return cppdatalib::core::value(0.5);
                 return tree;
             }
             else if (tree.is_bool())
             {
                 if (probability_result)
-                    return tree.as_bool()? 1.0: 0.0;
+                    return cppdatalib::core::value(tree.as_bool()? 1.0: 0.0);
                 return tree;
             }
             else

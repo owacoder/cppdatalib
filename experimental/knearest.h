@@ -46,8 +46,8 @@ namespace cppdatalib
         {
             if (test_tuple.is_object() && dataset_tuple.is_object())
             {
-                core::value lhs = core::array_t();
-                core::value rhs = core::array_t();
+                core::value lhs = cppdatalib::core::value(core::array_t());
+                core::value rhs = cppdatalib::core::value(core::array_t());
 
                 // Join columns (this is to make sure that all columns are accounted for; NULL values are inserted where the value is missing)
                 auto test_tuple_it = test_tuple.get_object_unchecked().begin();
@@ -91,23 +91,23 @@ namespace cppdatalib
                     ++data_tuple_it;
                 }
 
-                return euclidean<R, Distance>(lhs.get_array_unchecked().begin(),
+                return cppdatalib::core::value(euclidean<R, Distance>(lhs.get_array_unchecked().begin(),
                                               rhs.get_array_unchecked().begin(),
                                               lhs.array_size(),
-                                              measure);
+                                              measure));
             }
             else if (test_tuple.is_array() && dataset_tuple.is_array())
             {
                 if (test_tuple.array_size() != dataset_tuple.array_size())
                     throw core::error("cppdatalib::experimental::k_nearest_neighbor - test-sample and training-data arrays are not the same size");
 
-                return euclidean<R, Distance>(test_tuple.get_array_unchecked().begin(),
+                return cppdatalib::core::value(euclidean<R, Distance>(test_tuple.get_array_unchecked().begin(),
                                               dataset_tuple.get_array_unchecked().begin(),
                                               test_tuple.array_size(),
-                                              measure);
+                                              measure));
             }
             else
-                return static_cast<R>(measure(test_tuple, dataset_tuple));
+                return cppdatalib::core::value(static_cast<R>(measure(test_tuple, dataset_tuple)));
         }
 
         // k_nearest_neighbor_classify(): determines the most likely match for test_tuple, given a dataset (array) and the results-set (results)
@@ -140,7 +140,9 @@ namespace cppdatalib
             // Generate list of distances, with indexes tied to them
             core::value distances;
             for (size_t idx = 0; idx < array.size(); ++idx)
-                distances.push_back(core::object_t{{"distance", distance<R, Distance>(test_tuple, array[idx], measure)}, {"index", idx}});
+                distances.push_back(cppdatalib::core::value(core::object_t{
+                                                                {cppdatalib::core::value("distance"), cppdatalib::core::value(distance<R, Distance>(test_tuple, array[idx], measure))},
+                                                                {cppdatalib::core::value("index"), cppdatalib::core::value(idx)}}));
 
             auto lambda = [](const core::value &lhs, const core::value &rhs){return lhs["distance"].operator R() < rhs["distance"].operator R();};
 
@@ -196,7 +198,9 @@ namespace cppdatalib
             // Generate list of distances, with indexes tied to them
             core::value distances;
             for (size_t idx = 0; idx < array.size(); ++idx)
-                distances.push_back(core::object_t{{"distance", distance<R, Distance>(test_tuple, array[idx], measure)}, {"index", idx}});
+                distances.push_back(cppdatalib::core::value(core::object_t{
+                                                                {cppdatalib::core::value("distance"), cppdatalib::core::value(distance<R, Distance>(test_tuple, array[idx], measure))},
+                                                                {cppdatalib::core::value("index"), cppdatalib::core::value(idx)}}));
 
             auto lambda = [](const core::value &lhs, const core::value &rhs){return lhs["distance"].operator R() < rhs["distance"].operator R();};
 
@@ -207,7 +211,7 @@ namespace cppdatalib
                              k);
 
             // Accumulate weights for each class
-            core::value result = core::object_t();
+            core::value result = cppdatalib::core::value(core::object_t());
             for (size_t idx = 0; idx < k; ++idx)
             {
                 R temp_distance = distances[idx]["distance"].operator R();
@@ -225,11 +229,11 @@ namespace cppdatalib
             // Remove other possibilities from result
             if (isinf(total_weight))
             {
-                core::value new_result = core::object_t();
+                core::value new_result = cppdatalib::core::value(core::object_t());
 
                 for (const auto &item: result.get_object_unchecked())
                     if (isinf(item.second.as_real()))
-                        new_result.member(item.first) = 1.0;
+                        new_result.member(item.first) = cppdatalib::core::value(1.0);
 
                 return new_result;
             }
@@ -237,7 +241,7 @@ namespace cppdatalib
             // Everything is equally likely, so we decay to normal KNN search
             else if (total_weight == 0)
             {
-                result = core::object_t();
+                result = cppdatalib::core::value(core::object_t());
                 for (size_t idx = 0; idx < k; ++idx)
                     result.member(results[distances[idx]["index"].as_uint()]).get_real_ref() += 1.0 / k;
             }

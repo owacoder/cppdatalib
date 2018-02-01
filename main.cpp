@@ -9,6 +9,7 @@
 #define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 //#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
 #define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+//#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
 #define CPPDATALIB_THROW_IF_WRONG_TYPE
 #undef CPPDATALIB_ENABLE_MYSQL
 #include "cppdatalib.h"
@@ -430,7 +431,7 @@ class cast_to_cppdatalib<point>
     const point &bind;
 public:
     cast_to_cppdatalib(const point &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::object_t{{"x", bind.x}, {"y", bind.y}};}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::object_t{{cppdatalib::core::value("x"), cppdatalib::core::value(bind.x)}, {cppdatalib::core::value("y"), cppdatalib::core::value(bind.y)}});}
 };
 
 template<>
@@ -442,8 +443,8 @@ public:
     operator point() const
     {
         point p;
-        p.x = bind["x"];
-        p.y = bind["y"];
+        p.x = (int) bind["x"];
+        p.y = (int) bind["y"];
         return p;
     }
 };
@@ -456,9 +457,9 @@ int readme_simple_test4()
     core::value my_value, m2;               // Global cross-format value class
     core::value_builder builder(my_value);
 
-    m2 = std::array<int, 3>{{0, 1, 4}};
-    std::array<int, 2> axx = m2;
-    m2 = axx;
+    m2 = cppdatalib::core::value(std::array<int, 3>{{0, 1, 4}});
+    std::array<int, 2> axx = (decltype(axx)) m2;
+    m2 = cppdatalib::core::value(axx);
 
     std::stack<int, std::vector<int>> stack;
     stack.push(0);
@@ -483,14 +484,14 @@ int readme_simple_test4()
         vp.end();
 
         std::multimap<const char *, int> map = {{"x", 1}, {"y", 2}};
-        m2 = stack;
-        m2 = map;
+        m2 = cppdatalib::core::value(stack);
+        m2 = cppdatalib::core::value(map);
         point p2 = point();
         p2.x = 9;
-        m2 = p2;
-        p2 = m2;
+        m2 = cppdatalib::core::value(p2);
+        p2 = static_cast<decltype(p2)>(m2);
         p2.x += 1000;
-        m2 = p2;
+        m2 = cppdatalib::core::value(p2);
         w << m2;                // Write core::value out to STDOUT as JSON
     } catch (core::error e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
@@ -1163,10 +1164,10 @@ void test_select()
 
     auto lambda = [](const cppdatalib::core::value &v) {return v.is_bool();};
 
-    data.push_back(true);//cppdatalib::core::object_t{{"size", cppdatalib::core::null_t()}, {"shape", "weird"}, {0, -1}, {cppdatalib::core::object_t{{"object", 1}}, 1}});
-    data.push_back(false);//cppdatalib::core::object_t{{"size", cppdatalib::core::null_t()}, {"shape", "weird"}, {0, -1}, {cppdatalib::core::object_t{{"object", 1}}, 1}});
-    data.push_back(true);
-    data.push_back(false);
+    data.push_back(cppdatalib::core::value(true));//cppdatalib::core::object_t{{"size", cppdatalib::core::null_t()}, {"shape", "weird"}, {0, -1}, {cppdatalib::core::object_t{{"object", 1}}, 1}});
+    data.push_back(cppdatalib::core::value(false));//cppdatalib::core::object_t{{"size", cppdatalib::core::null_t()}, {"shape", "weird"}, {0, -1}, {cppdatalib::core::object_t{{"object", 1}}, 1}});
+    data.push_back(cppdatalib::core::value(true));
+    data.push_back(cppdatalib::core::value(false));
 
     json_writer json(std::cout);
     data >> cdlcore::make_select_from_array_filter(json, lambda);
@@ -1180,6 +1181,7 @@ void test_select()
 
 void test_decision_tree()
 {
+#if 0
     cppdatalib::core::value data;
     cppdatalib::core::value results;
 
@@ -1211,12 +1213,14 @@ void test_decision_tree()
     {
         std::cerr << e.what() << std::endl;
     }
+#endif
 }
 
 #include <fstream>
 
 void make_k_nearest()
 {
+#if 0
     std::ofstream out;
 
     out.open("/shared/Test_Data/knearest_test.json");
@@ -1232,6 +1236,7 @@ void make_k_nearest()
     }
 
     cppdatalib::json::pretty_stream_writer(out, 2) << cppdatalib::core::object_t{{"data", data}, {"results", results}};
+#endif
 }
 
 void test_k_nearest()
@@ -1242,12 +1247,14 @@ void test_k_nearest()
 
     cppdatalib::core::value data, value;
     //data << cppdatalib::json::parser(in);
+#if 0
     data["data"].push_back(cppdatalib::core::object_t{{"X", 0}, {"Y", 0}});
     data["results"].push_back(0);
     data["data"].push_back(cppdatalib::core::object_t{{"X", 3}, {"Y", 0}});
     data["results"].push_back(1);
     data["data"].push_back(cppdatalib::core::object_t{{"X", 3}, {"Y", 0}});
     data["results"].push_back(1);
+#endif
 
     std::cout << "\n";
 
@@ -1289,6 +1296,19 @@ void test_k_nearest()
 
 int main()
 {
+    cppdatalib::core::cache_vector_n<size_t*, 2> vec;
+
+    vec.resize(10);
+    for (size_t i = 0; i < 10; ++i)
+        vec[i] = &i;
+
+    std::cout << vec.size() << std::endl;
+
+    for (auto it: vec)
+        std::cout << it << "\n";
+
+    return vec.size();
+
     try
     {
         const char tuple[] = "2093";
@@ -1311,6 +1331,7 @@ int main()
 
     return 0;
 
+#if 0
     cppdatalib::core::value data = cppdatalib::core::object_t{{"value", 1}, {cppdatalib::core::object_t{{cppdatalib::core::object_t{{"string", "null"}}, cppdatalib::core::object_t{{"string", "null"}}}}, cppdatalib::core::object_t{{cppdatalib::core::object_t{{"string", "null"}}, cppdatalib::core::object_t{{"string", "null"}}}}}, {"Object", cppdatalib::core::null_t()}};
 
     try
@@ -1325,6 +1346,7 @@ int main()
     }
 
     return 0;
+#endif
 
     srand(std::time(NULL));
 
@@ -1338,7 +1360,7 @@ int main()
     using namespace json;
     boost::dynamic_bitset<> b;
 
-    cppdatalib::core::value yx = b;
+    cppdatalib::core::value yx = cppdatalib::core::value(b);
     yx = R"({"my string":""})"_json;
 
     std::tuple<unsigned int, const char *> myvec{44, "hello"};
@@ -1371,7 +1393,7 @@ int main()
     cppdatalib::core::dispersion_filter<cppdatalib::core::uinteger> dispersal(range);
     cppdatalib::core::array_sort_filter<> sorter(dispersal);
 
-    sorter << cppdatalib::core::array_t{2, 0, 1, 2, 3, 4, 4};
+    //sorter << cppdatalib::core::value(cppdatalib::core::array_t{2, 0, 1, 2, 3, 4, 4});
 
     std::cout << median.get_median() << std::endl;
     std::cout << mode.get_modes() << std::endl;

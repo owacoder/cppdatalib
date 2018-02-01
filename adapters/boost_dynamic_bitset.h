@@ -31,6 +31,8 @@
 #ifndef CPPDATALIB_BOOST_DYNAMIC_BITSET_H
 #define CPPDATALIB_BOOST_DYNAMIC_BITSET_H
 
+#ifdef CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
+
 #include <boost/dynamic_bitset.hpp>
 
 #include "../core/value_parser.h"
@@ -43,9 +45,9 @@ public:
     cast_template_to_cppdatalib(const boost::dynamic_bitset<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
+        cppdatalib::core::value result = cppdatalib::core::value(cppdatalib::core::array_t());
         for (size_t i = 0; i < bind.size(); ++i)
-            result.push_back(bool(bind[i]));
+            result.push_back(cppdatalib::core::value(bool(bind[i])));
         return result;
     }
 };
@@ -99,4 +101,5 @@ namespace cppdatalib { namespace core {
     };
 }}
 
+#endif // CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 #endif // CPPDATALIB_BOOST_DYNAMIC_BITSET_H
