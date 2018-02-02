@@ -173,6 +173,14 @@ namespace cppdatalib
 
         inline value &value::assign(value &dst, const value &src)
         {
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            if (dst.attr_ && src.attr_)
+                *dst.attr_ = *src.attr_;
+            else if (dst.attr_)
+                dst.attr_->data().clear();
+            else if (src.attr_)
+                dst.attr_ = new object_t(*src.attr_);
+#endif
             switch (src.get_type())
             {
                 case null: dst.set_null(src.get_subtype()); return dst;
@@ -216,6 +224,9 @@ namespace cppdatalib
                 default: break;
             }
             dst.subtype_ = src.get_subtype();
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            std::swap(dst.attr_, src.attr_);
+#endif
             return dst;
         }
 

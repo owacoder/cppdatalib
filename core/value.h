@@ -256,34 +256,61 @@ namespace cppdatalib
             template<typename PrefixPredicate, typename PostfixPredicate>
             void parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const;
 
-            value() : type_(null), subtype_(core::normal) {}
+            value() : type_(null), subtype_(core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
+            {}
 
-            value(null_t, subtype_t subtype = core::normal) : type_(null), subtype_(subtype) {}
+            value(null_t, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
+            {}
 
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(bool_t v, subtype_t subtype = core::normal) {bool_init(subtype, v);}
+            value(bool_t v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {bool_init(subtype, v);}
 
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(int_t v, subtype_t subtype = core::normal) {int_init(subtype, v);}
+            value(int_t v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {int_init(subtype, v);}
 
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(uint_t v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
+            value(uint_t v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {uint_init(subtype, v);}
 
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(real_t v, subtype_t subtype = core::normal) {real_init(subtype, v);}
+            value(real_t v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {real_init(subtype, v);}
 
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
             value(cstring_t v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
             {
                 if (*v)
                     string_init(subtype, v);
@@ -295,6 +322,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const string_t &v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
             {
                 if (!v.empty())
                     string_init(subtype, v);
@@ -306,6 +336,9 @@ namespace cppdatalib
             explicit
 #endif
             value(string_t &&v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
             {
                 if (!v.empty())
                     string_init(subtype, std::move(v));
@@ -333,23 +366,47 @@ namespace cppdatalib
 #endif
             value(object_t &&v, subtype_t subtype = core::normal);
 
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(const object_t &v, const object_t &attributes, subtype_t subtype = core::normal);
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(object_t &&v, object_t &&attributes, subtype_t subtype = core::normal);
+#endif
+
             template<typename T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(T v, subtype_t subtype = core::normal) {uint_init(subtype, v);}
+            value(T v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {uint_init(subtype, v);}
 
             template<typename T, typename std::enable_if<std::is_signed<T>::value, int>::type = 0, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(T v, subtype_t subtype = core::normal) {int_init(subtype, v);}
+            value(T v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {int_init(subtype, v);}
 
             template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(T v, subtype_t subtype = core::normal) {real_init(subtype, v);}
+            value(T v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {real_init(subtype, v);}
 
             template<typename... Ts>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
@@ -370,6 +427,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const T *v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 if (v)
                     assign(*this, cppdatalib::core::value(*v));
@@ -381,6 +441,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const T *v, UserData userdata, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 if (v)
                     assign(*this, cppdatalib::core::value(*v, userdata, subtype));
@@ -406,6 +469,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 assign(*this, cast_to_cppdatalib<T>(v));
             }
@@ -416,6 +482,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const T &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 assign(*this, cast_to_cppdatalib<T>(v, userdata));
             }
@@ -436,6 +505,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const Template<Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v, userdata));
             }
@@ -446,6 +518,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const Template<T, N, Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v));
             }
@@ -456,6 +531,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const Template<T, N, Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v, userdata));
             }
@@ -466,6 +544,9 @@ namespace cppdatalib
             explicit
 #endif
             value(const Template<N, Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v));
             }
@@ -476,13 +557,20 @@ namespace cppdatalib
             explicit
 #endif
             value(const Template<N, Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v, userdata));
             }
 
             ~value();
 
-            value(const value &other) : type_(null), subtype_(core::normal) {assign(*this, other);}
+            value(const value &other) : type_(null), subtype_(core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
+            {assign(*this, other);}
             value(value &&other);
             value &operator=(const value &other) {return assign(*this, other);}
             value &operator=(value &&other);
@@ -611,6 +699,32 @@ namespace cppdatalib
             value &add_member_at_end(value &&key);
             value &add_member_at_end(const value &key, const value &val);
             value &add_member_at_end(value &&key, value &&val);
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            value attribute(const value &key) const;
+            value &attribute(const value &key);
+            const value *attribute_ptr(const value &key) const;
+            bool_t is_attribute(cstring_t key) const;
+            bool_t is_attribute(const string_t &key) const;
+            bool_t is_attribute(const value &key) const;
+            size_t attribute_count(cstring_t key) const;
+            size_t attribute_count(const string_t &key) const;
+            size_t attribute_count(const value &key) const;
+            void erase_attribute(cstring_t key);
+            void erase_attribute(const string_t &key);
+            void erase_attribute(const value &key);
+            void erase_attributes();
+
+            value &add_attribute(const value &key);
+            value &add_attribute(value &&key);
+            value &add_attribute(const value &key, const value &val);
+            value &add_attribute(value &&key, value &&val);
+
+            value &add_attribute_at_end(const value &key);
+            value &add_attribute_at_end(value &&key);
+            value &add_attribute_at_end(const value &key, const value &val);
+            value &add_attribute_at_end(value &&key, value &&val);
+#endif // CPPDATALIB_DISABLE_ATTRIBUTES
 
             void push_back(const value &v);
             void push_back(value &&v);
@@ -830,10 +944,6 @@ namespace cppdatalib
                 subtype_ = new_subtype;
             }
 
-#ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-            void create_string();
-#endif
-
             template<typename... Args>
             void array_init(subtype_t new_subtype, Args... args);
 
@@ -841,6 +951,11 @@ namespace cppdatalib
 
             template<typename... Args>
             void object_init(subtype_t new_subtype, Args... args);
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            template<typename... Args>
+            void attr_init(Args... args);
+#endif
 
             void create_object();
 
@@ -1029,7 +1144,7 @@ namespace cppdatalib
 
                 return *this;
             }
-#endif
+#endif // CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
 
             string_t &str_ref_();
             const string_t &str_ref_() const;
@@ -1039,6 +1154,11 @@ namespace cppdatalib
 
             object_t &obj_ref_();
             const object_t &obj_ref_() const;
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            object_t &attr_ref_();
+            const object_t &attr_ref_() const;
+#endif
 
             union
             {
@@ -1051,6 +1171,11 @@ namespace cppdatalib
 #endif
                 mutable void *ptr_; // Mutable to provide editable traversal access to const destructor
             };
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            mutable object_t *attr_;
+#endif
+
             mutable type type_; // Mutable to provide editable traversal access to const destructor
             subtype_t subtype_;
         };
@@ -1296,6 +1421,9 @@ namespace cppdatalib
 
         template<typename... Ts>
         value::value(std::initializer_list<Ts...> v, subtype_t subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            : attr_(nullptr)
+#endif
         {
             if (v.begin() != v.end())
             {
@@ -1309,6 +1437,9 @@ namespace cppdatalib
 
         template<typename UserData, typename... Ts>
         value::value(std::initializer_list<Ts...> v, UserData userdata, subtype_t subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            : attr_(nullptr)
+#endif
         {
             if (v.begin() != v.end())
             {
@@ -1322,6 +1453,9 @@ namespace cppdatalib
 
         template<typename T, size_t N>
         value::value(const T (&v)[N], subtype_t subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            : attr_(nullptr)
+#endif
         {
             if (N)
             {
@@ -1335,6 +1469,9 @@ namespace cppdatalib
 
         template<typename T, size_t N, typename UserData>
         value::value(const T (&v)[N], UserData userdata, subtype_t subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            : attr_(nullptr)
+#endif
         {
             if (N)
             {
@@ -1361,6 +1498,14 @@ namespace cppdatalib
             type_ = object;
             subtype_ = new_subtype;
         }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+        template<typename... Args>
+        void value::attr_init(Args... args)
+        {
+            attr_ = new object_t(args...);
+        }
+#endif
 
         // Predicates must be callables with argument type `const core::value *arg, core::value::traversal_ancestry_finder arg_finder` and return value bool
         // If return value is non-zero, processing continues, otherwise processing aborts immediately
@@ -1863,6 +2008,9 @@ namespace cppdatalib
         }
 
         inline value::value(const array_t &v, subtype_t subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            : attr_(nullptr)
+#endif
         {
             if (!v.empty())
                 array_init(subtype, v);
@@ -1870,6 +2018,9 @@ namespace cppdatalib
                 init(array, subtype);
         }
         inline value::value(array_t &&v, subtype_t subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            : attr_(nullptr)
+#endif
         {
             if (!v.empty())
                 array_init(subtype, std::move(v));
@@ -1877,6 +2028,9 @@ namespace cppdatalib
                 init(array, subtype);
         }
         inline value::value(const object_t &v, subtype_t subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            : attr_(nullptr)
+#endif
         {
             if (!v.empty())
                 object_init(subtype, v);
@@ -1884,6 +2038,9 @@ namespace cppdatalib
                 init(object, subtype);
         }
         inline value::value(object_t &&v, subtype_t subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            : attr_(nullptr)
+#endif
         {
             if (!v.empty())
                 object_init(subtype, std::move(v));
@@ -1892,6 +2049,9 @@ namespace cppdatalib
         }
 
         inline value::value(value &&other) : type_(other.type_), subtype_(other.subtype_)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            , attr_(nullptr)
+#endif
         {
             switch (other.type_)
             {
@@ -1920,6 +2080,9 @@ namespace cppdatalib
                     break;
                 default: break;
             }
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            std::swap(attr_, other.attr_);
+#endif
         }
 
         inline value::~value()
@@ -1927,6 +2090,16 @@ namespace cppdatalib
             if ((is_nonempty_array() && arr_ref_().size() > 0) ||
                 (is_nonempty_object() && obj_ref_().size() > 0))
                 traverse(traverse_node_null, traverse_node_mutable_clear);
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            if (attr_)
+                for (auto &item: *attr_)
+                {
+                    item.first.traverse(traverse_node_null, traverse_node_mutable_clear);
+                    item.second.traverse(traverse_node_null, traverse_node_mutable_clear);
+                }
+#endif
+
             deinit();
         }
 
@@ -1973,6 +2146,11 @@ namespace cppdatalib
                 ptr_ = new object_t();
             return *reinterpret_cast<const object_t *>(ptr_);
         }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+        inline object_t &value::attr_ref_() {return attr_;}
+        inline const object_t &value::attr_ref_() const {return attr_;}
+#endif
 
         inline value &value::operator=(value &&other) {return assign(*this, std::move(other));}
 
@@ -2086,6 +2264,84 @@ namespace cppdatalib
             return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(std::move(key), std::move(val)))->second;
         }
 
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+        inline value value::attribute(const value &key) const
+        {
+            auto it = attr_ref_().data().find(key);
+            if (it != attr_ref_().end())
+                return it->second;
+            return value();
+        }
+        inline value &value::attribute(const value &key)
+        {
+            clear(object);
+            auto it = attr_ref_().data().lower_bound(key);
+            if (it != attr_ref_().end() && it->first == key)
+                return it->second;
+            it = attr_ref_().data().insert(it, {key, null_t()});
+            return it->second;
+        }
+        inline const value *value::attribute_ptr(const value &key) const
+        {
+            auto it = attr_ref_().data().find(key);
+            if (it != attr_ref_().end())
+                return std::addressof(it->second);
+            return NULL;
+        }
+        inline bool_t value::is_attribute(cstring_t key) const {return attr_ref_().data().find(value(key)) != attr_ref_().end();}
+        inline bool_t value::is_attribute(const string_t &key) const {return attr_ref_().data().find(value(key)) != attr_ref_().end();}
+        inline bool_t value::is_attribute(const value &key) const {return attr_ref_().data().find(key) != attr_ref_().end();}
+        inline size_t value::attribute_count(cstring_t key) const {return attr_ref_().data().count(value(key));}
+        inline size_t value::attribute_count(const string_t &key) const {return attr_ref_().data().count(value(key));}
+        inline size_t value::attribute_count(const value &key) const {return attr_ref_().data().count(key);}
+        inline void value::erase_attribute(cstring_t key) {attr_ref_().data().erase(value(key));}
+        inline void value::erase_attribute(const string_t &key) {attr_ref_().data().erase(value(key));}
+        inline void value::erase_attribute(const value &key) {attr_ref_().data().erase(key);}
+        inline void value::erase_attributes() {attr_ref_().data().clear();}
+
+        inline value &value::add_attribute(const value &key)
+        {
+            clear(object);
+            return attr_ref_().data().insert(std::make_pair(key, null_t()))->second;
+        }
+        inline value &value::add_attribute(value &&key)
+        {
+            clear(object);
+            return attr_ref_().data().insert(std::make_pair(std::move(key), null_t()))->second;
+        }
+        inline value &value::add_attribute(const value &key, const value &val)
+        {
+            clear(object);
+            return attr_ref_().data().insert(std::make_pair(key, val))->second;
+        }
+        inline value &value::add_attribute(value &&key, value &&val)
+        {
+            clear(object);
+            return attr_ref_().data().insert(std::make_pair(std::move(key), std::move(val)))->second;
+        }
+
+        inline value &value::add_attribute_at_end(const value &key)
+        {
+            clear(object);
+            return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(key, null_t()))->second;
+        }
+        inline value &value::add_attribute_at_end(value &&key)
+        {
+            clear(object);
+            return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(std::move(key), null_t()))->second;
+        }
+        inline value &value::add_attribute_at_end(const value &key, const value &val)
+        {
+            clear(object);
+            return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(key, val))->second;
+        }
+        inline value &value::add_attribute_at_end(value &&key, value &&val)
+        {
+            clear(object);
+            return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(std::move(key), std::move(val)))->second;
+        }
+#endif // CPPDATALIB_DISABLE_ATTRIBUTES
+
         inline void value::push_back(const value &v) {clear(array); arr_ref_().data().push_back(v);}
         inline void value::push_back(value &&v) {clear(array); arr_ref_().data().push_back(std::move(v));}
 
@@ -2168,6 +2424,9 @@ namespace cppdatalib
                 case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
                 default: break;
             }
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            delete attr_;
+#endif
             type_ = null;
         }
 
@@ -2213,6 +2472,9 @@ namespace cppdatalib
             }
             type_ = null;
             subtype_ = normal;
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            delete attr_;
+#endif
         }
 
         namespace impl
