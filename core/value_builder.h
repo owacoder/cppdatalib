@@ -115,6 +115,10 @@ namespace cppdatalib
                 }
                 else
                     *references.top() = v;
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                references.top()->set_attributes(v.get_attributes());
+#endif
             }
 
             void string_data_(const core::value &v, bool)
@@ -151,9 +155,13 @@ namespace cppdatalib
                     references.top()->set_object(core::object_t(), v.get_subtype());
                 else if (v.is_string())
                     references.top()->set_string(core::string_t(), v.get_subtype());
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                references.top()->set_attributes(v.get_attributes());
+#endif
             }
 
-            // end_container_() just removes a container from the stack, because nothing more needs to be done
+            // end_container() just removes a container from the stack, because nothing more needs to be done
             void end_container(bool is_key)
             {
                 if (references.empty())
@@ -173,6 +181,24 @@ namespace cppdatalib
 
         inline value &value::assign(value &dst, const value &src)
         {
+            switch (src.get_type())
+            {
+                case null: dst.set_null(src.get_subtype()); break;
+                case boolean: dst.set_bool(src.get_bool_unchecked(), src.get_subtype()); break;
+                case integer: dst.set_int(src.get_int_unchecked(), src.get_subtype()); break;
+                case uinteger: dst.set_uint(src.get_uint_unchecked(), src.get_subtype()); break;
+                case real: dst.set_real(src.get_real_unchecked(), src.get_subtype()); break;
+                case string: dst.set_string(src.get_string_unchecked(), src.get_subtype()); break;
+                case array:
+                case object:
+                {
+                    value_builder builder(dst);
+                    builder << src;
+                    break;
+                }
+                default: dst.set_null(src.get_subtype()); break;
+            }
+
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             if (dst.attr_ && src.attr_)
                 *dst.attr_ = *src.attr_;
@@ -181,23 +207,8 @@ namespace cppdatalib
             else if (src.attr_)
                 dst.attr_ = new object_t(*src.attr_);
 #endif
-            switch (src.get_type())
-            {
-                case null: dst.set_null(src.get_subtype()); return dst;
-                case boolean: dst.set_bool(src.get_bool_unchecked(), src.get_subtype()); return dst;
-                case integer: dst.set_int(src.get_int_unchecked(), src.get_subtype()); return dst;
-                case uinteger: dst.set_uint(src.get_uint_unchecked(), src.get_subtype()); return dst;
-                case real: dst.set_real(src.get_real_unchecked(), src.get_subtype()); return dst;
-                case string: dst.set_string(src.get_string_unchecked(), src.get_subtype()); return dst;
-                case array:
-                case object:
-                {
-                    value_builder builder(dst);
-                    builder << src;
-                    return dst;
-                }
-                default: dst.set_null(src.get_subtype()); return dst;
-            }
+
+            return dst;
         }
 
         inline value &value::assign(value &dst, value &&src)

@@ -112,6 +112,81 @@ namespace cppdatalib
                         }
                     }
                 };
+
+                class attribute_stream_writer : public impl::stream_writer_base
+                {
+                public:
+                    attribute_stream_writer(core::ostream_handle output)
+                        : stream_writer_base(output)
+                    {}
+
+                    std::string name() const {return "cppdatalib::dump::attribute_stream_writer";}
+
+                protected:
+                    void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
+
+                    void begin_item_(const core::value &v)
+                    {
+                        if (container_key_was_just_parsed())
+                            stream().put('=');
+                        else if (current_container_size() > 0)
+                            stream().put(',');
+
+                        write_type(stream(), v.get_type());
+                        write_subtype(stream(), v.get_subtype());
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                        if (v.attributes_size())
+                        {
+                            impl::attribute_stream_writer writer(stream());
+                            stream() << "[attributes=";
+                            writer << v.get_attributes();
+                            stream() << "].";
+                        }
+#endif
+                    }
+                    void begin_key_(const core::value &v)
+                    {
+                        if (current_container_size() > 0)
+                            stream().put(',');
+
+                        write_type(stream(), v.get_type());
+                        write_subtype(stream(), v.get_subtype());
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                        if (v.attributes_size())
+                        {
+                            impl::attribute_stream_writer writer(stream());
+                            stream() << "[attributes=";
+                            writer << v.get_attributes();
+                            stream() << "].";
+                        }
+#endif
+                    }
+
+                    void null_(const core::value &) {stream() << "null";}
+                    void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
+                    void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
+                    void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
+                    void real_(const core::value &v)
+                    {
+                        if (std::isinf(v.get_real_unchecked()))
+                            stream() << (v.get_real_unchecked() < 0? "-": "") << "infinity";
+                        else if (std::isnan(v.get_real_unchecked()))
+                            stream() << "NaN";
+                        else
+                            stream() << v.get_real_unchecked();
+                    }
+                    void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
+                    void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+                    void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
+
+                    void begin_array_(const core::value &, core::int_t, bool) {stream().put('[');}
+                    void end_array_(const core::value &, bool) {stream().put(']');}
+
+                    void begin_object_(const core::value &, core::int_t, bool) {stream().put('{');}
+                    void end_object_(const core::value &, bool) {stream().put('}');}
+                };
             }
 
             class stream_writer : public impl::stream_writer_base
@@ -161,6 +236,16 @@ namespace cppdatalib
 
                     write_type(stream(), v.get_type());
                     write_subtype(stream(), v.get_subtype());
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    if (v.attributes_size())
+                    {
+                        impl::attribute_stream_writer writer(stream());
+                        stream() << "[attributes=";
+                        writer << v.get_attributes();
+                        stream() << "].";
+                    }
+#endif
                 }
                 void begin_key_(const core::value &v)
                 {
@@ -171,6 +256,16 @@ namespace cppdatalib
 
                     write_type(stream(), v.get_type());
                     write_subtype(stream(), v.get_subtype());
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    if (v.attributes_size())
+                    {
+                        impl::attribute_stream_writer writer(stream());
+                        stream() << "[attributes=";
+                        writer << v.get_attributes();
+                        stream() << "].";
+                    }
+#endif
                 }
 
                 void null_(const core::value &) {stream() << "null";}

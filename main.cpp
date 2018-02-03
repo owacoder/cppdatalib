@@ -8,8 +8,9 @@
 #define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 #define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 //#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
-#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+//#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+#define CPPDATALIB_ENABLE_ATTRIBUTES
 #define CPPDATALIB_THROW_IF_WRONG_TYPE
 #undef CPPDATALIB_ENABLE_MYSQL
 #include "cppdatalib.h"
@@ -1294,8 +1295,24 @@ void test_k_nearest()
 
 #include <ctime>
 
+void test_attributes()
+{
+    auto attr = cppdatalib::core::object_t{{"attribute_1", true}, {"attribute_2", "My other attribute"}};
+
+    cppdatalib::core::value value(2);
+    value.set_attributes(attr);
+
+    value.add_attribute("my_attr").add_attribute("h23");
+
+    std::cout << cppdatalib::core::value(std::move(value));
+}
+
 int main()
 {
+    test_attributes();
+
+    return 0;
+
     cppdatalib::core::cache_vector_n<size_t*, 2> vec;
 
     vec.resize(10);

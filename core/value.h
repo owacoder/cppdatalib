@@ -701,6 +701,12 @@ namespace cppdatalib
             value &add_member_at_end(value &&key, value &&val);
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            const object_t &get_attributes() const {return attr_ref_();}
+            void set_attributes(const object_t &attributes);
+            void set_attributes(object_t &&attributes);
+
+            size_t attributes_size() const;
+
             value attribute(const value &key) const;
             value &attribute(const value &key);
             const value *attribute_ptr(const value &key) const;
@@ -1172,12 +1178,12 @@ namespace cppdatalib
                 mutable void *ptr_; // Mutable to provide editable traversal access to const destructor
             };
 
+            mutable type type_; // Mutable to provide editable traversal access to const destructor
+            subtype_t subtype_;
+
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             mutable object_t *attr_;
 #endif
-
-            mutable type type_; // Mutable to provide editable traversal access to const destructor
-            subtype_t subtype_;
         };
 
         namespace impl
@@ -1500,6 +1506,11 @@ namespace cppdatalib
         }
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+        inline void value::set_attributes(const object_t &attributes) {attr_ref_() = attributes;}
+        inline void value::set_attributes(object_t &&attributes) {attr_ref_() = std::move(attributes);}
+
+        inline size_t value::attributes_size() const {return attr_ != nullptr? attr_ref_().size(): 0;}
+
         template<typename... Args>
         void value::attr_init(Args... args)
         {
@@ -2148,8 +2159,18 @@ namespace cppdatalib
         }
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-        inline object_t &value::attr_ref_() {return attr_;}
-        inline const object_t &value::attr_ref_() const {return attr_;}
+        inline object_t &value::attr_ref_()
+        {
+            if (attr_ == nullptr)
+                attr_ = new object_t();
+            return *attr_;
+        }
+        inline const object_t &value::attr_ref_() const
+        {
+            if (attr_ == nullptr)
+                attr_ = new object_t();
+            return *attr_;
+        }
 #endif
 
         inline value &value::operator=(value &&other) {return assign(*this, std::move(other));}
@@ -2274,7 +2295,6 @@ namespace cppdatalib
         }
         inline value &value::attribute(const value &key)
         {
-            clear(object);
             auto it = attr_ref_().data().lower_bound(key);
             if (it != attr_ref_().end() && it->first == key)
                 return it->second;
@@ -2301,43 +2321,35 @@ namespace cppdatalib
 
         inline value &value::add_attribute(const value &key)
         {
-            clear(object);
             return attr_ref_().data().insert(std::make_pair(key, null_t()))->second;
         }
         inline value &value::add_attribute(value &&key)
         {
-            clear(object);
             return attr_ref_().data().insert(std::make_pair(std::move(key), null_t()))->second;
         }
         inline value &value::add_attribute(const value &key, const value &val)
         {
-            clear(object);
             return attr_ref_().data().insert(std::make_pair(key, val))->second;
         }
         inline value &value::add_attribute(value &&key, value &&val)
         {
-            clear(object);
             return attr_ref_().data().insert(std::make_pair(std::move(key), std::move(val)))->second;
         }
 
         inline value &value::add_attribute_at_end(const value &key)
         {
-            clear(object);
             return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(key, null_t()))->second;
         }
         inline value &value::add_attribute_at_end(value &&key)
         {
-            clear(object);
             return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(std::move(key), null_t()))->second;
         }
         inline value &value::add_attribute_at_end(const value &key, const value &val)
         {
-            clear(object);
             return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(key, val))->second;
         }
         inline value &value::add_attribute_at_end(value &&key, value &&val)
         {
-            clear(object);
             return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(std::move(key), std::move(val)))->second;
         }
 #endif // CPPDATALIB_DISABLE_ATTRIBUTES
@@ -2425,7 +2437,7 @@ namespace cppdatalib
                 default: break;
             }
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-            delete attr_;
+            delete attr_; attr_ = nullptr;
 #endif
             type_ = null;
         }
@@ -2473,7 +2485,7 @@ namespace cppdatalib
             type_ = null;
             subtype_ = normal;
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-            delete attr_;
+            delete attr_; attr_ = nullptr;
 #endif
         }
 
