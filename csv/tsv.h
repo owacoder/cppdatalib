@@ -1,5 +1,5 @@
 /*
- * csv.h
+ * tsv.h
  *
  * Copyright © 2017 Oliver Adams
  *
@@ -22,17 +22,19 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef CPPDATALIB_CSV_H
-#define CPPDATALIB_CSV_H
+#ifndef CPPDATALIB_TSV_H
+#define CPPDATALIB_TSV_H
 
 #include "../core/core.h"
 
 namespace cppdatalib
 {
-    namespace csv
+    namespace tsv
     {
         class parser : public core::stream_parser
         {
+            char separator;
+
         public:
             enum options
             {
@@ -165,77 +167,15 @@ namespace cppdatalib
                 return stream();
             }
 
-            // Expects that the leading quote has already been parsed out of the input_stream
-            core::istream &read_quoted_string(core::stream_handler &writer, bool parse_as_strings)
-            {
-                int chr;
-                std::string buffer;
-
-                if (parse_as_strings)
-                {
-                    writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
-
-                    // buffer is used to temporarily store whitespace for reading strings
-                    while (chr = stream().get(), chr != EOF)
-                    {
-                        if (chr == '"')
-                        {
-                            if (stream().peek() == '"')
-                                chr = stream().get();
-                            else
-                                break;
-                        }
-
-                        if (isspace(chr))
-                        {
-                            buffer.push_back(chr);
-                            continue;
-                        }
-                        else if (buffer.size())
-                        {
-                            writer.append_to_string(buffer);
-                            buffer.clear();
-                        }
-
-                        writer.append_to_string(core::string_t(1, chr));
-                    }
-
-                    writer.end_string(core::string_t());
-                }
-                else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
-                {
-                    while (chr = stream().get(), chr != EOF)
-                    {
-                        if (chr == '"')
-                        {
-                            if (stream().peek() == '"')
-                                chr = stream().get();
-                            else
-                                break;
-                        }
-
-                        buffer.push_back(chr);
-                    }
-
-                    while (!buffer.empty() && isspace(buffer.back() & 0xff))
-                        buffer.pop_back();
-
-                    deduce_type(buffer, writer);
-                }
-
-                return stream();
-            }
-
             options opts;
-            char separator;
-            bool comma_just_parsed = true;
+            bool tab_just_parsed = true;
             bool newline_just_parsed = true;
 
         public:
-            parser(core::istream_handle input, char separator = ',', options opts = convert_fields_by_deduction)
+            parser(core::istream_handle input, char separator = '\t', options opts = convert_fields_by_deduction)
                 : stream_parser(input)
-                , opts(opts)
                 , separator(separator)
+                , opts(opts)
             {
                 reset();
             }
@@ -245,7 +185,7 @@ namespace cppdatalib
         protected:
             void reset_()
             {
-                comma_just_parsed = newline_just_parsed = true;
+                tab_just_parsed = newline_just_parsed = true;
             }
 
             void write_one_()
@@ -264,42 +204,34 @@ namespace cppdatalib
                         newline_just_parsed = false;
                     }
 
-                    switch (chr)
+                    if (chr == separator)
                     {
-                        case '"':
-                            read_quoted_string(*get_output(), parse_as_strings);
-                            comma_just_parsed = false;
-                            break;
-                        case '\n':
-                            if (comma_just_parsed)
-                            {
-                                if (parse_as_strings)
-                                    get_output()->write(core::value(core::string_t()));
-                                else // parse by deduction of types, assume `,,` means null instead of empty string
-                                    get_output()->write(core::null_t());
-                            }
-                            comma_just_parsed = newline_just_parsed = true;
-                            get_output()->end_array(core::array_t());
-                            break;
-                        default:
-                            if (chr == separator)
-                            {
-                                if (comma_just_parsed)
-                                {
-                                    if (parse_as_strings)
-                                        get_output()->write(core::value(core::string_t()));
-                                    else // parse by deduction of types, assume `,,` means null instead of empty string
-                                        get_output()->write(core::null_t());
-                                }
-                                comma_just_parsed = true;
-                            }
-                            else if (!isspace(chr))
-                            {
-                                stream().unget();
-                                read_string(*get_output(), parse_as_strings);
-                                comma_just_parsed = false;
-                            }
-                            break;
+                        if (tab_just_parsed)
+                        {
+                            if (parse_as_strings)
+                                get_output()->write(core::value(core::string_t()));
+                            else // parse by deduction of types, assume `<tab><tab>` means null instead of empty string
+                                get_output()->write(core::null_t());
+                        }
+                        tab_just_parsed = true;
+                    }
+                    else if (chr == '\n')
+                    {
+                        if (tab_just_parsed)
+                        {
+                            if (parse_as_strings)
+                                get_output()->write(core::value(core::string_t()));
+                            else // parse by deduction of types, assume `<tab><tab>` means null instead of empty string
+                                get_output()->write(core::null_t());
+                        }
+                        tab_just_parsed = newline_just_parsed = true;
+                        get_output()->end_array(core::array_t());
+                    }
+                    else if (!isspace(chr))
+                    {
+                        stream().unget();
+                        read_string(*get_output(), parse_as_strings);
+                        tab_just_parsed = false;
                     }
                 }
 
@@ -307,11 +239,11 @@ namespace cppdatalib
                 {
                     if (!newline_just_parsed)
                     {
-                        if (comma_just_parsed)
+                        if (tab_just_parsed)
                         {
                             if (parse_as_strings)
                                 get_output()->write(core::value(core::string_t()));
-                            else // parse by deduction of types, assume `,,` means null instead of empty string
+                            else // parse by deduction of types, assume `<tab><tab>` means null instead of empty string
                                 get_output()->write(core::null_t());
                         }
 
@@ -327,18 +259,19 @@ namespace cppdatalib
         {
             class stream_writer_base : public core::stream_handler, public core::stream_writer
             {
+            protected:
+                char separator;
+
             public:
-                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
+                stream_writer_base(core::ostream_handle &stream, int separator = '\t') : core::stream_writer(stream), separator(separator) {}
 
             protected:
                 core::ostream &write_string(core::ostream &stream, const core::string_t &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
-                        int c = str[i] & 0xff;
-
-                        if (c == '"')
-                            stream.put('"');
+                        if (str[i] == separator || str[i] == '\n')
+                            throw core::error("cppdatalib::tsv::row_writer - 'string' value must not contain separator character or newline");
 
                         stream.put(str[i]);
                     }
@@ -350,12 +283,10 @@ namespace cppdatalib
 
         class row_writer : public impl::stream_writer_base
         {
-            char separator;
-
         public:
-            row_writer(core::ostream_handle output, char separator = ',') : stream_writer_base(output), separator(separator) {}
+            row_writer(core::ostream_handle output, char separator = '\t') : stream_writer_base(output, separator) {}
 
-            std::string name() const {return "cppdatalib::csv::row_writer";}
+            std::string name() const {return "cppdatalib::tsv::row_writer";}
 
         protected:
             void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
@@ -374,18 +305,16 @@ namespace cppdatalib
             void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
             void end_string_(const core::value &, bool) {stream().put('"');}
 
-            void begin_array_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'array' value not allowed in row output");}
-            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
+            void begin_array_(const core::value &, core::int_t, bool) {throw core::error("TSV - 'array' value not allowed in row output");}
+            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("TSV - 'object' value not allowed in output");}
         };
 
         class stream_writer : public impl::stream_writer_base
         {
-            char separator;
-
         public:
-            stream_writer(core::ostream_handle output, char separator = ',') : stream_writer_base(output), separator(separator) {}
+            stream_writer(core::ostream_handle output, char separator = '\t') : stream_writer_base(output, separator) {}
 
-            std::string name() const {return "cppdatalib::csv::stream_writer";}
+            std::string name() const {return "cppdatalib::tsv::stream_writer";}
 
         protected:
             void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
@@ -405,19 +334,17 @@ namespace cppdatalib
             void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v) {stream() << v.get_real_unchecked();}
-            void begin_string_(const core::value &, core::int_t, bool) {stream().put('"');}
             void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
-            void end_string_(const core::value &, bool) {stream().put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
                 if (nesting_depth() == 2)
-                    throw core::error("CSV - 'array' value not allowed in row output");
+                    throw core::error("TSV - 'array' value not allowed in row output");
             }
-            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
+            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("TSV - 'object' value not allowed in output");}
         };
 
-        inline core::value from_csv_table(core::istream_handle stream, char separator = ',', parser::options opts = parser::convert_fields_by_deduction)
+        inline core::value from_tsv_table(core::istream_handle stream, char separator = '\t', parser::options opts = parser::convert_fields_by_deduction)
         {
             parser reader(stream, separator, opts);
             core::value v;
@@ -425,7 +352,7 @@ namespace cppdatalib
             return v;
         }
 
-        inline std::string to_csv_row(const core::value &v, char separator = ',')
+        inline std::string to_tsv_row(const core::value &v, char separator = '\t')
         {
             core::ostringstream stream;
             row_writer writer(stream, separator);
@@ -433,7 +360,7 @@ namespace cppdatalib
             return stream.str();
         }
 
-        inline std::string to_csv_table(const core::value &v, char separator = ',')
+        inline std::string to_tsv_table(const core::value &v, char separator = '\t')
         {
             core::ostringstream stream;
             stream_writer writer(stream, separator);
@@ -441,9 +368,9 @@ namespace cppdatalib
             return stream.str();
         }
 
-        inline core::value from_csv(core::istream_handle stream, char separator = ',', parser::options opts = parser::convert_fields_by_deduction) {return from_csv_table(stream, separator, opts);}
-        inline std::string to_csv(const core::value &v, char separator = ',') {return to_csv_table(v, separator);}
+        inline core::value from_tsv(core::istream_handle stream, char separator = '\t', parser::options opts = parser::convert_fields_by_deduction) {return from_tsv_table(stream, separator, opts);}
+        inline std::string to_tsv(const core::value &v, char separator = '\t') {return to_tsv_table(v, separator);}
     }
 }
 
-#endif // CPPDATALIB_CSV_H
+#endif // CPPDATALIB_TSV_H

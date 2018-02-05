@@ -1315,7 +1315,7 @@ void test_mmap()
 
     cppdatalib::core::immapstream map("/shared/Test_Data/huge.json", true);
     cppdatalib::json::parser parser(map);
-    parser >> cppdatalib::json::stream_writer(wrap);
+    parser >> cppdatalib::tsv::stream_writer(wrap);
 }
 
 int main()

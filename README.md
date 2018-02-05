@@ -20,19 +20,20 @@ the following frameworks:
 
 Supported formats include
 
-   - [JSON](https://json.org/)
-   - [UBJSON](http://ubjson.org/)
    - [Bencode](https://en.wikipedia.org/wiki/Bencode)
-   - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
-   - [CSV](https://tools.ietf.org/html/rfc4180)
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
+   - [BJSON](http://bjson.org/) (write-only)
+   - [CSV](https://tools.ietf.org/html/rfc4180) (allows user-defined delimiter)
+   - [JSON](https://json.org/)
    - [MessagePack](https://msgpack.org/)
    - MySQL (database/table retrieval and writing)
+   - [Netstrings](https://en.wikipedia.org/wiki/Netstring) (write-only)
+   - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
+   - [TSV](https://en.wikipedia.org/wiki/Tab-separated_values) (allows user-defined delimiter)
+   - [UBJSON](http://ubjson.org/)
    - XML property lists (write-only)
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
-   - [BJSON](http://bjson.org/) (write-only)
-   - [Netstrings](https://en.wikipedia.org/wiki/Netstring) (write-only)
 
 Language formats include
 
@@ -42,7 +43,6 @@ Language formats include
 
    - Transenc
    - CBOR
-   - TSV
 
 ### Filters
 
@@ -390,6 +390,20 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - `uint` values are fully supported when reading.
        - No subtypes are supported.
        - Numerical metadata is lost when converting to and from CSV.
+
+   - TSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
+     Notes:
+       - `object`s are **not** supported.
+       - `uint` values are fully supported when reading.
+       - No subtypes are supported.
+       - Numerical metadata is lost when converting to and from TSV.
+
+   - DIF supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
+     Notes:
+       - `object`s are **not** supported.
+       - `uint` values are fully supported when reading.
+       - No subtypes are supported.
+       - Numerical metadata is lost when converting to and from DIF.
      
    - UBJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.
      Notes:

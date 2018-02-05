@@ -35,6 +35,7 @@
 #include "property_list/xml.h"
 #include "rpc/xml.h"
 #include "csv/csv.h"
+#include "csv/tsv.h"
 #include "dif/dif.h"
 #include "binn/binn.h"
 #include "ubjson/ubjson.h"
