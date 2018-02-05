@@ -47,6 +47,14 @@ namespace cppdatalib
             static_assert(N != 0, "cache_vector_n::N must be greater than zero");
 
         public:
+            typedef size_t size_type;
+            typedef T value_type;
+            typedef value_type &reference;
+            typedef const value_type &const_reference;
+            typedef Allocator allocator_type;
+            typedef typename std::allocator_traits<allocator_type>::pointer pointer;
+            typedef typename std::allocator_traits<allocator_type>::const_pointer const_pointer;
+
             class iterator : std::iterator<std::random_access_iterator_tag,
                                            typename Allocator::value_type,
                                            typename Allocator::difference_type,
@@ -225,13 +233,6 @@ namespace cppdatalib
                 typename cache_vector_n<T, N, Allocator>::size_type mPos;
             };
 
-            typedef size_t size_type;
-            typedef T value_type;
-            typedef value_type &reference;
-            typedef const value_type &const_reference;
-            typedef Allocator allocator_type;
-            typedef typename std::allocator_traits<allocator_type>::pointer pointer;
-            typedef typename std::allocator_traits<allocator_type>::const_pointer const_pointer;
             typedef std::reverse_iterator<iterator> reverse_iterator;
             typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
 
@@ -265,26 +266,24 @@ namespace cppdatalib
             }
 
             cache_vector_n(const cache_vector_n &rhs)
-                : mFast(rhs.mFast)
-                , mSlow(nullptr)
+                : mSlow(nullptr)
                 , mSize(0)
                 , mSlowCapacity(0)
                 , alloc(std::allocator_traits<Allocator>::select_on_container_copy_construction(rhs.alloc))
             {
                 growCapacity(rhs.size());
-                copyConstruct(N, rhs.size(), rhs.begin() + N);
+                copyConstruct(0, rhs.size(), rhs.begin());
                 mSize = rhs.size();
             }
 
             cache_vector_n(const cache_vector_n &rhs, const allocator_type &alloc)
-                : mFast(rhs.mFast)
-                , mSlow(nullptr)
+                : mSlow(nullptr)
                 , mSize(0)
                 , mSlowCapacity(0)
                 , alloc(alloc)
             {
                 growCapacity(rhs.size());
-                copyConstruct(N, rhs.size(), rhs.begin() + N);
+                copyConstruct(0, rhs.size(), rhs.begin());
                 mSize = rhs.size();
             }
 
