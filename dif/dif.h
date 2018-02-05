@@ -353,10 +353,10 @@ namespace cppdatalib
         public:
             stream_writer(core::ostream_handle output, const core::string_t &worksheet_name, core::int_t columns, core::int_t rows, core::int_t version = 1)
                 : stream_writer_base(output)
-                , worksheet_name(worksheet_name)
                 , version(version)
                 , columns(columns)
                 , rows(rows)
+                , worksheet_name(worksheet_name)
             {}
 
             std::string name() const {return "cppdatalib::dif::stream_writer";}
@@ -380,7 +380,7 @@ namespace cppdatalib
                 stream().write("EOD", 3);
             }
 
-            void begin_item_(const core::value &v)
+            void begin_item_(const core::value &)
             {
                 if (nesting_depth() == 1)
                     stream().write("-1,0\nBOT\n", 9);
@@ -411,16 +411,16 @@ namespace cppdatalib
             return v;
         }
 
-        inline std::string to_dif_table(const core::value &v, char separator = ',')
+        inline std::string to_dif_table(const core::value &v, const core::string_t &worksheet_name, core::int_t columns, core::int_t rows)
         {
             core::ostringstream stream;
-            stream_writer writer(stream, separator);
+            stream_writer writer(stream, worksheet_name, columns, rows);
             writer << v;
             return stream.str();
         }
 
         inline core::value from_dif(core::istream_handle stream, parser::options opts = parser::convert_fields_by_deduction) {return from_dif_table(stream, opts);}
-        inline std::string to_dif(const core::value &v, char separator = ',') {return to_dif_table(v, separator);}
+        inline std::string to_dif(const core::value &v, const core::string_t &worksheet_name, core::int_t columns, core::int_t rows) {return to_dif_table(v, worksheet_name, columns, rows);}
     }
 }
 

@@ -29,6 +29,12 @@
 #include <vector>
 #include <array>
 
+#if defined(__linux) || defined(__linux__)
+#define CPPDATALIB_LINUX
+#elif defined(__WIN32) || defined(__WIN64)
+#define CPPDATALIB_WINDOWS
+#endif
+
 namespace cppdatalib
 {
     namespace core

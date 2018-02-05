@@ -130,7 +130,7 @@ namespace cppdatalib
             virtual std::string pretty_name() const {return name();}
 
             // Returns the name of this output format
-            virtual std::string name() const = 0;
+            virtual std::string name() const {return "cppdatalib::core::stream_handler";}
 
             // Returns true if this handler is active (i.e. `begin()` has been called but `end()` has not)
             bool active() const {return active_;}
@@ -297,7 +297,7 @@ namespace cppdatalib
             // An API must call these when a long string is parsed. The number of bytes is passed in size, if possible
             // size == -1 means unknown size
             // If the length of v is equal to size, the entire string is provided
-            void begin_string(const core::string_t &v, core::int_t size) {begin_string(v, size);}
+            void begin_string(const core::string_t &v, core::int_t size) {begin_string(value(v), size);}
             void begin_string(const core::value &v, core::int_t size)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());

@@ -33,6 +33,16 @@
 #include <memory>
 
 #include "error.h"
+#include "global.h"
+
+#ifdef CPPDATALIB_LINUX
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#elif defined(CPPDATALIB_WINDOWS)
+#include <windows.h>
+#endif
 
 namespace cppdatalib
 {
@@ -654,6 +664,81 @@ namespace cppdatalib
                     flags_ |= bad_bit;
             }
         };
+
+        class ibufferstream : public istream
+        {
+            const char *mem_;
+            size_t size_, pos_;
+
+        public:
+            ibufferstream(const char *buffer, size_t buffer_size)
+                : mem_(buffer)
+                , size_(buffer_size)
+                , pos_(0)
+            {}
+
+            const char *buffer() const {return mem_;}
+            size_t buffer_size() const {return size_;}
+
+        protected:
+            int getc_() {return pos_ == size_? EOF: mem_[pos_++] & 0xff;}
+            int peekc_() {return pos_ == size_? EOF: mem_[pos_] & 0xff;}
+            void ungetc_()
+            {
+                if (pos_ == 0)
+                    flags_ |= bad_bit;
+                else
+                    --pos_;
+            }
+        };
+
+#ifdef CPPDATALIB_LINUX
+        class immapstream : public istream
+        {
+            ibufferstream stream;
+
+        public:
+            immapstream(const char *fname, bool shared_mapping = false)
+                : stream(NULL, 0)
+            {
+                const char *buffer;
+                struct stat fdstat;
+
+                int fd = open(fname, O_RDONLY);
+                if (fd == -1)
+                    goto failure;
+
+                if (fstat(fd, &fdstat) == -1)
+                    goto failure;
+
+                buffer = (const char *) mmap(NULL, fdstat.st_size, PROT_READ, shared_mapping? MAP_SHARED: MAP_PRIVATE, fd, 0);
+                if (buffer == MAP_FAILED)
+                    goto failure;
+
+                {
+                    ibufferstream temp(buffer, fdstat.st_size);
+                    std::swap(stream, temp);
+                }
+
+                return;
+            failure:
+                throw core::error("cppdatalib::core::immapstream - could not map file");
+            }
+
+            ~immapstream()
+            {
+                munmap((void *) stream.buffer(), stream.buffer_size());
+            }
+
+            const char *buffer() const {return stream.buffer();}
+            size_t buffer_size() const {return stream.buffer_size();}
+
+        protected:
+            int getc_() {return stream.get();}
+            int peekc_() {return stream.peek();}
+            void ungetc_() {stream.unget();}
+        };
+#endif
 
         class istream_handle
         {

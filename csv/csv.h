@@ -251,7 +251,7 @@ namespace cppdatalib
                 bool parse_as_strings = opts == convert_all_fields_as_strings;
                 int chr;
 
-                if (!busy())
+                if (was_just_reset())
                     get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
 
                 if (chr = stream().get(), chr != EOF)
@@ -300,21 +300,23 @@ namespace cppdatalib
                     }
                 }
 
-                if (!newline_just_parsed)
+                if (chr == EOF)
                 {
-                    if (comma_just_parsed)
+                    if (!newline_just_parsed)
                     {
-                        if (parse_as_strings)
-                            get_output()->write(core::value(core::string_t()));
-                        else // parse by deduction of types, assume `,,` means null instead of empty string
-                            get_output()->write(core::null_t());
+                        if (comma_just_parsed)
+                        {
+                            if (parse_as_strings)
+                                get_output()->write(core::value(core::string_t()));
+                            else // parse by deduction of types, assume `,,` means null instead of empty string
+                                get_output()->write(core::null_t());
+                        }
+
+                        get_output()->end_array(core::array_t());
                     }
 
                     get_output()->end_array(core::array_t());
                 }
-
-                if (chr == EOF)
-                    get_output()->end_array(core::array_t());
             }
         };
 

@@ -361,6 +361,36 @@ namespace cppdatalib
             void flush_() {stream_->pubsync();}
         };
 
+        class obufferstream : public ostream
+        {
+            char *mem_;
+            size_t size_;
+
+        public:
+            obufferstream(char *buffer, size_t buffer_size)
+                : mem_(buffer)
+                , size_(buffer_size)
+            {}
+
+        protected:
+            void write_(const char *c, size_t n)
+            {
+                if (n > size_)
+                    throw core::error("cppdatalib::core::obufferstream - attempt to write past end of buffer");
+                memcpy(mem_, c, sizeof(*mem_) * n);
+                mem_ += n;
+                size_ -= n;
+            }
+            void putc_(char c)
+            {
+                if (!size_)
+                    throw core::error("cppdatalib::core::obufferstream - attempt to write past end of buffer");
+                *mem_++ = c;
+                --size_;
+            }
+            void flush_() {}
+        };
+
         class ostream_handle
         {
             std::ostream *std_;

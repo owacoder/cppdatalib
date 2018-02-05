@@ -215,7 +215,7 @@ namespace cppdatalib
                                     // Attempt to read as an integer
                                     {
                                         core::istring_wrapper_stream temp_stream(buffer);
-                                        core::int_t value;
+                                        core::int_t value = 0;
                                         temp_stream >> value;
                                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                                         {
@@ -227,7 +227,7 @@ namespace cppdatalib
                                     // Attempt to read as an unsigned integer
                                     {
                                         core::istring_wrapper_stream temp_stream(buffer);
-                                        core::uint_t value;
+                                        core::uint_t value = 0;
                                         temp_stream >> value;
                                         if (!temp_stream.fail() && temp_stream.get() == EOF)
                                         {
@@ -241,7 +241,7 @@ namespace cppdatalib
                                 if (buffer.find_first_of("eE.") != std::string::npos)
                                 {
                                     core::istring_wrapper_stream temp_stream(buffer);
-                                    core::real_t value;
+                                    core::real_t value = 0.0;
                                     temp_stream >> value;
                                     if (!temp_stream.fail() && temp_stream.get() == EOF)
                                     {

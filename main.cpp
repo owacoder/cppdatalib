@@ -2,10 +2,10 @@
 
 //#include "adapters/stl.h"
 
-#define CPPDATALIB_FAST_IO
+#define CPPDATALIB_ENABLE_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
-#define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+//#define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 #define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 //#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
@@ -1307,8 +1307,21 @@ void test_attributes()
     std::cout << cppdatalib::core::value(std::move(value));
 }
 
+void test_mmap()
+{
+    std::ofstream out;
+    out.open("/shared/Test_Data/huger.dif");
+    cppdatalib::core::ostd_streambuf_wrapper wrap(out.rdbuf());
+
+    cppdatalib::core::immapstream map("/shared/Test_Data/huge.json", true);
+    cppdatalib::json::parser parser(map);
+    parser >> cppdatalib::json::stream_writer(wrap);
+}
+
 int main()
 {
+    test_mmap();
+
     test_attributes();
 
     return 0;
