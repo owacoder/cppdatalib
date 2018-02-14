@@ -32,6 +32,7 @@ namespace cppdatalib
         struct error
         {
             error(const char *reason) : what_(reason) {}
+            virtual ~error() {}
 
             const char *what() const {return what_;}
 

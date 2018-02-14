@@ -250,7 +250,7 @@ namespace cppdatalib
                 , alloc(alloc)
             {
                 growCapacity(n);
-                construct(N, n); // TODO: can fail, in which case the size will not be correct for destruction and deallocation
+                construct(N, n);
                 mSize = n;
             }
 

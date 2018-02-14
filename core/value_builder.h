@@ -230,7 +230,7 @@ namespace cppdatalib
                 case array:
                 case object:
                     dst.ptr_ = src.ptr_;
-                    dst.ptr_ = nullptr;
+                    src.ptr_ = nullptr;
                     break;
                 default: break;
             }

@@ -26,6 +26,7 @@
 #define CPPDATALIB_VALUE_H
 
 #include "cache_vector.h"
+#include "global.h"
 
 #include <cassert>
 #include <cstdint>
@@ -830,30 +831,16 @@ namespace cppdatalib
 #endif
 
             template<typename T>
-            typename std::remove_cv<typename std::remove_reference<T>::type>::type
-            cast() const {return cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this);}
+            typename std::remove_cv<typename std::remove_reference<T>::type>::type cast() const {return operator typename std::remove_cv<typename std::remove_reference<T>::type>::type();}
 
             template<typename T, typename UserData>
-            typename std::remove_cv<typename std::remove_reference<T>::type>::type
-            cast(UserData userdata) const {return cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this, userdata);}
+            typename std::remove_cv<typename std::remove_reference<T>::type>::type cast(UserData userdata) const;
 
-            template<template<typename...> class Template, typename... Ts>
-            Template<Ts...> cast() const {return cast_template_from_cppdatalib<Template, Ts...>(*this);}
+            template<typename T>
+            typename std::remove_cv<typename std::remove_reference<T>::type>::type as() const {return cast<T>();}
 
-            template<template<typename...> class Template, typename UserData, typename... Ts>
-            Template<Ts...> cast(UserData userdata) const {return cast_template_from_cppdatalib<Template, Ts...>(*this, userdata);}
-
-            template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
-            Template<T, N, Ts...> cast() const {return cast_array_template_from_cppdatalib<Template, T, N, Ts...>(*this);}
-
-            template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename UserData, typename... Ts>
-            Template<T, N, Ts...> cast(UserData userdata) const {return cast_array_template_from_cppdatalib<Template, T, N, Ts...>(*this, userdata);}
-
-            template<template<size_t, typename...> class Template, size_t N, typename... Ts>
-            Template<N, Ts...> cast() const {return cast_sized_template_from_cppdatalib<Template, N, Ts...>(*this);}
-
-            template<template<size_t, typename...> class Template, size_t N, typename UserData, typename... Ts>
-            Template<N, Ts...> cast(UserData userdata) const {return cast_sized_template_from_cppdatalib<Template, N, Ts...>(*this, userdata);}
+            template<typename T, typename UserData>
+            typename std::remove_cv<typename std::remove_reference<T>::type>::type as(UserData userdata) const {return cast<T>(userdata);}
 
             template<typename T>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
@@ -2143,7 +2130,7 @@ namespace cppdatalib
         }
         inline const array_t &value::arr_ref_() const {
             if (ptr_ == nullptr)
-                ptr_ = new object_t();
+                ptr_ = new array_t();
             return *reinterpret_cast<const array_t *>(ptr_);
         }
 
@@ -2523,14 +2510,15 @@ namespace cppdatalib
         }
 
         template<typename T>
+        typename std::remove_cv<typename std::remove_reference<T>::type>::type cast(const cppdatalib::core::value &val)
+        {
+            return val.operator T();
+        }
+
+        template<typename T>
         cppdatalib::core::value cast(T val, subtype_t subtype = normal)
         {
             return cppdatalib::core::value(val, subtype);
-        }
-
-        inline const value &cast(const value &val)
-        {
-            return val;
         }
 
         template<typename UserData>
@@ -2556,6 +2544,12 @@ namespace cppdatalib
         {
             return value(bind, userdata, subtype);
         }
+
+        template<typename T, typename UserData>
+        typename std::remove_cv<typename std::remove_reference<T>::type>::type value::cast(UserData userdata) const
+        {
+            return userdata_cast(*this, userdata).operator typename std::remove_cv<typename std::remove_reference<T>::type>::type();
+        }
     }
 
     inline void swap(core::value &l, core::value &r) {l.swap(r);}
@@ -2564,64 +2558,72 @@ namespace cppdatalib
 template<typename T>
 class cast_to_cppdatalib
 {
+    typedef typename T::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
 public:
     cast_to_cppdatalib(T) {}
-    operator cppdatalib::core::value() const {return T::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value();}
 };
 
 template<template<typename...> class Template, typename... Ts>
 struct cast_template_to_cppdatalib
 {
+    typedef typename Template<Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
 public:
     cast_template_to_cppdatalib(const Template<Ts...> &) {}
-    operator cppdatalib::core::value() const {return Template<Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value();}
 };
 
 template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
 struct cast_array_template_to_cppdatalib
 {
+    typedef typename Template<T, N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
 public:
     cast_array_template_to_cppdatalib(const Template<T, N, Ts...> &) {}
-    operator cppdatalib::core::value() const {return Template<T, N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value();}
 };
 
 template<template<size_t, typename...> class Template, size_t N, typename... Ts>
 struct cast_sized_template_to_cppdatalib
 {
+    typedef typename Template<N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
 public:
     cast_sized_template_to_cppdatalib(const Template<N, Ts...> &) {}
-    operator cppdatalib::core::value() const {return Template<N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value();}
 };
 
 template<typename T>
 class cast_from_cppdatalib {
+    typedef typename T::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &) {}
-    operator T() const {return T::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator T() const {return T();}
 };
 
 template<template<typename...> class Template, typename... Ts>
 struct cast_template_from_cppdatalib
 {
+    typedef typename Template<Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &) {}
-    operator Template<Ts...>() const {return Template<Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator Template<Ts...>() const {return Template<Ts...>();}
 };
 
 template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
 struct cast_array_template_from_cppdatalib
 {
+    typedef typename Template<T, N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
 public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &) {}
-    operator Template<T, N, Ts...>() const {return Template<T, N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator Template<T, N, Ts...>() const {return Template<T, N, Ts...>();}
 };
 
 template<template<size_t, typename...> class Template, size_t N, typename... Ts>
 struct cast_sized_template_from_cppdatalib
 {
+    typedef typename Template<N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
 public:
     cast_sized_template_from_cppdatalib(const cppdatalib::core::value &) {}
-    operator Template<N, Ts...>() const {return Template<N, Ts...>::You_must_reimplement_cppdatalib_conversions_for_custom_types();}
+    operator Template<N, Ts...>() const {return Template<N, Ts...>();}
 };
 
 template<>

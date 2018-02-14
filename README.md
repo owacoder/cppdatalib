@@ -108,7 +108,7 @@ int main() {
         json::stream_writer w(std::cout);   // Initialize writer
         p >> my_value;                      // Read in to core::value as JSON
         w << my_value;                      // Write core::value out as JSON
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -128,7 +128,7 @@ int main()
 
     try {
         json::stream_writer(std::cout) << from_json(std::cin);        // Write core::value out to STDOUT as JSON
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -148,7 +148,7 @@ int main()
 
     try {
         json::parser(std::cin) >> json::stream_writer(std::cout);        // Write core::value out to STDOUT as JSON
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -186,7 +186,7 @@ int main() {
                                               // `my_value`. Note that my_value is also accessible by using `builder.value()`
 
         core::convert(my_value, writer);      // Convert from internal representation to UBJSON on standard output
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl;   // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -200,7 +200,7 @@ int main() {
                                               // (i.e. don't write to `writer` here unless you don't want to employ the filter)
                                               // Note that this DOES NOT READ the entire stream before writing!
                                               // The data is read and written at the same time
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl;   // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -221,7 +221,7 @@ int main() {
                                               // converting `null`s to empty strings, and clearing all strings beginning with 'a'
                                               // Again, note that this does not read the entire stream before writing
                                               // The data is read and written at the same time
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl;   // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -237,7 +237,7 @@ int main() {
                                               // converting booleans to integers, and converting integers to reals
                                               // Note that order of filters is important. The last filter enabled will be the first to be called.
                                               // If the filter order was switched, all booleans and integers would become reals.
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl;   // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -250,7 +250,7 @@ int main() {
 
         parser >> tee_filter;                 // Convert from JSON on standard input to UBJSON on standard output,
                                               // as well as building internal representation in my_value
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl;   // Catch any errors that might have occured (syntax or logical)
     }
 

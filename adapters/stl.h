@@ -503,7 +503,7 @@ namespace cppdatalib { namespace core {
         {
             if (was_just_reset())
             {
-                get_output()->begin_object(core::object_t(), bind->size());
+                get_output()->begin_object(core::object_t(), bind.size());
                 if (iterator != bind.end())
                     compose_parser(iterator->first);
             }

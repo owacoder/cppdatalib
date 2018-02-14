@@ -1,4 +1,4 @@
-#include <iostream>
+//#include <iostream>
 
 //#include "adapters/stl.h"
 
@@ -384,7 +384,7 @@ int readme_simple_test()
         json::stream_writer w(std::cout);
         p >> my_value;                      // Read in to core::value from STDIN as JSON
         w << my_value;                      // Write core::value out to STDOUT as JSON
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -398,7 +398,7 @@ int readme_simple_test2()
 
     try {
         json::parser(std::cin) >> json::stream_writer(std::cout);        // Write core::value out to STDOUT as JSON
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -412,7 +412,7 @@ int readme_simple_test3()
 
     try {
         json::stream_writer(std::cout) << from_json(std::cin);        // Write core::value out to STDOUT as JSON
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -485,7 +485,8 @@ int readme_simple_test4()
         vp.end();
 
         std::multimap<const char *, int> map = {{"x", 1}, {"y", 2}};
-        m2 = cppdatalib::core::value(stack);
+        m2 = stack;
+        stack = m2;
         m2 = cppdatalib::core::value(map);
         point p2 = point();
         p2.x = 9;
@@ -494,7 +495,7 @@ int readme_simple_test4()
         p2.x += 1000;
         m2 = cppdatalib::core::value(p2);
         w << m2;                // Write core::value out to STDOUT as JSON
-    } catch (core::error e) {
+    } catch (const core::error &e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
 
@@ -1148,7 +1149,7 @@ void test_sql()
         mysql_close(&sql);
         mysql_close(&sql2);
     }
-    catch (cppdatalib::core::error e)
+    catch (cppdatalib::const core::error &e)
     {
         std::cerr << "ERROR: " << e.what() << std::endl;
     }
@@ -1210,7 +1211,7 @@ void test_decision_tree()
         std::cout << cppdatalib::experimental::test_decision_tree(tree, cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "blue"}}, true) << std::endl;
 
         data >> cppdatalib::lang::lisp::stream_writer(std::cout);
-    } catch (cppdatalib::core::error e)
+    } catch (cppdatalib::const core::error &e)
     {
         std::cerr << e.what() << std::endl;
     }
@@ -1320,6 +1321,8 @@ void test_mmap()
 
 int main()
 {
+    return readme_simple_test4();
+
     test_mmap();
 
     test_attributes();
@@ -1354,7 +1357,7 @@ int main()
         //tuple = cppdatalib::core::value(f777);
         w.stream() << std::endl;
     }
-    catch (cppdatalib::core::error e)
+    catch (const cppdatalib::core::error &e)
     {
         std::cerr << e.what() << std::endl;
     }
@@ -1369,7 +1372,7 @@ int main()
         cppdatalib::core::dump::stream_writer out(std::cout, 2);
         cppdatalib::core::object_keys_to_array_filter(out) << data;
     }
-    catch (cppdatalib::core::error e)
+    catch (cppdatalib::const core::error &e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
@@ -1453,7 +1456,7 @@ int main()
         Test("Bencode", bencode_tests, [](const auto &test){return cppdatalib::bencode::to_bencode(cppdatalib::bencode::from_bencode(test));}, false);
         Test("MessagePack", message_pack_tests, [](const auto &test) -> hex_string {return hex_string(cppdatalib::message_pack::to_message_pack(cppdatalib::message_pack::from_message_pack(test)));}, false);
     }
-    catch (cppdatalib::core::error e)
+    catch (cppdatalib::const core::error &e)
     {
         std::cout << e.what() << std::endl;
     }
