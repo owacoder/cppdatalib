@@ -31,8 +31,6 @@
 #ifndef CPPDATALIB_BOOST_DYNAMIC_BITSET_H
 #define CPPDATALIB_BOOST_DYNAMIC_BITSET_H
 
-#ifdef CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
-
 #include <boost/dynamic_bitset.hpp>
 
 #include "../core/value_parser.h"
@@ -101,5 +99,4 @@ namespace cppdatalib { namespace core {
     };
 }}
 
-#endif // CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 #endif // CPPDATALIB_BOOST_DYNAMIC_BITSET_H

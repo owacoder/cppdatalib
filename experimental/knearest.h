@@ -27,6 +27,7 @@
 
 #include "../core/core.h"
 #include "algorithm.h"
+#include <algorithm>
 
 namespace cppdatalib
 {

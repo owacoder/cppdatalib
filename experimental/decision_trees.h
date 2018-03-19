@@ -203,8 +203,8 @@ namespace cppdatalib
 
         // Tests a tuple based on a previously made decision tree (i.e. a tree returned from make_decision_tree())
         // The tuple should be based on the same fields the tree was made with
-        // The value returned is either true, false, or null if probability_result = false,
-        // and is either null or a real value between 0 and 1, returning the probability that the tree thinks the correct response is true
+        // If probability_result is false, the value returned is either true, false, or null.
+        // If probability_result is true, the value returned is either null or a real value between 0 and 1, returning the probability that the tree thinks the correct response is true
         // TODO: probability is based on classification of tree entries, not actual data. Probabilities of actual data should be stored in trees
         core::value test_decision_tree(const core::value &tree, const core::value &test_tuple, bool probability_result = false)
         {

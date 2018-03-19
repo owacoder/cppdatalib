@@ -33,45 +33,10 @@ namespace cppdatalib
 
     namespace xml_rpc
     {
-        namespace impl
-        {
-            class stream_writer_base : public core::stream_handler, public core::stream_writer
-            {
-            public:
-                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
-
-            protected:
-                core::ostream &write_string(core::ostream &stream, const std::string &str)
-                {
-                    for (size_t i = 0; i < str.size(); ++i)
-                    {
-                        int c = str[i] & 0xff;
-
-                        switch (c)
-                        {
-                            case '"': stream.write("&quot;", 6); break;
-                            case '&': stream.write("&amp;", 5); break;
-                            case '\'': stream.write("&apos;", 6); break;
-                            case '<': stream.write("&lt;", 4); break;
-                            case '>': stream.write("&gt;", 4); break;
-                            default:
-                                if (iscntrl(c))
-                                    stream.write("&#", 2).put(c).put(';');
-                                else
-                                    stream.put(str[i]);
-                                break;
-                        }
-                    }
-
-                    return stream;
-                }
-            };
-        }
-
-        class stream_writer : public impl::stream_writer_base
+        class stream_writer : public core::xml_impl::stream_writer_base
         {
         public:
-            stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream_handle output) : core::xml_impl::stream_writer_base(output) {}
 
             std::string name() const {return "cppdatalib::xml_rpc::stream_writer";}
 
@@ -101,7 +66,7 @@ namespace cppdatalib
                 else
                     stream() << "<value><string>";
             }
-            void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+            void string_data_(const core::value &v, bool) {write_element_content(stream(), v.get_string_unchecked());}
             void end_string_(const core::value &, bool is_key)
             {
                 if (is_key)
@@ -122,7 +87,7 @@ namespace cppdatalib
             }
         };
 
-        class pretty_stream_writer : public impl::stream_writer_base
+        class pretty_stream_writer : public core::xml_impl::stream_writer_base
         {
             std::unique_ptr<char []> buffer;
             size_t indent_width;
@@ -143,7 +108,7 @@ namespace cppdatalib
 
         public:
             pretty_stream_writer(core::ostream_handle output, size_t indent_width)
-                : impl::stream_writer_base(output)
+                : core::xml_impl::stream_writer_base(output)
                 , buffer(new char [core::buffer_size])
                 , indent_width(indent_width)
             {}
@@ -223,7 +188,7 @@ namespace cppdatalib
                 if (current_container_size() == 0)
                     stream() << '\n', output_padding(current_indent + indent_width);
 
-                write_string(stream(), v.get_string_unchecked());
+                write_element_content(stream(), v.get_string_unchecked());
             }
             void end_string_(const core::value &, bool is_key)
             {

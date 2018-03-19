@@ -61,8 +61,6 @@ namespace cppdatalib
         public:
             uint8_stream_writer(core::ostream_handle output) : core::stream_writer(output) {}
 
-            unsigned int required_features() const {return requires_prefix_array_size | requires_prefix_object_size | requires_prefix_string_size;}
-
             std::string name() const {return "cppdatalib::raw::uint8_stream_writer";}
 
         protected:

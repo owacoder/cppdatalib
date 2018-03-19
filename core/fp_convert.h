@@ -77,7 +77,7 @@ namespace cppdatalib
                 if (mantissa == 0) // +/- Infinity
                     result = std::numeric_limits<float>::infinity();
                 else // qNaN, sNaN
-                    return f >> sign_offset?
+                    result = (f >> (exponent_offset - 1)) & 1?
                         std::numeric_limits<float>::quiet_NaN():
                         std::numeric_limits<float>::signaling_NaN();
             }
@@ -158,7 +158,7 @@ namespace cppdatalib
                 if (mantissa == 0) // +/- Infinity
                     result = std::numeric_limits<float>::infinity();
                 else // qNaN, sNaN
-                    return f >> sign_offset?
+                    result = (f >> (exponent_offset - 1)) & 1?
                         std::numeric_limits<float>::quiet_NaN():
                         std::numeric_limits<float>::signaling_NaN();
             }
@@ -263,7 +263,7 @@ namespace cppdatalib
                 if (mantissa == 0) // +/- Infinity
                     result = std::numeric_limits<double>::infinity();
                 else // qNaN, sNaN
-                    return f >> sign_offset?
+                    result = (f >> (exponent_offset - 1)) & 1?
                         std::numeric_limits<double>::quiet_NaN():
                         std::numeric_limits<double>::signaling_NaN();
             }

@@ -1002,6 +1002,113 @@ namespace cppdatalib
                 return true;
             }
         };
+
+        namespace xml_impl
+        {
+            class stream_writer_base : public core::stream_handler, public core::stream_writer
+            {
+            public:
+                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
+
+            protected:
+                bool is_name_start_char(unsigned long code) const
+                {
+                    if (code < 128)
+                        return isalpha(code) || code == ':' || code == '_';
+                    else if ((code >= 0xC0 && code <= 0xD6) ||
+                             (code >= 0xD8 && code <= 0xF6) ||
+                             (code >= 0xF8 && code <= 0x2FF) ||
+                             (code >= 0x370 && code <= 0x37D) ||
+                             (code >= 0x37F && code <= 0x1FFF) ||
+                             (code >= 0x200C && code <= 0x200D) ||
+                             (code >= 0x2070 && code <= 0x218F) ||
+                             (code >= 0x2C00 && code <= 0x2FEF) ||
+                             (code >= 0x3001 && code <= 0xD7FF) ||
+                             (code >= 0xF900 && code <= 0xFDCF) ||
+                             (code >= 0xFDF0 && code <= 0xFFFD) ||
+                             (code >= 0x10000 && code <= 0xEFFFF))
+                        return true;
+                    return false;
+                }
+
+                bool is_name_char(unsigned long code) const
+                {
+                    if (code < 128 && (isdigit(code) || code == '-' || code == '.'))
+                        return true;
+                    return is_name_start_char(code) || code == 0xB7 || (code >= 0x300 && code <= 0x36F) || (code >= 0x203F && code <= 0x2040);
+                }
+
+                // TODO: check for valid UTF-8 name
+                // Right now only ASCII attribute values are checked
+                core::ostream &write_name(core::ostream &stream, const std::string &str)
+                {
+                    if (str.empty())
+                        throw core::error("XML - tag or attribute name must not be empty string");
+
+                    if (!is_name_start_char(str[0]))
+                        throw core::error("XML - invalid tag or attribute name");
+
+                    for (size_t i = 1; i < str.size(); ++i)
+                        if (!is_name_char(str[i]))
+                            throw core::error("XML - invalid tag or attribute name");
+
+                    return stream << str;
+                }
+
+                core::ostream &write_attribute_content(core::ostream &stream, const std::string &str)
+                {
+                    for (size_t i = 0; i < str.size(); ++i)
+                    {
+                        int c = str[i] & 0xff;
+
+                        switch (c)
+                        {
+                            case '"': stream.write("&quot;", 6); break;
+                            case '&': stream.write("&amp;", 5); break;
+                            case '\'': stream.write("&apos;", 6); break;
+                            case '<': stream.write("&lt;", 4); break;
+                            case '>': stream.write("&gt;", 4); break;
+                            default:
+                                if (iscntrl(c))
+                                    (stream.write("&#", 2) << c).put(';');
+                                else
+                                    stream.put(str[i]);
+                                break;
+                        }
+                    }
+
+                    return stream;
+                }
+
+                core::ostream &write_element_content(core::ostream &stream, const std::string &str)
+                {
+                    for (size_t i = 0; i < str.size(); ++i)
+                    {
+                        int c = str[i] & 0xff;
+
+                        switch (c)
+                        {
+                            case '"': stream.write("&quot;", 6); break;
+                            case '&': stream.write("&amp;", 5); break;
+                            case '\'': stream.write("&apos;", 6); break;
+                            case '<': stream.write("&lt;", 4); break;
+                            case '>': stream.write("&gt;", 4); break;
+                            case '\n':
+                            case '\r':
+                            case '\t': stream.put(c); break;
+                            default:
+                                if (iscntrl(c))
+                                    (stream.write("&#", 2) << c).put(';');
+                                else
+                                    stream.put(str[i]);
+                                break;
+                        }
+                    }
+
+                    return stream;
+                }
+            };
+        }
     }
 }
 

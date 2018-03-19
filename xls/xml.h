@@ -31,45 +31,10 @@ namespace cppdatalib
 {
     namespace xml_xls
     {
-        namespace impl
-        {
-            class stream_writer_base : public core::stream_handler, public core::stream_writer
-            {
-            public:
-                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
-
-            protected:
-                core::ostream &write_string(core::ostream &stream, const std::string &str)
-                {
-                    for (size_t i = 0; i < str.size(); ++i)
-                    {
-                        int c = str[i] & 0xff;
-
-                        switch (c)
-                        {
-                            case '"': stream.write("&quot;", 6); break;
-                            case '&': stream.write("&amp;", 5); break;
-                            case '\'': stream.write("&apos;", 6); break;
-                            case '<': stream.write("&lt;", 4); break;
-                            case '>': stream.write("&gt;", 4); break;
-                            default:
-                                if (iscntrl(c))
-                                    stream.write("&#", 2).put(c).put(';');
-                                else
-                                    stream.put(str[i]);
-                                break;
-                        }
-                    }
-
-                    return stream;
-                }
-            };
-        }
-
-        class table_writer : public impl::stream_writer_base
+        class table_writer : public core::xml_impl::stream_writer_base
         {
         public:
-            table_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
+            table_writer(core::ostream_handle output) : core::xml_impl::stream_writer_base(output) {}
 
             std::string name() const {return "cppdatalib::xml_xls::table_writer";}
 
@@ -122,7 +87,7 @@ namespace cppdatalib
             void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v) {stream() << v.get_real_unchecked();}
-            void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+            void string_data_(const core::value &v, bool) {write_element_content(stream(), v.get_string_unchecked());}
 
             void begin_array_(const core::value &, core::int_t, bool)
             {
@@ -146,7 +111,7 @@ namespace cppdatalib
                     throw core::error("XML XLS - Invalid worksheet name cannot contain any of '\\/?*[]'");
 
                 stream() << "<Worksheet ss:Name=\"";
-                write_string(stream(), worksheet_name);
+                write_attribute_content(stream(), worksheet_name);
                 stream() << "\">";
 
                 table_writer::begin_();

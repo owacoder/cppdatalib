@@ -33,45 +33,10 @@ namespace cppdatalib
 
     namespace xml_property_list
     {
-        namespace impl
-        {
-            class stream_writer_base : public core::stream_handler, public core::stream_writer
-            {
-            public:
-                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
-
-            protected:
-                core::ostream &write_string(core::ostream &stream, const std::string &str)
-                {
-                    for (size_t i = 0; i < str.size(); ++i)
-                    {
-                        int c = str[i] & 0xff;
-
-                        switch (c)
-                        {
-                            case '"': stream.write("&quot;", 6); break;
-                            case '&': stream.write("&amp;", 5); break;
-                            case '\'': stream.write("&apos;", 6); break;
-                            case '<': stream.write("&lt;", 4); break;
-                            case '>': stream.write("&gt;", 4); break;
-                            default:
-                                if (iscntrl(c))
-                                    stream.write("&#", 2).put(c).put(';');
-                                else
-                                    stream.put(str[i]);
-                                break;
-                        }
-                    }
-
-                    return stream;
-                }
-            };
-        }
-
-        class stream_writer : public impl::stream_writer_base
+        class stream_writer : public core::xml_impl::stream_writer_base
         {
         public:
-            stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
+            stream_writer(core::ostream_handle output) : core::xml_impl::stream_writer_base(output) {}
 
             std::string name() const {return "cppdatalib::xml_property_list::stream_writer";}
 
@@ -106,10 +71,11 @@ namespace cppdatalib
             }
             void string_data_(const core::value &v, bool)
             {
+                // TODO: dumb Base64 concatenation is dangerous and wrong. Needs to be fixed
                 if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
                     base64::write(stream(), v.get_string_unchecked());
                 else
-                    write_string(stream(), v.get_string_unchecked());
+                    write_element_content(stream(), v.get_string_unchecked());
             }
             void end_string_(const core::value &v, bool is_key)
             {
@@ -134,7 +100,7 @@ namespace cppdatalib
             void end_object_(const core::value &, bool) {stream() << "</dict>";}
         };
 
-        class pretty_stream_writer : public impl::stream_writer_base
+        class pretty_stream_writer : public core::xml_impl::stream_writer_base
         {
             std::unique_ptr<char []> buffer;
             size_t indent_width;
@@ -155,7 +121,7 @@ namespace cppdatalib
 
         public:
             pretty_stream_writer(core::ostream_handle output, size_t indent_width)
-                : impl::stream_writer_base(output)
+                : core::xml_impl::stream_writer_base(output)
                 , buffer(new char [core::buffer_size])
                 , indent_width(indent_width)
                 , current_indent(0)
@@ -220,10 +186,11 @@ namespace cppdatalib
                 if (current_container_size() == 0)
                     stream() << '\n', output_padding(current_indent + indent_width);
 
+                // TODO: dumb Base64 concatenation is dangerous and wrong. Needs to be fixed
                 if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
                     base64::write(stream(), v.get_string_unchecked());
                 else
-                    write_string(stream(), v.get_string_unchecked());
+                    write_element_content(stream(), v.get_string_unchecked());
             }
             void end_string_(const core::value &v, bool is_key)
             {
