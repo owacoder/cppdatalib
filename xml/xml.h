@@ -38,7 +38,7 @@ namespace cppdatalib
     {
         class stream_writer : public core::xml_impl::stream_writer_base
         {
-            core::value current_key;
+            core::cache_vector_n<core::string_t, core::cache_size> current_keys;
 
         public:
             stream_writer(core::ostream_handle output) : core::xml_impl::stream_writer_base(output) {}
@@ -46,32 +46,7 @@ namespace cppdatalib
             std::string name() const {return "cppdatalib::xml::stream_writer";}
 
         protected:
-            void write_attributes(const core::value &v)
-            {
-                for (auto attr: v.get_attributes())
-                {
-                    if (!attr.first.is_string())
-                        throw core::error("XML - cannot write attribute with non-string key");
-                    stream().put(' ');
-                    write_name(stream(), attr.first.get_string_unchecked());
-
-                    stream().write("=\"", 2);
-                    switch (attr.second.get_type())
-                    {
-                        case core::null: break;
-                        case core::boolean: bool_(attr.second); break;
-                        case core::integer: integer_(attr.second); break;
-                        case core::uinteger: uinteger_(attr.second); break;
-                        case core::real: real_(attr.second); break;
-                        case core::string: write_attribute_content(stream(), attr.second.get_string_unchecked()); break;
-                        case core::array:
-                        case core::object: throw core::error("XML - cannot write attribute with 'array' or 'object' value");
-                    }
-                    stream().put('"');
-                }
-            }
-
-            void begin_() {stream().precision(CPPDATALIB_REAL_DIG); current_key.set_null();}
+            void begin_() {stream().precision(CPPDATALIB_REAL_DIG); current_keys.clear();}
 
             void begin_item_(const core::value &v)
             {
@@ -83,15 +58,10 @@ namespace cppdatalib
                 else if (current_container() == core::array) // Must be using an array to counteract the lack of ordering when using objects
                 {
                     // Not an object? Then we can't serialize. An object is required so that the key may be used for the tag name!
-                    // Otherwise, all the array elements would be concatenated together, and that doesn't really make sense for most cases
+                    // Otherwise, all the array elements would be concatenated together as raw content, and that doesn't really make sense for most cases
                     if (!v.is_object())
                         throw core::error("XML - array elements must be objects");
                 }
-            }
-            void end_item_(const core::value &v)
-            {
-                if (current_container() == core::object && !v.is_object())
-                    stream() << "</" << current_key.get_string_unchecked() << ">";
             }
 
             void begin_key_(const core::value &v)
@@ -99,8 +69,14 @@ namespace cppdatalib
                 if (!v.is_string())
                     throw core::error("XML - cannot write non-string key");
 
+                if (current_container_size() > 0)
+                {
+                    write_name(stream().write("</", 2), current_keys.back()).put('>');
+                    current_keys.pop_back();
+                }
+
                 stream().put('<');
-                current_key.set_string("");
+                current_keys.push_back("");
             }
             void end_key_(const core::value &v)
             {
@@ -121,14 +97,20 @@ namespace cppdatalib
             void string_data_(const core::value &v, bool is_key)
             {
                 if (is_key)
-                    current_key.get_string_ref() += v.get_string_unchecked();
+                    current_keys.back() += v.get_string_unchecked();
                 else
                     write_element_content(stream(), v.get_string_unchecked());
             }
             void end_string_(const core::value &, bool is_key)
             {
                 if (is_key)
-                    write_name(stream(), current_key.get_string_unchecked());
+                    write_name(stream(), current_keys.back());
+            }
+
+            void end_object_(const core::value &, bool)
+            {
+                write_name(stream().write("</", 2), current_keys.back()).put('>');
+                current_keys.pop_back();
             }
         };
 
@@ -137,6 +119,7 @@ namespace cppdatalib
             std::unique_ptr<char []> buffer;
             size_t indent_width;
             size_t current_indent;
+            core::cache_vector_n<core::string_t, core::cache_size> current_keys;
 
             void output_padding(size_t padding)
             {
@@ -164,30 +147,50 @@ namespace cppdatalib
             std::string name() const {return "cppdatalib::xml::pretty_stream_writer";}
 
         protected:
-            void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG);}
+            void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG); current_keys.clear();}
 
-            void begin_item_(const core::value &)
+            void begin_item_(const core::value &v)
             {
                 if (container_key_was_just_parsed())
-                    stream() << ": ";
-                else if (current_container_size() > 0)
-                    stream().put(',');
-
-                if (current_container() == core::array)
+                {
+                    write_attributes(v);
+                    stream().put('>');
                     stream().put('\n'), output_padding(current_indent);
+                }
+                else if (current_container() == core::array) // Must be using an array to counteract the lack of ordering when using objects
+                {
+                    // Not an object? Then we can't serialize. An object is required so that the key may be used for the tag name!
+                    // Otherwise, all the array elements would be concatenated together, and that doesn't really make sense for most cases
+                    if (!v.is_object())
+                        throw core::error("XML - array elements must be objects");
+
+                    if (current_container_size() > 0)
+                        stream().put('\n'), output_padding(current_indent);
+                }
             }
+
             void begin_key_(const core::value &v)
             {
-                if (current_container_size() > 0)
-                    stream().put(',');
-
-                stream().put('\n'), output_padding(current_indent);
-
                 if (!v.is_string())
                     throw core::error("XML - cannot write non-string key");
+
+                if (current_container_size() > 0)
+                {
+                    stream().put('\n'), output_padding(current_indent);
+                    write_name(stream().write("</", 2), current_keys.back()).put('>');
+                    current_keys.pop_back();
+                }
+
+                stream().put('<');
+                current_keys.push_back("");
+            }
+            void end_key_(const core::value &v)
+            {
+                write_attributes(v);
             }
 
-            void null_(const core::value &) {stream() << "null";}
+            // Implementation of null_() does nothing
+            // void null_(const core::value &) {}
             void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
             void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
@@ -197,38 +200,30 @@ namespace cppdatalib
                     throw core::error("XML - cannot write 'NaN' or 'Infinity' values");
                 stream() << v.get_real_unchecked();
             }
-            void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
-            void string_data_(const core::value &v, bool) {write_element_content(stream(), v.get_string_unchecked());}
-            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
-
-            void begin_array_(const core::value &, core::int_t, bool)
+            void string_data_(const core::value &v, bool is_key)
             {
-                stream().put('[');
-                current_indent += indent_width;
+                if (is_key)
+                    current_keys.back() += v.get_string_unchecked();
+                else
+                    write_element_content(stream(), v.get_string_unchecked());
             }
-            void end_array_(const core::value &, bool)
+            void end_string_(const core::value &, bool is_key)
             {
-                current_indent -= indent_width;
-
-                if (current_container_size() > 0)
-                    stream().put('\n'), output_padding(current_indent);
-
-                stream().put(']');
+                if (is_key)
+                    write_name(stream(), current_keys.back());
             }
 
             void begin_object_(const core::value &, core::int_t, bool)
             {
-                stream().put('{');
                 current_indent += indent_width;
             }
             void end_object_(const core::value &, bool)
             {
                 current_indent -= indent_width;
 
-                if (current_container_size() > 0)
-                    stream().put('\n'), output_padding(current_indent);
-
-                stream().put('}');
+                stream().put('\n'), output_padding(current_indent);
+                write_name(stream().write("</", 2), current_keys.back()).put('>');
+                current_keys.pop_back();
             }
         };
 

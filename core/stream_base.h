@@ -174,6 +174,9 @@ namespace cppdatalib
             // Current container is array, object, string, or null if no container is present
             type current_container() const {return nested_scopes.back().get_type();}
 
+            // Parent container is array, object, or null if no parent is present
+            type parent_container() const {return nested_scopes.size() > 1? nested_scopes[nested_scopes.size() - 2].get_type(): null;}
+
             // Container size is updated after the item was handled
             // (begins at 0 with no elements, the first element is handled, then it increments to 1)
             size_t current_container_size() const {return nested_scopes.back().items_parsed();}
@@ -198,6 +201,8 @@ namespace cppdatalib
                         *this << v;
                     else
                     {
+                        bool remove_scope = false;
+
                         if (is_key)
                             begin_key_(v);
                         else
@@ -207,15 +212,21 @@ namespace cppdatalib
                         {
                             case string:
                                 begin_string_(v, v.size(), is_key);
+                                nested_scopes.push_back(string);
+                                remove_scope = true;
                                 string_data_(v, is_key);
                                 end_string_(v, is_key);
                                 break;
                             case array:
                                 begin_array_(v, 0, is_key);
+                                nested_scopes.push_back(array);
+                                remove_scope = true;
                                 end_array_(v, is_key);
                                 break;
                             case object:
                                 begin_object_(v, 0, is_key);
+                                nested_scopes.push_back(object);
+                                remove_scope = true;
                                 end_object_(v, is_key);
                                 break;
                             default:
@@ -239,6 +250,9 @@ namespace cppdatalib
                             end_key_(v);
                         else
                             end_item_(v);
+
+                        if (remove_scope)
+                            nested_scopes.pop_back();
                     }
                 }
 
@@ -1036,6 +1050,31 @@ namespace cppdatalib
                     if (code < 128 && (isdigit(code) || code == '-' || code == '.'))
                         return true;
                     return is_name_start_char(code) || code == 0xB7 || (code >= 0x300 && code <= 0x36F) || (code >= 0x203F && code <= 0x2040);
+                }
+
+                void write_attributes(const core::value &v)
+                {
+                    for (auto attr: v.get_attributes())
+                    {
+                        if (!attr.first.is_string())
+                            throw core::error("XML - cannot write attribute with non-string key");
+                        stream().put(' ');
+                        write_name(stream(), attr.first.get_string_unchecked());
+
+                        stream().write("=\"", 2);
+                        switch (attr.second.get_type())
+                        {
+                            case core::null: break;
+                            case core::boolean: bool_(attr.second); break;
+                            case core::integer: integer_(attr.second); break;
+                            case core::uinteger: uinteger_(attr.second); break;
+                            case core::real: real_(attr.second); break;
+                            case core::string: write_attribute_content(stream(), attr.second.get_string_unchecked()); break;
+                            case core::array:
+                            case core::object: throw core::error("XML - cannot write attribute with 'array' or 'object' value");
+                        }
+                        stream().put('"');
+                    }
                 }
 
                 // TODO: check for valid UTF-8 name
