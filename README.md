@@ -24,6 +24,7 @@ Supported formats include
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
    - [BJSON](http://bjson.org/) (write-only)
    - [CSV](https://tools.ietf.org/html/rfc4180) (allows user-defined delimiter)
+   - [DIF](https://en.wikipedia.org/wiki/Data_Interchange_Format) (write-only, requires table dimensions prior to writing to create well-formed output)
    - [JSON](https://json.org/)
    - [MessagePack](https://msgpack.org/)
    - MySQL (database/table retrieval and writing)
@@ -31,6 +32,7 @@ Supported formats include
    - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
    - [TSV](https://en.wikipedia.org/wiki/Tab-separated_values) (allows user-defined delimiter)
    - [UBJSON](http://ubjson.org/)
+   - Raw [XML](https://www.w3.org/TR/xml/) (write-only)
    - XML property lists (write-only)
    - [XML-RPC](http://xmlrpc.scripting.com/spec.html) (write-only)
    - [XML-XLS](https://msdn.microsoft.com/en-us/library/aa140066(office.10).aspx) (write-only)
@@ -372,7 +374,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
      Notes:
        - `string` subtypes `blob`, `bignum`, `date`, `time`, and `datetime` are supported.
        - MySQL datatypes `ENUM` and `SET` are not supported natively, although they are extracted as raw strings.
-       - Due to a limitation with the MySQL C API, it is not possible to read a table/db and write to another table/db at the same time. An intermediate representation is required (i.e. parse table to core::value, then output core::value to the table/db).
+       - Due to a limitation with the MySQL C API, it is not possible to read a table/db and write to another table/db using the same connection at the same time. Doing so results in undefined behavior. An intermediate representation is required (i.e. parse table to core::value, then output core::value to the table/db), or else use multiple connections to the MySQL server.
 
    - XML property lists support `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
@@ -410,7 +412,14 @@ If a format-defined limit is reached, such as an object key length limit, an err
    - UBJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.
      Notes:
        - `string` subtype `bignum` is supported.
-       - `uint` values are limited to the `int` value range when reading or writing, due to lack of format support for unsigned types
+       - `uint` values are limited to the `int` value range when reading or writing, due to lack of format support for unsigned types.
+
+    - XML supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+      Notes:
+        - No subtypes are supported.
+        - Numerical metadata is lost when converting to and from XML.
+        - Value attributes are supported (and in fact required, if you want attributes attached to your elements), either on object keys or object values, or both. No protection is provided against duplicate keys existing in both an object key and the associated object value.
+        - XML cannot compile without CPPDATALIB_ENABLE_ATTRIBUTES being defined.
 
    - XML-XLS supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:

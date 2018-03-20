@@ -227,7 +227,35 @@ namespace cppdatalib
             }
         };
 
-        inline std::string to_xml(const core::value &v)
+        class document_writer : public stream_writer
+        {
+        public:
+            document_writer(core::ostream_handle output) : stream_writer(output) {}
+
+        protected:
+            void begin_()
+            {
+                stream() << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+
+                stream_writer::begin_();
+            }
+        };
+
+        class pretty_document_writer : public pretty_stream_writer
+        {
+        public:
+            pretty_document_writer(core::ostream_handle output, size_t indent_width) : pretty_stream_writer(output, indent_width) {}
+
+        protected:
+            void begin_()
+            {
+                stream() << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+
+                pretty_stream_writer::begin_();
+            }
+        };
+
+        inline std::string to_xml_elements(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer writer(stream);
@@ -235,10 +263,26 @@ namespace cppdatalib
             return stream.str();
         }
 
-        inline std::string to_pretty_xml(const core::value &v, size_t indent_width)
+        inline std::string to_pretty_xml_elements(const core::value &v, size_t indent_width)
         {
             core::ostringstream stream;
             pretty_stream_writer writer(stream, indent_width);
+            writer << v;
+            return stream.str();
+        }
+
+        inline std::string to_xml_document(const core::value &v)
+        {
+            core::ostringstream stream;
+            document_writer writer(stream);
+            writer << v;
+            return stream.str();
+        }
+
+        inline std::string to_pretty_xml_document(const core::value &v, size_t indent_width)
+        {
+            core::ostringstream stream;
+            pretty_document_writer writer(stream, indent_width);
             writer << v;
             return stream.str();
         }

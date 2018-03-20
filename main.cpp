@@ -732,9 +732,9 @@ void test_attributes()
 
         value.add_attribute("my_attr").add_attribute("h23");
 
-        cppdatalib::core::value e1 = cppdatalib::core::array_t{cppdatalib::core::object_t{{"root", value}}, cppdatalib::core::object_t{{"secondary", v2}}};
+        cppdatalib::core::value e1 = cppdatalib::core::array_t{cppdatalib::core::object_t{{"secondary", v2}}, cppdatalib::core::object_t{{"first", value}}};
 
-        cppdatalib::xml::pretty_stream_writer(std::cout, 2) << cppdatalib::core::object_t{{"root", e1}};
+        cppdatalib::xml::pretty_document_writer(std::cout, 2) << cppdatalib::core::object_t{{"root", e1}};
     } catch (cppdatalib::core::error e)
     {
         std::cerr << e.what() << std::endl;
