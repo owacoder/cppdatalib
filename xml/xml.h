@@ -36,6 +36,8 @@ namespace cppdatalib
 {
     namespace xml
     {
+        // Use an array to counteract the lack of ordering when using objects
+        // Array elements that are not objects are concatenated together, which may or may not be the desired operation
         class stream_writer : public core::xml_impl::stream_writer_base
         {
             core::cache_vector_n<core::string_t, core::cache_size> current_keys;
@@ -54,13 +56,6 @@ namespace cppdatalib
                 {
                     write_attributes(v);
                     stream().put('>');
-                }
-                else if (current_container() == core::array) // Must be using an array to counteract the lack of ordering when using objects
-                {
-                    // Not an object? Then we can't serialize. An object is required so that the key may be used for the tag name!
-                    // Otherwise, all the array elements would be concatenated together as raw content, and that doesn't really make sense for most cases
-                    if (!v.is_object())
-                        throw core::error("XML - array elements must be objects");
                 }
             }
 
@@ -159,10 +154,7 @@ namespace cppdatalib
                 }
                 else if (current_container() == core::array) // Must be using an array to counteract the lack of ordering when using objects
                 {
-                    // Not an object? Then we can't serialize. An object is required so that the key may be used for the tag name!
-                    // Otherwise, all the array elements would be concatenated together, and that doesn't really make sense for most cases
-                    if (!v.is_object())
-                        throw core::error("XML - array elements must be objects");
+                    // Array elements that are not objects are concatenated together, which may or may not be the desired operation
 
                     if (current_container_size() > 0)
                         stream().put('\n'), output_padding(current_indent);
