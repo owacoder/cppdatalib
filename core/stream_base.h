@@ -25,6 +25,7 @@
 #ifndef CPPDATALIB_STREAM_BASE_H
 #define CPPDATALIB_STREAM_BASE_H
 
+#include "utf.h"
 #include "value.h"
 #include "istream.h"
 #include "ostream.h"
@@ -658,6 +659,10 @@ namespace cppdatalib
             }
 
         protected:
+            // Provides the nesting level of this parser (since parsers can be initialized on an existing stream,
+            // checking the nesting level of the output may not be accurate)
+            size_t nesting_depth() const {return output? output->nesting_depth() - initial_nesting_level: 0;}
+
             // Called when output changes, allows parser to reset any external output references needed
             // Note that get_output() always returns non-NULL when this function is executing!
             virtual void output_changed_() {}
@@ -1019,13 +1024,20 @@ namespace cppdatalib
 
         namespace xml_impl
         {
-            class stream_writer_base : public core::stream_handler, public core::stream_writer
+            class xml_base
             {
-            public:
-                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
-
             protected:
-                bool is_name_start_char(unsigned long code) const
+                static bool is_valid_char(uint32_t codepoint)
+                {
+                    return (codepoint >= 0x20 && codepoint <= 0xd7ff) ||
+                            codepoint == 0x9 ||
+                            codepoint == 0xa ||
+                            codepoint == 0xd ||
+                           (codepoint >= 0xe000 && codepoint <= 0xfffd) ||
+                           (codepoint >= 0x10000 && codepoint <= 0x10ffff);
+                }
+
+                static bool is_name_start_char(unsigned long code)
                 {
                     if (code < 128)
                         return isalpha(code) || code == ':' || code == '_';
@@ -1045,13 +1057,604 @@ namespace cppdatalib
                     return false;
                 }
 
-                bool is_name_char(unsigned long code) const
+                static bool is_name_char(unsigned long code)
                 {
                     if (code < 128 && (isdigit(code) || code == '-' || code == '.'))
                         return true;
                     return is_name_start_char(code) || code == 0xB7 || (code >= 0x300 && code <= 0x36F) || (code >= 0x203F && code <= 0x2040);
                 }
+            };
 
+            // TODO: newlines should be normalized to \n
+            class stream_parser : public core::stream_parser, public xml_base
+            {
+                // First: entity value
+                // Second: true if parameter entity, false if general entity
+                typedef std::pair<core::string_t, bool> entity;
+
+                core::cache_vector_n<core::string_t, core::cache_size> tag_names;
+                std::map<core::string_t, entity> entities;
+                std::map<core::string_t, entity> parameter_entities;
+                bool has_doctypedecl;
+                bool has_root_element;
+
+                core::istringstream entity_buffer;
+                bool last_read_was_from_buffer;
+
+            public:
+                stream_parser(core::istream_handle input) : core::stream_parser(input) {}
+
+            protected:
+                enum entity_deref_mode
+                {
+                    deref_no_entities,
+                    deref_all_but_general_entities,
+                    deref_all_entities,
+                    deref_all_entities_as_markup
+                };
+
+                enum what_was_read
+                {
+                    eof_was_reached,
+                    nothing_was_read,
+                    comment_was_read,
+                    processing_instruction_was_read,
+                    start_tag_was_read,
+                    complete_tag_was_read,
+                    content_was_read,
+                    entity_value_was_read, // That is, an entity that could resolve to markup was read
+                    end_tag_was_read
+                };
+
+                void reset_()
+                {
+                    tag_names.clear();
+                    parameter_entities.clear();
+                    entities.clear();
+                    has_doctypedecl = false;
+                    has_root_element = false;
+                    last_read_was_from_buffer = false;
+                }
+
+                int peek() {
+                    int c = entity_buffer.peek();
+                    return c == EOF? stream().peek(): c;
+                }
+
+                int get() {
+                    int c = entity_buffer.get();
+                    last_read_was_from_buffer = c != EOF;
+                    return c == EOF? stream().get(): c;
+                }
+
+                void unget() {
+                    if (last_read_was_from_buffer)
+                        entity_buffer.unget();
+                    else
+                        stream().unget();
+                }
+
+                bool read(char *buf, size_t size)
+                {
+                    while (size--)
+                    {
+                        int c = get();
+                        if (c == EOF)
+                            return false;
+                        *buf++ = c;
+                    }
+                    return true;
+                }
+
+                void register_entity(const core::string_t &name, const core::string_t &value, bool parameter_entity)
+                {
+                    if (parameter_entity)
+                        parameter_entities.insert({name, entity(value, parameter_entity)});
+                    else
+                        entities.insert({name, entity(value, parameter_entity)});
+                }
+
+                // read_entity() assumes that the initial '&' or '%' has already been read and discarded
+                // TODO: implement `deref_all_entities_as_markup` mode, and dereference sub-references entities
+                bool read_entity(bool parse_param_entity, entity_deref_mode mode, core::string_t &value)
+                {
+                    if (mode == deref_no_entities)
+                    {
+                        value.clear();
+                        value.push_back(parse_param_entity? '%': '&');
+                        return false;
+                    }
+
+                    int c = get();
+
+                    if (c == '#') // Character reference
+                    {
+                        c = get();
+
+                        if (c == 'x') // Hexadecimal reference
+                        {
+                            const char hexchars[] = "0123456789abcdef";
+                            uint32_t code = 0;
+
+                            for (; code <= 0x10ffff; )
+                            {
+                                c = get();
+                                if (isxdigit(c))
+                                    code = (code << 4) + (strchr(hexchars, tolower(c)) - hexchars);
+                                else
+                                    break;
+                            }
+
+                            if (!is_valid_char(code) || // Invalid code point
+                                c != ';') // Invalid closing character
+                                return false;
+
+                            value = core::ucs_to_utf8(code);
+                        }
+                        else if (isdigit(c)) // Decimal reference
+                        {
+                            uint32_t code = 0;
+
+                            for (; code <= 0x10ffff; )
+                            {
+                                if (isdigit(c))
+                                    code = (code * 10) + (c - '0');
+                                else
+                                    break;
+                                c = get();
+                            }
+
+                            if (!is_valid_char(code) || // Invalid code point
+                                c != ';') // Invalid closing character
+                                return false;
+
+                            value = core::ucs_to_utf8(code);
+                        }
+                        else
+                            return false;
+                    }
+                    else if (!parse_param_entity && mode == deref_all_but_general_entities)
+                    {
+                        unget();
+                        if (!read_name(value) ||
+                            get() != ';')
+                            return false;
+
+                        if (value == "amp")
+                            value = "&";
+                        else if (value == "lt")
+                            value = "<";
+                        else if (value == "gt")
+                            value = ">";
+                        else if (value == "quot")
+                            value = "\"";
+                        else if (value == "apos")
+                            value = "'";
+                        else
+                        {
+                            value.insert(value.begin(), parse_param_entity? '%': '&');
+                            value.push_back(';');
+                        }
+
+                        return true;
+                    }
+                    else
+                    {
+                        unget();
+
+                        if (!read_name(value) ||
+                            get() != ';')
+                            return false;
+
+                        if (parse_param_entity)
+                        {
+                            auto it = parameter_entities.find(value);
+                            if (it == parameter_entities.end()) // Entity not found
+                            {
+                                return false;
+                            }
+                            else
+                            {
+                                // TODO: expand expansion of entity
+                                value = it->second.first;
+                            }
+                        }
+                        else
+                        {
+                            auto it = entities.find(value);
+                            if (it == entities.end()) // Entity not found
+                            {
+                                if (value == "amp")
+                                    value = "&";
+                                else if (value == "lt")
+                                    value = "<";
+                                else if (value == "gt")
+                                    value = ">";
+                                else if (value == "quot")
+                                    value = "\"";
+                                else if (value == "apos")
+                                    value = "'";
+                                else
+                                    return false;
+                            }
+                            else
+                            {
+                                // TODO: expand expansion of entity
+                                value = it->second.first;
+                            }
+                        }
+                    }
+
+                    return true;
+                }
+
+                // read_spaces() reads any number of space characters from the stream and discards them,
+                // failing (returning false) if the number of spaces is less than `minimum`
+                bool read_spaces(unsigned int minimum)
+                {
+                    int c;
+                    while (c = get(), c == ' ' || c == '\t' || c == '\n' || c == '\r')
+                        if (minimum > 0)
+                            --minimum;
+
+                    if (c != EOF)
+                        unget();
+
+                    return minimum == 0;
+                }
+
+                // read_name() reads a tag or entity name from the stream, leaving the next non-name (or EOF) character in the stream, ready to be read
+                bool read_name(core::string_t &name)
+                {
+                    uint32_t codepoint;
+                    bool eof;
+
+                    name.clear();
+                    while (codepoint = utf8_to_ucs(entity_buffer, &eof), codepoint <= 0x10ffff)
+                    {
+                        last_read_was_from_buffer = true;
+                        if (name.empty())
+                        {
+                            if (is_name_start_char(codepoint))
+                                name += ucs_to_utf8(codepoint);
+                            else
+                                break;
+                        }
+                        else if (is_name_char(codepoint))
+                            name += ucs_to_utf8(codepoint);
+                        else
+                            break;
+                    }
+
+                    if (eof)
+                    {
+                        last_read_was_from_buffer = false;
+                        while (codepoint = utf8_to_ucs(stream(), &eof), codepoint <= 0x10ffff)
+                        {
+                            if (name.empty())
+                            {
+                                if (is_name_start_char(codepoint))
+                                    name += ucs_to_utf8(codepoint);
+                                else
+                                    break;
+                            }
+                            else if (is_name_char(codepoint))
+                                name += ucs_to_utf8(codepoint);
+                            else
+                                break;
+                        }
+                    }
+
+                    if (eof)
+                        return true;
+                    else if (codepoint > 0x80) // Invalid UTF-8, or not a valid character following a name (names are followed by ASCII characters)
+                        return false;
+
+                    unget();
+                    return true;
+                }
+
+                // read_attribute_value() assumes that the '=' between the name and the attribute value has already been read and discarded
+                bool read_attribute_value(entity_deref_mode allow_references, core::string_t &value)
+                {
+                    core::string_t entity;
+
+                    int c = get();
+                    if (c == '"')
+                    {
+                        value.clear();
+                        while (c = get(), c != '"' && c != EOF)
+                        {
+                            if (allow_references == deref_no_entities)
+                                value.push_back(c);
+                            else if (c == '&' ||
+                                     c == '%')
+                            {
+                                if (!read_entity(c == '%', allow_references, entity))
+                                    return false;
+                                value += entity;
+                            }
+                            else
+                                value.push_back(c);
+                        }
+                    }
+                    else if (c == '\'')
+                    {
+                        value.clear();
+                        while (c = get(), c != '\'' && c != EOF)
+                        {
+                            if (allow_references == deref_no_entities)
+                                value.push_back(c);
+                            else if (c == '&' ||
+                                     c == '%')
+                            {
+                                if (!read_entity(c == '%', allow_references, entity))
+                                    return false;
+                                value += entity;
+                            }
+                            else
+                                value.push_back(c);
+                        }
+                    }
+                    else
+                        return false;
+
+                    return true;
+                }
+
+                // read_prolog() assumes nothing has been read in the current document
+                bool read_prolog(core::value &attributes)
+                {
+                    int c;
+                    char buf[10];
+
+                    if ((!read(buf, 5) || memcmp(buf, "<?xml", 5)) ||
+                        (!read_spaces(1)))
+                        return false;
+
+                    c = get();
+
+                    // Is there a version specified
+                    if (c == 'v')
+                    {
+                        buf[0] = c;
+                        if ((!read(buf+1, 6) || memcmp(buf, "version", 7)) ||
+                            (!read_spaces(0)) ||
+                            (get() != '=') ||
+                            (!read_spaces(0)) ||
+                            (!read_attribute_value(deref_no_entities, attributes["version"].get_string_ref())) ||
+                            (!read_spaces(0)))
+                            return false;
+                        c = get();
+                    }
+
+                    // Is there an encoding specified?
+                    if (c == 'e')
+                    {
+                        buf[0] = c;
+                        if ((!read(buf+1, 7) || memcmp(buf, "encoding", 8)) ||
+                            (!read_spaces(0)) ||
+                            (get() != '=') ||
+                            (!read_spaces(0)) ||
+                            (!read_attribute_value(deref_no_entities, attributes["encoding"].get_string_ref())))
+                            return false;
+                        c = get();
+                    }
+
+                    // Is standalone specified?
+                    if (c == 's')
+                    {
+                        buf[0] = c;
+                        if ((!read(buf+1, 9) || memcmp(buf, "standalone", 10)) ||
+                            (!read_spaces(0)) ||
+                            (get() != '=') ||
+                            (!read_spaces(0)) ||
+                            (!read_attribute_value(deref_no_entities, attributes["standalone"].get_string_ref())))
+                            return false;
+                        c = get();
+                    }
+
+                    if (c != '?')
+                    {
+                        unget();
+                        if (!read_spaces(0) ||
+                            get() != '?')
+                            return false;
+                    }
+
+                    if (get() != '>')
+                        return false;
+
+                    return true;
+                }
+
+                // read_next() reads the next XML element from the stream, whether it be content, or a start, complete, or end tag, or a comment, or a processing instruction, or nothing (garbage)
+                // `value_with_attributes` will only be assigned if `read` contains `start_tag_was_read` or `complete_tag_was_read`.
+                bool read_next(bool parsing_inside_element, what_was_read &read, core::string_t &value, core::value &value_with_attributes)
+                {
+                    (void) parsing_inside_element;
+
+                    int c = peek();
+
+                    if (isspace(c) && !parsing_inside_element)
+                    {
+                        read = nothing_was_read;
+                        return read_spaces(1);
+                    }
+                    else if (c == '<')
+                    {
+                        get(); // Skip '<'
+                        c = get();
+                        if (c == '?') // Processing instruction, starting with "<?"
+                        {
+                            read = processing_instruction_was_read;
+                            value.clear();
+                            while (c = get(), c != '?' && c != EOF)
+                                value.push_back(c);
+                            return c == '?' && get() == '>';
+                        }
+                        else if (c == '!') // ENTITY, DOCTYPE, CDATA, or comment
+                        {
+                            char buf[10];
+
+                            c = get();
+                            if (c == '-') // Comment
+                            {
+                                read = comment_was_read;
+                                if (get() != '-')
+                                    return false;
+
+                                value.clear();
+                                while (c = get(), c != EOF)
+                                {
+                                    if (c == '-' && peek() == '-')
+                                        break;
+                                    value.push_back(c);
+                                }
+
+                                if (get() != '-' ||
+                                    get() != '>')
+                                    return false;
+
+                                value.pop_back(); // Remove trailing '-'
+                            }
+                            else if (c == 'E') // ENTITY?
+                            {
+                                bool parameter_entity = false;
+                                buf[0] = c;
+                                core::string_t attribute_value;
+
+                                if (!this->read(buf+1, 5) || memcmp(buf, "ENTITY", 6) ||
+                                    !read_spaces(1))
+                                    return false;
+
+                                if (get() == '%')
+                                {
+                                    parameter_entity = true;
+                                    if (!read_spaces(1))
+                                        return false;
+                                }
+                                else
+                                    unget();
+
+                                if (!read_name(value) ||
+                                    !read_spaces(1) ||
+                                    !read_attribute_value(deref_all_but_general_entities, attribute_value) ||
+                                    !read_spaces(0) ||
+                                    get() != '>')
+                                    return false;
+
+                                register_entity(value, attribute_value, parameter_entity);
+                            }
+                            else if (c == 'D') // DOCTYPE?
+                            {
+
+                            }
+                            else
+                                return false;
+                        }
+                        else if (c == '/') // End tag, starts with "</"
+                        {
+                            value.clear();
+                            read = end_tag_was_read;
+                            if (!read_name(value) ||
+                                !read_spaces(0) ||
+                                get() != '>')
+                                return false;
+                        }
+                        else // Element tag? Starts with '<', not followed by '!', '?', or '/'
+                        {
+                            core::string_t attribute_name, attribute_value;
+                            value.clear();
+                            read = start_tag_was_read;
+
+                            unget();
+                            if (!read_name(value) ||
+                                !read_spaces(0))
+                                return false;
+
+                            value_with_attributes = value;
+
+                            while (true)
+                            {
+                                c = get();
+                                if (c == '/') // Closed tag
+                                {
+                                    read = complete_tag_was_read;
+                                    c = get();
+                                }
+
+                                if (c == '>')
+                                    break;
+                                else if (read == complete_tag_was_read)
+                                    return false; // closing slash not followed by '>'
+
+                                // If at this point, assume an attribute name follows
+                                unget();
+                                if (!read_name(attribute_name) ||
+                                    !read_spaces(0) ||
+                                    get() != '=' ||
+                                    !read_spaces(0) ||
+                                    !read_attribute_value(deref_all_entities, attribute_value) ||
+                                    !read_spaces(0) ||
+                                    value_with_attributes.is_attribute(attribute_name)) // Cannot have duplicate attribute keys
+                                    return false;
+
+                                value_with_attributes.add_attribute(attribute_name, attribute_value);
+                            }
+                        }
+                    }
+                    else if (c == EOF)
+                        read = eof_was_reached;
+                    else // Must be content! Any entities found here are parsable as content, and should be
+                    {
+                        read = content_was_read;
+                        value.clear();
+                        get(); // Eat first character
+                        while (c != EOF && c != '&' && c != '%' && c != '<' && value.size() < core::buffer_size)
+                        {
+                            value.push_back(c);
+                            c = get();
+                        }
+
+                        if (value.empty())
+                        {
+                            if (c == '&' || c == '%')
+                            {
+                                read = entity_value_was_read;
+                                bool b = read_entity(c == '%', deref_all_entities_as_markup, value);
+                                if (entity_buffer.peek() == EOF)
+                                {
+                                    core::istringstream temp(value);
+                                    std::swap(entity_buffer, temp);
+                                }
+                                else
+                                {
+                                    core::string_t str;
+
+                                    while (c = entity_buffer.get(), c != EOF)
+                                        str.push_back(c);
+
+                                    core::istringstream temp(value + str);
+                                    std::swap(entity_buffer, temp);
+                                }
+                                return b;
+                            }
+                        }
+                        else if (c != EOF)
+                            unget();
+                    }
+
+                    return true;
+                }
+            };
+
+            class stream_writer_base : public core::stream_handler, public core::stream_writer, public xml_base
+            {
+            public:
+                stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
+
+            protected:
                 void write_attributes(const core::value &v)
                 {
                     for (auto attr: v.get_attributes())
@@ -1077,18 +1680,19 @@ namespace cppdatalib
                     }
                 }
 
-                // TODO: check for valid UTF-8 name
-                // Right now only ASCII attribute values are checked
+                // Assumes name is UTF-8 encoded, not binary
                 core::ostream &write_name(core::ostream &stream, const std::string &str)
                 {
                     if (str.empty())
                         throw core::error("XML - tag or attribute name must not be empty string");
 
-                    if (!is_name_start_char(str[0]))
+                    std::vector<uint32_t> ucs = utf8_to_ucs(str);
+
+                    if (!is_name_start_char(ucs[0]))
                         throw core::error("XML - invalid tag or attribute name");
 
-                    for (size_t i = 1; i < str.size(); ++i)
-                        if (!is_name_char(str[i]))
+                    for (size_t i = 1; i < ucs.size(); ++i)
+                        if (!is_name_char(ucs[i]))
                             throw core::error("XML - invalid tag or attribute name");
 
                     return stream << str;

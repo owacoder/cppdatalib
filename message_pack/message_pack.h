@@ -563,7 +563,7 @@ namespace cppdatalib
 
         inline core::value operator "" _msgpack(const char *stream, size_t size)
         {
-            core::istring_wrapper_stream wrap(std::string(stream, size));
+            core::istringstream wrap(std::string(stream, size));
             return from_message_pack(wrap);
         }
 

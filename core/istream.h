@@ -630,6 +630,10 @@ namespace cppdatalib
                 : string(string)
                 , pos(0)
             {}
+            istringstream(std::string &&string)
+                : string(std::move(string))
+                , pos(0)
+            {}
 
             const std::string &str() const {return string;}
             void str(const std::string &s) {string = s; pos = 0;}

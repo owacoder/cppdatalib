@@ -168,7 +168,7 @@ namespace cppdatalib
 
         inline core::value operator "" _bencode(const char *stream, size_t size)
         {
-            core::istring_wrapper_stream wrap(std::string(stream, size));
+            core::istringstream wrap(std::string(stream, size));
             return from_bencode(wrap);
         }
 

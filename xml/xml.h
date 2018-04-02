@@ -36,6 +36,140 @@ namespace cppdatalib
 {
     namespace xml
     {
+        class parser : public core::xml_impl::stream_parser
+        {
+            std::unique_ptr<char []> buffer;
+            bool require_full_document;
+
+            core::cache_vector_n<core::string_t, core::cache_size> element_stack;
+            core::string_t content;
+
+            enum {
+                ready_to_read_prolog,
+                ready_to_read_elements,
+                reading_elements
+            } state;
+
+        public:
+            parser(core::istream_handle input, bool require_full_document = true)
+                : core::xml_impl::stream_parser(input)
+                , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
+                , require_full_document(require_full_document)
+            {
+                reset();
+            }
+
+            bool busy() const {return get_output() && state == reading_elements;}
+
+        protected:
+            void reset_()
+            {
+                state = require_full_document? ready_to_read_prolog: ready_to_read_elements;
+                element_stack.clear();
+                content.clear();
+                core::xml_impl::stream_parser::reset_();
+            }
+
+            void begin_tag()
+            {
+                if (nesting_depth() > 0 && get_output()->current_container() != core::array)
+                    // We have to start an array for mixed content
+                    get_output()->begin_array(core::value(core::array_t()), core::stream_handler::unknown_size);
+
+                if (content.empty())
+                    return;
+
+                get_output()->write(core::value(std::move(content)));
+                content = core::string_t();
+            }
+
+            void end_tag()
+            {
+                if (!content.empty())
+                {
+                    get_output()->write(core::value(std::move(content)));
+                    content = core::string_t();
+                }
+
+                if (nesting_depth() > 0 &&
+                        get_output()->current_container() == core::array)
+                    get_output()->end_array(core::value(core::array_t()));
+
+                if (nesting_depth() > 0 &&
+                        get_output()->current_container() == core::object)
+                    get_output()->end_object(core::value(core::object_t()));
+            }
+
+            void write_one_()
+            {
+                switch (state)
+                {
+                    case ready_to_read_prolog:
+                    {
+                        core::value attributes;
+                        if (!read_prolog(attributes))
+                            throw core::error("XML - invalid prolog");
+
+                        if (attributes["version"].get_string().substr(0, 2) != "1.")
+                            throw core::error("XML - unsupported version");
+
+                        if (attributes["encoding"].get_string() != "UTF-8")
+                            throw core::error("XML - unsupported encoding");
+
+                        state = reading_elements;
+                        break;
+                    }
+                    case ready_to_read_elements:
+                        state = reading_elements;
+                        // Fallthrough
+                    case reading_elements:
+                    {
+                        what_was_read read;
+                        core::string_t string;
+                        core::value value;
+
+                        if (!read_next(element_stack.size(), read, string, value))
+                            throw core::error("XML - invalid document");
+
+                        switch (read)
+                        {
+                            case eof_was_reached:
+                                state = require_full_document? ready_to_read_prolog: ready_to_read_elements;
+                                break;
+                            case start_tag_was_read:
+                                begin_tag();
+                                element_stack.push_back(string);
+                                get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                                get_output()->write(value);
+                                break;
+                            case end_tag_was_read:
+                                if (element_stack.empty() || string != element_stack.back())
+                                    throw core::error("XML - mismatching start and end tags");
+                                element_stack.pop_back();
+                                end_tag();
+                                break;
+                            case complete_tag_was_read:
+                                begin_tag();
+                                get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                                get_output()->write(core::value(value));
+                                get_output()->write(core::value());
+                                end_tag();
+                                break;
+                            case content_was_read:
+                                content += string;
+                                break;
+                            case nothing_was_read:
+                            case comment_was_read:
+                            case processing_instruction_was_read:
+                            default:
+                                break; // Discard, we don't need them right now
+                        }
+                    }
+                    default: break;
+                }
+            }
+        };
+
         // Use an array to counteract the lack of ordering when using objects
         // Array elements that are not objects are concatenated together, which may or may not be the desired operation
         class stream_writer : public core::xml_impl::stream_writer_base
@@ -246,6 +380,20 @@ namespace cppdatalib
                 pretty_stream_writer::begin_();
             }
         };
+
+        inline core::value from_xml(core::istream_handle stream)
+        {
+            parser reader(stream);
+            core::value v;
+            reader >> v;
+            return v;
+        }
+
+        inline core::value operator "" _xml(const char *stream, size_t size)
+        {
+            core::istringstream wrap(std::string(stream, size));
+            return from_xml(wrap);
+        }
 
         inline std::string to_xml_elements(const core::value &v)
         {

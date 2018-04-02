@@ -36,5 +36,6 @@
 #include "stream_filters.h"
 #include "value_parser.h"
 #include "dump.h"
+#include "utf.h"
 
 #endif // CPPDATALIB_CORE_CORE_H

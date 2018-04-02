@@ -72,12 +72,7 @@ namespace cppdatalib
                                     code = (code << 4) | pos;
                                 }
 
-#ifdef CPPDATALIB_MSVC
-                                std::wstring_convert<std::codecvt_utf8<unsigned int>, unsigned int> utf8;
-#else
-								std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-#endif
-                                std::string bytes = utf8.to_bytes(code);
+                                core::string_t bytes = core::ucs_to_utf8(code);
 
                                 memcpy(write, bytes.c_str(), bytes.size());
                                 write += bytes.size();
@@ -465,7 +460,7 @@ namespace cppdatalib
 
         inline core::value operator "" _json(const char *stream, size_t size)
         {
-            core::istring_wrapper_stream wrap(std::string(stream, size));
+            core::istringstream wrap(std::string(stream, size));
             return from_json(wrap);
         }
 

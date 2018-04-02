@@ -88,7 +88,7 @@ namespace cppdatalib
 
         inline core::value operator "" _raw_uint8(const char *stream, size_t size)
         {
-            core::istring_wrapper_stream wrap(std::string(stream, size));
+            core::istringstream wrap(std::string(stream, size));
             return from_raw_uint8(wrap);
         }
 

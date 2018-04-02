@@ -724,6 +724,19 @@ void test_attributes()
 {
     try
     {
+        using namespace cppdatalib::xml;
+
+        cppdatalib::core::value xml;
+        xml << parser("<?xml version = \"1.3\" encoding = \"UTF-8\"?>\n"
+                      "<!ENTITY % pub    '&#xc9;ditions Gallimard' >\n"
+                      "<!ENTITY   rights '<rights>All rights reserved</rights>' >\n"
+                      "<!ENTITY   book   'La Peste: Albert Camus,"
+                      " &#xA9; 1947 %pub;. &rights;'>\n"
+                      "<greeting>&book;<first>In first<tag id=\"my_id\" i = '&amp;none'>In tag</tag>Hello, world!</first>Before first</greeting> ", true);
+        cppdatalib::json::pretty_stream_writer(std::cout, 2) << xml;
+
+        return;
+
         auto attr = cppdatalib::core::object_t{{"attribute_1", true}, {"attribute_2", "My other attribute"}};
 
         cppdatalib::core::value value(2), v2("string");
@@ -741,6 +754,7 @@ void test_attributes()
     }
 }
 
+#ifdef CPPDATALIB_ENABLE_FAST_IO
 void test_mmap()
 {
     std::ofstream out;
@@ -751,6 +765,7 @@ void test_mmap()
     cppdatalib::json::parser parser(map);
     parser >> cppdatalib::tsv::stream_writer(wrap);
 }
+#endif
 
 int main()
 {
