@@ -239,7 +239,7 @@ namespace cppdatalib
                     mysql_free_result(result);
                     result = NULL;
                 }
-                catch (core::error)
+                catch (const core::error &)
                 {
                     if (result)
                         mysql_free_result(result);
@@ -320,7 +320,7 @@ namespace cppdatalib
 
                         get_output()->end_array(core::array_t());
                     }
-                } catch (core::error) {
+                } catch (const core::error &) {
                     if (result)
                         mysql_free_result(result);
                     result = NULL;
@@ -411,7 +411,7 @@ namespace cppdatalib
                     mysql_free_result(result);
                     result = NULL;
                 }
-                catch (core::error)
+                catch (const core::error &)
                 {
                     if (result)
                         mysql_free_result(result);
@@ -505,7 +505,7 @@ namespace cppdatalib
                             tbl_parser.write_one();
                         }
                     }
-                } catch (core::error) {
+                } catch (const core::error &) {
                     if (result)
                         mysql_free_result(result);
                     result = NULL;

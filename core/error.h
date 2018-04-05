@@ -25,19 +25,37 @@
 #ifndef CPPDATALIB_ERROR_H
 #define CPPDATALIB_ERROR_H
 
+#include <string>
+
 namespace cppdatalib
 {
     namespace core
     {
         struct error
         {
+        protected:
+            error() : what_("") {}
+
+        public:
             error(const char *reason) : what_(reason) {}
             virtual ~error() {}
 
-            const char *what() const {return what_;}
+            virtual const char *what() const {return what_;}
 
         private:
             const char *what_;
+        };
+
+        struct custom_error : public error
+        {
+            custom_error(const char *reason) : what_(reason) {}
+            custom_error(const std::string &reason) : what_(reason) {}
+            custom_error(std::string &&reason) : what_(std::move(reason)) {}
+
+            const char *what() const {return what_.c_str();}
+
+        private:
+            std::string what_;
         };
     }
 }

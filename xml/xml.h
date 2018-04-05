@@ -41,7 +41,6 @@ namespace cppdatalib
             std::unique_ptr<char []> buffer;
             bool require_full_document;
 
-            core::cache_vector_n<core::string_t, core::cache_size> element_stack;
             core::string_t content;
 
             enum {
@@ -65,7 +64,6 @@ namespace cppdatalib
             void reset_()
             {
                 state = require_full_document? ready_to_read_prolog: ready_to_read_elements;
-                element_stack.clear();
                 content.clear();
                 core::xml_impl::stream_parser::reset_();
             }
@@ -108,7 +106,7 @@ namespace cppdatalib
                     {
                         core::value attributes;
                         if (!read_prolog(attributes))
-                            throw core::error("XML - invalid prolog");
+                            throw core::custom_error("XML - " + last_error());
 
                         if (attributes["version"].get_string().substr(0, 2) != "1.")
                             throw core::error("XML - unsupported version");
@@ -128,8 +126,8 @@ namespace cppdatalib
                         core::string_t string;
                         core::value value;
 
-                        if (!read_next(element_stack.size(), read, string, value))
-                            throw core::error("XML - invalid document");
+                        if (!read_next(current_element_stack().size(), read, string, value))
+                            throw core::custom_error("XML - " + last_error());
 
                         switch (read)
                         {
@@ -138,14 +136,10 @@ namespace cppdatalib
                                 break;
                             case start_tag_was_read:
                                 begin_tag();
-                                element_stack.push_back(string);
                                 get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
                                 get_output()->write(value);
                                 break;
                             case end_tag_was_read:
-                                if (element_stack.empty() || string != element_stack.back())
-                                    throw core::error("XML - mismatching start and end tags");
-                                element_stack.pop_back();
                                 end_tag();
                                 break;
                             case complete_tag_was_read:
@@ -159,7 +153,10 @@ namespace cppdatalib
                                 content += string;
                                 break;
                             case nothing_was_read:
+                                break;
                             case comment_was_read:
+                                std::cout << "<!--" << string << "-->\n";
+                                break;
                             case processing_instruction_was_read:
                             default:
                                 break; // Discard, we don't need them right now

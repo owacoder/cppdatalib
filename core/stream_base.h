@@ -1065,24 +1065,36 @@ namespace cppdatalib
                 }
             };
 
-            // TODO: newlines should be normalized to \n
             class stream_parser : public core::stream_parser, public xml_base
             {
                 // First: entity value
                 // Second: true if parameter entity, false if general entity
                 typedef std::pair<core::string_t, bool> entity;
 
-                core::cache_vector_n<core::string_t, core::cache_size> tag_names;
+                std::string last_error_;
+
+                core::cache_vector_n<core::string_t, core::cache_size> element_stack;
                 std::map<core::string_t, entity> entities;
                 std::map<core::string_t, entity> parameter_entities;
-                bool has_doctypedecl;
+
+                // Format of doctypedecl:
+                // {
+                //     "root": <expected root element name>
+                //     "internal_subset": <internal subset>
+                // }
+                core::value doctypedecl;
                 bool has_root_element;
 
-                core::istringstream entity_buffer;
-                bool last_read_was_from_buffer;
+                std::vector<std::pair<core::string_t, core::istringstream>> entity_buffers;
 
             public:
                 stream_parser(core::istream_handle input) : core::stream_parser(input) {}
+
+                const core::cache_vector_n<core::string_t, core::cache_size> &current_element_stack() const {return element_stack;}
+                const std::map<core::string_t, entity> registered_entities() const {return entities;}
+                const std::map<core::string_t, entity> registered_parameter_entities() const {return parameter_entities;}
+
+                const std::string &last_error() const {return last_error_;}
 
             protected:
                 enum entity_deref_mode
@@ -1108,28 +1120,83 @@ namespace cppdatalib
 
                 void reset_()
                 {
-                    tag_names.clear();
+                    element_stack.clear();
                     parameter_entities.clear();
                     entities.clear();
-                    has_doctypedecl = false;
+                    entity_buffers.clear();
+                    doctypedecl.set_null();
                     has_root_element = false;
-                    last_read_was_from_buffer = false;
                 }
 
-                int peek() {
-                    int c = entity_buffer.peek();
-                    return c == EOF? stream().peek(): c;
+                istream::int_type peek() {
+                    if (entity_buffers.size())
+                    {
+                        istream::int_type c;
+                        while (entity_buffers.size() && (c = entity_buffers.back().second.peek(), c == EOF))
+                            entity_buffers.pop_back();
+
+                        if (c != EOF)
+                            return c;
+                    }
+
+                    return stream().peek();
                 }
 
-                int get() {
-                    int c = entity_buffer.get();
-                    last_read_was_from_buffer = c != EOF;
-                    return c == EOF? stream().get(): c;
+                istream::int_type get() {
+                    if (entity_buffers.size())
+                    {
+                        istream::int_type c;
+                        while (entity_buffers.size() && (c = entity_buffers.back().second.get(), c == EOF))
+                            entity_buffers.pop_back();
+
+                        if (c != EOF)
+                            return c;
+                    }
+
+                    return stream().get();
+                }
+
+                bool match(istream::int_type c)
+                {
+                    if (get() != c)
+                    {
+                        last_error_ = "expected '" + std::string(1, c) + '\'';
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                istream::int_type peek_from_current_level_only()
+                {
+                    if (entity_buffers.size())
+                        return entity_buffers.back().second.peek();
+                    else
+                        return stream().peek();
+                }
+
+                istream::int_type get_from_current_level_only()
+                {
+                    if (entity_buffers.size())
+                        return entity_buffers.back().second.get();
+                    else
+                        return stream().get();
+                }
+
+                bool match_from_current_level_only(istream::int_type c)
+                {
+                    if (get_from_current_level_only() != c)
+                    {
+                        last_error_ = "expected '" + std::string(1, c) + '\'';
+                        return false;
+                    }
+
+                    return true;
                 }
 
                 void unget() {
-                    if (last_read_was_from_buffer)
-                        entity_buffer.unget();
+                    if (entity_buffers.size())
+                        entity_buffers.back().second.unget();
                     else
                         stream().unget();
                 }
@@ -1138,8 +1205,20 @@ namespace cppdatalib
                 {
                     while (size--)
                     {
-                        int c = get();
-                        if (c == EOF)
+                        istream::int_type c = get();
+                        if (c == EOF || c > 0xff)
+                            return false;
+                        *buf++ = c;
+                    }
+                    return true;
+                }
+
+                bool read_from_current_level_only(char *buf, size_t size)
+                {
+                    while (size--)
+                    {
+                        istream::int_type c = get_from_current_level_only();
+                        if (c == EOF || c > 0xff)
                             return false;
                         *buf++ = c;
                     }
@@ -1154,22 +1233,43 @@ namespace cppdatalib
                         entities.insert({name, entity(value, parameter_entity)});
                 }
 
+                bool add_entity_to_be_parsed(const core::string_t &entity_name, const core::string_t &entity_value)
+                {
+                    for (size_t i = 0; i < entity_buffers.size(); ++i)
+                        if (entity_buffers[i].first == entity_name)
+                        {
+                            last_error_ = "invalid recursive entity reference";
+                            return false;
+                        }
+
+                    if (entity_buffers.empty() || entity_buffers.back().second.peek() != EOF)
+                        entity_buffers.push_back({entity_name, core::istringstream(entity_value)});
+                    else // At end of buffer, just replace it
+                    {
+                        std::pair<core::string_t, core::istringstream> temp(entity_name, core::istringstream(entity_value));
+                        std::swap(entity_buffers.back(), temp);
+                    }
+
+                    return true;
+                }
+
                 // read_entity() assumes that the initial '&' or '%' has already been read and discarded
-                // TODO: implement `deref_all_entities_as_markup` mode, and dereference sub-references entities
-                bool read_entity(bool parse_param_entity, entity_deref_mode mode, core::string_t &value)
+                bool read_entity(bool parse_param_entity, entity_deref_mode mode, core::string_t &entity_name, core::string_t &value, bool &entity_should_be_parsed)
                 {
                     if (mode == deref_no_entities)
                     {
                         value.clear();
                         value.push_back(parse_param_entity? '%': '&');
-                        return false;
+                        return true;
                     }
 
-                    int c = get();
+                    istream::int_type c = get_from_current_level_only();
 
                     if (c == '#') // Character reference
                     {
-                        c = get();
+                        entity_name.clear();
+                        entity_should_be_parsed = false;
+                        c = get_from_current_level_only();
 
                         if (c == 'x') // Hexadecimal reference
                         {
@@ -1178,7 +1278,7 @@ namespace cppdatalib
 
                             for (; code <= 0x10ffff; )
                             {
-                                c = get();
+                                c = get_from_current_level_only();
                                 if (isxdigit(c))
                                     code = (code << 4) + (strchr(hexchars, tolower(c)) - hexchars);
                                 else
@@ -1187,7 +1287,10 @@ namespace cppdatalib
 
                             if (!is_valid_char(code) || // Invalid code point
                                 c != ';') // Invalid closing character
+                            {
+                                last_error_ = "invalid hexadecimal character reference";
                                 return false;
+                            }
 
                             value = core::ucs_to_utf8(code);
                         }
@@ -1201,41 +1304,31 @@ namespace cppdatalib
                                     code = (code * 10) + (c - '0');
                                 else
                                     break;
-                                c = get();
+                                c = get_from_current_level_only();
                             }
 
                             if (!is_valid_char(code) || // Invalid code point
                                 c != ';') // Invalid closing character
+                            {
+                                last_error_ = "invalid decimal character reference";
                                 return false;
+                            }
 
                             value = core::ucs_to_utf8(code);
                         }
                         else
+                        {
+                            last_error_ = "invalid character reference";
                             return false;
+                        }
                     }
                     else if (!parse_param_entity && mode == deref_all_but_general_entities)
                     {
-                        unget();
-                        if (!read_name(value) ||
-                            get() != ';')
-                            return false;
-
-                        if (value == "amp")
-                            value = "&";
-                        else if (value == "lt")
-                            value = "<";
-                        else if (value == "gt")
-                            value = ">";
-                        else if (value == "quot")
-                            value = "\"";
-                        else if (value == "apos")
-                            value = "'";
-                        else
-                        {
-                            value.insert(value.begin(), parse_param_entity? '%': '&');
-                            value.push_back(';');
-                        }
-
+                        entity_name.clear();
+                        entity_should_be_parsed = false;
+                        value.clear();
+                        value.push_back('&');
+                        value.push_back(c);
                         return true;
                     }
                     else
@@ -1243,45 +1336,51 @@ namespace cppdatalib
                         unget();
 
                         if (!read_name(value) ||
-                            get() != ';')
+                            !match_from_current_level_only(';'))
+                        {
+                            last_error_ = "invalid entity reference syntax";
                             return false;
+                        }
 
+                        entity_name = value;
                         if (parse_param_entity)
                         {
+                            entity_should_be_parsed = false;
+
                             auto it = parameter_entities.find(value);
                             if (it == parameter_entities.end()) // Entity not found
                             {
+                                last_error_ = "parameter entity '" + value + "' is not declared";
                                 return false;
                             }
                             else
-                            {
-                                // TODO: expand expansion of entity
                                 value = it->second.first;
-                            }
                         }
                         else
                         {
+                            entity_should_be_parsed = true;
+
                             auto it = entities.find(value);
                             if (it == entities.end()) // Entity not found
                             {
                                 if (value == "amp")
-                                    value = "&";
+                                    value = "&", entity_should_be_parsed = false;
                                 else if (value == "lt")
-                                    value = "<";
+                                    value = "<", entity_should_be_parsed = false;
                                 else if (value == "gt")
-                                    value = ">";
+                                    value = ">", entity_should_be_parsed = false;
                                 else if (value == "quot")
-                                    value = "\"";
+                                    value = "\"", entity_should_be_parsed = false;
                                 else if (value == "apos")
-                                    value = "'";
+                                    value = "'", entity_should_be_parsed = false;
                                 else
+                                {
+                                    last_error_ = "general entity '" + value + "' is not declared";
                                     return false;
+                                }
                             }
                             else
-                            {
-                                // TODO: expand expansion of entity
                                 value = it->second.first;
-                            }
                         }
                     }
 
@@ -1292,13 +1391,16 @@ namespace cppdatalib
                 // failing (returning false) if the number of spaces is less than `minimum`
                 bool read_spaces(unsigned int minimum)
                 {
-                    int c;
-                    while (c = get(), c == ' ' || c == '\t' || c == '\n' || c == '\r')
+                    istream::int_type c;
+                    while (c = get_from_current_level_only(), c == ' ' || c == '\t' || c == '\n' || c == '\r')
                         if (minimum > 0)
                             --minimum;
 
                     if (c != EOF)
                         unget();
+
+                    if (minimum != 0)
+                        last_error_ = "expected space separator";
 
                     return minimum == 0;
                 }
@@ -1307,28 +1409,28 @@ namespace cppdatalib
                 bool read_name(core::string_t &name)
                 {
                     uint32_t codepoint;
-                    bool eof;
+                    bool eof = true;
 
                     name.clear();
-                    while (codepoint = utf8_to_ucs(entity_buffer, &eof), codepoint <= 0x10ffff)
+                    if (entity_buffers.size())
                     {
-                        last_read_was_from_buffer = true;
-                        if (name.empty())
+                        while (codepoint = utf8_to_ucs(entity_buffers.back().second, &eof), codepoint <= 0x10ffff)
                         {
-                            if (is_name_start_char(codepoint))
+                            if (name.empty())
+                            {
+                                if (is_name_start_char(codepoint))
+                                    name += ucs_to_utf8(codepoint);
+                                else
+                                    break;
+                            }
+                            else if (is_name_char(codepoint))
                                 name += ucs_to_utf8(codepoint);
                             else
                                 break;
                         }
-                        else if (is_name_char(codepoint))
-                            name += ucs_to_utf8(codepoint);
-                        else
-                            break;
                     }
-
-                    if (eof)
+                    else
                     {
-                        last_read_was_from_buffer = false;
                         while (codepoint = utf8_to_ucs(stream(), &eof), codepoint <= 0x10ffff)
                         {
                             if (name.empty())
@@ -1348,53 +1450,120 @@ namespace cppdatalib
                     if (eof)
                         return true;
                     else if (codepoint > 0x80) // Invalid UTF-8, or not a valid character following a name (names are followed by ASCII characters)
+                    {
+                        last_error_ = "invalid tag, attribute, or other name";
                         return false;
+                    }
 
                     unget();
                     return true;
                 }
 
                 // read_attribute_value() assumes that the '=' between the name and the attribute value has already been read and discarded
-                bool read_attribute_value(entity_deref_mode allow_references, core::string_t &value)
+                bool read_attribute_value(entity_deref_mode allow_references, core::string_t &value, bool allow_less_than = false)
                 {
-                    core::string_t entity;
+                    core::string_t entity_name, entity;
 
-                    int c = get();
+                    istream::int_type c = get();
                     if (c == '"')
                     {
+                        size_t starting_nesting_level = entity_buffers.size();
                         value.clear();
-                        while (c = get(), c != '"' && c != EOF)
+                        while (c = get(), c != EOF && (starting_nesting_level < entity_buffers.size() || c != '"'))
                         {
+                            // Normalize end-of-line
+                            if (c == '\r')
+                            {
+                                if (peek() == '\n')
+                                    get();
+                                c = '\n';
+                            }
+                            else if (!allow_less_than && c == '<') // There should be no raw (unescaped) '<' in attribute values
+                            {
+                                last_error_ = "unescaped '<' is not allowed in attribute values";
+                                return false;
+                            }
+
                             if (allow_references == deref_no_entities)
                                 value.push_back(c);
                             else if (c == '&' ||
                                      c == '%')
                             {
-                                if (!read_entity(c == '%', allow_references, entity))
+                                bool add_entity;
+
+                                if (!read_entity(c == '%', allow_references, entity_name, entity, add_entity))
+                                {
+                                    last_error_ = "invalid attribute value; " + last_error_;
                                     return false;
-                                value += entity;
+                                }
+
+                                if (add_entity)
+                                {
+                                    if (!add_entity_to_be_parsed(entity_name, entity))
+                                    {
+                                        last_error_ = "invalid attribute value; " + last_error_;
+                                        return false;
+                                    }
+                                }
+                                else
+                                    value += entity;
                             }
                             else
                                 value.push_back(c);
                         }
+
+                        if (c != '"')
+                            return false;
                     }
                     else if (c == '\'')
                     {
+                        size_t starting_nesting_level = entity_buffers.size();
                         value.clear();
-                        while (c = get(), c != '\'' && c != EOF)
+                        while (c = get(), c != EOF && (starting_nesting_level < entity_buffers.size() || c != '\''))
                         {
+                            // Normalize end-of-line
+                            if (c == '\r')
+                            {
+                                if (peek() == '\n')
+                                    get();
+                                c = '\n';
+                            }
+                            else if (!allow_less_than && c == '<') // There should be no raw (unescaped) '<' in attribute values
+                            {
+                                last_error_ = "unescaped '<' is not allowed in attribute values";
+                                return false;
+                            }
+
                             if (allow_references == deref_no_entities)
                                 value.push_back(c);
                             else if (c == '&' ||
                                      c == '%')
                             {
-                                if (!read_entity(c == '%', allow_references, entity))
+                                bool add_entity;
+
+                                if (!read_entity(c == '%', allow_references, entity_name, entity, add_entity))
+                                {
+                                    last_error_ = "invalid attribute value; " + last_error_;
                                     return false;
-                                value += entity;
+                                }
+
+                                if (add_entity)
+                                {
+                                    if (!add_entity_to_be_parsed(entity_name, entity))
+                                    {
+                                        last_error_ = "invalid attribute value; " + last_error_;
+                                        return false;
+                                    }
+                                }
+                                else
+                                    value += entity;
                             }
                             else
                                 value.push_back(c);
                         }
+
+                        if (c != '\'')
+                            return false;
                     }
                     else
                         return false;
@@ -1410,7 +1579,10 @@ namespace cppdatalib
 
                     if ((!read(buf, 5) || memcmp(buf, "<?xml", 5)) ||
                         (!read_spaces(1)))
+                    {
+                        last_error_ = "invalid prolog, expected '<?xml '";
                         return false;
+                    }
 
                     c = get();
 
@@ -1420,11 +1592,14 @@ namespace cppdatalib
                         buf[0] = c;
                         if ((!read(buf+1, 6) || memcmp(buf, "version", 7)) ||
                             (!read_spaces(0)) ||
-                            (get() != '=') ||
+                            (!match('=')) ||
                             (!read_spaces(0)) ||
                             (!read_attribute_value(deref_no_entities, attributes["version"].get_string_ref())) ||
                             (!read_spaces(0)))
+                        {
+                            last_error_ = "invalid prolog; " + last_error_;
                             return false;
+                        }
                         c = get();
                     }
 
@@ -1434,10 +1609,13 @@ namespace cppdatalib
                         buf[0] = c;
                         if ((!read(buf+1, 7) || memcmp(buf, "encoding", 8)) ||
                             (!read_spaces(0)) ||
-                            (get() != '=') ||
+                            (!match('=')) ||
                             (!read_spaces(0)) ||
                             (!read_attribute_value(deref_no_entities, attributes["encoding"].get_string_ref())))
+                        {
+                            last_error_ = "invalid prolog; " + last_error_;
                             return false;
+                        }
                         c = get();
                     }
 
@@ -1447,10 +1625,13 @@ namespace cppdatalib
                         buf[0] = c;
                         if ((!read(buf+1, 9) || memcmp(buf, "standalone", 10)) ||
                             (!read_spaces(0)) ||
-                            (get() != '=') ||
+                            (!match('=')) ||
                             (!read_spaces(0)) ||
                             (!read_attribute_value(deref_no_entities, attributes["standalone"].get_string_ref())))
+                        {
+                            last_error_ = "invalid prolog; " + last_error_;
                             return false;
+                        }
                         c = get();
                     }
 
@@ -1458,12 +1639,18 @@ namespace cppdatalib
                     {
                         unget();
                         if (!read_spaces(0) ||
-                            get() != '?')
+                            !match('?'))
+                        {
+                            last_error_ = "invalid prolog; " + last_error_;
                             return false;
+                        }
                     }
 
-                    if (get() != '>')
+                    if (!match('>'))
+                    {
+                        last_error_ = "invalid prolog; " + last_error_;
                         return false;
+                    }
 
                     return true;
                 }
@@ -1472,63 +1659,83 @@ namespace cppdatalib
                 // `value_with_attributes` will only be assigned if `read` contains `start_tag_was_read` or `complete_tag_was_read`.
                 bool read_next(bool parsing_inside_element, what_was_read &read, core::string_t &value, core::value &value_with_attributes)
                 {
+                    core::string_t entity_name;
                     (void) parsing_inside_element;
 
-                    int c = peek();
+                    istream::int_type c = peek();
 
-                    if (isspace(c) && !parsing_inside_element)
+                    if (c < 0x80 && isspace(c) && !parsing_inside_element)
                     {
                         read = nothing_was_read;
                         return read_spaces(1);
                     }
                     else if (c == '<')
                     {
-                        get(); // Skip '<'
-                        c = get();
+                        get_from_current_level_only(); // Skip '<'
+                        c = get_from_current_level_only();
                         if (c == '?') // Processing instruction, starting with "<?"
                         {
                             read = processing_instruction_was_read;
                             value.clear();
-                            while (c = get(), c != '?' && c != EOF)
+                            while (c = get_from_current_level_only(), c != '?' && c != EOF)
                                 value.push_back(c);
-                            return c == '?' && get() == '>';
+                            bool b = c == '?' && get_from_current_level_only() == '>';
+                            if (!b)
+                                last_error_ = "processing instruction is not closed properly";
+                            return b;
                         }
                         else if (c == '!') // ENTITY, DOCTYPE, CDATA, or comment
                         {
                             char buf[10];
 
-                            c = get();
+                            c = get_from_current_level_only();
                             if (c == '-') // Comment
                             {
                                 read = comment_was_read;
-                                if (get() != '-')
+                                if (!match_from_current_level_only('-'))
+                                {
+                                    last_error_ = "invalid comment prefix; " + last_error_;
                                     return false;
+                                }
 
                                 value.clear();
-                                while (c = get(), c != EOF)
+                                while (c = get_from_current_level_only(), c != EOF)
                                 {
                                     if (c == '-' && peek() == '-')
                                         break;
+
+                                    // Normalize end-of-line
+                                    if (c == '\r')
+                                    {
+                                        if (peek_from_current_level_only() == '\n')
+                                            get_from_current_level_only();
+                                        c = '\n';
+                                    }
+
                                     value.push_back(c);
                                 }
 
-                                if (get() != '-' ||
-                                    get() != '>')
+                                if (!match_from_current_level_only('-') ||
+                                    !match_from_current_level_only('>'))
+                                {
+                                    last_error_ = "comment is not closed properly; " + last_error_;
                                     return false;
-
-                                value.pop_back(); // Remove trailing '-'
+                                }
                             }
-                            else if (c == 'E') // ENTITY?
+                            else if (c == 'E') // ENTITY
                             {
                                 bool parameter_entity = false;
                                 buf[0] = c;
                                 core::string_t attribute_value;
 
-                                if (!this->read(buf+1, 5) || memcmp(buf, "ENTITY", 6) ||
+                                if (!this->read_from_current_level_only(buf+1, 5) || memcmp(buf, "ENTITY", 6) ||
                                     !read_spaces(1))
+                                {
+                                    last_error_ = "expected ENTITY declaration";
                                     return false;
+                                }
 
-                                if (get() == '%')
+                                if (get_from_current_level_only() == '%')
                                 {
                                     parameter_entity = true;
                                     if (!read_spaces(1))
@@ -1539,16 +1746,69 @@ namespace cppdatalib
 
                                 if (!read_name(value) ||
                                     !read_spaces(1) ||
-                                    !read_attribute_value(deref_all_but_general_entities, attribute_value) ||
+                                    !read_attribute_value(deref_all_but_general_entities, attribute_value, true) ||
                                     !read_spaces(0) ||
-                                    get() != '>')
+                                    !match_from_current_level_only('>'))
+                                {
+                                    last_error_ = "invalid ENTITY declaration; " + last_error_;
                                     return false;
+                                }
 
                                 register_entity(value, attribute_value, parameter_entity);
                             }
-                            else if (c == 'D') // DOCTYPE?
+                            else if (c == '[') // CDATA
                             {
+                                if (!this->read_from_current_level_only(buf, 6) || memcmp(buf, "CDATA[", 6))
+                                {
+                                    last_error_ = "expected CDATA";
+                                    return false;
+                                }
 
+                                read = content_was_read;
+                                value.clear();
+                                while (c = get_from_current_level_only(), c != EOF)
+                                {
+                                    // Normalize end-of-line
+                                    if (c == '\r')
+                                    {
+                                        if (peek_from_current_level_only() == '\n')
+                                            get_from_current_level_only();
+                                        c = '\n';
+                                    }
+                                    else if (c == '>' &&
+                                             value.size() >= 2 &&
+                                             value[value.size() - 2] == ']' &&
+                                             value[value.size() - 1] == ']')
+                                        break;
+
+                                    value.push_back(c);
+                                }
+
+                                if (c == EOF)
+                                {
+                                    last_error_ = "CDATA is not closed properly";
+                                    return false;
+                                }
+
+                                // Pop the two trailing ']' characters off
+                                value.pop_back();
+                                value.pop_back();
+                            }
+                            else if (c == 'D') // DOCTYPE
+                            {
+                                buf[0] = c;
+
+                                if (!this->read_from_current_level_only(buf+1, 6) || memcmp(buf, "DOCTYPE", 7) ||
+                                    !read_spaces(1) ||
+                                    !read_name(value) ||
+                                    !read_spaces(0) ||
+                                    !match_from_current_level_only('>'))
+                                {
+                                    last_error_ = "invalid DOCTYPE; " + last_error_;
+                                    return false;
+                                }
+
+                                doctypedecl["root"] = core::value(value);
                             }
                             else
                                 return false;
@@ -1559,8 +1819,18 @@ namespace cppdatalib
                             read = end_tag_was_read;
                             if (!read_name(value) ||
                                 !read_spaces(0) ||
-                                get() != '>')
+                                !match_from_current_level_only('>'))
+                            {
+                                last_error_ = "invalid end tag; " + last_error_;
                                 return false;
+                            }
+
+                            if (element_stack.empty() || value != element_stack.back())
+                            {
+                                last_error_ = "mismatched start and end tags";
+                                return false;
+                            }
+                            element_stack.pop_back();
                         }
                         else // Element tag? Starts with '<', not followed by '!', '?', or '/'
                         {
@@ -1571,37 +1841,63 @@ namespace cppdatalib
                             unget();
                             if (!read_name(value) ||
                                 !read_spaces(0))
+                            {
+                                last_error_ = "invalid start tag; " + last_error_;
                                 return false;
+                            }
+
+                            if (!parsing_inside_element && doctypedecl.is_member("root"))
+                            {
+                                if (doctypedecl["root"].get_string() != value)
+                                {
+                                    last_error_ = "invalid document; root element does not match DTD";
+                                    return false;
+                                }
+                            }
 
                             value_with_attributes = value;
 
                             while (true)
                             {
-                                c = get();
+                                c = get_from_current_level_only();
                                 if (c == '/') // Closed tag
                                 {
                                     read = complete_tag_was_read;
-                                    c = get();
+                                    c = get_from_current_level_only();
                                 }
 
                                 if (c == '>')
                                     break;
                                 else if (read == complete_tag_was_read)
+                                {
+                                    last_error_ = "invalid closed tag";
                                     return false; // closing slash not followed by '>'
+                                }
 
                                 // If at this point, assume an attribute name follows
                                 unget();
                                 if (!read_name(attribute_name) ||
                                     !read_spaces(0) ||
-                                    get() != '=' ||
+                                    !match_from_current_level_only('=') ||
                                     !read_spaces(0) ||
                                     !read_attribute_value(deref_all_entities, attribute_value) ||
-                                    !read_spaces(0) ||
-                                    value_with_attributes.is_attribute(attribute_name)) // Cannot have duplicate attribute keys
+                                    !read_spaces(0))
+                                {
+                                    last_error_ = "invalid start tag; " + last_error_;
                                     return false;
+                                }
+
+                                if (value_with_attributes.is_attribute(attribute_name)) // Cannot have duplicate attribute keys
+                                {
+                                    last_error_ = "invalid start tag; duplicate attribute names found";
+                                    return false;
+                                }
 
                                 value_with_attributes.add_attribute(attribute_name, attribute_value);
                             }
+
+                            if (read == start_tag_was_read)
+                                element_stack.push_back(value);
                         }
                     }
                     else if (c == EOF)
@@ -1610,34 +1906,37 @@ namespace cppdatalib
                     {
                         read = content_was_read;
                         value.clear();
-                        get(); // Eat first character
+                        get_from_current_level_only(); // Eat first character
                         while (c != EOF && c != '&' && c != '%' && c != '<' && value.size() < core::buffer_size)
                         {
+                            // Normalize end-of-line
+                            if (c == '\r')
+                            {
+                                if (peek_from_current_level_only() == '\n')
+                                    get_from_current_level_only();
+                                c = '\n';
+                            }
+
                             value.push_back(c);
-                            c = get();
+                            c = get_from_current_level_only();
                         }
 
                         if (value.empty())
                         {
                             if (c == '&' || c == '%')
                             {
-                                read = entity_value_was_read;
-                                bool b = read_entity(c == '%', deref_all_entities_as_markup, value);
-                                if (entity_buffer.peek() == EOF)
+                                bool should_be_added_to_entity_list;
+                                bool b = read_entity(c == '%', deref_all_entities_as_markup, entity_name, value, should_be_added_to_entity_list);
+
+                                if (should_be_added_to_entity_list)
                                 {
-                                    core::istringstream temp(value);
-                                    std::swap(entity_buffer, temp);
+                                    read = entity_value_was_read;
+                                    if (!add_entity_to_be_parsed(entity_name, value))
+                                        return false;
                                 }
                                 else
-                                {
-                                    core::string_t str;
+                                    read = content_was_read;
 
-                                    while (c = entity_buffer.get(), c != EOF)
-                                        str.push_back(c);
-
-                                    core::istringstream temp(value + str);
-                                    std::swap(entity_buffer, temp);
-                                }
                                 return b;
                             }
                         }

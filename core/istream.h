@@ -48,12 +48,28 @@ namespace cppdatalib
 {
     namespace core
     {
+        enum encoding
+        {
+            unknown,
+            raw, // Read raw bytes
+            raw16, // Read raw words
+            raw32, // Read raw double-words
+            utf8,
+            utf16_big_endian,
+            utf16_little_endian,
+            utf32_big_endian,
+            utf32_little_endian,
+            utf32_2143_endian,
+            utf32_3412_endian
+        };
+
 #ifdef CPPDATALIB_ENABLE_FAST_IO
         class istream
         {
         public:
             typedef int64_t streamsize;
             typedef unsigned int iostate;
+            typedef int32_t int_type;
 
         private:
             friend class sentry;
@@ -69,7 +85,7 @@ namespace cppdatalib
 
                 void skip_spaces(istream &stream)
                 {
-                    int c;
+                    int_type c;
                     do
                     {
                         c = stream.getc_();
@@ -78,11 +94,11 @@ namespace cppdatalib
                 }
 
                 operator bool() const {return success;}
-                int get_last_char() const {return last;}
+                int_type get_last_char() const {return last;}
 
             private:
                 bool success;
-                int last;
+                int_type last;
             };
 
         protected:
@@ -96,9 +112,9 @@ namespace cppdatalib
             streamsize last_read_;
 #endif
 
-            virtual int getc_() = 0;
+            virtual int_type getc_() = 0;
             virtual void ungetc_() = 0;
-            virtual int peekc_() = 0;
+            virtual int_type peekc_() = 0;
 
         public:
             istream() : flags_(0), skip_ws(true)
@@ -120,7 +136,7 @@ namespace cppdatalib
             streamsize gcount() const {return last_read_;}
 #endif
 
-            int peek()
+            int_type peek()
             {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                 last_read_ = 0;
@@ -130,13 +146,13 @@ namespace cppdatalib
                 if (!s)
                     return EOF;
 
-                int c = peekc_();
+                int_type c = peekc_();
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
                 return c;
             }
 
-            int get()
+            int_type get()
             {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                 last_read_ = 0;
@@ -149,7 +165,7 @@ namespace cppdatalib
                     return EOF;
                 }
 
-                int c = getc_();
+                int_type c = getc_();
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
@@ -171,9 +187,11 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int c = getc_();
+                int_type c = getc_();
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
+                else if (c > 0xff)
+                    flags_ = fail_bit;
                 else
                 {
                     ch = c;
@@ -199,10 +217,15 @@ namespace cppdatalib
 
                 while (--n > 0)
                 {
-                    int c = getc_();
+                    int_type c = getc_();
                     if (c == EOF)
                     {
                         flags_ = eof_bit;
+                        break;
+                    }
+                    else if (c > 0xff)
+                    {
+                        flags_ = fail_bit;
                         break;
                     }
                     else if (c == delim)
@@ -242,10 +265,15 @@ namespace cppdatalib
 
                 while (n-- > 0)
                 {
-                    int c = getc_();
+                    int_type c = getc_();
                     if (c == EOF)
                     {
                         flags_ = eof_bit | fail_bit;
+                        break;
+                    }
+                    else if (c > 0xff)
+                    {
+                        flags_ = fail_bit;
                         break;
                     }
                     else
@@ -306,7 +334,7 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int c = s.get_last_char();
+                int_type c = s.get_last_char();
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
                 else
@@ -335,7 +363,7 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int c = s.get_last_char();
+                int_type c = s.get_last_char();
                 if (c == '-')
                     negative = true, c = getc_();
 
@@ -350,7 +378,7 @@ namespace cppdatalib
 #else
                     bool read = false;
 #endif
-                    while (c != EOF && isdigit(c))
+                    while (c != EOF && c < 0x80 && isdigit(c))
                     {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                         ++last_read_;
@@ -408,7 +436,7 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int c = s.get_last_char();
+                int_type c = s.get_last_char();
 
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
@@ -421,7 +449,7 @@ namespace cppdatalib
                     bool read = false;
 #endif
 
-                    while (c != EOF && isdigit(c))
+                    while (c != EOF && c < 0x80 && isdigit(c))
                     {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                         ++last_read_;
@@ -471,14 +499,14 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int c = s.get_last_char();
+                int_type c = s.get_last_char();
 
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
                 else
                 {
                     f = 0;
-                    while (c != EOF && (isdigit(c) || strchr(".eE+-", c)))
+                    while (c != EOF && c < 0x80 && (isdigit(c) || strchr(".eE+-", c)))
                     {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                         ++last_read_;
@@ -535,8 +563,8 @@ namespace cppdatalib
                 return in;
             }
 
-            int c = in.getc_();
-            while (c != EOF)
+            istream::int_type c = in.getc_();
+            while (c != EOF && c <= 0xff)
             {
                 ++read;
                 buf->sputc(c);
@@ -544,6 +572,8 @@ namespace cppdatalib
             }
 
             in.flags_ |= istream::eof_bit;
+            if (c != EOF)
+                in.flags_ |= istream::fail_bit;
 
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
             in.last_read_ = read;
@@ -579,8 +609,8 @@ namespace cppdatalib
             const std::string &str() const {return string;}
 
         protected:
-            int getc_() {return pos < string.size()? string[pos++] & 0xff: EOF;}
-            int peekc_() {return pos < string.size()? string[pos] & 0xff: EOF;}
+            int_type getc_() {return pos < string.size()? string[pos++] & 0xff: EOF;}
+            int_type peekc_() {return pos < string.size()? string[pos] & 0xff: EOF;}
             void ungetc_()
             {
                 if (pos > 0)
@@ -605,8 +635,8 @@ namespace cppdatalib
             std::string str() const {return std::string(string, len);}
 
         protected:
-            int getc_() {return pos < len? string[pos++] & 0xff: EOF;}
-            int peekc_() {return pos < len? string[pos] & 0xff: EOF;}
+            int_type getc_() {return pos < len? string[pos++] & 0xff: EOF;}
+            int_type peekc_() {return pos < len? string[pos] & 0xff: EOF;}
             void ungetc_()
             {
                 if (pos > 0)
@@ -626,6 +656,10 @@ namespace cppdatalib
                 : string()
                 , pos(0)
             {}
+            istringstream(const char *string)
+                : string(string)
+                , pos(0)
+            {}
             istringstream(const std::string &string)
                 : string(string)
                 , pos(0)
@@ -639,8 +673,8 @@ namespace cppdatalib
             void str(const std::string &s) {string = s; pos = 0;}
 
         protected:
-            int getc_() {return pos < string.size()? string[pos++]: EOF;}
-            int peekc_() {return pos < string.size()? string[pos]: EOF;}
+            int_type getc_() {return pos < string.size()? string[pos++] & 0xff: EOF;}
+            int_type peekc_() {return pos < string.size()? string[pos] & 0xff: EOF;}
             void ungetc_()
             {
                 if (pos > 0)
@@ -660,8 +694,8 @@ namespace cppdatalib
             {}
 
         protected:
-            int getc_() {return stream_->sbumpc();}
-            int peekc_() {return stream_->sgetc();}
+            int_type getc_() {return stream_->sbumpc() & 0xff;}
+            int_type peekc_() {return stream_->sgetc() & 0xff;}
             void ungetc_()
             {
                 if (stream_->sungetc() == EOF)
@@ -685,8 +719,8 @@ namespace cppdatalib
             size_t buffer_size() const {return size_;}
 
         protected:
-            int getc_() {return pos_ == size_? EOF: mem_[pos_++] & 0xff;}
-            int peekc_() {return pos_ == size_? EOF: mem_[pos_] & 0xff;}
+            int_type getc_() {return pos_ == size_? EOF: mem_[pos_++] & 0xff;}
+            int_type peekc_() {return pos_ == size_? EOF: mem_[pos_] & 0xff;}
             void ungetc_()
             {
                 if (pos_ == 0)
@@ -738,8 +772,8 @@ namespace cppdatalib
             size_t buffer_size() const {return stream.buffer_size();}
 
         protected:
-            int getc_() {return stream.get();}
-            int peekc_() {return stream.peek();}
+            int_type getc_() {return stream.get();}
+            int_type peekc_() {return stream.peek();}
             void ungetc_() {stream.unget();}
         };
 #endif
@@ -779,6 +813,89 @@ namespace cppdatalib
 
             // std_stream() returns NULL if not created from a standard stream
             std::istream *std_stream() {return std_;}
+        };
+
+        uint32_t utf_to_ucs(core::istream &stream, encoding mode, bool *eof);
+        std::string ucs_to_utf(uint32_t codepoint, encoding mode);
+        encoding encoding_from_name(const char *name);
+
+        class iencodingstream : public istream
+        {
+            core::istream *underlying_stream_;
+            int_type last_;
+            bool use_buffer_next;
+            int_type peek_;
+            bool use_peek_next;
+            encoding current_encoding_;
+
+        public:
+            iencodingstream(core::istream &stream, encoding encoding_type = unknown)
+                : underlying_stream_(&stream)
+                , last_(0)
+                , use_buffer_next(false)
+                , peek_(0)
+                , use_peek_next(false)
+                , current_encoding_(encoding_type)
+            {}
+
+            encoding get_encoding() const {return current_encoding_;}
+            void set_encoding(const char *encoding_name) {current_encoding_ = encoding_from_name(encoding_name);}
+            void set_encoding(encoding encoding_type) {current_encoding_ = encoding_type;}
+
+        protected:
+            int_type getc_()
+            {
+                if (use_buffer_next)
+                {
+                    use_buffer_next = false;
+                    return last_;
+                }
+                else if (use_peek_next)
+                {
+                    use_peek_next = false;
+                    return peek_;
+                }
+
+                bool eof;
+                uint32_t codepoint = utf_to_ucs(*underlying_stream_, current_encoding_, &eof);
+
+                if (eof)
+                    return EOF;
+                else if (codepoint == uint32_t(-1))
+                    return last_ = 0xfffd; // The replacement character
+
+                return last_ = codepoint;
+            }
+
+            void ungetc_()
+            {
+                if (use_buffer_next)
+                    flags_ |= fail_bit;
+                else
+                    use_buffer_next = true;
+            }
+
+            int_type peekc_()
+            {
+                if (use_buffer_next)
+                    return last_;
+                else if (use_peek_next)
+                    return peek_;
+
+                bool eof;
+                uint32_t codepoint = utf_to_ucs(*underlying_stream_, current_encoding_, &eof);
+
+                if (eof)
+                    return EOF;
+                else if (codepoint == uint32_t(-1))
+                {
+                    use_peek_next = true;
+                    return peek_ = 0xfffd; // The replacement character
+                }
+
+                use_peek_next = true;
+                return peek_ = codepoint;
+            }
         };
 #else
         typedef std::istream istream;

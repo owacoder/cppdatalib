@@ -635,7 +635,7 @@ void test_decision_tree()
         std::cout << cppdatalib::experimental::test_decision_tree(tree, cppdatalib::core::object_t{{"size", "L"}, {"shape", "pillar"}, {"color", "blue"}}, true) << std::endl;
 
         data >> cppdatalib::lang::lisp::stream_writer(std::cout);
-    } catch (cppdatalib::const core::error &e)
+    } catch (const cppdatalib::core::error &e)
     {
         std::cerr << e.what() << std::endl;
     }
@@ -727,13 +727,19 @@ void test_attributes()
         using namespace cppdatalib::xml;
 
         cppdatalib::core::value xml;
-        xml << parser("<?xml version = \"1.3\" encoding = \"UTF-8\"?>\n"
-                      "<!ENTITY % pub    '&#xc9;ditions Gallimard' >\n"
-                      "<!ENTITY   rights '<rights>All rights reserved</rights>' >\n"
-                      "<!ENTITY   book   'La Peste: Albert Camus,"
-                      " &#xA9; 1947 %pub;. &rights;'>\n"
-                      "<greeting>&book;<first>In first<tag id=\"my_id\" i = '&amp;none'>In tag</tag>Hello, world!</first>Before first</greeting> ", true);
-        cppdatalib::json::pretty_stream_writer(std::cout, 2) << xml;
+        cppdatalib::core::istringstream stream("<?xml version = \"1.3\" encoding = \"UTF-8\"?>\n"
+                                   "<!DOCTYPE greeting>"
+                                   "<!ENTITY % pub    '&#xc9;ditions Gallimard' >\n"
+                                   "<!ENTITY   left   'I was left behind!&amp;'> \n"
+                                   "<!ENTITY   rights '<rights xml:lang=\"en-GB\" tag=&#39;&lt;&#39;>&left;All rights reserved</rights>' >\n"
+                                   "<!ENTITY   book   'La Peste: Albert Camus,"
+                                   " &#xA9; 1947 %pub;. &rights;'>\xff\n"
+                                   "<!-- This document (<head> and <body>) should not be used -->\n"
+                                   "<greeting>&rights;<first><![CDATA[A CDATA SECTION!!<>]]>In first<tag id=\"my_id\" i = '&amp;none'>In tag</tag>Hello, world!</first>Before first</greeting> ");
+        cppdatalib::core::iencodingstream encstream(stream, cppdatalib::core::raw);
+
+        xml << cppdatalib::xml::parser(encstream, true);
+        cppdatalib::xml::stream_writer(std::cout) << xml;
 
         return;
 
@@ -748,7 +754,7 @@ void test_attributes()
         cppdatalib::core::value e1 = cppdatalib::core::array_t{"some text ", cppdatalib::core::object_t{{"secondary", v2}}, cppdatalib::core::object_t{{"first", value}}};
 
         cppdatalib::xml::pretty_document_writer(std::cout, 2) << cppdatalib::core::object_t{{"root", e1}};
-    } catch (cppdatalib::core::error e)
+    } catch (const cppdatalib::core::error &e)
     {
         std::cerr << e.what() << std::endl;
     }
@@ -820,7 +826,7 @@ int main()
         cppdatalib::core::dump::stream_writer out(std::cout, 2);
         cppdatalib::core::object_keys_to_array_filter(out) << data;
     }
-    catch (cppdatalib::const core::error &e)
+    catch (const cppdatalib::core::error &e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
@@ -904,7 +910,7 @@ int main()
         Test("Bencode", bencode_tests, [](const auto &test){return cppdatalib::bencode::to_bencode(cppdatalib::bencode::from_bencode(test));}, false);
         Test("MessagePack", message_pack_tests, [](const auto &test) -> hex_string {return hex_string(cppdatalib::message_pack::to_message_pack(cppdatalib::message_pack::from_message_pack(test)));}, false);
     }
-    catch (cppdatalib::const core::error &e)
+    catch (const cppdatalib::core::error &e)
     {
         std::cout << e.what() << std::endl;
     }
