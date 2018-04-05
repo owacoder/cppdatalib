@@ -33,6 +33,7 @@ namespace cppdatalib
 {
     namespace ubjson
     {
+        /* TODO: doesn't really support core::iencodingstream formats other than `raw` */
         class parser : public core::stream_parser
         {
             struct container_data
@@ -173,14 +174,14 @@ namespace cppdatalib
 
             inline core::istream &read_string(char specifier, core::stream_handler &writer)
             {
-                int c = stream().get();
+                core::istream::int_type c = stream().get();
 
                 if (c == EOF) throw core::error("UBJSON - expected string value after type specifier");
 
                 if (specifier == 'C')
                 {
                     writer.begin_string(core::string_t(), 1);
-                    writer.write(core::value(core::string_t(1, c)));
+                    writer.write(core::value(core::ucs_to_utf8(c)));
                     writer.end_string(core::string_t());
                 }
                 else if (specifier == 'H')
@@ -209,7 +210,7 @@ namespace cppdatalib
                     read_int(size, c);
                     if (size < 0) throw core::error("UBJSON - invalid negative size specified for string");
 
-                    writer.begin_string(core::string_t(), size);
+                    writer.begin_string(core::value(core::string_t(), core::clob), size);
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
@@ -219,7 +220,7 @@ namespace cppdatalib
                         writer.append_to_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                         size -= buffer_size;
                     }
-                    writer.end_string(core::string_t());
+                    writer.end_string(core::value(core::string_t(), core::clob));
                 }
                 else
                     throw core::error("UBJSON - invalid string specifier found in input");
@@ -246,7 +247,7 @@ namespace cppdatalib
             void write_one_()
             {
                 const char valid_types[] = "ZTFUiIlLdDCHS[{";
-                int chr;
+                core::istream::int_type chr;
 
                 if (containers.size() > 0)
                 {
@@ -556,6 +557,9 @@ namespace cppdatalib
             {
                 if (size == unknown_size)
                     throw core::error("UBJSON - 'string' value does not have size specified");
+                else if (v.get_subtype() == core::blob ||
+                         v.get_subtype() == core::clob)
+                    throw core::error("UBJSON - 'string' value must be in UTF-8 format");
 
                 if (!is_key)
                     stream().put(v.get_subtype() == core::bignum? 'H': 'S');

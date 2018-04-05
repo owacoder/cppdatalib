@@ -31,6 +31,7 @@ namespace cppdatalib
 {
     namespace message_pack
     {
+        /* TODO: doesn't really support core::iencodingstream formats other than `raw` */
         class parser : public core::stream_parser
         {
             struct container_data

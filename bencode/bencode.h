@@ -50,7 +50,7 @@ namespace cppdatalib
 
             void write_one_()
             {
-                int chr;
+                core::istream::int_type chr;
 
                 chr = stream().get();
                 if (chr == EOF)
@@ -83,26 +83,30 @@ namespace cppdatalib
                         get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size);
                         break;
                     default:
-                        if (isdigit(chr))
+                        if (chr < 0x80 && isdigit(chr))
                         {
                             core::int_t size;
+                            core::value string_type(core::string_t(), core::clob);
 
                             stream().unget();
                             stream() >> size;
                             if (size < 0) throw core::error("Bencode - expected string size");
                             if (stream().get() != ':') throw core::error("Bencode - expected ':' separating string size and data");
 
-                            get_output()->begin_string(core::string_t(), size);
+                            get_output()->begin_string(string_type, size);
                             while (size > 0)
                             {
                                 core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
                                 stream().read(buffer.get(), buffer_size);
                                 if (stream().fail())
                                     throw core::error("Bencode - unexpected end of string");
-                                get_output()->append_to_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                                // Set string in string_type to preserve the subtype
+                                string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                                get_output()->append_to_string(string_type);
                                 size -= buffer_size;
                             }
-                            get_output()->end_string(core::string_t());
+                            string_type.set_string("");
+                            get_output()->end_string(string_type);
                         }
                         else
                             throw core::error("Bencode - expected value");
@@ -116,7 +120,7 @@ namespace cppdatalib
         public:
             stream_writer(core::ostream_handle output) : core::stream_writer(output) {}
 
-            bool requires_prefix_string_size() const {return true;}
+            unsigned int required_features() const {return requires_prefix_string_size;}
 
             std::string name() const {return "cppdatalib::bencode::stream_writer";}
 

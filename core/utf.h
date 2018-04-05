@@ -465,7 +465,9 @@ namespace cppdatalib
                                 if (low < 0xdc00 || low > 0xdfff) // Not followed by a low surrogate
                                     return -1;
 
-                                result -= 0xd7ffdc00; // Subtract metadata value of both surrogates, and add 0x10000
+                                result -= 0xd800dc00; // Subtract metadata value of both surrogates
+                                result = ((result & 0x3ff0000) >> 6) | (result & 0x3ff);
+                                result += 0x10000;
                             }
 
                             break;
@@ -492,10 +494,14 @@ namespace cppdatalib
                                 if (low < 0xdc00 || low > 0xdfff) // Not followed by a low surrogate
                                     return -1;
 
-                                result -= 0xd7ffdc00; // Subtract metadata value of both surrogates, and add 0x10000
+                                result -= 0xd800dc00; // Subtract metadata value of both surrogates
+                                result = ((result & 0x3ff0000) >> 6) | (result & 0x3ff);
+                                result += 0x10000;
                             }
                             break;
                     }
+
+                    break;
                 }
                 case raw32:
                 case utf32_big_endian:
@@ -537,6 +543,8 @@ namespace cppdatalib
                             result |= uint32_t(uint8_t(s[idx+3])) << 8;
                             break;
                     }
+
+                    break;
                 }
                 default: // Unrecognized encoding
                     return -1;
@@ -603,7 +611,9 @@ namespace cppdatalib
                                     return -1;
 
                                 result = (result << 16) | low;
-                                result -= 0xd7ffdc00; // Subtract metadata value of both surrogates, and add 0x10000
+                                result -= 0xd800dc00; // Subtract metadata value of both surrogates
+                                result = ((result & 0x3ff0000) >> 6) | (result & 0x3ff);
+                                result += 0x10000;
                             }
 
                             break;
@@ -627,10 +637,14 @@ namespace cppdatalib
                                     return -1;
 
                                 result = (result << 16) | low;
-                                result -= 0xd7ffdc00; // Subtract metadata value of both surrogates, and add 0x10000
+                                result -= 0xd800dc00; // Subtract metadata value of both surrogates
+                                result = ((result & 0x3ff0000) >> 6) | (result & 0x3ff);
+                                result += 0x10000;
                             }
                             break;
                     }
+
+                    break;
                 }
                 case raw32:
                 case utf32_big_endian:
@@ -675,6 +689,8 @@ namespace cppdatalib
                                     (uint32_t(uint8_t(buf[2])));
                             break;
                     }
+
+                    break;
                 }
                 default: // Unrecognized encoding
                     return -1;

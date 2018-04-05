@@ -119,7 +119,7 @@ namespace cppdatalib
 
             core::istream &read_string(core::stream_handler &writer, bool parse_as_strings)
             {
-                int chr;
+                core::istream::int_type chr;
                 core::string_t buffer;
 
                 if (parse_as_strings)
@@ -129,9 +129,9 @@ namespace cppdatalib
                     // buffer is used to temporarily store whitespace for reading strings
                     while (chr = stream().get(), chr != EOF && chr != separator && chr != '\n')
                     {
-                        if (isspace(chr))
+                        if (chr < 0x80 && isspace(chr))
                         {
-                            buffer.push_back(chr);
+                            buffer += core::ucs_to_utf8(chr);
                             continue;
                         }
                         else if (buffer.size())
@@ -140,7 +140,7 @@ namespace cppdatalib
                             buffer.clear();
                         }
 
-                        writer.append_to_string(core::string_t(1, chr));
+                        writer.append_to_string(core::ucs_to_utf8(chr));
                     }
 
                     if (chr != EOF)
@@ -151,7 +151,7 @@ namespace cppdatalib
                 else // Unfortunately, one cannot deduce the type of the incoming data without first loading the field into a buffer
                 {
                     while (chr = stream().get(), chr != EOF && chr != separator && chr != '\n')
-                        buffer.push_back(chr);
+                        buffer += core::ucs_to_utf8(chr);
 
                     if (chr != EOF)
                         stream().unget();
@@ -168,7 +168,7 @@ namespace cppdatalib
             // Expects that the leading quote has already been parsed out of the input_stream
             core::istream &read_quoted_string(core::stream_handler &writer, bool parse_as_strings)
             {
-                int chr;
+                core::istream::int_type chr;
                 std::string buffer;
 
                 if (parse_as_strings)
@@ -186,9 +186,9 @@ namespace cppdatalib
                                 break;
                         }
 
-                        if (isspace(chr))
+                        if (chr < 0x80 && isspace(chr))
                         {
-                            buffer.push_back(chr);
+                            buffer += core::ucs_to_utf8(chr);
                             continue;
                         }
                         else if (buffer.size())
@@ -197,7 +197,7 @@ namespace cppdatalib
                             buffer.clear();
                         }
 
-                        writer.append_to_string(core::string_t(1, chr));
+                        writer.append_to_string(core::ucs_to_utf8(chr));
                     }
 
                     writer.end_string(core::string_t());
@@ -214,7 +214,7 @@ namespace cppdatalib
                                 break;
                         }
 
-                        buffer.push_back(chr);
+                        buffer += core::ucs_to_utf8(chr);
                     }
 
                     while (!buffer.empty() && isspace(buffer.back() & 0xff))

@@ -338,43 +338,113 @@ Please note that custom datatypes are a work-in-progress. Defining custom types 
 
 ## Supported datatypes
 
+Generic strings have three main subtypes:
+
+   - `normal` - Only use this for strings known to be UTF-8 encoded. This is the default string type.
+   - `clob` - Use this for strings that have an unknown encoding (that could possibly be UTF-8, or could be binary).
+   - `blob` - Use this for strings that are known to be binary encoded, or if you want to remove any encoding metadata from the string.
+
 If a type is unsupported in a serialization format, the type is not converted to something recognizable by the format, but an error is thrown instead, describing the failure. However, if a subtype is not supported, the value is processed as if it had none (i.e. if a value is a `string`, with unsupported subtype `date`, the value is processed as a meaningless string and the subtype metadata is removed).
 
 If a format-defined limit is reached, such as an object key length limit, an error will be thrown.
-
-   - JSON supports `null`, `bool`, `uint` and `int` and `real`, `string`, `array`, and `object`.<br/>
-     Notes:
-       - `string` subtype `bignum` is fully supported, for both reading and writing.<br/>
-       - There is no limit to the magnitude of numbers supported. `int` is attempted first, then `uint`, then `real`, then `bignum`.
-       - Numerical metadata is lost when converting to and from JSON.
      
    - Bencode supports `uint`, `int`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`, `bool`, and `real`s are **not** supported.
        - integers are limited to two's complement 64-bit integers when reading.
-       - No subtypes are supported.
+       - Strings are read as `clob` subtype.
+       - No subtypes are supported; strings are written without modification (i.e. as binary data). If the string is already UTF-8 encoded, it will stay UTF-8 encoded, but be read as `clob`.
        - Numerical metadata is lost when converting to and from Bencode.
+
+   - Binn supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `date`, `time`, `datetime`, `bignum`, `blob`, and `clob` are supported.
+       - `object` subtype `map` is supported.
+       - Map keys are limited to signed 32-bit integers.
+       - The Binn `string` type is used to identify UTF-8 strings, and the Binn `blob` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
+       - Object keys are limited to 255 characters or fewer.
+       - Custom subtypes for `null`, `bool`, `int`, `string`, and `array` are supported, as long as they are at least equal to the value of `core::user`.
+
+   - BJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `blob` and `clob` are supported.
+       - The BJSON `string` type is used to identify UTF-8 strings, and the BJSON `binary` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
+       - Numerical metadata is lost when converting to and from BJSON.
+
+   - CSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
+     Notes:
+       - `object`s are **not** supported.
+       - `uint` values are fully supported when reading.
+       - All strings are converted to UTF-8 when read, regardless of the input encoding.<br/>
+       - No subtypes are supported; strings are written without modification (i.e. as binary data). If the string is already UTF-8 encoded, it will stay UTF-8 encoded.
+       - Numerical metadata is lost when converting to and from CSV.
+
+   - DIF supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
+     Notes:
+       - `object`s are **not** supported.
+       - `uint` values are fully supported when reading.
+       - No subtypes are supported; strings are written without modification (i.e. as binary data). If the string is already UTF-8 encoded, it will stay UTF-8 encoded.
+       - Numerical metadata is lost when converting to and from DIF.
      
+   - JSON supports `null`, `bool`, `uint` and `int` and `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - All strings are converted to UTF-8 when read, regardless of the input encoding.<br/>
+       - `string` subtype `bignum` is fully supported, for both reading and writing.<br/>
+       - `string` subtypes `clob` and `blob` are supported when writing, as well as UTF-8 strings.<br/>
+       - There is no limit to the magnitude of numbers supported. `int` is attempted first, then `uint`, then `real`, then `bignum`.
+       - Numerical metadata is lost when converting to and from JSON.
+
+   - Lisp supports `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - No subtypes are supported; strings are written without modification (i.e. as binary data). If the string is already UTF-8 encoded, it will stay UTF-8 encoded.
+       - Numerical metadata is lost when converting to Lisp.
+
+   - MessagePack supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - MessagePack extensions are not currently supported.
+       - `string` subtypes `blob` and `clob` are supported.
+       - The MessagePack `str` type is used to identify UTF-8 strings, and the MessagePack `bin` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
+       - MessagePack timestamps are not currently supported.
+
+   - MySQL supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `blob`, `bignum`, `date`, `time`, and `datetime` are supported.
+       - MySQL datatypes `ENUM` and `SET` are not supported natively, although they are extracted as raw strings.
+       - Due to a limitation with the MySQL C API, it is not possible to read a table/db and write to another table/db using the same connection at the same time. Doing so results in undefined behavior. An intermediate representation is required (i.e. parse table to core::value, then output core::value to the table/db), or else use multiple connections to the MySQL server.
+
+   - Netstrings supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - No subtypes are supported.
+       - Type information is lost when converting to Netstrings.
+
    - plain text property lists support `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
        - `null`s are **not** supported.<br/>
        - integers are limited to two's complement 64-bit integers when reading.
        - `string` subtypes `date`, `time`, and `datetime` are supported.
        - Numerical metadata is lost when converting to and from plain text property lists.
-     
-   - Binn supports `null`, `bool`, `int`, `real`, `string`, `array`, and `object`.<br/>
+
+   - TSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:
-       - `string` subtypes `date`, `time`, `datetime`, `bignum`, `blob`, and `clob` are supported.
-       - `object` subtype `map` is supported.
-       - Map keys are limited to signed 32-bit integers.
-       - Object keys are limited to 255 characters or fewer.
-       - Custom subtypes for `null`, `bool`, `int`, `string`, and `array` are supported, as long as they are at least equal to the value of `core::user`.
-   
-   - MySQL supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+       - `object`s are **not** supported.
+       - `uint` values are fully supported when reading.
+       - All strings are converted to UTF-8 when read, regardless of the input encoding.<br/>
+       - No subtypes are supported; strings are written without modification (i.e. as binary data). If the string is already UTF-8 encoded, it will stay UTF-8 encoded.
+       - Numerical metadata is lost when converting to and from TSV.
+
+   - UBJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.
      Notes:
-       - `string` subtypes `blob`, `bignum`, `date`, `time`, and `datetime` are supported.
-       - MySQL datatypes `ENUM` and `SET` are not supported natively, although they are extracted as raw strings.
-       - Due to a limitation with the MySQL C API, it is not possible to read a table/db and write to another table/db using the same connection at the same time. Doing so results in undefined behavior. An intermediate representation is required (i.e. parse table to core::value, then output core::value to the table/db), or else use multiple connections to the MySQL server.
+       - `string` subtype `bignum` is supported.
+       - `string` subtypes `blob` and `clob` are **not** supported. These subtypes cannot be written. Convert all strings to UTF-8 before writing them to UBJSON (and don't just change the subtype, unless you know that doing so will result in a valid UTF-8 string).
+       - `uint` values are limited to the `int` value range when reading or writing, due to lack of format support for unsigned types.
+
+   - XML supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - All strings are converted to UTF-8 when read, regardless of the input encoding.<br/>
+       - `string` subtypes `clob` and `blob` are supported when writing, as well as UTF-8 strings.<br/>
+       - Numerical metadata is lost when converting to and from XML.
+       - Value attributes are supported when writing (and in fact required, if you want attributes attached to your elements), either on object keys or object values, or both. No protection is provided when writing against duplicate keys existing in both an object key and the associated object value.
+       - XML cannot compile without CPPDATALIB_ENABLE_ATTRIBUTES being defined.
 
    - XML property lists support `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
@@ -387,63 +457,9 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - `null`s are **not** supported.
        - No subtypes are supported.
        - Numerical metadata is lost when converting to XML-RPC.
-     
-   - CSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
-     Notes:
-       - `object`s are **not** supported.
-       - `uint` values are fully supported when reading.
-       - No subtypes are supported.
-       - Numerical metadata is lost when converting to and from CSV.
-
-   - TSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
-     Notes:
-       - `object`s are **not** supported.
-       - `uint` values are fully supported when reading.
-       - No subtypes are supported.
-       - Numerical metadata is lost when converting to and from TSV.
-
-   - DIF supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
-     Notes:
-       - `object`s are **not** supported.
-       - `uint` values are fully supported when reading.
-       - No subtypes are supported.
-       - Numerical metadata is lost when converting to and from DIF.
-     
-   - UBJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.
-     Notes:
-       - `string` subtype `bignum` is supported.
-       - `uint` values are limited to the `int` value range when reading or writing, due to lack of format support for unsigned types.
-
-    - XML supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
-      Notes:
-        - No subtypes are supported.
-        - Numerical metadata is lost when converting to and from XML.
-        - Value attributes are supported (and in fact required, if you want attributes attached to your elements), either on object keys or object values, or both. No protection is provided against duplicate keys existing in both an object key and the associated object value.
-        - XML cannot compile without CPPDATALIB_ENABLE_ATTRIBUTES being defined.
 
    - XML-XLS supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:
        - `object`s are **not** supported.
        - `string` subtypes `date`, `time`, and `datetime` are supported.
        - Numerical metadata is lost when converting to and from XML-XLS.
-
-   - MessagePack supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
-     Notes:
-       - MessagePack extensions are not currently supported.
-       - `string` subtypes `blob` and `clob` are supported.
-       - MessagePack timestamps are not currently supported.
-
-   - BJSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
-     Notes:
-       - `string` subtypes `blob` and `clob` are supported.
-       - Numerical metadata is lost when converting to and from BJSON.
-
-   - Netstrings supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
-     Notes:
-       - No subtypes are supported.
-       - Type information is lost when converting to Netstrings.
-
-   - Lisp supports `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
-     Notes:
-       - No subtypes are supported.
-       - Numerical metadata is lost when converting to Lisp.

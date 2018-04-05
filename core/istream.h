@@ -89,7 +89,7 @@ namespace cppdatalib
                     do
                     {
                         c = stream.getc_();
-                    } while (c != EOF && isspace(c));
+                    } while (c != EOF && c < 0x80 && isspace(c));
                     last = c;
                 }
 
@@ -670,7 +670,7 @@ namespace cppdatalib
             {}
 
             const std::string &str() const {return string;}
-            void str(const std::string &s) {string = s; pos = 0;}
+            void str(const std::string &s) {string = s; pos = 0; flags_ = 0;}
 
         protected:
             int_type getc_() {return pos < string.size()? string[pos++] & 0xff: EOF;}
@@ -810,6 +810,7 @@ namespace cppdatalib
             }
 
             operator core::istream &() {return *p_;}
+            core::istream &stream() {return *p_;}
 
             // std_stream() returns NULL if not created from a standard stream
             std::istream *std_stream() {return std_;}
@@ -923,6 +924,7 @@ namespace cppdatalib
             }
 
             operator core::istream &() {return std_? *std_: *d_;}
+            core::istream &stream() {return std_? *std_: *d_;}
 
             // std_stream() returns NULL if not created from a standard stream
             std::istream *std_stream() {return std_;}

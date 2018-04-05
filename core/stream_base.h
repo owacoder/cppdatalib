@@ -68,17 +68,20 @@ namespace cppdatalib
         protected:
             struct scope_data
             {
-                scope_data(type t, bool parsed_key = false)
+                scope_data(type t, subtype_t s, bool parsed_key = false)
                     : type_(t)
+                    , subtype_(s)
                     , parsed_key_(parsed_key)
                     , items_(0)
                 {}
 
                 type get_type() const {return type_;}
+                subtype_t get_subtype() const {return subtype_;}
                 size_t items_parsed() const {return items_;}
                 bool key_was_parsed() const {return parsed_key_;}
 
                 type type_; // The type of container that is being parsed
+                subtype_t subtype_; // The subtype of container that is being parsed
                 bool parsed_key_; // false if the object key needs to be or is being parsed, true if it has already been parsed but the value associated with it has not
                 size_t items_; // The number of items parsed into this container
             };
@@ -116,7 +119,7 @@ namespace cppdatalib
 
             stream_handler() : active_(false), is_key_(false)
             {
-                nested_scopes.push_back(scope_data(null));
+                nested_scopes.push_back(scope_data(null, normal));
             }
             virtual ~stream_handler() {}
 
@@ -143,7 +146,7 @@ namespace cppdatalib
 
                 active_ = true;
                 nested_scopes = decltype(nested_scopes)();
-                nested_scopes.push_back(scope_data(null));
+                nested_scopes.push_back(scope_data(null, normal));
                 is_key_ = false;
                 begin_();
             }
@@ -174,6 +177,9 @@ namespace cppdatalib
 
             // Current container is array, object, string, or null if no container is present
             type current_container() const {return nested_scopes.back().get_type();}
+
+            // Current subtype of current container, or normal if no container is present
+            subtype_t current_container_subtype() const {return nested_scopes.back().get_subtype();}
 
             // Parent container is array, object, or null if no parent is present
             type parent_container() const {return nested_scopes.size() > 1? nested_scopes[nested_scopes.size() - 2].get_type(): null;}
@@ -213,20 +219,20 @@ namespace cppdatalib
                         {
                             case string:
                                 begin_string_(v, v.size(), is_key);
-                                nested_scopes.push_back(string);
+                                nested_scopes.push_back({string, v.get_subtype()});
                                 remove_scope = true;
                                 string_data_(v, is_key);
                                 end_string_(v, is_key);
                                 break;
                             case array:
                                 begin_array_(v, 0, is_key);
-                                nested_scopes.push_back(array);
+                                nested_scopes.push_back({array, v.get_subtype()});
                                 remove_scope = true;
                                 end_array_(v, is_key);
                                 break;
                             case object:
                                 begin_object_(v, 0, is_key);
-                                nested_scopes.push_back(object);
+                                nested_scopes.push_back({object, v.get_subtype()});
                                 remove_scope = true;
                                 end_object_(v, is_key);
                                 break;
@@ -334,7 +340,7 @@ namespace cppdatalib
                     begin_string_(v, size, is_key_ = false);
                 }
 
-                nested_scopes.push_back(string);
+                nested_scopes.push_back({string, v.get_subtype()});
             }
             void append_to_string(const core::string_t &v) {append_to_string(value(v));}
             void append_to_string(const core::value &v)
@@ -409,7 +415,7 @@ namespace cppdatalib
                     begin_array_(v, size, false);
                 }
 
-                nested_scopes.push_back(array);
+                nested_scopes.push_back({array, v.get_subtype()});
             }
             void end_array(const core::array_t &v) {end_array(value(v));}
             void end_array(const core::value &v)
@@ -470,7 +476,7 @@ namespace cppdatalib
                     begin_object_(v, size, false);
                 }
 
-                nested_scopes.push_back(object);
+                nested_scopes.push_back({object, v.get_subtype()});
             }
             void end_object(const core::object_t &v) {end_object(value(v));}
             void end_object(const core::value &v)
@@ -1328,7 +1334,7 @@ namespace cppdatalib
                         entity_should_be_parsed = false;
                         value.clear();
                         value.push_back('&');
-                        value.push_back(c);
+                        value += ucs_to_utf8(c);
                         return true;
                     }
                     else
@@ -1485,7 +1491,7 @@ namespace cppdatalib
                             }
 
                             if (allow_references == deref_no_entities)
-                                value.push_back(c);
+                                value += ucs_to_utf8(c);
                             else if (c == '&' ||
                                      c == '%')
                             {
@@ -1509,7 +1515,7 @@ namespace cppdatalib
                                     value += entity;
                             }
                             else
-                                value.push_back(c);
+                                value += ucs_to_utf8(c);
                         }
 
                         if (c != '"')
@@ -1535,7 +1541,7 @@ namespace cppdatalib
                             }
 
                             if (allow_references == deref_no_entities)
-                                value.push_back(c);
+                                value += ucs_to_utf8(c);
                             else if (c == '&' ||
                                      c == '%')
                             {
@@ -1559,7 +1565,7 @@ namespace cppdatalib
                                     value += entity;
                             }
                             else
-                                value.push_back(c);
+                                value += ucs_to_utf8(c);
                         }
 
                         if (c != '\'')
@@ -1574,7 +1580,7 @@ namespace cppdatalib
                 // read_prolog() assumes nothing has been read in the current document
                 bool read_prolog(core::value &attributes)
                 {
-                    int c;
+                    istream::int_type c;
                     char buf[10];
 
                     if ((!read(buf, 5) || memcmp(buf, "<?xml", 5)) ||
@@ -1678,7 +1684,7 @@ namespace cppdatalib
                             read = processing_instruction_was_read;
                             value.clear();
                             while (c = get_from_current_level_only(), c != '?' && c != EOF)
-                                value.push_back(c);
+                                value += ucs_to_utf8(c);
                             bool b = c == '?' && get_from_current_level_only() == '>';
                             if (!b)
                                 last_error_ = "processing instruction is not closed properly";
@@ -1712,7 +1718,7 @@ namespace cppdatalib
                                         c = '\n';
                                     }
 
-                                    value.push_back(c);
+                                    value += ucs_to_utf8(c);
                                 }
 
                                 if (!match_from_current_level_only('-') ||
@@ -1781,7 +1787,7 @@ namespace cppdatalib
                                              value[value.size() - 1] == ']')
                                         break;
 
-                                    value.push_back(c);
+                                    value += ucs_to_utf8(c);
                                 }
 
                                 if (c == EOF)
@@ -1917,7 +1923,7 @@ namespace cppdatalib
                                 c = '\n';
                             }
 
-                            value.push_back(c);
+                            value += ucs_to_utf8(c);
                             c = get_from_current_level_only();
                         }
 
@@ -2023,6 +2029,37 @@ namespace cppdatalib
                 }
 
                 core::ostream &write_element_content(core::ostream &stream, const std::string &str)
+                {
+                    for (size_t i = 0; i < str.size();)
+                    {
+                        uint32_t c = utf8_to_ucs(str, i, i);
+
+                        if (c == uint32_t(-1))
+                            throw core::error("XML - invalid UTF-8 string");
+
+                        switch (c)
+                        {
+                            case '"': stream.write("&quot;", 6); break;
+                            case '&': stream.write("&amp;", 5); break;
+                            case '\'': stream.write("&apos;", 6); break;
+                            case '<': stream.write("&lt;", 4); break;
+                            case '>': stream.write("&gt;", 4); break;
+                            case '\n':
+                            case '\r':
+                            case '\t': stream.put(c); break;
+                            default:
+                                if (c > 0x80 || iscntrl(c))
+                                    (stream.write("&#", 2) << c).put(';');
+                                else
+                                    stream.put(str[i]);
+                                break;
+                        }
+                    }
+
+                    return stream;
+                }
+
+                core::ostream &write_binary_element_content(core::ostream &stream, const std::string &str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {

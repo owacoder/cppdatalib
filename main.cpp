@@ -735,11 +735,24 @@ void test_attributes()
                                    "<!ENTITY   book   'La Peste: Albert Camus,"
                                    " &#xA9; 1947 %pub;. &rights;'>\xff\n"
                                    "<!-- This document (<head> and <body>) should not be used -->\n"
-                                   "<greeting>&rights;<first><![CDATA[A CDATA SECTION!!<>]]>In first<tag id=\"my_id\" i = '&amp;none'>In tag</tag>Hello, world!</first>Before first</greeting> ");
-        cppdatalib::core::iencodingstream encstream(stream, cppdatalib::core::raw);
+                                   "<greeting>&rights;<first><![CDATA[A CDATA SECTION!!<>]]>In first<tag id=\"my_id\" i = '&amp;none'>In tag</tag>Hello, world!</first>Before first");
+        cppdatalib::core::istringstream stream2("</greeting>");
+        std::string str;
+        while (stream)
+            str.push_back(stream.get()), str.push_back(0);
+        str.pop_back();
+        str.pop_back();
+        str += cppdatalib::core::ucs_to_utf(0x1D11E, cppdatalib::core::utf16_little_endian);
+        while (stream2)
+            str.push_back(stream2.get()), str.push_back(0);
+        str.pop_back();
+        str.pop_back();
+        stream.str(str);
+
+        cppdatalib::core::iencodingstream encstream(stream, cppdatalib::core::utf16_little_endian);
 
         xml << cppdatalib::xml::parser(encstream, true);
-        cppdatalib::xml::stream_writer(std::cout) << xml;
+        cppdatalib::json::stream_writer(std::cout) << xml;
 
         return;
 

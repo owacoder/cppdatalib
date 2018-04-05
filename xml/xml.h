@@ -224,6 +224,9 @@ namespace cppdatalib
             {
                 if (is_key)
                     current_keys.back() += v.get_string_unchecked();
+                else if (current_container_subtype() == core::clob ||
+                         current_container_subtype() == core::blob)
+                    write_binary_element_content(stream(), v.get_string_unchecked());
                 else
                     write_element_content(stream(), v.get_string_unchecked());
             }

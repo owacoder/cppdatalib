@@ -76,6 +76,9 @@ namespace cppdatalib
             object
         };
 
+        /* TODO: doesn't really support core::iencodingstream formats other than `raw`
+         * TODO: support normal and clob strings properly
+         */
         class parser : public core::stream_parser
         {
             struct container_data
@@ -320,7 +323,7 @@ namespace cppdatalib
                     case string:
                     {
                         uint32_t size = read_size(stream());
-                        core::value string_type = core::value("");
+                        core::value string_type = core::value(core::string_t());
 
                         switch (element_subtype)
                         {

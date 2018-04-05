@@ -83,14 +83,14 @@ namespace cppdatalib
 
         enum subtype
         {
-            normal = -1,
+            normal = -1, // Normal strings are encoded with valid UTF-8. Use blob or clob for other types of strings.
 
             // Integers
             timestamp = -10, // Number of seconds since the epoch, Jan 1, 1970
 
             // Strings
             blob = -20, // A chunk of binary data
-            clob = -21, // A chunk of binary data, that should be interpreted as text
+            clob = -21, // A chunk of binary data, that should be interpreted as text (unknown encoding, can include random bytes > 0x7f)
             symbol = -22, // A symbolic atom, or identifier
             datetime = -23, // A datetime structure, with unspecified format
             date = -24, // A date structure, with unspecified format

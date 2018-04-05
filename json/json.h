@@ -42,7 +42,7 @@ namespace cppdatalib
             {
                 static const std::string hex = "0123456789ABCDEF";
 
-                int c;
+                core::istream::int_type c;
                 char *write = buffer.get();
 
                 writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
@@ -70,6 +70,28 @@ namespace cppdatalib
                                     size_t pos = hex.find(toupper(c));
                                     if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
                                     code = (code << 4) | pos;
+                                }
+
+                                if (code >= 0xd800 && code <= 0xdbff)
+                                {
+                                    char buf[2];
+                                    if (!stream.read(buf, 2) || memcmp(buf, "\\u", 2))
+                                        throw core::error("JSON - invalid character escape, expected low surrogate of UTF-16 pair");
+
+                                    uint32_t code2 = 0;
+                                    for (int i = 0; i < 4; ++i)
+                                    {
+                                        c = stream.get();
+                                        if (c == EOF) throw core::error("JSON - unexpected end of string");
+                                        size_t pos = hex.find(toupper(c));
+                                        if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
+                                        code2 = (code2 << 4) | pos;
+                                    }
+
+                                    if (code2 < 0xdc00 || code2 > 0xdfff)
+                                        throw core::error("JSON - invalid character escape, expected low surrogate of UTF-16 pair");
+
+                                    code = ((code << 16) | code2) - 0xd7ffdc00; // Subtract metadata value of both surrogates, and add 0x10000
                                 }
 
                                 core::string_t bytes = core::ucs_to_utf8(code);
@@ -268,6 +290,73 @@ namespace cppdatalib
             protected:
                 core::ostream &write_string(core::ostream &stream, const std::string &str)
                 {
+                    for (size_t i = 0; i < str.size();)
+                    {
+                        uint32_t c = core::utf8_to_ucs(str, i, i);
+
+                        if (c == uint32_t(-1))
+                            throw core::error("JSON - invalid UTF-8 string");
+
+                        switch (c)
+                        {
+                            case '"':
+                            case '\\':
+                                stream.put('\\');
+                                stream.put(c);
+                                break;
+                            default:
+                                if (c < 0x80 && iscntrl(c))
+                                {
+                                    switch (c)
+                                    {
+                                        case '\b': stream.write("\\b", 2); break;
+                                        case '\f': stream.write("\\f", 2); break;
+                                        case '\n': stream.write("\\n", 2); break;
+                                        case '\r': stream.write("\\r", 2); break;
+                                        case '\t': stream.write("\\t", 2); break;
+                                        default:
+                                            hex::write(stream.write("\\u00", 4), c);
+                                            break;
+                                    }
+                                }
+                                else if (c >= 0xd800 && c <= 0xdfff)
+                                    throw core::error("JSON - invalid UTF-8 string");
+                                else if (c > 0x80)
+                                {
+                                    char buf[13];
+
+                                    buf[0] = '\\';
+                                    buf[1] = 'u';
+
+                                    if (c <= 0xffff)
+                                        std::sprintf(buf+2, "%04x", (unsigned) c);
+                                    else
+                                    {
+                                        c -= 0x10000;
+                                        c = ((c << 6) & 0x3ff0000) | (c & 0x3ff); // Place top ten and lower ten bits in proper positions
+                                        c += 0xd800dc00; // Add UTF-16 surrogate values
+
+                                        std::sprintf(buf+2, "%04x", (unsigned) (c >> 16));
+                                        std::sprintf(buf+8, "%04x", (unsigned) (c & 0xffff));
+
+                                        // This assignments must be done afterward because the first sprintf will write a NUL to buf[6]
+                                        buf[6] = '\\';
+                                        buf[7] = 'u';
+                                    }
+
+                                    stream << buf;
+                                }
+                                else
+                                    stream.put(c);
+                                break;
+                        }
+                    }
+
+                    return stream;
+                }
+
+                core::ostream &write_blob_string(core::ostream &stream, const std::string &str)
+                {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
                         int c = str[i] & 0xff;
@@ -280,7 +369,7 @@ namespace cppdatalib
                                 stream.put(c);
                                 break;
                             default:
-                                if (iscntrl(c))
+                                if (c > 0x7f || iscntrl(c))
                                 {
                                     switch (c)
                                     {
@@ -340,7 +429,14 @@ namespace cppdatalib
                 stream() << v.get_real_unchecked();
             }
             void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
-            void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
+            void string_data_(const core::value &v, bool)
+            {
+                if (current_container_subtype() == core::blob ||
+                    current_container_subtype() == core::clob)
+                    write_blob_string(stream(), v.get_string_unchecked());
+                else
+                    write_string(stream(), v.get_string_unchecked());
+            }
             void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
 
             void begin_array_(const core::value &, core::int_t, bool) {stream().put('[');}

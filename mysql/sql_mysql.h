@@ -59,12 +59,13 @@ namespace cppdatalib
                         native_column_type.find("text") != std::string::npos ||
                         native_column_type.find("mediumtext") != std::string::npos ||
                         native_column_type.find("longtext") != std::string::npos)
-                    value.convert_to_string();
+                {
+                    value.set_subtype(core::clob);
+                }
                 else if (native_column_type.find("blob") != std::string::npos ||
                          native_column_type.find("mediumblob") != std::string::npos ||
                          native_column_type.find("longblob") != std::string::npos)
                 {
-                    value.convert_to_string();
                     value.set_subtype(core::blob);
                 }
                 else if (native_column_type.find("tinyint") != std::string::npos ||
@@ -91,6 +92,8 @@ namespace cppdatalib
                 else if (native_column_type.find("datetime") != std::string::npos ||
                          native_column_type.find("timestamp") != std::string::npos)
                     value.set_subtype(core::datetime);
+                else
+                    value.set_subtype(core::blob);
             }
 
             class stream_writer_base : public core::stream_handler
