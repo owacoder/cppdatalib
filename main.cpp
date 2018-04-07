@@ -733,26 +733,28 @@ void test_attributes()
                                    "<!ENTITY   left   'I was left behind!&amp;'> \n"
                                    "<!ENTITY   rights '<rights xml:lang=\"en-GB\" tag=&#39;&lt;&#39;>&left;All rights reserved</rights>' >\n"
                                    "<!ENTITY   book   'La Peste: Albert Camus,"
-                                   " &#xA9; 1947 %pub;. &rights;'>\xff\n"
+                                   " &#xA9; 1947 %pub;. &rights;'>\n"
                                    "<!-- This document (<head> and <body>) should not be used -->\n"
                                    "<greeting>&rights;<first><![CDATA[A CDATA SECTION!!<>]]>In first<tag id=\"my_id\" i = '&amp;none'>In tag</tag>Hello, world!</first>Before first");
         cppdatalib::core::istringstream stream2("</greeting>");
         std::string str;
         while (stream)
-            str.push_back(stream.get()), str.push_back(0);
+            str.push_back(stream.get());//, str.push_back(0);
         str.pop_back();
-        str.pop_back();
-        str += cppdatalib::core::ucs_to_utf(0x1D11E, cppdatalib::core::utf16_little_endian);
+        //str.pop_back();
+        str += cppdatalib::core::ucs_to_utf(0x1D11E, cppdatalib::core::encoding_from_name("UTF-8"));
         while (stream2)
-            str.push_back(stream2.get()), str.push_back(0);
+            str.push_back(stream2.get());//, str.push_back(0);
         str.pop_back();
-        str.pop_back();
+        //str.pop_back();
         stream.str(str);
+        std::cout << cppdatalib::core::ucs_to_utf(0xD1, cppdatalib::core::encoding_from_name("UTF-8"));
 
-        cppdatalib::core::iencodingstream encstream(stream, cppdatalib::core::utf16_little_endian);
+        cppdatalib::core::iencodingstream encstream(stream, cppdatalib::core::encoding_from_name("UTF-8"));
 
         xml << cppdatalib::xml::parser(encstream, true);
-        cppdatalib::json::stream_writer(std::cout) << xml;
+        std::cout << xml;
+        cppdatalib::xml::stream_writer(std::cout) << xml;
 
         return;
 

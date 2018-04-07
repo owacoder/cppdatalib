@@ -71,7 +71,7 @@ namespace cppdatalib
         }
 
         // Returns empty string if invalid codepoint is encountered
-        // Returns UTF-8 string on valid input
+        // Returns UTF-xx string on valid input
         std::string ucs_to_utf(const uint32_t *s, size_t size, encoding mode)
         {
             if (mode == utf8)
@@ -337,7 +337,7 @@ namespace cppdatalib
                 result = (c & 0x1f) << 6;
 
                 c = stream.get();
-                if (c == EOF || (c & 0xc0) != 0xc0) // EOF, or not a continuation byte?
+                if (c == EOF || (c & 0xc0) != 0x80) // EOF, or not a continuation byte?
                     return -1;
 
                 result |= c & 0x3f;
@@ -351,13 +351,13 @@ namespace cppdatalib
                 result = uint32_t(c & 0xf) << 12;
 
                 c = stream.get();
-                if (c == EOF || (c & 0xc0) != 0xc0) // EOF, or not a continuation byte?
+                if (c == EOF || (c & 0xc0) != 0x80) // EOF, or not a continuation byte?
                     return -1;
 
                 result |= (c & 0x3f) << 6;
 
                 c = stream.get();
-                if (c == EOF || (c & 0xc0) != 0xc0) // EOF, or not a continuation byte?
+                if (c == EOF || (c & 0xc0) != 0x80) // EOF, or not a continuation byte?
                     return -1;
 
                 result |= c & 0x3f;
@@ -371,19 +371,19 @@ namespace cppdatalib
                 result = uint32_t(c & 0x7) << 24;
 
                 c = stream.get();
-                if (c == EOF || (c & 0xc0) != 0xc0) // EOF, or not a continuation byte?
+                if (c == EOF || (c & 0xc0) != 0x80) // EOF, or not a continuation byte?
                     return -1;
 
                 result |= uint32_t(c & 0x3f) << 12;
 
                 c = stream.get();
-                if (c == EOF || (c & 0xc0) != 0xc0) // EOF, or not a continuation byte?
+                if (c == EOF || (c & 0xc0) != 0x80) // EOF, or not a continuation byte?
                     return -1;
 
                 result |= (c & 0x3f) << 6;
 
                 c = stream.get();
-                if (c == EOF || (c & 0xc0) != 0xc0) // EOF, or not a continuation byte?
+                if (c == EOF || (c & 0xc0) != 0x80) // EOF, or not a continuation byte?
                     return -1;
 
                 result |= c & 0x3f;
@@ -411,9 +411,21 @@ namespace cppdatalib
             return ucs_to_utf8(&codepoint, 1);
         }
 
+        // Returns empty string if invalid codepoint is encountered
+        // Returns UTF-xx string on valid input
+        std::string ucs_to_utf(const uint32_t *s, size_t size, const char *encoding_name)
+        {
+            return ucs_to_utf(s, size, encoding_from_name(encoding_name));
+        }
+
         std::string ucs_to_utf(uint32_t codepoint, encoding mode)
         {
             return ucs_to_utf(&codepoint, 1, mode);
+        }
+
+        std::string ucs_to_utf(uint32_t codepoint, const char *encoding_name)
+        {
+            return ucs_to_utf(&codepoint, 1, encoding_from_name(encoding_name));
         }
 
         // Returns -1 on conversion failure, invalid codepoint, overlong encoding, or truncated input

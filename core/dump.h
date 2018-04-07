@@ -45,7 +45,7 @@ namespace cppdatalib
                     {
                         for (size_t i = 0; i < str.size(); ++i)
                         {
-                            int c = str[i];
+                            int c = str[i] & 0xff;
 
                             switch (c)
                             {

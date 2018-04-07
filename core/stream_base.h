@@ -2020,7 +2020,7 @@ namespace cppdatalib
                                 if (iscntrl(c))
                                     (stream.write("&#", 2) << c).put(';');
                                 else
-                                    stream.put(str[i]);
+                                    stream.put(c);
                                 break;
                         }
                     }
@@ -2051,7 +2051,7 @@ namespace cppdatalib
                                 if (c > 0x80 || iscntrl(c))
                                     (stream.write("&#", 2) << c).put(';');
                                 else
-                                    stream.put(str[i]);
+                                    stream.put(c);
                                 break;
                         }
                     }
@@ -2079,7 +2079,7 @@ namespace cppdatalib
                                 if (iscntrl(c))
                                     (stream.write("&#", 2) << c).put(';');
                                 else
-                                    stream.put(str[i]);
+                                    stream.put(c);
                                 break;
                         }
                     }
