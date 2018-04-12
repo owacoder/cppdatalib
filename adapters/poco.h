@@ -523,7 +523,7 @@ public:
             for (const auto &item: bind)
                 result.push_back(cppdatalib::core::value(item));
         }
-        else if (bind.isString()) result = bind.convert<std::string>();
+        else if (bind.isString()) result = cppdatalib::core::value(bind.convert<std::string>(), cppdatalib::core::clob);
         else if (bind.isStruct()) extract_struct(bind, result);
         else if (bind.isInteger())
         {

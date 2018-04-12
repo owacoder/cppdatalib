@@ -94,22 +94,14 @@ namespace cppdatalib
 
                     core::ostream &write_subtype(core::ostream &stream, core::subtype_t subtype)
                     {
-                        switch (subtype)
-                        {
-                            case normal: return stream;
-                            case timestamp: return stream << "timestamp.";
-                            case blob: return stream << "blob.";
-                            case clob: return stream << "clob.";
-                            case symbol: return stream << "symbol.";
-                            case datetime: return stream << "datetime.";
-                            case date: return stream << "date.";
-                            case time: return stream << "time.";
-                            case bignum: return stream << "bignum.";
-                            case regexp: return stream << "regexp.";
-                            case sexp: return stream << "sexp.";
-                            case map: return stream << "map.";
-                            default: return stream << "unknown " << subtype << ".";
-                        }
+                        if (subtype == normal)
+                            return stream;
+                        if (subtype_is_reserved(subtype, &subtype))
+                            return stream << "reserved " << subtype << ".";
+                        else if (subtype_is_user_defined(subtype, &subtype))
+                            return stream << "user " << subtype << ".";
+                        else
+                            return stream << subtype_to_string(subtype) << ".";
                     }
                 };
 

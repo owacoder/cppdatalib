@@ -30,6 +30,7 @@
 #include "json/json_patch.h"
 #include "json/json.h"
 #include "bencode/bencode.h"
+#include "bson/bson.h"
 #include "bjson/bjson.h"
 #include "property_list/plain_text.h"
 #include "property_list/xml.h"

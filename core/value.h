@@ -81,32 +81,64 @@ namespace cppdatalib
             object
         };
 
+        // Value map:
+        //     0 to maximum: format- or user-specified subtypes
+        //     -9 to -1: generic subtypes applicable to all types
+        //     -19 to -10: subtypes applicable to booleans
+        //     -29 to -20: subtypes applicable to integers, either signed or unsigned
+        //     -39 to -30: subtypes applicable only to signed integers
+        //     -49 to -40: subtypes applicable only to unsigned integers
+        //     -59 to -50: subtypes applicable to floating-point values
+        //     -129 to -60: subtypes applicable to strings, encoded as some form of text
+        //     -199 to -130: subtypes applicable to strings, encoded as some form of binary value
+        //     -209 to -200: subtypes applicable to arrays
+        //     -219 to -200: subtypes applicable to objects
+        //     -255 to -220: undefined, reserved
+        //
+        //     minimum to -256: format-specified reserved subtypes
         enum subtype
         {
-            normal = -1, // Normal strings are encoded with valid UTF-8. Use blob or clob for other types of strings.
+            normal = -1, // Normal strings are encoded with valid UTF-8. Use blob or clob for other generic types of strings.
 
             // Integers
-            timestamp = -10, // Number of seconds since the epoch, Jan 1, 1970
+            unix_timestamp = -29, // Number of seconds since the epoch, Jan 1, 1970
 
-            // Strings
-            blob = -20, // A chunk of binary data
-            clob = -21, // A chunk of binary data, that should be interpreted as text (unknown encoding, can include random bytes > 0x7f)
-            symbol = -22, // A symbolic atom, or identifier
-            datetime = -23, // A datetime structure, with unspecified format
-            date = -24, // A date structure, with unspecified format
-            time = -25, // A time structure, with unspecified format
-            bignum = -26, // A high-precision, decimal-encoded, number
-            uuid = -27, // A generic UUID value
+            // Text strings
+            clob = -129, // A chunk of text (unknown encoding, can include random bytes > 0x7f)
+            symbol, // A symbolic atom, or identifier (should be interpreted as text, but has unknown encoding, can include random bytes > 0x7f)
+            datetime, // A datetime structure, with unspecified format (unknown text encoding)
+            date, // A date structure, with unspecified format (unknown text encoding)
+            time, // A time structure, with unspecified format (unknown text encoding)
+            regexp, // A generic regexp structure, with unspecified text format, encoding, and option flags
+            bignum, // A high-precision, decimal-encoded, number (unknown text encoding)
+            uuid, // A generic UUID value (unknown text encoding)
+            function, // A generic function value (unknown text encoding or language)
+
+            // Binary strings
+            blob = -199, // A chunk of binary data
+            binary_symbol, // A symbolic atom, or identifier (should be interpreted as binary data)
+            binary_datetime, // A datetime structure, with unspecified binary format
+            binary_date, // A date structure, with unspecified binary format
+            binary_time, // A time structure, with unspecified binary format
+            binary_regexp, // A generic regexp structure, with unspecified binary format
+            binary_bignum, // A high-precision, binary-encoded, number (unknown binary encoding)
+            binary_uuid, // A generic binary UUID value
+            binary_function, // A generic binary function value (unknown language or target)
 
             // Arrays
-            regexp = -30, // A regular expression definition containing two string elements, the first is the definition, the second is the options list
-            sexp = -31, // Ordered collection of values, distinct from an array only by name
+            sexp = -209, // Ordered collection of values, distinct from an array only by name
 
             // Objects
-            map = -40, // A normal object with integral keys
-            hash = -41, // A hash lookup (not supported as such in the value class, but can be used as a tag for external variant classes)
+            map = -219, // A normal object with integral keys
+            hash, // A hash lookup (not supported as such in the value class, but can be used as a tag for external variant classes)
 
-            user = 0
+            // Other reserved values (32,513 options)
+            reserved = INT16_MIN,
+            reserved_max = -256,
+
+            // User-defined values (32,768 options)
+            user = 0,
+            user_max = INT16_MAX
         };
 
         class value_builder;
@@ -163,6 +195,80 @@ namespace cppdatalib
 #endif
 
         struct null_t {};
+
+        inline bool subtype_is_reserved(subtype_t subtype, subtype_t *which)
+        {
+            if (subtype <= reserved_max)
+            {
+                if (which)
+                    *which = subtype - reserved;
+                return true;
+            }
+            return false;
+        }
+
+        inline bool subtype_is_user_defined(subtype_t subtype, subtype_t *which)
+        {
+            if (subtype >= user)
+            {
+                if (which)
+                    *which = subtype - user;
+                return true;
+            }
+            return false;
+        }
+
+        inline bool subtype_is_text_string(subtype_t subtype)
+        {
+            return (subtype > -130 && subtype <= -60) || (subtype > -10 && subtype <= -1);
+        }
+
+        inline bool subtype_is_binary_string(subtype_t subtype)
+        {
+            return (subtype > -200 && subtype <= -130);
+        }
+
+        const char *subtype_to_string(subtype_t subtype)
+        {
+            switch (subtype)
+            {
+                case normal: return "normal";
+
+                case unix_timestamp: return "UNIX timestamp";
+
+                case clob: return "text (unknown encoding)";
+                case symbol: return "symbol";
+                case datetime: return "date/time";
+                case date: return "date";
+                case time: return "time";
+                case regexp: return "regular expression";
+                case bignum: return "bignum";
+                case uuid: return "UUID";
+                case function: return "function";
+
+                case blob: return "binary (unknown data)";
+                case binary_symbol: return "binary symbol";
+                case binary_datetime: return "binary date/time";
+                case binary_date: return "binary date";
+                case binary_time: return "binary time";
+                case binary_bignum: return "binary bignum";
+                case binary_uuid: return "binary UUID";
+                case binary_regexp: return "binary regexp";
+
+                case sexp: return "s-expression";
+
+                case map: return "map";
+                case hash: return "hash";
+
+                default:
+                    if (subtype <= reserved_max)
+                        return "reserved";
+                    else if (subtype >= user)
+                        return "user";
+                    else
+                        return "undefined subtype";
+            }
+        }
 
         /* The core value class for all of cppdatalib.
          *

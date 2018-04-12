@@ -77,12 +77,15 @@ namespace cppdatalib
         };
 
         /* TODO: doesn't really support core::iencodingstream formats other than `raw`
-         * TODO: support normal and clob strings properly
          */
         class parser : public core::stream_parser
         {
             struct container_data
             {
+                container_data()
+                    : sub_type(nobytes)
+                    , remaining_size(0)
+                {}
                 container_data(core::subtype_t sub_type, uint32_t remaining_size)
                     : sub_type(sub_type)
                     , remaining_size(remaining_size)
@@ -93,7 +96,7 @@ namespace cppdatalib
             };
 
             std::unique_ptr<char []> buffer;
-            std::stack<container_data, std::vector<container_data>> containers;
+            core::cache_vector_n<container_data, core::cache_size> containers;
             bool written;
 
             uint32_t read_size(core::istream &input)
@@ -144,24 +147,24 @@ namespace cppdatalib
                 int chr;
                 core::uint_t integer;
 
-                while (containers.size() > 0 && !get_output()->container_key_was_just_parsed() && containers.top().remaining_size == 0)
+                while (containers.size() > 0 && !get_output()->container_key_was_just_parsed() && containers.back().remaining_size == 0)
                 {
                     if (get_output()->current_container() == core::array)
-                        get_output()->end_array(core::value(core::array_t(), containers.top().sub_type));
+                        get_output()->end_array(core::value(core::array_t(), containers.back().sub_type));
                     else if (get_output()->current_container() == core::object)
-                        get_output()->end_object(core::value(core::object_t(), containers.top().sub_type));
-                    containers.pop();
+                        get_output()->end_object(core::value(core::object_t(), containers.back().sub_type));
+                    containers.pop_back();
                 }
 
                 if (containers.size() > 0)
                 {
-                    if (containers.top().remaining_size > 0)
-                        --containers.top().remaining_size;
+                    if (containers.back().remaining_size > 0)
+                        --containers.back().remaining_size;
 
                     if (get_output()->current_container() == core::object && !get_output()->container_key_was_just_parsed())
                     {
                         // Parse keys here
-                        if (containers.top().sub_type == core::map) // Integer keys
+                        if (containers.back().sub_type == core::map) // Integer keys
                         {
                             // Read 4-byte signed integer key
                             integer = 0;
@@ -189,7 +192,7 @@ namespace cppdatalib
                             if (stream().fail())
                                 throw core::error("Binn - unexpected end of object key");
 
-                            get_output()->write(core::value(core::string_t(key_buffer, chr)));
+                            get_output()->write(core::value(core::string_t(key_buffer, chr), core::clob));
                         }
                     }
                 }
@@ -403,7 +406,7 @@ namespace cppdatalib
                             get_output()->begin_object(container, count);
                         else
                             get_output()->begin_array(container, count);
-                        containers.push(container_data(sub_type, count));
+                        containers.push_back(container_data(sub_type, count));
                         break;
                     }
                 }
@@ -803,15 +806,18 @@ namespace cppdatalib
                     case core::time: write_type(stream(), string, time); break;
                     case core::datetime: write_type(stream(), string, datetime); break;
                     case core::bignum: write_type(stream(), string, decimal_str); break;
-                    case core::blob:
-                    case core::clob: write_type(stream(), blob, blob_data); break;
-                    default: write_type(stream(), string, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) text); break;
+                    default:
+                        if (!core::subtype_is_text_string(v.get_subtype()))
+                            write_type(stream(), blob, blob_data);
+                        else
+                            write_type(stream(), string, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) text);
+                        break;
                 }
 
                 write_size(stream(), size);
             }
             void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
-            void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::blob && v.get_subtype() != core::clob && !is_key) stream().put(0);}
+            void end_string_(const core::value &, bool is_key) {if (core::subtype_is_text_string(current_container_subtype()) && !is_key) stream().put(0);}
 
             void begin_array_(const core::value &v, core::int_t size, bool)
             {

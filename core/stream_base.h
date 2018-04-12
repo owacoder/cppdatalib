@@ -1107,8 +1107,7 @@ namespace cppdatalib
                 {
                     deref_no_entities,
                     deref_all_but_general_entities,
-                    deref_all_entities,
-                    deref_all_entities_as_markup
+                    deref_all_entities
                 };
 
                 enum what_was_read
@@ -1117,10 +1116,14 @@ namespace cppdatalib
                     nothing_was_read,
                     comment_was_read,
                     processing_instruction_was_read,
+                    content_was_read,
+                    entity_declaration_was_read,
+                    element_declaration_was_read,
+                    attlist_declaration_was_read,
+                    notation_declaration_was_read,
+                    entity_value_was_read, // That is, an entity that could resolve to markup was read
                     start_tag_was_read,
                     complete_tag_was_read,
-                    content_was_read,
-                    entity_value_was_read, // That is, an entity that could resolve to markup was read
                     end_tag_was_read
                 };
 
@@ -1734,6 +1737,8 @@ namespace cppdatalib
                                 buf[0] = c;
                                 core::string_t attribute_value;
 
+                                read = entity_declaration_was_read;
+
                                 if (!this->read_from_current_level_only(buf+1, 5) || memcmp(buf, "ENTITY", 6) ||
                                     !read_spaces(1))
                                 {
@@ -1932,7 +1937,7 @@ namespace cppdatalib
                             if (c == '&' || c == '%')
                             {
                                 bool should_be_added_to_entity_list;
-                                bool b = read_entity(c == '%', deref_all_entities_as_markup, entity_name, value, should_be_added_to_entity_list);
+                                bool b = read_entity(c == '%', deref_all_entities, entity_name, value, should_be_added_to_entity_list);
 
                                 if (should_be_added_to_entity_list)
                                 {

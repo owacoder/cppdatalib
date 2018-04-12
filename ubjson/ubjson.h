@@ -557,8 +557,7 @@ namespace cppdatalib
             {
                 if (size == unknown_size)
                     throw core::error("UBJSON - 'string' value does not have size specified");
-                else if (v.get_subtype() == core::blob ||
-                         v.get_subtype() == core::clob)
+                else if (!core::subtype_is_text_string(v.get_subtype()))
                     throw core::error("UBJSON - 'string' value must be in UTF-8 format");
 
                 if (!is_key)

@@ -62,7 +62,8 @@ class cast_sized_template_to_cppdatalib<etl::string, N>
     const etl::string<N> &bind;
 public:
     cast_sized_template_to_cppdatalib(const etl::string<N> &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::string_t(bind.c_str(), bind.size());}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
+                                                                             cppdatalib::core::clob);}
 };
 
 template<size_t N>

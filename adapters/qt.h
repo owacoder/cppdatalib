@@ -284,7 +284,7 @@ public:
     {
         cppdatalib::core::value result = cppdatalib::core::array_t();
         for (const auto &item: bind)
-            result.push_back(item);
+            result.push_back(cppdatalib::core::value(item));
         return result;
     }
 };
@@ -300,7 +300,7 @@ public:
         QStringList result;
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item);
+                result.push_back(item.operator QString());
         return result;
     }
 };

@@ -513,7 +513,8 @@ class cast_template_to_cppdatalib<boost::container::basic_string, char, Ts...>
     const boost::container::basic_string<char, Ts...> &bind;
 public:
     cast_template_to_cppdatalib(const boost::container::basic_string<char, Ts...> &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::string_t(bind.c_str(), bind.size());}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
+                                                                             cppdatalib::core::clob);}
 };
 
 template<typename... Ts>
@@ -549,7 +550,7 @@ namespace cppdatalib { namespace core {
 
         void write_one_()
         {
-            get_output()->write(core::value(bind));
+            get_output()->write(core::value(bind, core::clob));
         }
     };
 }}

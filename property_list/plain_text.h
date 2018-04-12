@@ -419,14 +419,17 @@ finish:
                     case core::date:
                     case core::time:
                     case core::datetime: stream() << "<*D"; break;
-                    case core::blob:
-                    case core::clob: stream().put('<'); break;
-                    default: stream().put('"'); break;
+                    default:
+                        if (!core::subtype_is_text_string(v.get_subtype()))
+                            stream().put('<');
+                        else
+                            stream().put('"');
+                        break;
                 }
             }
             void string_data_(const core::value &v, bool)
             {
-                if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
+                if (!core::subtype_is_text_string(current_container_subtype()))
                     hex::write(stream(), v.get_string_unchecked());
                 else
                     write_string(stream(), v.get_string_unchecked());
@@ -438,9 +441,14 @@ finish:
                     case core::date:
                     case core::time:
                     case core::datetime:
-                    case core::blob:
-                    case core::clob: stream().put('>'); break;
-                    default: stream().put('"'); break;
+                        stream().put('>');
+                        break;
+                    default:
+                        if (!core::subtype_is_text_string(v.get_subtype()))
+                            stream().put('>');
+                        else
+                            stream().put('"');
+                        break;
                 }
             }
 
@@ -538,14 +546,17 @@ finish:
                     case core::date:
                     case core::time:
                     case core::datetime: stream() << "<*D"; break;
-                    case core::blob:
-                    case core::clob: stream().put('<'); break;
-                    default: stream().put('"'); break;
+                    default:
+                        if (!core::subtype_is_text_string(v.get_subtype()))
+                            stream().put('<');
+                        else
+                            stream().put('"');
+                        break;
                 }
             }
             void string_data_(const core::value &v, bool)
             {
-                if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
+                if (!core::subtype_is_text_string(current_container_subtype()))
                     hex::write(stream(), v.get_string_unchecked());
                 else
                     write_string(stream(), v.get_string_unchecked());
@@ -557,9 +568,14 @@ finish:
                     case core::date:
                     case core::time:
                     case core::datetime:
-                    case core::blob:
-                    case core::clob: stream().put('>'); break;
-                    default: stream().put('"'); break;
+                        stream().put('>');
+                        break;
+                    default:
+                        if (!core::subtype_is_text_string(v.get_subtype()))
+                            stream().put('>');
+                        else
+                            stream().put('"');
+                        break;
                 }
             }
 

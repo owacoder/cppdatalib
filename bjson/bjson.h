@@ -165,7 +165,7 @@ namespace cppdatalib
                                             size.top() += 4; // requires a four-byte size specifier
                                         else if (arg->size() >= UINT8_MAX)
                                             size.top() += 2; // requires a two-byte size specifier
-                                        else if (arg->size() > 0 && arg->get_subtype() != core::blob && arg->get_subtype() != core::clob)
+                                        else if (arg->size() > 0 && core::subtype_is_text_string(arg->get_subtype()))
                                             size.top() += 1; // requires a one-byte size specifier
 
                                         size.top() += arg->string_size();
@@ -316,20 +316,14 @@ namespace cppdatalib
 
                 if (size == unknown_size)
                     throw core::error("BJSON - 'string' value does not have size specified");
-                else if (size == 0 && v.get_subtype() != core::blob && v.get_subtype() != core::clob)
+                else if (size == 0 && core::subtype_is_text_string(v.get_subtype()))
                 {
                     stream().put(2); // Empty string type
                     return;
                 }
 
-                switch (v.get_subtype())
-                {
-                    case core::blob:
-                    case core::clob:
-                        initial_type += 4;
-                        break;
-                    default: break;
-                }
+                if (!core::subtype_is_text_string(v.get_subtype()))
+                    initial_type += 4;
 
                 write_size(stream(), initial_type, size);
             }

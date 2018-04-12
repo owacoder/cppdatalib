@@ -34,7 +34,8 @@ class cast_template_to_cppdatalib<std::basic_string, char, Ts...>
     const std::basic_string<char, Ts...> &bind;
 public:
     cast_template_to_cppdatalib(const std::basic_string<char, Ts...> &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::string_t(bind.c_str(), bind.size());}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
+                                                                             cppdatalib::core::clob);}
 };
 
 namespace cppdatalib { namespace core {
@@ -57,7 +58,7 @@ namespace cppdatalib { namespace core {
 
         void write_one_()
         {
-            get_output()->write(core::value(bind));
+            get_output()->write(core::value(bind, core::clob));
         }
     };
 }}

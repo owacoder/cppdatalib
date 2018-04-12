@@ -742,13 +742,13 @@ void test_attributes()
             str.push_back(stream.get());//, str.push_back(0);
         str.pop_back();
         //str.pop_back();
-        str += cppdatalib::core::ucs_to_utf(0x1D11E, cppdatalib::core::encoding_from_name("UTF-8"));
+        str += cppdatalib::core::ucs_to_utf(0x1D11E, "UTF-8");
         while (stream2)
             str.push_back(stream2.get());//, str.push_back(0);
         str.pop_back();
         //str.pop_back();
         stream.str(str);
-        std::cout << cppdatalib::core::ucs_to_utf(0xD1, cppdatalib::core::encoding_from_name("UTF-8"));
+        std::cout << cppdatalib::core::ucs_to_utf(0xD1, "UTF-8");
 
         cppdatalib::core::iencodingstream encstream(stream, cppdatalib::core::encoding_from_name("UTF-8"));
 

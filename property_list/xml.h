@@ -64,15 +64,18 @@ namespace cppdatalib
                         case core::date:
                         case core::time:
                         case core::datetime: stream() << "<date>"; break;
-                        case core::blob:
-                        case core::clob: stream() << "<data>"; break;
-                        default: stream() << "<string>"; break;
+                        default:
+                            if (!core::subtype_is_text_string(v.get_subtype()))
+                                 stream() << "<data>";
+                            else
+                                stream() << "<string>";
+                            break;
                     }
             }
             void string_data_(const core::value &v, bool)
             {
                 // TODO: dumb Base64 concatenation is dangerous and wrong. Needs to be fixed
-                if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
+                if (!core::subtype_is_text_string(current_container_subtype()))
                     base64::write(stream(), v.get_string_unchecked());
                 else
                     write_element_content(stream(), v.get_string_unchecked());
@@ -87,9 +90,12 @@ namespace cppdatalib
                         case core::date:
                         case core::time:
                         case core::datetime: stream() << "</date>"; break;
-                        case core::blob:
-                        case core::clob: stream() << "</data>"; break;
-                        default: stream() << "</string>"; break;
+                        default:
+                            if (!core::subtype_is_text_string(v.get_subtype()))
+                                stream() << "</data>";
+                            else
+                                stream() << "</string>";
+                            break;
                     }
             }
 
@@ -176,9 +182,12 @@ namespace cppdatalib
                         case core::date:
                         case core::time:
                         case core::datetime: stream() << "<date>"; break;
-                        case core::blob:
-                        case core::clob: stream() << "<data>"; break;
-                        default: stream() << "<string>"; break;
+                        default:
+                            if (!core::subtype_is_text_string(v.get_subtype()))
+                                 stream() << "<data>";
+                            else
+                                stream() << "<string>";
+                            break;
                     }
             }
             void string_data_(const core::value &v, bool)
@@ -187,7 +196,7 @@ namespace cppdatalib
                     stream() << '\n', output_padding(current_indent + indent_width);
 
                 // TODO: dumb Base64 concatenation is dangerous and wrong. Needs to be fixed
-                if (v.get_subtype() == core::blob || v.get_subtype() == core::clob)
+                if (!core::subtype_is_text_string(current_container_subtype()))
                     base64::write(stream(), v.get_string_unchecked());
                 else
                     write_element_content(stream(), v.get_string_unchecked());
@@ -205,9 +214,12 @@ namespace cppdatalib
                         case core::date:
                         case core::time:
                         case core::datetime: stream() << "</date>"; break;
-                        case core::blob:
-                        case core::clob: stream() << "</data>"; break;
-                        default: stream() << "</string>"; break;
+                        default:
+                            if (!core::subtype_is_text_string(v.get_subtype()))
+                                stream() << "</data>";
+                            else
+                                stream() << "</string>";
+                            break;
                     }
             }
 

@@ -431,8 +431,7 @@ namespace cppdatalib
             void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
             void string_data_(const core::value &v, bool)
             {
-                if (current_container_subtype() == core::blob ||
-                    current_container_subtype() == core::clob)
+                if (!core::subtype_is_text_string(current_container_subtype()))
                     write_blob_string(stream(), v.get_string_unchecked());
                 else
                     write_string(stream(), v.get_string_unchecked());

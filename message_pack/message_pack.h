@@ -447,7 +447,7 @@ namespace cppdatalib
                 core::ostream &write_string_size(core::ostream &stream, size_t str_size, core::subtype_t subtype)
                 {
                     // Binary string?
-                    if (subtype == core::blob || subtype == core::clob)
+                    if (!core::subtype_is_text_string(subtype))
                     {
                         if (str_size <= UINT8_MAX)
                             return stream.put(static_cast<unsigned char>(0xc4)).put(static_cast<char>(str_size));
