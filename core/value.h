@@ -101,7 +101,8 @@ namespace cppdatalib
             normal = -1, // Normal strings are encoded with valid UTF-8. Use blob or clob for other generic types of strings.
 
             // Integers
-            unix_timestamp = -29, // Number of seconds since the epoch, Jan 1, 1970
+            unix_timestamp = -29, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds
+            utc_timestamp, // Number of seconds since the epoch, Jan 1, 1970, with leap seconds
 
             // Text strings
             clob = -129, // A chunk of text (unknown encoding, can include random bytes > 0x7f)
@@ -113,6 +114,7 @@ namespace cppdatalib
             bignum, // A high-precision, decimal-encoded, number (unknown text encoding)
             uuid, // A generic UUID value (unknown text encoding)
             function, // A generic function value (unknown text encoding or language)
+            javascript, // A section of executable JavaScript code (unknown text encoding, likely UTF-8)
 
             // Binary strings
             blob = -199, // A chunk of binary data
@@ -124,6 +126,7 @@ namespace cppdatalib
             binary_bignum, // A high-precision, binary-encoded, number (unknown binary encoding)
             binary_uuid, // A generic binary UUID value
             binary_function, // A generic binary function value (unknown language or target)
+            binary_object_id, // A 12-byte binary Object ID (used especially for BSON)
 
             // Arrays
             sexp = -209, // Ordered collection of values, distinct from an array only by name
@@ -245,6 +248,7 @@ namespace cppdatalib
                 case bignum: return "bignum";
                 case uuid: return "UUID";
                 case function: return "function";
+                case javascript: return "JavaScript";
 
                 case blob: return "binary (unknown data)";
                 case binary_symbol: return "binary symbol";

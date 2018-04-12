@@ -724,7 +724,18 @@ void test_attributes()
 {
     try
     {
+        using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
+
+        cppdatalib::core::value bson;
+
+        cppdatalib::core::istringstream bstream(std::string("\x16\x00\x00\x00"               // total document size
+                                                "\x02"                           // 0x02 = type String
+                                                "hello\x00"                      // field name
+                                                "\x06\x00\x00\x00world\x00"      // field value (size of value, value, null terminator)
+                                                "\x00", 0x16));
+
+        std::cout << from_bson(bstream);
 
         cppdatalib::core::value xml;
         cppdatalib::core::istringstream stream("<?xml version = \"1.3\" encoding = \"UTF-8\"?>\n"

@@ -117,6 +117,8 @@ namespace cppdatalib
 
                 if (element_type > 0xff) // Use of non-standard encoding stream?
                     throw core::error("BSON - invalid input encoding, binary is required");
+                else if (element_type == EOF)
+                    throw core::error("BSON - unexpected end of input");
 
                 switch (static_cast<type>(element_type))
                 {
@@ -138,9 +140,12 @@ namespace cppdatalib
                         break;
                     }
                     case utf8_string:
+                    case javascript:
+                    case symbol:
                     {
                         int32_t size;
-                        core::value string_type{core::string_t()};
+                        core::value string_type{core::string_t(), element_type == javascript? core::javascript:
+                                                                  element_type == symbol? core::symbol: core::normal};
 
                         read_name();
 
@@ -150,13 +155,14 @@ namespace cppdatalib
                         if (size <= 0)
                             throw core::error("BSON - string size must not be negative or zero");
 
+                        decrement_counter(size + 5);
                         size -= 1; // Remove trailing NUL
 
                         get_output()->begin_string(string_type, size);
                         while (size > 0)
                         {
                             int32_t buffer_size = std::min(int32_t(core::buffer_size), size);
-                            if (stream().read(buffer.get(), buffer_size))
+                            if (!stream().read(buffer.get(), buffer_size))
                                 throw core::error("BSON - unexpected end of string");
                             // Set string in string_type to preserve the subtype
                             string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
@@ -169,7 +175,6 @@ namespace cppdatalib
                         if (stream().get() != 0)
                             throw core::error("BSON - invalid string terminator");
 
-                        decrement_counter(size + 5);
                         break;
                     }
                     case object:
@@ -185,9 +190,9 @@ namespace cppdatalib
                         if (size < 5)
                             throw core::error("BSON - invalid document size specified");
 
-                        if (containers.back().size_ < size)
+                        if (containers.back().size_ - 1 < size)
                             throw core::error("BSON - invalid document size specified");
-                        containers.back().size_ -= size;
+                        containers.back().size_ -= size + 1;
                         containers.push_back(container(size, static_cast<type>(element_type)));
 
                         if (static_cast<type>(element_type) == object)
@@ -227,11 +232,13 @@ namespace cppdatalib
                                 break;
                         }
 
+                        decrement_counter(size + 5);
+
                         get_output()->begin_string(string_type, size);
                         while (size > 0)
                         {
                             int32_t buffer_size = std::min(int32_t(core::buffer_size), size);
-                            if (stream().read(buffer.get(), buffer_size))
+                            if (!stream().read(buffer.get(), buffer_size))
                                 throw core::error("BSON - unexpected end of string");
                             // Set string in string_type to preserve the subtype
                             string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
@@ -241,14 +248,15 @@ namespace cppdatalib
                         string_type.set_string("");
                         get_output()->end_string(string_type);
 
-                        decrement_counter(size + 5);
                         break;
                     }
                     case undefined:
+                    case null:
                     {
                         read_name();
 
                         get_output()->write(core::value());
+                        decrement_counter(1);
                         break;
                     }
                     case object_id:
@@ -259,7 +267,8 @@ namespace cppdatalib
                         if (!stream().read(buf, 12))
                             throw core::error("BSON - expected ObjectID");
 
-                        decrement_counter(12);
+                        get_output()->write(core::value(core::string_t(buf, 12), core::binary_object_id));
+                        decrement_counter(13);
                         break;
                     }
                     case boolean:
@@ -275,15 +284,114 @@ namespace cppdatalib
                         else
                             throw core::error("BSON - expected boolean value");
 
-                        decrement_counter(1);
+                        decrement_counter(2);
                         break;
                     }
-                    default:
+                    case utc_datetime:
+                    {
+                        int64_t time;
+
+                        read_name();
+
+                        if (!core::read_int64_le(stream(), time))
+                            throw core::error("BSON - expected UTC timestamp");
+
+                        get_output()->write(core::value(time, core::utc_timestamp));
                         break;
+                    }
+                    case regex:
+                    {
+                        core::value str{core::string_t(), core::regexp};
+
+                        decrement_counter(1);
+
+                        read_name();
+
+                        if (!read_cstring(str.get_string_ref()))
+                            throw core::error("BSON - expected regular expression");
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                        if (!read_cstring(str.attribute("options").get_string_ref()))
+                            throw core::error("BSON - expected regular expression options");
+#else
+                        core::string_t temp;
+                        if (!read_cstring(temp))
+                            throw core::error("BSON - expected regular expression options");
+#endif
+                        get_output()->write(str);
+
+                        break;
+                    }
+                    case db_pointer:
+                        throw core::error("BSON - DBPointer not supported");
+                    case javascript_code_w_scope:
+                        throw core::error("BSON - JavaScript code with scope not supported");
+                    case int32:
+                    {
+                        int32_t i;
+
+                        read_name();
+
+                        if (!core::read_int32_le(stream(), i))
+                            throw core::error("BSON - expected 32-bit integer");
+
+                        decrement_counter(5);
+                        get_output()->write(core::value(i));
+                        break;
+                    }
+                    case timestamp:
+                    {
+                        uint64_t i;
+
+                        read_name();
+
+                        if (!core::read_uint64_le(stream(), i))
+                            throw core::error("BSON - expected timestamp");
+
+                        decrement_counter(9);
+                        get_output()->write(core::value(i));
+                        break;
+                    }
+                    case int64:
+                    {
+                        int64_t i;
+
+                        read_name();
+
+                        if (!core::read_int64_le(stream(), i))
+                            throw core::error("BSON - expected 64-bit integer");
+
+                        decrement_counter(9);
+                        get_output()->write(core::value(i));
+                        break;
+                    }
+                    case decimal128:
+                        throw core::error("BSON - 128-bit decimal floating-point values not supported");
+                    case min_key:
+                        throw core::error("BSON - minimum keys are not supported");
+                    case max_key:
+                        throw core::error("BSON - maximum keys are not supported");
+                    default:
+                        throw core::error("BSON - unknown datatype or corrupt stream encountered");
                 }
             }
 
         private:
+            bool read_cstring(core::string_t &ref)
+            {
+                core::istream::int_type c;
+                ref.clear();
+                while (c = stream().get(), c != EOF && c != 0 && c <= 0xff)
+                    ref.push_back(c);
+
+                decrement_counter(ref.size() + 1);
+
+                if (c != 0)
+                    return false;
+
+                return true;
+            }
+
             void read_name()
             {
                 core::istream::int_type c;
@@ -323,6 +431,20 @@ namespace cppdatalib
                 }
             }
         };
+
+        inline core::value from_bson(core::istream_handle stream)
+        {
+            parser p(stream);
+            core::value v;
+            p >> v;
+            return v;
+        }
+
+        inline core::value operator "" _bson(const char *stream, size_t size)
+        {
+            core::istringstream wrap(std::string(stream, size));
+            return from_bson(wrap);
+        }
     }
 }
 
