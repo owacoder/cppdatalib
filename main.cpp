@@ -729,11 +729,14 @@ void test_attributes()
 
         cppdatalib::core::value bson;
 
-        cppdatalib::core::istringstream bstream(std::string("\x16\x00\x00\x00"               // total document size
-                                                "\x02"                           // 0x02 = type String
-                                                "hello\x00"                      // field name
-                                                "\x06\x00\x00\x00world\x00"      // field value (size of value, value, null terminator)
-                                                "\x00", 0x16));
+        cppdatalib::core::istringstream bstream(std::string("\x31\x00\x00\x00"
+                                                             "\x04\x42SON\x00"
+                                                             "\x26\x00\x00\x00"
+                                                             "\x02\x30\x00\x08\x00\x00\x00\x61wesome\x00"
+                                                             "\x01\x31\x00\x33\x33\x33\x33\x33\x33\x14\x40"
+                                                             "\x10\x32\x00\xc2\x07\x00\x00"
+                                                             "\x00"
+                                                             "\x00", 0x31));
 
         std::cout << from_bson(bstream);
 

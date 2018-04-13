@@ -193,7 +193,7 @@ namespace cppdatalib
                         if (containers.back().size_ - 1 < size)
                             throw core::error("BSON - invalid document size specified");
                         containers.back().size_ -= size + 1;
-                        containers.push_back(container(size, static_cast<type>(element_type)));
+                        containers.push_back(container(size - 4, static_cast<type>(element_type)));
 
                         if (static_cast<type>(element_type) == object)
                             get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
