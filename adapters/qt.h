@@ -102,10 +102,7 @@ namespace cppdatalib { namespace core {
                 compose_parser(bind.first);
             }
             else if (++idx == 1)
-            {
                 compose_parser(bind.second);
-                write_next();
-            }
             else
                 get_output()->end_array(core::array_t());
         }
@@ -170,7 +167,7 @@ class cast_to_cppdatalib<QString>
     const QString &bind;
 public:
     cast_to_cppdatalib(const QString &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return bind.toStdString();}
+    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toStdString());}
 };
 
 template<>
@@ -586,7 +583,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());
@@ -665,7 +661,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());
@@ -745,7 +740,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());
@@ -825,7 +819,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());

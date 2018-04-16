@@ -133,8 +133,6 @@ namespace cppdatalib
         protected:
             template<typename ForItem>
             void compose_parser(const ForItem &item);
-
-            void write_next();
         };
 
         // Parser for a generic scalar type. Can be specialized for different scalar types
@@ -280,6 +278,7 @@ namespace cppdatalib
                 }
 
                 core::stream_input &parser() {return *input;}
+                const core::stream_input &parser() const {return *input;}
             };
         }
 
@@ -309,6 +308,8 @@ namespace cppdatalib
                 stack.push_back(impl::impl_generic_parser(bind, get_output(), *this));
             }
 
+            bool busy() const {return core::stream_input::busy() || stack.size() > 1;}
+
         protected:
             void output_changed_()
             {
@@ -324,7 +325,7 @@ namespace cppdatalib
 
             void write_one_()
             {
-                if (!stack.back().parser().was_just_reset() && !stack.back().parser().busy() && stack.size() > 1)
+                while (!stack.back().parser().was_just_reset() && !stack.back().parser().busy() && stack.size() > 1)
                     stack.pop_back();
                 stack.back().parser().write_one();
             }
@@ -340,10 +341,7 @@ namespace cppdatalib
                     compose_parser(*iterator++);
             }
             else if (iterator != bind->end())
-            {
                 compose_parser(*iterator++);
-                write_next();
-            }
             else
                 get_output()->end_array(core::array_t());
         }
@@ -358,10 +356,7 @@ namespace cppdatalib
                     compose_parser(*iterator++);
             }
             else if (iterator != bind->end())
-            {
                 compose_parser(*iterator++);
-                write_next();
-            }
             else
                 get_output()->end_array(core::array_t());
         }
@@ -376,10 +371,7 @@ namespace cppdatalib
                     compose_parser(*iterator++);
             }
             else if (iterator != bind->end())
-            {
                 compose_parser(*iterator++);
-                write_next();
-            }
             else
                 get_output()->end_array(core::array_t());
         }
@@ -395,11 +387,6 @@ namespace cppdatalib
         void generic_stream_input::compose_parser(const ForItem &item)
         {
             master_parser->compose_parser(item);
-        }
-
-        inline void generic_stream_input::write_next()
-        {
-            master_parser->write_one();
         }
     }
 }

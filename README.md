@@ -23,6 +23,7 @@ Supported formats include
    - [Bencode](https://en.wikipedia.org/wiki/Bencode)
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
    - [BJSON](http://bjson.org/) (write-only)
+   - [BSON](http://bsonspec.org/spec.html) (read-only)
    - [CSV](https://tools.ietf.org/html/rfc4180) (allows user-defined delimiter)
    - [DIF](https://en.wikipedia.org/wiki/Data_Interchange_Format) (write-only, requires table dimensions prior to writing to create well-formed output)
    - [JSON](https://json.org/)
@@ -338,10 +339,36 @@ Please note that custom datatypes are a work-in-progress. Defining custom types 
 
 ## Supported datatypes
 
+Top-level types include:
+   - null
+   - boolean
+   - integer
+   - uinteger
+   - real
+   - string
+   - array
+   - object
+
+Subtypes include (all ranges inclusive on both ends):
+
+   - 0 to 32767: format- or user-specified subtypes
+   - -9 to -1: generic subtypes applicable to all types
+   - -19 to -10: subtypes applicable to booleans
+   - -29 to -20: subtypes applicable to integers, either signed or unsigned
+   - -39 to -30: subtypes applicable only to signed integers
+   - -49 to -40: subtypes applicable only to unsigned integers
+   - -59 to -50: subtypes applicable to floating-point values
+   - -129 to -60: subtypes applicable to strings, encoded as some form of text
+   - -199 to -130: subtypes applicable to strings, encoded as some form of binary value
+   - -209 to -200: subtypes applicable to arrays
+   - -219 to -200: subtypes applicable to objects
+   - -255 to -220: undefined, reserved
+   - -32768 to -256: format-specified reserved subtypes
+
 Generic strings have three main subtypes:
 
    - `normal` - Only use this for strings known to be UTF-8 encoded. This is the default string type.
-   - `clob` - Use this for strings that have an unknown encoding (that could possibly be UTF-8, or could be binary).
+   - `clob` - Use this for strings that have an unknown text encoding (that could possibly be UTF-8).
    - `blob` - Use this for strings that are known to be binary encoded, or if you want to remove any encoding metadata from the string.
 
 If a type is unsupported in a serialization format, the type is not converted to something recognizable by the format, but an error is thrown instead, describing the failure. However, if a subtype is not supported, the value is processed as if it had none (i.e. if a value is a `string`, with unsupported subtype `date`, the value is processed as a meaningless string and the subtype metadata is removed).
@@ -370,6 +397,11 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - `string` subtypes `blob` and `clob` are supported.
        - The BJSON `string` type is used to identify UTF-8 strings, and the BJSON `binary` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
        - Numerical metadata is lost when converting to and from BJSON.
+
+   - BSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `blob` and `clob` are supported.
+       - The BSON `string` type is used to identify UTF-8 strings, and the BSON `binary` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
 
    - CSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:

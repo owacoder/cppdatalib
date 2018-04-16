@@ -406,6 +406,7 @@ namespace cppdatalib
             }
 
             operator core::ostream &() {return predef_? *predef_: *d_;}
+            core::ostream &stream() {return predef_? *predef_: *d_;}
 
             // std_stream() returns NULL if not created from a standard stream
             std::ostream *std_stream() {return std_;}
@@ -422,6 +423,7 @@ namespace cppdatalib
             ostream_handle(core::ostream &stream) : d_(&stream) {}
 
             operator core::ostream &() {return *d_;}
+            core::ostream &stream() {return *d_;}
 
             std::ostream *std_stream() {return d_;}
         };

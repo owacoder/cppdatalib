@@ -97,13 +97,13 @@ namespace cppdatalib { namespace core {
 
         void write_one_()
         {
-            if (bind)
+            if (was_just_reset())
             {
-                compose_parser(*bind);
-                write_next();
+                if (bind)
+                    compose_parser(*bind);
+                else
+                    get_output()->write(core::value());
             }
-            else
-                get_output()->write(core::value());
         }
     };
 }}
@@ -142,13 +142,13 @@ namespace cppdatalib { namespace core {
 
         void write_one_()
         {
-            if (bind)
+            if (was_just_reset())
             {
-                compose_parser(*bind);
-                write_next();
+                if (bind)
+                    compose_parser(*bind);
+                else
+                    get_output()->write(core::value());
             }
-            else
-                get_output()->write(core::value());
         }
     };
 }}
@@ -188,13 +188,13 @@ namespace cppdatalib { namespace core {
 
         void write_one_()
         {
-            if (bind)
+            if (was_just_reset())
             {
-                compose_parser(*bind);
-                write_next();
+                if (bind)
+                    compose_parser(*bind);
+                else
+                    get_output()->write(core::value());
             }
-            else
-                get_output()->write(core::value());
         }
     };
 }}
@@ -389,10 +389,7 @@ namespace cppdatalib { namespace core {
             if (was_just_reset())
                 get_output()->begin_array(core::array_t(), bind.size());
             else if (idx != bind.size())
-            {
                 compose_parser(bind[idx++]);
-                write_next();
-            }
             else
                 get_output()->end_array(core::array_t());
         }
@@ -515,7 +512,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());
@@ -574,7 +570,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());
@@ -634,7 +629,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());
@@ -694,7 +688,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());
@@ -738,10 +731,7 @@ namespace cppdatalib { namespace core {
                 compose_parser(bind.first);
             }
             else if (++idx == 1)
-            {
                 compose_parser(bind.second);
-                write_next();
-            }
             else
                 get_output()->end_array(core::array_t());
         }
@@ -887,12 +877,9 @@ namespace cppdatalib { namespace core {
             if (was_just_reset())
             {
                 if (bind)
-                    get_output()->write(core::null_t());
-                else
-                {
                     compose_parser(*bind);
-                    write_next();
-                }
+                else
+                    get_output()->write(core::null_t());
             }
         }
     };
@@ -937,10 +924,7 @@ namespace cppdatalib { namespace core {
                 if (bind.valueless_by_exception())
                     get_output()->write(core::null_t());
                 else
-                {
                     compose_parser(std::get<bind.index()>(bind));
-                    write_next();
-                }
             }
         }
     };
@@ -1339,6 +1323,8 @@ public:
 };
 
 #if __cplusplus >= 201703L
+#include <filesystem>
+
 template<typename... Ts>
 class cast_template_from_cppdatalib<std::optional, Ts...>
 {

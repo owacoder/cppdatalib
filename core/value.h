@@ -94,7 +94,6 @@ namespace cppdatalib
         //     -209 to -200: subtypes applicable to arrays
         //     -219 to -200: subtypes applicable to objects
         //     -255 to -220: undefined, reserved
-        //
         //     minimum to -256: format-specified reserved subtypes
         enum subtype
         {

@@ -345,7 +345,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());
@@ -460,7 +459,6 @@ namespace cppdatalib { namespace core {
                 else
                     compose_parser((iterator++)->first);
                 parsingKey = !parsingKey;
-                write_next();
             }
             else
                 get_output()->end_object(core::object_t());

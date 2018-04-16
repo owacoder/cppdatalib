@@ -56,7 +56,7 @@ namespace cppdatalib
             stream_writer(core::ostream_handle &output) : handle(output) {}
             virtual ~stream_writer() {}
 
-            core::ostream &stream() {return handle;}
+            core::ostream &stream() {return handle.stream();}
             // May return NULL! See core::ostream_handle::std_stream() for details.
             std::ostream *std_stream() {return handle.std_stream();}
         };

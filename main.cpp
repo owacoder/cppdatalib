@@ -6,7 +6,7 @@
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
 //#define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-#define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
+//#define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 //#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
@@ -724,8 +724,13 @@ void test_attributes()
 {
     try
     {
+        using namespace cppdatalib::json;
         using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
+
+        cppdatalib::filesystem::stream_writer("/shared/Test_Data/filesystem/", false, false)
+                << "{\"directory\": {\"file 1\": 012354, \"file 2\": true, \"dir\": [\"0 contents\", \"1 contents\"]},"
+                   "\"file\": \"Hello Worlds!\"}"_json;
 
         cppdatalib::core::value bson;
 
@@ -790,6 +795,7 @@ void test_attributes()
 }
 
 #ifdef CPPDATALIB_ENABLE_FAST_IO
+#ifdef CPPDATALIB_LINUX
 void test_mmap()
 {
     std::ofstream out;
@@ -801,6 +807,7 @@ void test_mmap()
     parser >> cppdatalib::tsv::stream_writer(wrap);
 }
 #endif
+#endif
 
 int main()
 {
@@ -810,7 +817,7 @@ int main()
 
     test_attributes();
 
-    return 0;
+    //return 0;
 
     cppdatalib::core::cache_vector_n<size_t*, 2> vec;
 
@@ -823,7 +830,7 @@ int main()
     for (auto it: vec)
         std::cout << it << "\n";
 
-    return vec.size();
+    //return vec.size();
 
     try
     {
@@ -836,9 +843,10 @@ int main()
         f << p;
         std::cout << cppdatalib::core::value(tuple);
         std::unique_ptr<int, std::default_delete<int>> s = cppdatalib::core::value(tuple);
+        f << cppdatalib::core::generic_parser(tuple);
         std::cout << *s << std::endl;
         //tuple = cppdatalib::core::value(f777);
-        w.stream() << std::endl;
+        w.stream() << "\n";// std::endl;
     }
     catch (const cppdatalib::core::error &e)
     {
@@ -874,9 +882,9 @@ int main()
 
     using namespace cppdatalib;
     using namespace json;
-    boost::dynamic_bitset<> b;
+    //boost::dynamic_bitset<> b;
 
-    cppdatalib::core::value yx = cppdatalib::core::value(b);
+    cppdatalib::core::value yx;// = cppdatalib::core::value(b);
     yx = R"({"my string":""})"_json;
 
     std::tuple<unsigned int, const char *> myvec{44, "hello"};
@@ -884,7 +892,7 @@ int main()
     cppdatalib::core::generic_parser(myvec);
     std::cout << std::endl;
     std::cout << yx << std::endl;
-    b = yx;
+    //b = yx;
 
     return 0;
 
