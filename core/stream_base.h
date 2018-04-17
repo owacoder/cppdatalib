@@ -1999,11 +1999,11 @@ namespace cppdatalib
                     std::vector<uint32_t> ucs = utf8_to_ucs(str);
 
                     if (!is_name_start_char(ucs[0]))
-                        throw core::error("XML - invalid tag or attribute name");
+                        throw core::custom_error("XML - invalid tag or attribute name \"" + str + "\"");
 
                     for (size_t i = 1; i < ucs.size(); ++i)
                         if (!is_name_char(ucs[i]))
-                            throw core::error("XML - invalid tag or attribute name");
+                            throw core::custom_error("XML - invalid tag or attribute name \"" + str + "\"");
 
                     return stream << str;
                 }

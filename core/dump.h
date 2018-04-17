@@ -316,6 +316,28 @@ namespace cppdatalib
             writer << v;
             return o;
         }
+
+        inline std::ostream &operator<<(std::ostream &o, core::stream_input &&parser)
+        {
+            core::ostream_handle wrap(o);
+            dump::stream_writer writer(wrap, 2);
+            writer << parser;
+            return o;
+        }
+
+        inline const value &operator>>(const value &v, std::ostream &o)
+        {
+            core::ostream_handle wrap(o);
+            dump::stream_writer writer(wrap, 2);
+            return v >> writer;
+        }
+
+        inline void operator>>(core::stream_input &&parser, std::ostream &o)
+        {
+            core::ostream_handle wrap(o);
+            dump::stream_writer writer(wrap, 2);
+            parser >> writer;
+        }
     }
 }
 

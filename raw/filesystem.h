@@ -41,6 +41,8 @@
 
 #endif
 
+#include <chrono>
+
 #if __cplusplus >= 201402L
 namespace cppdatalib
 {
@@ -51,6 +53,216 @@ namespace cppdatalib
 #else
         namespace fs = std::experimental::filesystem;
 #endif
+
+        class parser : public core::stream_input
+        {
+            fs::path root_path;
+            bool recursive_parse;
+            fs::directory_iterator it;
+            fs::recursive_directory_iterator r_it;
+
+            fs::path filepath;
+            std::ifstream stream;
+
+            fs::directory_options options;
+            unsigned long file_options;
+
+            std::unique_ptr<char []> buffer;
+
+        public:
+            enum read_options
+            {
+                read_block_devices = 0x01, // Read special block files to output (if not enabled, just output as empty file)
+                read_char_devices = 0x02, // Read character files to output (if not enabled, just output as empty file)
+                read_fifo_devices = 0x04, // Read IPC pipe files to output (if not enabled, just output as empty file)
+                read_socket_devices = 0x08, // Read IPC socket files to output (if not enabled, just output as empty file)
+                skip_unread_files = 0x10, // If enabled, don't output even the filename of unread files (as mentioned above)
+                skip_file_reading = 0x20 // If enabled, don't output any file contents
+            };
+
+            parser(const fs::path &root, bool recursive_parse = true, unsigned long file_options = 0, fs::directory_options options = fs::directory_options())
+                : root_path(root)
+                , recursive_parse(recursive_parse)
+                , it(!recursive_parse && fs::is_directory(root)? fs::directory_iterator(root, options): fs::directory_iterator())
+                , r_it(recursive_parse && fs::is_directory(root)? fs::recursive_directory_iterator(root, options): fs::recursive_directory_iterator())
+                , options(options)
+                , file_options(file_options)
+                , buffer(new char [core::buffer_size])
+            {
+                reset();
+            }
+
+            unsigned int features() const {return provides_prefix_string_size;}
+
+            bool busy() const {return core::stream_input::busy() || (!was_just_reset() && (it != fs::end(it) || r_it != fs::end(r_it) || stream.is_open()));}
+
+        protected:
+            void reset_()
+            {
+                bool is_dir = fs::is_directory(root_path);
+                it = !recursive_parse && is_dir? fs::directory_iterator(root_path, options): fs::directory_iterator();
+                r_it = recursive_parse && is_dir? fs::recursive_directory_iterator(root_path, options): fs::recursive_directory_iterator();
+                filepath.clear();
+            }
+
+            intmax_t file_time_to_unix_time(fs::file_time_type time)
+            {
+                return std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch()).count();
+            }
+
+            void begin_read_file_contents(const fs::directory_entry &entry)
+            {
+                core::value v;
+                uintmax_t filesize = fs::file_size(entry.path());
+
+                v.set_string(entry.path().filename());
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                v.add_attribute("permissions", core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
+                v.add_attribute("size", core::value(filesize));
+                v.add_attribute("modified", core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+#endif
+                get_output()->write(v);
+
+                if (file_options & skip_file_reading)
+                    get_output()->write(core::value());
+                else
+                {
+                    get_output()->begin_string(core::value(core::string_t(), core::blob), filesize);
+                    stream.open(filepath = entry.path());
+                    if (!stream)
+                        throw core::custom_error("filesystem - could not open \"" + entry.path().native() + "\" for input");
+                }
+            }
+
+            void write_one_()
+            {
+                try
+                {
+                    if (was_just_reset())
+                    {
+                        if (fs::is_directory(root_path))
+                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                        else
+                        {
+                            if ((file_options & skip_file_reading) == 0)
+                            {
+                                get_output()->begin_string(core::value(core::string_t(), core::blob), fs::file_size(root_path));
+                                stream.open(root_path);
+                            }
+                            else
+                                get_output()->write(core::value(core::string_t(), core::blob));
+                        }
+                        return;
+                    }
+                    else if (stream.is_open()) // Read file contents
+                    {
+                        stream.read(buffer.get(), core::buffer_size);
+                        if (stream)
+                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), core::buffer_size)));
+                        else if (stream.eof())
+                        {
+                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), stream.gcount())));
+                            get_output()->end_string(core::value(core::string_t(), core::blob));
+                            stream.close();
+                        }
+                        else
+                            throw core::custom_error("filesystem - an error occured while reading \"" + filepath.native() + "\"");
+                        return;
+                    }
+
+                    core::value v;
+                    fs::directory_entry entry;
+
+                    if (recursive_parse)
+                    {
+                        if (r_it == fs::end(r_it))
+                        {
+                            while (nesting_depth())
+                                get_output()->end_object(core::value(core::object_t()));
+                            return;
+                        }
+
+                        // If the iterator went up, we need to close directory objects until we get back to the same level
+                        while (r_it.depth() < 0 || unsigned(r_it.depth()) + 1 < nesting_depth())
+                            get_output()->end_object(core::value(core::object_t()));
+
+                        entry = *r_it++;
+                    }
+                    else
+                    {
+                        if (it == fs::end(it))
+                        {
+                            while (nesting_depth())
+                                get_output()->end_object(core::value(core::object_t()));
+                            return;
+                        }
+
+                        // If the iterator went up, we need to close directory objects until we get back to the same level
+                        while (nesting_depth() > 1)
+                            get_output()->end_object(core::value(core::object_t()));
+
+                        entry = *it++;
+                    }
+
+                    switch (entry.status().type())
+                    {
+                        case fs::file_type::block:
+                            if (file_options & read_block_devices)
+                                begin_read_file_contents(entry);
+                            else if ((file_options & skip_unread_files) == 0)
+                            {
+                                v.set_string(entry.path().filename());
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                                v.add_attribute("permissions", core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
+                                v.add_attribute("size", core::value(fs::file_size(entry.path())));
+                                v.add_attribute("modified", core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+#endif
+                                get_output()->write(v);
+                                get_output()->write(core::value());
+                            }
+                            break;
+                        case fs::file_type::character:
+                            if (file_options & read_char_devices)
+                                begin_read_file_contents(entry);
+                            else if ((file_options & skip_unread_files) == 0)
+                            {
+                                v.set_string(entry.path().filename());
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                                v.add_attribute("permissions", core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
+                                v.add_attribute("size", core::value(fs::file_size(entry.path())));
+                                v.add_attribute("modified", core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+#endif
+                                get_output()->write(v);
+                                get_output()->write(core::value());
+                            }
+                            break;
+                        case fs::file_type::directory:
+                            v.set_string(entry.path().filename());
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                            v.add_attribute("permissions", core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
+                            v.add_attribute("size", core::value(0));
+                            v.add_attribute("modified", core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+#endif
+
+                            get_output()->write(v);
+                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                            break;
+                        case fs::file_type::regular:
+                        case fs::file_type::unknown: // Exists, but unknown type. Attempt to read it
+                            begin_read_file_contents(entry);
+                            break;
+                        case fs::file_type::not_found:
+                            // Do nothing
+                            break;
+                        case fs::file_type::none:
+                        default:
+                            throw core::custom_error("filesystem - an error occured while reading file type information for \"" + entry.path().native() + "\"");
+                    }
+                } catch (const fs::filesystem_error &e) {
+                    throw core::custom_error("filesystem - " + std::string(e.what()));
+                }
+            }
+        };
 
         class stream_writer : public core::stream_handler
         {

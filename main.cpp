@@ -728,6 +728,13 @@ void test_attributes()
         using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
 
+        cppdatalib::core::stream_handler() << cppdatalib::filesystem::parser("/shared/",
+                                                                             true,
+                                                                             cppdatalib::filesystem::parser::skip_file_reading,
+                                                                             cppdatalib::filesystem::fs::directory_options::skip_permission_denied);
+
+        return;
+
         cppdatalib::filesystem::stream_writer("/shared/Test_Data/filesystem/", false, false)
                 << "{\"directory\": {\"file 1\": 012354, \"file 2\": true, \"dir\": [\"0 contents\", \"1 contents\"]},"
                    "\"file\": \"Hello Worlds!\"}"_json;
