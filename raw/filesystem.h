@@ -267,10 +267,10 @@ namespace cppdatalib
         class stream_writer : public core::stream_handler
         {
             fs::path path_root;
-            std::vector<std::string> directories;
+            std::vector<core::value> directories;
 
             std::ofstream stream;
-            std::string key;
+            core::value key;
             bool scalar_is_key;
 
             bool safe_write; // true: don't allow overwriting files, false: allow overwriting files
@@ -278,7 +278,12 @@ namespace cppdatalib
 
         public:
             // By default, pre-existing files and directories are not allowed
-            stream_writer(const fs::path &path_root, bool safe_write = true, bool safe_dirs = true) : path_root(path_root), safe_write(safe_write), safe_dirs(safe_dirs) {}
+            stream_writer(const fs::path &path_root, bool safe_write = true, bool safe_dirs = true)
+                : path_root(path_root)
+                , key("")
+                , safe_write(safe_write)
+                , safe_dirs(safe_dirs)
+            {}
 
             std::string name() const {return "cppdatalib::filesystem::stream_writer";}
 
@@ -307,11 +312,12 @@ namespace cppdatalib
             }
             void end_key_(const core::value &)
             {
-                if (key == "." ||
-                    key == ".." ||
-                    key.find('/') != key.npos ||
-                    key.find(fs::path::preferred_separator) != key.npos)
-                    throw core::custom_error("filesystem - invalid filename, cannot open \"" + path().native() + "\" for writing");
+                if (key.get_string_unchecked().empty() ||
+                    key.get_string_unchecked() == "." ||
+                    key.get_string_unchecked() == ".." ||
+                    key.get_string_unchecked().find('/') != key.get_string_unchecked().npos ||
+                    key.get_string_unchecked().find(fs::path::preferred_separator) != key.get_string_unchecked().npos)
+                    throw core::custom_error("filesystem - invalid filename, cannot open \"" + (path() / key.get_string_unchecked()).native() + "\" for writing");
                 scalar_is_key = false;
             }
 
@@ -323,18 +329,34 @@ namespace cppdatalib
 
                 if (!v.is_array() && !v.is_object())
                 {
-                    if (safe_write && fs::exists(path() / key))
-                        throw core::custom_error("filesystem - file \"" + (path() / key).native() + "\" already exists");
+                    fs::path p = path() / key.get_string_unchecked();
 
-                    stream.open(path() / key);
+                    if (safe_write && fs::exists(p))
+                        throw core::custom_error("filesystem - file \"" + p.native() + "\" already exists");
+
+                    stream.open(p);
                     if (!stream)
-                        throw core::custom_error("filesystem - error when opening \"" + (path() / key).native() + "\" for writing");
+                        throw core::custom_error("filesystem - error when opening \"" + p.native() + "\" for writing");
                 }
             }
             void end_item_(const core::value &v)
             {
                 if (!v.is_array() && !v.is_object())
+                {
                     stream.close();
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    fs::path p = path() / key.get_string_unchecked();
+
+                    core::value permissions = key.const_attribute("permissions");
+                    if (permissions.is_uint())
+                        fs::permissions(p, static_cast<fs::perms>(permissions.get_uint()) & fs::perms::mask);
+
+                    core::value write_time = key.const_attribute("modified");
+                    if (write_time.is_int())
+                        fs::last_write_time(p, fs::file_time_type(std::chrono::seconds(write_time.get_int())));
+#endif
+                }
             }
 
             void bool_(const core::value &v) {stream << (v.get_bool_unchecked()? "true": "false");}
@@ -362,15 +384,18 @@ namespace cppdatalib
                 else
                     stream << v.get_real_unchecked();
             }
-            void begin_string_(const core::value &, core::int_t, bool is_key)
+            void begin_string_(const core::value &v, core::int_t, bool is_key)
             {
                 if (is_key)
-                    key.clear();
+                {
+                    key = v; // Copy attributes, if any
+                    key.get_string_ref().clear();
+                }
             }
             void string_data_(const core::value &v, bool is_key)
             {
                 if (is_key)
-                    key += v.get_string_unchecked();
+                    key.get_string_ref() += v.get_string_unchecked();
                 else
                     stream << v.get_string_unchecked();
             }
@@ -379,13 +404,18 @@ namespace cppdatalib
             {
                 if (nesting_depth() > 0)
                 {
-                    if (fs::status(path() / key).type() == fs::file_type::directory)
+                    fs::path p = path() / key.get_string_unchecked();
+
+                    if (fs::status(p).type() == fs::file_type::directory)
                     {
                         if (safe_dirs)
-                            throw core::custom_error("filesystem - directory \"" + (path() / key).native() + "\" already exists");
+                            throw core::custom_error("filesystem - directory \"" + p.native() + "\" already exists");
                     }
-                    else if (!fs::create_directory(path() / key))
-                        throw core::custom_error("filesystem - unable to create directory \"" + (path() / key).native() + "\"");
+                    else
+                    {
+                        if (!fs::create_directory(path() / key.get_string_unchecked()))
+                            throw core::custom_error("filesystem - unable to create directory \"" + p.native() + "\"");
+                    }
 
                     directories.push_back(key);
                 }
@@ -393,20 +423,39 @@ namespace cppdatalib
             void end_array_(const core::value &, bool)
             {
                 if (nesting_depth() > 1)
+                {
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    fs::path p = path();
+
+                    core::value permissions = directories.back().const_attribute("permissions");
+                    if (permissions.is_uint())
+                        fs::permissions(p, static_cast<fs::perms>(permissions.get_uint()) & fs::perms::mask);
+
+                    core::value write_time = directories.back().const_attribute("modified");
+                    if (write_time.is_int())
+                        fs::last_write_time(p, fs::file_time_type(std::chrono::seconds(write_time.get_int())));
+#endif
+
                     directories.pop_back();
+                }
             }
 
             void begin_object_(const core::value &, core::int_t, bool)
             {
                 if (nesting_depth() > 0)
                 {
-                    if (fs::status(path() / key).type() == fs::file_type::directory)
+                    fs::path p = path() / key.get_string_unchecked();
+
+                    if (fs::status(p).type() == fs::file_type::directory)
                     {
                         if (safe_dirs)
-                            throw core::custom_error("filesystem - directory \"" + (path() / key).native() + "\" already exists");
+                            throw core::custom_error("filesystem - directory \"" + p.native() + "\" already exists");
                     }
-                    else if (!fs::create_directory(path() / key))
-                        throw core::custom_error("filesystem - unable to create directory \"" + (path() / key).native() + "\"");
+                    else
+                    {
+                        if (!fs::create_directory(path() / key.get_string_unchecked()))
+                            throw core::custom_error("filesystem - unable to create directory \"" + p.native() + "\"");
+                    }
 
                     directories.push_back(key);
                 }
@@ -414,7 +463,21 @@ namespace cppdatalib
             void end_object_(const core::value &, bool)
             {
                 if (nesting_depth() > 1)
+                {
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    fs::path p = path();
+
+                    core::value permissions = directories.back().const_attribute("permissions");
+                    if (permissions.is_uint())
+                        fs::permissions(p, static_cast<fs::perms>(permissions.get_uint()) & fs::perms::mask);
+
+                    core::value write_time = directories.back().const_attribute("modified");
+                    if (write_time.is_int())
+                        fs::last_write_time(p, fs::file_time_type(std::chrono::seconds(write_time.get_int())));
+#endif
+
                     directories.pop_back();
+                }
             }
         };
     }

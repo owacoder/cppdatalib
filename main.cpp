@@ -728,10 +728,11 @@ void test_attributes()
         using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
 
-        cppdatalib::core::stream_handler() << cppdatalib::filesystem::parser("/shared/",
-                                                                             true,
-                                                                             cppdatalib::filesystem::parser::skip_file_reading,
-                                                                             cppdatalib::filesystem::fs::directory_options::skip_permission_denied);
+        cppdatalib::filesystem::stream_writer("/shared/Test_Data2")
+         << cppdatalib::filesystem::parser("/shared/Test_Data",
+                                           true,
+                                           0/*cppdatalib::filesystem::parser::skip_file_reading*/,
+                                           cppdatalib::filesystem::fs::directory_options::skip_permission_denied);
 
         return;
 

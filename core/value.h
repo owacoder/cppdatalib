@@ -787,6 +787,7 @@ namespace cppdatalib
             value &operator[](cstring_t key);
             value operator[](const string_t &key) const;
             value &operator[](const string_t &key);
+            value const_member(const value &key) const;
             value member(const value &key) const;
             value &member(const value &key);
             const value *member_ptr(const value &key) const;
@@ -817,6 +818,7 @@ namespace cppdatalib
 
             size_t attributes_size() const;
 
+            value const_attribute(const value &key) const;
             value attribute(const value &key) const;
             value &attribute(const value &key);
             const value *attribute_ptr(const value &key) const;
@@ -848,6 +850,7 @@ namespace cppdatalib
             void append(It begin, It end);
             value operator[](size_t pos) const;
             value &operator[](size_t pos);
+            value const_element(size_t pos) const;
             value element(size_t pos) const;
             value &element(size_t pos);
             void erase_element(size_t pos);
@@ -863,19 +866,19 @@ namespace cppdatalib
             int_t get_int(int_t = 0) const
             {
                 if (is_int())
-                    return get_int();
+                    return int_;
                 throw core::error("cppdatalib::core::value - get_int() called on non-integer value");
             }
             uint_t get_uint(uint_t = 0) const
             {
                 if (is_uint())
-                    return get_uint();
+                    return uint_;
                 throw core::error("cppdatalib::core::value - get_uint() called on non-uinteger value");
             }
             real_t get_real(real_t = 0.0) const
             {
                 if (is_real())
-                    return get_real();
+                    return real_;
                 throw core::error("cppdatalib::core::value - get_real() called on non-real value");
             }
             cstring_t get_cstring(cstring_t = "") const
@@ -2300,7 +2303,7 @@ namespace cppdatalib
         inline value &value::operator[](cstring_t key) {return member(value(key));}
         inline value value::operator[](const string_t &key) const {return member(value(key));}
         inline value &value::operator[](const string_t &key) {return member(value(key));}
-        inline value value::member(const value &key) const
+        inline value value::const_member(const value &key) const
         {
             if (is_nonempty_object())
             {
@@ -2310,6 +2313,7 @@ namespace cppdatalib
             }
             return value();
         }
+        inline value value::member(const value &key) const {return const_member(key);}
         inline value &value::member(const value &key)
         {
             clear(object);
@@ -2382,13 +2386,14 @@ namespace cppdatalib
         }
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-        inline value value::attribute(const value &key) const
+        inline value value::const_attribute(const value &key) const
         {
             auto it = attr_ref_().data().find(key);
             if (it != attr_ref_().end())
                 return it->second;
             return value();
         }
+        inline value value::attribute(const value &key) const {return const_attribute(key);}
         inline value &value::attribute(const value &key)
         {
             auto it = attr_ref_().data().lower_bound(key);
@@ -2466,7 +2471,8 @@ namespace cppdatalib
 
         inline value value::operator[](size_t pos) const {return element(pos);}
         inline value &value::operator[](size_t pos) {return element(pos);}
-        inline value value::element(size_t pos) const {return is_nonempty_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
+        inline value value::const_element(size_t pos) const {return is_nonempty_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
+        inline value value::element(size_t pos) const {return const_element(pos);}
         inline value &value::element(size_t pos)
         {
             clear(array);
