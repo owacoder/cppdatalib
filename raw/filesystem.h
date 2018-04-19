@@ -236,6 +236,36 @@ namespace cppdatalib
                                 get_output()->write(core::value());
                             }
                             break;
+                        case fs::file_type::fifo:
+                            if (file_options & read_fifo_devices)
+                                begin_read_file_contents(entry);
+                            else if ((file_options & skip_unread_files) == 0)
+                            {
+                                v.set_string(entry.path().filename());
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                                v.add_attribute("permissions", core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
+                                v.add_attribute("size", core::value(fs::file_size(entry.path())));
+                                v.add_attribute("modified", core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+#endif
+                                get_output()->write(v);
+                                get_output()->write(core::value());
+                            }
+                            break;
+                        case fs::file_type::socket:
+                            if (file_options & read_socket_devices)
+                                begin_read_file_contents(entry);
+                            else if ((file_options & skip_unread_files) == 0)
+                            {
+                                v.set_string(entry.path().filename());
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                                v.add_attribute("permissions", core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
+                                v.add_attribute("size", core::value(fs::file_size(entry.path())));
+                                v.add_attribute("modified", core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+#endif
+                                get_output()->write(v);
+                                get_output()->write(core::value());
+                            }
+                            break;
                         case fs::file_type::directory:
                             v.set_string(entry.path().filename());
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
@@ -254,6 +284,8 @@ namespace cppdatalib
                         case fs::file_type::not_found:
                             // Do nothing
                             break;
+                        case fs::file_type::symlink:
+                            throw core::custom_error("filesystem - an error occured while reading symbolic link information for \"" + entry.path().native() + "\"");
                         case fs::file_type::none:
                         default:
                             throw core::custom_error("filesystem - an error occured while reading file type information for \"" + entry.path().native() + "\"");
