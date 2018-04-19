@@ -731,7 +731,7 @@ void test_attributes()
         cppdatalib::filesystem::stream_writer("/shared/Test_Data2")
          << cppdatalib::filesystem::parser("/shared/Test_Data",
                                            true,
-                                           0/*cppdatalib::filesystem::parser::skip_file_reading*/,
+                                           cppdatalib::filesystem::parser::skip_file_reading,
                                            cppdatalib::filesystem::fs::directory_options::skip_permission_denied);
 
         return;

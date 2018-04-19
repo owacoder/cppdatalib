@@ -26,6 +26,7 @@ Supported formats include
    - [BSON](http://bsonspec.org/spec.html) (read-only)
    - [CSV](https://tools.ietf.org/html/rfc4180) (allows user-defined delimiter)
    - [DIF](https://en.wikipedia.org/wiki/Data_Interchange_Format) (write-only, requires table dimensions prior to writing to create well-formed output)
+   - [Filesystem I/O](http://en.cppreference.com/w/cpp/filesystem) (`std::experimental::filesystem` or `std::filesystem`)
    - [JSON](https://json.org/)
    - [MessagePack](https://msgpack.org/)
    - MySQL (database/table retrieval and writing)
@@ -309,7 +310,7 @@ Below is a list of compile-time adjustments supported by cppdatalib:
    - `CPPDATALIB_STRING_T` - The underlying string type of the implementation. Defaults to `std::string`
    - `CPPDATALIB_ARRAY_T` - The underlying array type of the implementation. Defaults to `std::vector<cppdatalib::core::value>`
    - `CPPDATALIB_OBJECT_T` - The underlying object type of the implementation. Defaults to `std::multimap<cppdatalib::core::value, cppdatalib::core::value>`
-   - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Default to `int16_t`
+   - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Defaults to `int16_t`
    - `CPPDATALIB_BUFFER_SIZE` - The size of underlying buffers in the implementation. Defaults to 4096
    - `CPPDATALIB_CACHE_SIZE` - The cache depth of traversal in the implementation. Defaults to 3
 
@@ -317,14 +318,14 @@ Enable/Disable flags are listed below:
 
    - `CPPDATALIB_ENABLE_MYSQL` - Enables inclusion of the MySQL interface library. If defined, the MySQL headers must be available in the include path
    - `CPPDATALIB_ENABLE_XML` - Enables inclusion of the standard XML library. If defined, `CPPDATALIB_ENABLE_ATTRIBUTES` must also be defined
-   - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If write checks are disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but can result in better performance. Use at your own risk
-   - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). Use at your own risk
+   - `CPPDATALIB_DISABLE_WRITE_CHECKS` - Disables nesting checks in the stream_handler class. If write checks are disabled, and the generating code is buggy, it may generate corrupted output without catching the errors, but can result in better performance. Use at your own risk (this is *very* risky)
+   - `CPPDATALIB_ENABLE_FAST_IO` - Swaps usage of the `std::ios` classes to trimmed-down, more performant, custom I/O classes. Although it acts as a drop-in replacement for the STL, it only implements a subset of the features (but the features it does implement should be usage-compatible). It is preferred that this option be enabled.
    - `CPPDATALIB_DISABLE_FAST_IO_GCOUNT` - Disables calculation of `gcount()` in the fast input classes. This removes the `gcount()` function altogether. This flag only has an effect if `CPPDATALIB_ENABLE_FAST_INPUT` is defined
-   - `CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE` - Trims value sizes down to optimize space for large numeric arrays. This theoretically slows down string values somewhat, but saves space
+   - `CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE` - Trims value sizes down to optimize space for large numeric arrays. This theoretically (and practically) slows down string values somewhat, but saves space
    - `CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS` - Disables raw pointer and std::weak_ptr conversions to core::values. Note that defining this flag will not result in compile-time errors when attempting to convert a weakly-defined pointer. It will be implicitly converted to bool instead. As this may not be what you want, use at your own risk.
    - `CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS` - Disables implicit conversions between types and removes the convert_to_xxx() member functions of core::value. The as_xxx() member functions of core::value are remapped to be identical to the get_xxx() member functions. The MySQL format requires that this be undefined
    - `CPPDATALIB_THROW_IF_WRONG_TYPE` - Makes the get_xxx() member functions of core::value throw an error if the currently stored type is not the requested type. The "default value" parameter is irrelevant if this is defined. Some internal library code may throw errors with this flag defined, so use at your own risk
-   - `CPPDATALIB_ENABLE_ATTRIBUTES` - Enables API for attachment of attributes to any core::value instance. Attributes consist of an object with arbitrary-type keys and values, and each of those keys or values may have attributes of their own. NOTE: This must be defined for the standard XML format. WARNING: Stack-overflow protection is not extended to attributes having attributes having attributes, etc. Please limit how many nesting levels of attributes a given attribute has.
+   - `CPPDATALIB_ENABLE_ATTRIBUTES` - Enables API for attachment of attributes to any core::value instance. Attributes consist of an object with arbitrary-type keys and values, and each of those keys or values may have attributes of their own. NOTE: This must be defined for the standard XML format. The filesystem library requires this to be defined for file metadata (permissions and modification time) to be available. WARNING: Stack-overflow protection is not extended to attributes having attributes having attributes, etc. Please limit how many nesting levels of attributes a given attribute has.
    - `CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS` - If defined, this flag makes all core::value constructors (except for core::null_t) and all core::value type conversion operators `explicit`. User code and future formats should compile with this flag defined, although the library is much easier to use with it undefined
    - `CPPDATALIB_DISABLE_CONVERSION_LOSS` - If defined, this flag makes internal core::value converters throw errors if data loss would result, including loss of precision by converting to or from "real"
    - `CPPDATALIB_ENABLE_BOOST_COMPUTE` - Enables the [Boost.Compute](http://www.boost.org/doc/libs/1_66_0/libs/compute/doc/html/index.html) adapters, to smoothly integrate with Boost.Compute types. The Boost source tree must be in the include path

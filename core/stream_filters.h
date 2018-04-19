@@ -350,7 +350,7 @@ namespace cppdatalib
                     ++ignore_nesting;
                 else if (cache.active() || (flags & buffer_arrays && nesting_level <= nesting_depth()))
                 {
-                    if (size != unknown_size && size_t(size) == v.size())
+                    if (size != unknown_size && uintmax_t(size) == v.size())
                     {
                         ++ignore_nesting;
                         write_buffered_value_(v, is_key);
@@ -390,7 +390,7 @@ namespace cppdatalib
                     ++ignore_nesting;
                 else if (cache.active() || (flags & buffer_objects && nesting_level <= nesting_depth()))
                 {
-                    if (size != unknown_size && size_t(size) == v.size())
+                    if (size != unknown_size && uintmax_t(size) == v.size())
                     {
                         ++ignore_nesting;
                         write_buffered_value_(v, is_key);
@@ -430,7 +430,7 @@ namespace cppdatalib
                     ++ignore_nesting;
                 else if (cache.active() || (flags & buffer_strings && nesting_level <= nesting_depth()))
                 {
-                    if (size != unknown_size && size_t(size) == v.size())
+                    if (size != unknown_size && uintmax_t(size) == v.size())
                     {
                         ++ignore_nesting;
                         write_buffered_value_(v, is_key);
