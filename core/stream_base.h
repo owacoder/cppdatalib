@@ -602,7 +602,11 @@ namespace cppdatalib
             // Begins parse sequence. Must be called after `set_output()`, with inactive output
             void begin()
             {
-                if (output) output->begin();
+                if (output)
+                {
+                    output->begin();
+                    begin_();
+                }
                 reset();
             }
 
@@ -610,7 +614,7 @@ namespace cppdatalib
             void begin(core::stream_handler &output) {set_output(output); begin();}
 
             // Ends parse sequence. Must be called with active output
-            void end() {if (output) output->end();}
+            void end() {if (output) {end_(); output->end();}}
 
             // Performs one minimal parse step with specified output and then returns.
             stream_input &write_one()
@@ -636,7 +640,10 @@ namespace cppdatalib
                     const bool active = output_is_active();
 
                     if (!active)
+                    {
                         output->begin();
+                        begin_();
+                    }
 
                     reset();
 
@@ -645,10 +652,21 @@ namespace cppdatalib
                     write_one_();
                     mReset = false;
 
+#ifdef CPPDATALIB_EVENT_LOOP_CALLBACK
+                    while (busy())
+                    {
+                        CPPDATALIB_EVENT_LOOP_CALLBACK;
+                        write_one_();
+                    }
+#else
                     while (busy()) write_one_();
+#endif
 
                     if (!active)
+                    {
+                        end_();
                         output->end();
+                    }
                 }
                 else
                     throw core::error("cppdatalib::core::stream_input - attempted to parse without output specified or while busy");
@@ -693,6 +711,16 @@ namespace cppdatalib
             //
             // Note that get_output() always returns non-NULL when this function is executing!
             virtual void write_one_() = 0;
+
+            // Called when beginning a new parse sequence (this is not necessarily called every time a value is read)
+            // Parse sequences may include multiple values, or call begin() and end() every time a value is parsed.
+            // Note that get_output() always returns non-NULL when this function is executing!
+            virtual void begin_() {}
+
+            // Called when ending a new parse sequence (this is not necessarily called every time a value is read)
+            // Parse sequences may include multiple values, or call begin() and end() every time a value is parsed.
+            // Note that get_output() always returns non-NULL when this function is executing!
+            virtual void end_() {}
 
             // Resets the input class to start parsing a new stream (NOTE: if input reads from a stream, reset_() should NOT attempt to seek to the beginning of the stream!)
             // Note that get_output() may return NULL when this function is executing!

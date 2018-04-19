@@ -313,6 +313,8 @@ Below is a list of compile-time adjustments supported by cppdatalib:
    - `CPPDATALIB_SUBTYPE_T` - The underlying subtype type of the implementation. Must be able to store all subtypes specified in the `core` namespace. Defaults to `int16_t`
    - `CPPDATALIB_BUFFER_SIZE` - The size of underlying buffers in the implementation. Defaults to 4096
    - `CPPDATALIB_CACHE_SIZE` - The cache depth of traversal in the implementation. Defaults to 3
+   - `CPPDATALIB_DEFAULT_NETWORK_LIBRARY` - The default network interface to use. Defaults to the first interface defined. To redefine this value, check what value is introduced by the defining of the `CPPDATALIB_ENABLE_<XXX>_NETWORK` flag (e.g. `qt_network_library` for QtNetwork).
+   - `CPPDATALIB_EVENT_LOOP_CALLBACK` - Defines a section of code to run while a parser is busy parsing. If defined, this should be either empty or a valid function call (including parentheses and arguments, if any). For example, for the Qt framework: `#define CPPDATALIB_EVENT_LOOP_CALLBACK qApp->processEvents();`
 
 Enable/Disable flags are listed below:
 
@@ -335,6 +337,7 @@ Enable/Disable flags are listed below:
    - `CPPDATALIB_ENABLE_POCO` - Enables the [POCO](https://pocoproject.org/) adapters, to smoothly integrate with POCO types. The "Poco" source tree must be in the include path
    - `CPPDATALIB_ENABLE_ETL` - Enables the [ETL](https://www.etlcpp.com/home.html) adapters, to smoothly integrate with ETL types. The "etl" source tree must be in the include path
    - `CPPDATALIB_ENABLE_STL` - Enables the STL adapters, to smoothly integrate with all STL types
+   - `CPPDATALIB_ENABLE_QT_NETWORK` - Enables the [Qt](https://www.qt.io/) network adapter, for use with the `cppdatalib::http::parser` class. This defines the value `qt_network_library` to be used with `CPPDATALIB_DEFAULT_NETWORK_LIBRARY`.
 
 Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.
 

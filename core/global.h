@@ -53,6 +53,20 @@ namespace cppdatalib
             cache_size = 3
 #endif
         };
+
+        enum network_library
+        {
+            unknown_network_library = -1
+#ifdef CPPDATALIB_ENABLE_QT_NETWORK
+            , qt_network_library
+#endif
+            , network_library_count
+#ifdef CPPDATALIB_DEFAULT_NETWORK_LIBRARY
+            , default_network_library = CPPDATALIB_DEFAULT_NETWORK_LIBRARY
+#else
+            , default_network_library = 0
+#endif
+        };
     }
 }
 

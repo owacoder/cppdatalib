@@ -10,8 +10,10 @@
 //#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+#define CPPDATALIB_ENABLE_QT_NETWORK
 #define CPPDATALIB_THROW_IF_WRONG_TYPE
 #undef CPPDATALIB_ENABLE_MYSQL
+
 #include "cppdatalib.h"
 
 struct vt100
@@ -728,6 +730,9 @@ void test_attributes()
         using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
 
+        cppdatalib::http::parser("http://owacoder.com", cppdatalib::core::qt_network_library) >> cppdatalib::json::stream_writer(std::cout);
+        std::cout << "\n";
+
         cppdatalib::filesystem::stream_writer("/shared/Test_Data2")
          << cppdatalib::filesystem::parser("/shared/Test_Data",
                                            true,
@@ -817,13 +822,15 @@ void test_mmap()
 #endif
 #endif
 
-int main()
+#include <qtapp.h>
+
+int main(int argc, char **argv)
 {
     //return readme_simple_test4();
 
     //test_mmap();
 
-    test_attributes();
+    return qtapp_main(argc, argv, test_attributes);
 
     //return 0;
 
