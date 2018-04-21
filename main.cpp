@@ -730,7 +730,7 @@ void test_attributes()
         using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
 
-        cppdatalib::http::parser("http://owacoder.com", cppdatalib::core::qt_network_library) >> cppdatalib::json::stream_writer(std::cout);
+        cppdatalib::http::parser("http://owacoder.com", cppdatalib::core::poco_network_library) >> cppdatalib::json::stream_writer(std::cout);
         std::cout << "\n";
 
         cppdatalib::filesystem::stream_writer("/shared/Test_Data2")

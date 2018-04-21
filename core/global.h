@@ -60,6 +60,9 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_QT_NETWORK
             , qt_network_library
 #endif
+#ifdef CPPDATALIB_ENABLE_POCO_NETWORK
+            , poco_network_library
+#endif
             , network_library_count
 #ifdef CPPDATALIB_DEFAULT_NETWORK_LIBRARY
             , default_network_library = CPPDATALIB_DEFAULT_NETWORK_LIBRARY

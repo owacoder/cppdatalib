@@ -37,6 +37,14 @@
 #include <QtNetwork/QtNetwork>
 #endif
 
+#ifdef CPPDATALIB_ENABLE_POCO_NETWORK
+#include <Poco/Net/HTTPClientSession.h>
+#include <Poco/Net/HTTPSClientSession.h>
+#include <Poco/Net/HTTPRequest.h>
+#include <Poco/Net/HTTPResponse.h>
+#include <Poco/URI.h>
+#endif
+
 namespace cppdatalib
 {
     namespace http
@@ -44,8 +52,10 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_QT_NETWORK
         class qt_parser : public core::stream_input
         {
-            core::value url, headers;
+            core::value url;
+            core::object_t headers;
             std::string verb;
+            int maximum_redirects;
             QNetworkAccessManager *manager;
             bool owns_manager;
 
@@ -53,13 +63,15 @@ namespace cppdatalib
             QNetworkReply *reply;
 
         public:
-            qt_parser(const core::value &url /* URL may include headers if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
+            qt_parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
                       const std::string &verb = "GET",
                       const core::object_t &headers = core::object_t(),
+                      int max_redirects = 20,
                       QNetworkAccessManager *manager = nullptr)
                 : url(url)
                 , headers(headers)
                 , verb(verb)
+                , maximum_redirects(max_redirects)
                 , manager(manager? manager: new QNetworkAccessManager())
                 , owns_manager(manager == nullptr)
                 , reply(nullptr)
@@ -83,11 +95,11 @@ namespace cppdatalib
                     request.setRawHeader(QByteArray::fromStdString(header.first.as_string()),
                                          QByteArray::fromStdString(header.second.as_string()));
 #endif
-                for (const auto &header: headers.get_object_unchecked())
+                for (const auto &header: headers)
                     request.setRawHeader(QByteArray::fromStdString(header.first.as_string()),
                                          QByteArray::fromStdString(header.second.as_string()));
-                request.setMaximumRedirectsAllowed(20);
-                request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
+                request.setMaximumRedirectsAllowed(maximum_redirects);
+                request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, (maximum_redirects != 0));
 
                 if (reply)
                     reply->deleteLater();
@@ -125,27 +137,175 @@ namespace cppdatalib
         };
 #endif
 
+#ifdef CPPDATALIB_ENABLE_POCO_NETWORK
+        class poco_parser : public core::stream_input
+        {
+            std::unique_ptr<char []> buffer;
+
+            core::value url;
+            core::object_t headers;
+            std::string verb;
+            int maximum_redirects;
+            Poco::Net::HTTPClientSession *http;
+            Poco::Net::HTTPSClientSession *https;
+            bool owns_http_session, owns_https_session, is_https;
+
+            Poco::Net::HTTPRequest request;
+            Poco::Net::HTTPResponse response;
+
+        public:
+            poco_parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
+                        const std::string &verb = "GET",
+                        const core::object_t &headers = core::object_t(),
+                        int max_redirects = 20,
+                        Poco::Net::HTTPClientSession *session = nullptr,
+                        Poco::Net::HTTPSClientSession *s_session = nullptr)
+                : buffer(new char [core::buffer_size])
+                , url(url)
+                , headers(headers)
+                , verb(verb)
+                , maximum_redirects(max_redirects)
+                , http(session)
+                , https(s_session)
+                , owns_http_session(false)
+                , owns_https_session(false)
+                , is_https(false)
+            {
+                reset();
+            }
+            ~poco_parser()
+            {
+                if (owns_http_session)
+                    delete http;
+                if (owns_https_session)
+                    delete https;
+            }
+
+        protected:
+            void reset_()
+            {
+                try
+                {
+                    Poco::URI uri(url.as_string());
+                    request.setMethod(verb);
+                    request.setURI(url.as_string());
+                    request.setVersion("HTTP/1.1");
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    for (const auto &header: url.get_attributes())
+                        request.add(header.first.as_string(),
+                                    header.second.as_string());
+#endif
+                    for (const auto &header: headers)
+                        request.add(header.first.as_string(),
+                                    header.second.as_string());
+
+                    if (uri.getScheme() == "https")
+                    {
+                        is_https = true;
+                        if (https == nullptr)
+                        {
+                            https = new Poco::Net::HTTPSClientSession(uri.getHost(), uri.getPort()? uri.getPort(): unsigned(Poco::Net::HTTPSClientSession::HTTPS_PORT));
+                            owns_https_session = true;
+                        }
+
+                        if (uri.getHost() != https->getHost() ||
+                            (uri.getPort() != https->getPort() && uri.getPort() != 0))
+                        {
+                            https->reset();
+                            https->setHost(uri.getHost());
+                            https->setPort(uri.getPort());
+                            https->setKeepAlive(true);
+                        }
+                    }
+                    else
+                    {
+                        if (http == nullptr)
+                        {
+                            http = new Poco::Net::HTTPClientSession(uri.getHost(), uri.getPort()? uri.getPort(): unsigned(Poco::Net::HTTPClientSession::HTTP_PORT));
+                            owns_http_session = true;
+                        }
+
+                        if (uri.getHost() != http->getHost() ||
+                            (uri.getPort() != http->getPort() && uri.getPort() != 0))
+                        {
+                            http->reset();
+                            http->setHost(uri.getHost());
+                            http->setPort(uri.getPort());
+                            http->setKeepAlive(true);
+                        }
+                    }
+                } catch (const Poco::SyntaxException &e) {
+                    throw core::custom_error("HTTP - " + std::string(e.what()));
+                }
+            }
+
+            void write_one_()
+            {
+                if (was_just_reset())
+                {
+                    std::istream *in;
+
+                    if (is_https)
+                    {
+                        https->sendRequest(request);
+
+                        in = &https->receiveResponse(response);
+                    }
+                    else
+                    {
+                        http->sendRequest(request);
+
+                        in = &http->receiveResponse(response);
+                    }
+
+                    get_output()->begin_string(core::value(core::string_t(), core::blob), core::stream_handler::unknown_size);
+                    while (true)
+                    {
+                        in->read(buffer.get(), core::buffer_size);
+
+                        if (*in)
+                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), core::buffer_size)));
+                        else if (in->eof())
+                        {
+                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), in->gcount())));
+                            get_output()->end_string(core::value(core::string_t(), core::blob));
+                            break;
+                        }
+                        else
+                            throw core::custom_error("HTTP - an error occured while retrieving \"" + url.as_string() + "\"");
+                    }
+                }
+            }
+        };
+#endif
+
         class parser : public core::stream_input
         {
             core::value url;
             core::object_t headers;
             std::string verb;
+            int maximum_redirects;
             core::network_library interface;
             core::stream_input *interface_stream;
-            void *context;
+            void *context, *s_context;
 
         public:
-            parser(const core::value &url /* URL may include headers if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
+            parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
                    core::network_library interface = core::default_network_library,
                    const std::string &verb = "GET",
                    const core::object_t &headers = core::object_t(),
-                   void *context = nullptr /* Context varies, based on individual interfaces (e.g. qt_parser takes a pointer to a QNetworkAccessManager) */)
+                   int max_redirects = 20,
+                   void *context = nullptr /* Context varies, based on individual interfaces (e.g. qt_parser takes a pointer to a QNetworkAccessManager) */,
+                   void *s_context = nullptr /* Secondary context varies, based on individual interfaces (e.g. poco_parser takes a pointer to Poco::Net::HTTPClientSession as initial context, and a pointer to Poco::Net::HTTPSClientSession as secondary context) */)
                 : url(url)
                 , headers(headers)
                 , verb(verb)
+                , maximum_redirects(max_redirects)
                 , interface(core::unknown_network_library)
                 , interface_stream(nullptr)
                 , context(context)
+                , s_context(s_context)
             {
                 set_interface(interface);
                 reset();
@@ -176,7 +336,16 @@ namespace cppdatalib
                             break;
 #ifdef CPPDATALIB_ENABLE_QT_NETWORK
                         case core::qt_network_library:
-                            interface_stream = new qt_parser(url, verb, headers, static_cast<QNetworkAccessManager *>(context));
+                            interface_stream = new qt_parser(url, verb, headers, maximum_redirects, static_cast<QNetworkAccessManager *>(context));
+                            if (get_output())
+                                interface_stream->set_output(*get_output());
+                            break;
+#endif
+#ifdef CPPDATALIB_ENABLE_POCO_NETWORK
+                        case core::poco_network_library:
+                            interface_stream = new poco_parser(url, verb, headers, maximum_redirects,
+                                                               static_cast<Poco::Net::HTTPClientSession *>(context),
+                                                               static_cast<Poco::Net::HTTPSClientSession *>(s_context));
                             if (get_output())
                                 interface_stream->set_output(*get_output());
                             break;
@@ -187,6 +356,9 @@ namespace cppdatalib
                 }
             }
             core::network_library get_interface() const {return interface;}
+
+            int max_redirects() const {return maximum_redirects;}
+            void set_max_redirects(int max) {maximum_redirects = max;}
 
         protected:
             void test_interface()
