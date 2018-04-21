@@ -1,7 +1,7 @@
 /*
  * dump.h
  *
- * Copyright © 2017 Oliver Adams
+ * Copyright © 2018 Oliver Adams
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the “Software”), to
@@ -213,8 +213,8 @@ namespace cppdatalib
                 std::string name() const {return "cppdatalib::dump::stream_writer";}
 
             protected:
-                void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG); stream() << "=== CORE DUMP ===\n";}
-                void end_() {stream() << "\n=== END CORE DUMP ===\n";}
+                void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG); stream() << "=== CPPDATALIB DUMP ===\n";}
+                void end_() {stream() << "\n=== END CPPDATALIB DUMP ===\n";}
 
                 void begin_item_(const core::value &v)
                 {

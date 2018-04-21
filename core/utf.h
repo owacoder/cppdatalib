@@ -32,6 +32,44 @@ namespace cppdatalib
 {
     namespace core
     {
+        // Converts ASCII characters in string to lowercase
+        void ascii_lowercase(std::string &str)
+        {
+            for (size_t i = 0; i < str.size(); ++i)
+            {
+                unsigned char c = str[i];
+                if (c < 0x80)
+                    str[i] = tolower(c);
+            }
+        }
+
+        // Returns string with ASCII characters converted to lowercase
+        std::string ascii_lowercase_copy(const std::string &str)
+        {
+            std::string copy(str);
+            ascii_lowercase(copy);
+            return copy;
+        }
+
+        // Converts ASCII characters in string to uppercase
+        void ascii_uppercase(std::string &str)
+        {
+            for (size_t i = 0; i < str.size(); ++i)
+            {
+                unsigned char c = str[i];
+                if (c < 0x80)
+                    str[i] = toupper(c);
+            }
+        }
+
+        // Returns string with ASCII characters converted to uppercase
+        std::string ascii_uppercase_copy(const std::string &str)
+        {
+            std::string copy(str);
+            ascii_uppercase(copy);
+            return copy;
+        }
+
         // Returns empty string if invalid codepoint is encountered
         // Returns UTF-8 string on valid input
         std::string ucs_to_utf8(const uint32_t *s, size_t size)

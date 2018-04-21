@@ -142,10 +142,11 @@ namespace cppdatalib
         {
             std::unique_ptr<char []> buffer;
 
-            core::value url;
+            core::value url, working_url;
             core::object_t headers;
             std::string verb;
             int maximum_redirects;
+            int redirects;
             Poco::Net::HTTPClientSession *http;
             Poco::Net::HTTPSClientSession *https;
             bool owns_http_session, owns_https_session, is_https;
@@ -165,6 +166,7 @@ namespace cppdatalib
                 , headers(headers)
                 , verb(verb)
                 , maximum_redirects(max_redirects)
+                , redirects(0)
                 , http(session)
                 , https(s_session)
                 , owns_http_session(false)
@@ -181,18 +183,24 @@ namespace cppdatalib
                     delete https;
             }
 
+            bool busy() const {return stream_input::busy() || redirects;}
+
         protected:
-            void reset_()
+            void init_to_url(const std::string &new_url)
             {
                 try
                 {
-                    Poco::URI uri(url.as_string());
+                    working_url.set_string(new_url);
+
+                    Poco::URI uri(working_url.as_string());
+                    std::string path_part(uri.getPathAndQuery());
+
                     request.setMethod(verb);
-                    request.setURI(url.as_string());
-                    request.setVersion("HTTP/1.1");
+                    request.setURI(path_part.empty()? "/": path_part);
+                    request.setVersion(Poco::Net::HTTPMessage::HTTP_1_1);
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-                    for (const auto &header: url.get_attributes())
+                    for (const auto &header: working_url.get_attributes())
                         request.add(header.first.as_string(),
                                     header.second.as_string());
 #endif
@@ -218,8 +226,9 @@ namespace cppdatalib
                             https->setKeepAlive(true);
                         }
                     }
-                    else
+                    else if (uri.getScheme() == "http")
                     {
+                        is_https = false;
                         if (http == nullptr)
                         {
                             http = new Poco::Net::HTTPClientSession(uri.getHost(), uri.getPort()? uri.getPort(): unsigned(Poco::Net::HTTPClientSession::HTTP_PORT));
@@ -235,46 +244,76 @@ namespace cppdatalib
                             http->setKeepAlive(true);
                         }
                     }
+                    else
+                        throw core::custom_error("HTTP - invalid scheme \"" + uri.getScheme() + "\" requested in URL");
                 } catch (const Poco::SyntaxException &e) {
                     throw core::custom_error("HTTP - " + std::string(e.what()));
                 }
             }
 
+            void reset_()
+            {
+                working_url = url;
+                redirects = 0;
+
+                init_to_url(url.as_string());
+            }
+
             void write_one_()
             {
-                if (was_just_reset())
+                core::value string_type(core::string_t(), core::blob);
+                std::istream *in;
+
+                if (is_https)
                 {
-                    std::istream *in;
+                    https->sendRequest(request);
 
-                    if (is_https)
+                    in = &https->receiveResponse(response);
+                }
+                else
+                {
+                    http->sendRequest(request);
+
+                    in = &http->receiveResponse(response);
+                }
+
+                if (response.getStatus() / 100 >= 4)
+                    throw core::custom_error("HTTP - error \"" + response.getReason() + "\" while retrieving \"" + working_url.as_string() + "\"");
+                else if (response.getStatus() / 100 == 3)
+                {
+                    if (++redirects > maximum_redirects)
+                        throw core::custom_error("HTTP - request to \"" + url.as_string() + "\" failed with too many redirects");
+
+                    if (!response.has("location"))
+                        throw core::custom_error("HTTP - redirection from \"" + working_url.as_string() + "\" has no destination location");
+
+                    init_to_url(response.get("location"));
+                    return;
+                }
+                else
+                {
+                    redirects = 0;
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    for (const auto &header: response)
+                        string_type.add_attribute_at_end(header.first, header.second);
+#endif
+                }
+
+                get_output()->begin_string(string_type, core::stream_handler::unknown_size);
+                while (true)
+                {
+                    in->read(buffer.get(), core::buffer_size);
+
+                    if (*in)
+                        get_output()->append_to_string(core::value(core::string_t(buffer.get(), core::buffer_size)));
+                    else if (in->eof())
                     {
-                        https->sendRequest(request);
-
-                        in = &https->receiveResponse(response);
+                        get_output()->append_to_string(core::value(core::string_t(buffer.get(), in->gcount())));
+                        get_output()->end_string(string_type);
+                        break;
                     }
                     else
-                    {
-                        http->sendRequest(request);
-
-                        in = &http->receiveResponse(response);
-                    }
-
-                    get_output()->begin_string(core::value(core::string_t(), core::blob), core::stream_handler::unknown_size);
-                    while (true)
-                    {
-                        in->read(buffer.get(), core::buffer_size);
-
-                        if (*in)
-                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), core::buffer_size)));
-                        else if (in->eof())
-                        {
-                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), in->gcount())));
-                            get_output()->end_string(core::value(core::string_t(), core::blob));
-                            break;
-                        }
-                        else
-                            throw core::custom_error("HTTP - an error occured while retrieving \"" + url.as_string() + "\"");
-                    }
+                        throw core::custom_error("HTTP - an error occured while retrieving \"" + working_url.as_string() + "\"");
                 }
             }
         };
@@ -359,6 +398,8 @@ namespace cppdatalib
 
             int max_redirects() const {return maximum_redirects;}
             void set_max_redirects(int max) {maximum_redirects = max;}
+
+            bool busy() const {return stream_input::busy() || (interface_stream && interface_stream->busy());}
 
         protected:
             void test_interface()
