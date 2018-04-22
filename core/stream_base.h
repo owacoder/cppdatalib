@@ -1894,7 +1894,7 @@ namespace cppdatalib
                                 }
                             }
 
-                            value_with_attributes = value;
+                            value_with_attributes = core::value(value);
 
                             while (true)
                             {
@@ -1932,7 +1932,7 @@ namespace cppdatalib
                                     return false;
                                 }
 
-                                value_with_attributes.add_attribute(attribute_name, attribute_value);
+                                value_with_attributes.add_attribute(core::value(attribute_name), core::value(attribute_value));
                             }
 
                             if (read == start_tag_was_read)

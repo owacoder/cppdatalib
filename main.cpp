@@ -5,11 +5,11 @@
 #define CPPDATALIB_ENABLE_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
-//#define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+#define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 //#define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
-//#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
-//#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
-//#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+#define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
+#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
 #define CPPDATALIB_THROW_IF_WRONG_TYPE
 #undef CPPDATALIB_ENABLE_MYSQL
 
@@ -486,7 +486,7 @@ int readme_simple_test4()
 
         std::multimap<const char *, int> map = {{"x", 1}, {"y", 2}};
         std::map<std::string, int> str;
-        m2 = str;
+        /*m2 = str;
         str = m2.as<decltype(str)>();
         m2 = stack;
         stack = m2;
@@ -497,7 +497,7 @@ int readme_simple_test4()
         p2 = static_cast<decltype(p2)>(m2);
         p2.x += 1000;
         m2 = cppdatalib::core::value(p2);
-        w << m2;                // Write core::value out to STDOUT as JSON
+        w << m2;                // Write core::value out to STDOUT as JSON*/
     } catch (const core::error &e) {
         std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
     }
@@ -729,7 +729,7 @@ void test_attributes()
         using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
 
-        cppdatalib::http::parser("http://owacoder.com", cppdatalib::core::poco_network_library) >> std::cout;
+        cppdatalib::http::parser(cppdatalib::core::value("http://owacoder.com"), cppdatalib::core::qt_network_library, "GET", cppdatalib::core::object_t(), 0) >> std::cout;
         std::cout << "\n";
 
         cppdatalib::filesystem::stream_writer("/shared/Test_Data2")
@@ -789,6 +789,7 @@ void test_attributes()
 
         return;
 
+        /*
         auto attr = cppdatalib::core::object_t{{"attribute_1", true}, {"attribute_2", "My other attribute"}};
 
         cppdatalib::core::value value(2), v2("string");
@@ -799,7 +800,7 @@ void test_attributes()
 
         cppdatalib::core::value e1 = cppdatalib::core::array_t{"some text ", cppdatalib::core::object_t{{"secondary", v2}}, cppdatalib::core::object_t{{"first", value}}};
 
-        cppdatalib::xml::pretty_document_writer(std::cout, 2) << cppdatalib::core::object_t{{"root", e1}};
+        cppdatalib::xml::pretty_document_writer(std::cout, 2) << cppdatalib::core::object_t{{"root", e1}};*/
     } catch (const cppdatalib::core::error &e)
     {
         std::cerr << e.what() << std::endl;
@@ -856,7 +857,7 @@ int main(int argc, char **argv)
         std::cout << f.name() << std::endl;
         f << p;
         std::cout << cppdatalib::core::value(tuple);
-        std::unique_ptr<int, std::default_delete<int>> s = cppdatalib::core::value(tuple);
+        std::unique_ptr<int, std::default_delete<int>> s = cppdatalib::core::value(tuple).as<decltype(s)>();
         f << cppdatalib::core::generic_parser(tuple);
         std::cout << *s << std::endl;
         //tuple = cppdatalib::core::value(f777);

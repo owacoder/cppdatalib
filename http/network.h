@@ -86,6 +86,8 @@ namespace cppdatalib
                     delete manager;
             }
 
+            bool busy() const {return stream_input::busy() || reply;}
+
         protected:
             void reset_()
             {
@@ -99,7 +101,7 @@ namespace cppdatalib
                     request.setRawHeader(QByteArray::fromStdString(header.first.as_string()),
                                          QByteArray::fromStdString(header.second.as_string()));
                 request.setMaximumRedirectsAllowed(maximum_redirects);
-                request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, (maximum_redirects != 0));
+                request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, (maximum_redirects >= 0));
 
                 if (reply)
                     reply->deleteLater();
@@ -108,15 +110,16 @@ namespace cppdatalib
 
             void write_one_()
             {
+                core::value string_type(core::string_t(), core::blob);
+
 #ifndef CPPDATALIB_EVENT_LOOP_CALLBACK
                 qApp->processEvents();
+                QThread::usleep(100);
 #endif
 
                 if (was_just_reset())
                 {
                     reply = manager->sendCustomRequest(request, QByteArray::fromStdString(verb));
-
-                    get_output()->begin_string(core::value(core::string_t(), core::blob), core::stream_handler::unknown_size);
                     return;
                 }
 
@@ -127,12 +130,23 @@ namespace cppdatalib
                 {
                     if (reply->bytesAvailable() > 0)
                         get_output()->append_to_string(core::value(reply->readAll().toStdString()));
-                    get_output()->end_string(core::value(core::string_t(), core::blob));
+                    get_output()->end_string(string_type);
 
                     reply->deleteLater(); reply = nullptr;
                 }
                 else if (reply->bytesAvailable() > 0)
+                {
+                    if (get_output()->current_container() != core::string)
+                    {
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                        for (const auto &header: reply->rawHeaderPairs())
+                            string_type.add_attribute_at_end(core::value(header.first.toStdString()), core::value(header.second.toStdString()));
+#endif
+
+                        get_output()->begin_string(string_type, core::stream_handler::unknown_size);
+                    }
                     get_output()->append_to_string(core::value(reply->readAll().toStdString()));
+                }
             }
         };
 #endif
@@ -281,7 +295,7 @@ namespace cppdatalib
                     throw core::custom_error("HTTP - error \"" + response.getReason() + "\" while retrieving \"" + working_url.as_string() + "\"");
                 else if (response.getStatus() / 100 == 3)
                 {
-                    if (++redirects > maximum_redirects)
+                    if (++redirects > maximum_redirects && maximum_redirects >= 0)
                         throw core::custom_error("HTTP - request to \"" + url.as_string() + "\" failed with too many redirects");
 
                     if (!response.has("location"))
@@ -295,7 +309,7 @@ namespace cppdatalib
                     redirects = 0;
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                     for (const auto &header: response)
-                        string_type.add_attribute_at_end(header.first, header.second);
+                        string_type.add_attribute_at_end(core::value(header.first), core::value(header.second));
 #endif
                 }
 

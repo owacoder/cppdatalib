@@ -818,8 +818,14 @@ namespace cppdatalib
 
             size_t attributes_size() const;
 
+            value const_attribute(cstring_t key) const;
+            value const_attribute(const string_t &key) const;
             value const_attribute(const value &key) const;
+            value attribute(cstring_t key) const;
+            value attribute(const string_t &key) const;
             value attribute(const value &key) const;
+            value &attribute(cstring_t key);
+            value &attribute(const string_t &key);
             value &attribute(const value &key);
             const value *attribute_ptr(const value &key) const;
             bool_t is_attribute(cstring_t key) const;
@@ -2386,6 +2392,8 @@ namespace cppdatalib
         }
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+        inline value value::const_attribute(cstring_t key) const {return const_attribute(core::value(key));}
+        inline value value::const_attribute(const string_t &key) const {return const_attribute(core::value(key));}
         inline value value::const_attribute(const value &key) const
         {
             auto it = attr_ref_().data().find(key);
@@ -2393,7 +2401,11 @@ namespace cppdatalib
                 return it->second;
             return value();
         }
+        inline value value::attribute(cstring_t key) const {return const_attribute(value(key));}
+        inline value value::attribute(const string_t &key) const {return const_attribute(value(key));}
         inline value value::attribute(const value &key) const {return const_attribute(key);}
+        inline value &value::attribute(cstring_t key) {return attribute(value(key));}
+        inline value &value::attribute(const string_t &key) {return attribute(value(key));}
         inline value &value::attribute(const value &key)
         {
             auto it = attr_ref_().data().lower_bound(key);

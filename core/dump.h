@@ -132,7 +132,7 @@ namespace cppdatalib
                         {
                             impl::attribute_stream_writer writer(stream());
                             stream() << "[attributes=";
-                            writer << v.get_attributes();
+                            writer << core::value(v.get_attributes());
                             stream() << "].";
                         }
 #endif
@@ -150,7 +150,7 @@ namespace cppdatalib
                         {
                             impl::attribute_stream_writer writer(stream());
                             stream() << "[attributes=";
-                            writer << v.get_attributes();
+                            writer << core::value(v.get_attributes());
                             stream() << "].";
                         }
 #endif
@@ -234,7 +234,7 @@ namespace cppdatalib
                     {
                         impl::attribute_stream_writer writer(stream());
                         stream() << "[attributes=";
-                        writer << v.get_attributes();
+                        writer << core::value(v.get_attributes());
                         stream() << "].";
                     }
 #endif
@@ -254,7 +254,7 @@ namespace cppdatalib
                     {
                         impl::attribute_stream_writer writer(stream());
                         stream() << "[attributes=";
-                        writer << v.get_attributes();
+                        writer << core::value(v.get_attributes());
                         stream() << "].";
                     }
 #endif
