@@ -740,6 +740,7 @@ void test_attributes()
                                                             {"password", ""}}) >> std::cout;
         std::cout << "\n";
 
+#ifdef CPPDATALIB_ENABLE_FILESYSTEM
         cppdatalib::filesystem::stream_writer("/shared/Test_Data2")
          << cppdatalib::filesystem::parser("/shared/Test_Data",
                                            true,
@@ -751,6 +752,7 @@ void test_attributes()
         cppdatalib::filesystem::stream_writer("/shared/Test_Data/filesystem/", false, false)
                 << "{\"directory\": {\"file 1\": 012354, \"file 2\": true, \"dir\": [\"0 contents\", \"1 contents\"]},"
                    "\"file\": \"Hello Worlds!\"}"_json;
+#endif
 
         cppdatalib::core::value bson;
 

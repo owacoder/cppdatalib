@@ -32,7 +32,7 @@
 #include <iostream>
 #include <fstream>
 
-#elif __cplusplus >= 201402L
+#else
 
 #include "../core/core.h"
 #include <experimental/filesystem>

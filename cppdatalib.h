@@ -42,7 +42,6 @@
 #include "netstrings/netstrings.h"
 #include "property_list/plain_text.h"
 #include "property_list/xml.h"
-#include "raw/filesystem.h"
 #include "raw/uint8.h"
 #include "rpc/xml.h"
 #include "ubjson/ubjson.h"
@@ -75,6 +74,10 @@
 
 #ifdef CPPDATALIB_ENABLE_STL
 #include "adapters/stl.h"
+#endif
+
+#ifdef CPPDATALIB_ENABLE_FILESYSTEM
+#include "raw/filesystem.h"
 #endif
 
 #endif // CPPDATALIB_H
