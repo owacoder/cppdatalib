@@ -144,8 +144,8 @@ namespace cppdatalib
                     case symbol:
                     {
                         int32_t size;
-                        core::value string_type{core::string_t(), element_type == javascript? core::javascript:
-                                                                  element_type == symbol? core::symbol: core::normal};
+                        core::value string_type(core::string_t(), element_type == javascript? core::javascript:
+                                                                  element_type == symbol? core::symbol: core::normal);
 
                         read_name();
 
