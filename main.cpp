@@ -9,7 +9,7 @@
 //#define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 #define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
 #define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
-#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+//#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
 #define CPPDATALIB_THROW_IF_WRONG_TYPE
 #undef CPPDATALIB_ENABLE_MYSQL
 
@@ -729,7 +729,15 @@ void test_attributes()
         using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
 
-        cppdatalib::http::parser(cppdatalib::core::value("http://owacoder.com"), cppdatalib::core::qt_network_library, "GET", cppdatalib::core::object_t(), 0) >> std::cout;
+        cppdatalib::http::parser(cppdatalib::core::value("http://owacoder.com"),
+                                 cppdatalib::core::poco_network_library,
+                                 "GET",
+                                 cppdatalib::core::object_t(),
+                                 1,
+                                 cppdatalib::core::object_t{{"host", "localhost"},
+                                                            {"port", 3128u},
+                                                            {"username", ""},
+                                                            {"password", ""}}) >> std::cout;
         std::cout << "\n";
 
         cppdatalib::filesystem::stream_writer("/shared/Test_Data2")

@@ -787,8 +787,14 @@ namespace cppdatalib
             value &operator[](cstring_t key);
             value operator[](const string_t &key) const;
             value &operator[](const string_t &key);
+            value const_member(cstring_t key) const;
+            value const_member(const string_t &key) const;
             value const_member(const value &key) const;
+            value member(cstring_t key) const;
+            value member(const string_t &key) const;
             value member(const value &key) const;
+            value &member(cstring_t key);
+            value &member(const string_t &key);
             value &member(const value &key);
             const value *member_ptr(const value &key) const;
             bool_t is_member(cstring_t key) const;
@@ -2309,6 +2315,8 @@ namespace cppdatalib
         inline value &value::operator[](cstring_t key) {return member(value(key));}
         inline value value::operator[](const string_t &key) const {return member(value(key));}
         inline value &value::operator[](const string_t &key) {return member(value(key));}
+        inline value value::const_member(cstring_t key) const {return const_member(value(key));}
+        inline value value::const_member(const string_t &key) const {return const_member(value(key));}
         inline value value::const_member(const value &key) const
         {
             if (is_nonempty_object())
@@ -2319,7 +2327,11 @@ namespace cppdatalib
             }
             return value();
         }
+        inline value value::member(cstring_t key) const {return const_member(key);}
+        inline value value::member(const string_t &key) const {return const_member(key);}
         inline value value::member(const value &key) const {return const_member(key);}
+        inline value &value::member(cstring_t key) {return member(value(key));}
+        inline value &value::member(const string_t &key) {return member(value(key));}
         inline value &value::member(const value &key)
         {
             clear(object);

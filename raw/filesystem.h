@@ -128,7 +128,7 @@ namespace cppdatalib
                 else
                 {
                     get_output()->begin_string(core::value(core::string_t(), core::blob), filesize);
-                    stream.open(filepath = entry.path());
+                    stream.open(filepath = entry.path(), std::ios_base::in | std::ios_base::binary);
                     if (!stream)
                         throw core::custom_error("filesystem - could not open \"" + entry.path().native() + "\" for input");
                 }
@@ -147,7 +147,7 @@ namespace cppdatalib
                             if ((file_options & skip_file_reading) == 0)
                             {
                                 get_output()->begin_string(core::value(core::string_t(), core::blob), fs::file_size(root_path));
-                                stream.open(root_path);
+                                stream.open(root_path, std::ios_base::in | std::ios_base::binary);
                             }
                             else
                                 get_output()->write(core::value(core::string_t(), core::blob));
@@ -366,7 +366,7 @@ namespace cppdatalib
                     if (safe_write && fs::exists(p))
                         throw core::custom_error("filesystem - file \"" + p.native() + "\" already exists");
 
-                    stream.open(p);
+                    stream.open(p, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
                     if (!stream)
                         throw core::custom_error("filesystem - error when opening \"" + p.native() + "\" for writing");
                 }
