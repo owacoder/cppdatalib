@@ -45,6 +45,10 @@
 #include <Poco/URI.h>
 #endif
 
+#ifdef CPPDATALIB_ENABLE_CURL_NETWORK
+#include <curl/curl.h>
+#endif
+
 namespace cppdatalib
 {
     namespace http
@@ -361,6 +365,238 @@ namespace cppdatalib
             }
         };
 #endif
+
+#ifdef CPPDATALIB_ENABLE_CURL_NETWORK
+        class curl_parser : public core::stream_input
+        {
+            std::unique_ptr<char []> buffer;
+
+            core::value url, working_url;
+            core::object_t headers;
+            std::string verb;
+            int maximum_redirects;
+            int redirects;
+            core::value proxy_settings;
+            CURL *easy;
+            CURLM *curl;
+            bool owns_easy, owns_curl;
+
+        public:
+            curl_parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
+                        const std::string &verb = "GET",
+                        const core::object_t &headers = core::object_t(),
+                        int max_redirects = 20,
+                        const core::object_t &proxy_settings = core::object_t(),
+                        CURL *connection = nullptr,
+                        CURLM *session = nullptr)
+                : buffer(new char [core::buffer_size])
+                , url(url)
+                , headers(headers)
+                , verb(verb)
+                , maximum_redirects(max_redirects)
+                , redirects(0)
+                , proxy_settings(proxy_settings)
+                , easy(connection)
+                , curl(session)
+                , owns_easy(false)
+                , owns_curl(false)
+            {
+                reset();
+            }
+            ~curl_parser()
+            {
+                if (owns_easy)
+                    curl_easy_cleanup(easy);
+                if (owns_curl)
+                    curl_multi_cleanup(curl);
+            }
+
+            bool busy() const {return stream_input::busy() || redirects;}
+
+        protected:
+            void init_to_url(const std::string &new_url)
+            {
+                try
+                {
+                    if (!curl)
+                    {
+                        curl = curl_multi_init();
+                        if (!curl)
+                            throw std::bad_alloc();
+                        owns_curl = true;
+                    }
+
+                    if (!easy)
+                    {
+                        easy = curl_easy_init();
+                        if (!easy)
+                            throw std::bad_alloc();
+                        owns_easy = true;
+                    }
+
+                    curl_easy_reset(easy);
+                    curl_easy_setopt(easy, CURLOPT_URL, working_url.as_string().c_str());
+                    if (proxy_settings.object_size())
+                    {
+                        curl_easy_setopt(easy, CURLOPT_PROXYTYPE, working_url.as_string().substr(0, 5) == "https"? CURLPROXY_HTTPS: CURLPROXY_HTTP);
+                        curl_easy_setopt(easy, CURLOPT_PROXY, proxy_settings.const_member("host").get_cstring());
+                        curl_easy_setopt(easy, CURLOPT_PROXYPORT, proxy_settings.const_member("port").as_uint(80));
+                        curl_easy_setopt(easy, CURLOPT_PROXYUSERNAME, proxy_settings.const_member("username").get_cstring());
+                        curl_easy_setopt(easy, CURLOPT_PROXYPASSWORD, proxy_settings.const_member("password").get_cstring());
+                    }
+
+                    working_url.set_string(new_url);
+
+#if 0
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    for (const auto &header: working_url.get_attributes())
+                        request.add(header.first.as_string(),
+                                    header.second.as_string());
+#endif
+                    for (const auto &header: headers)
+                        request.add(header.first.as_string(),
+                                    header.second.as_string());
+
+
+
+                    if (uri.getScheme() == "https")
+                    {
+                        is_https = true;
+                        if (https == nullptr)
+                        {
+                            https = new Poco::Net::HTTPSClientSession(uri.getHost(), uri.getPort()? uri.getPort(): unsigned(Poco::Net::HTTPSClientSession::HTTPS_PORT));
+                            owns_https_session = true;
+                        }
+
+                        if (uri.getHost() != https->getHost() ||
+                            (uri.getPort() != https->getPort() && uri.getPort() != 0))
+                        {
+                            https->reset();
+                            https->setHost(uri.getHost());
+                            https->setPort(uri.getPort());
+                            https->setKeepAlive(true);
+                        }
+
+                        https->setProxy(proxy_settings.const_member("host").get_string(),
+                                        proxy_settings.const_member("port").as_uint(Poco::Net::HTTPSession::HTTP_PORT));
+                        https->setProxyCredentials(proxy_settings.const_member("username").get_string(),
+                                                   proxy_settings.const_member("password").get_string());
+                    }
+                    else if (uri.getScheme() == "http")
+                    {
+                        is_https = false;
+                        if (http == nullptr)
+                        {
+                            http = new Poco::Net::HTTPClientSession(uri.getHost(), uri.getPort()? uri.getPort(): unsigned(Poco::Net::HTTPClientSession::HTTP_PORT));
+                            owns_http_session = true;
+                        }
+
+                        if (uri.getHost() != http->getHost() ||
+                            (uri.getPort() != http->getPort() && uri.getPort() != 0))
+                        {
+                            http->reset();
+                            http->setHost(uri.getHost());
+                            http->setPort(uri.getPort());
+                            http->setKeepAlive(true);
+                        }
+
+                        http->setProxy(proxy_settings.const_member("host").get_string(),
+                                       proxy_settings.const_member("port").as_uint(Poco::Net::HTTPSession::HTTP_PORT));
+                        http->setProxyCredentials(proxy_settings.const_member("username").get_string(),
+                                                  proxy_settings.const_member("password").get_string());
+                    }
+                    else
+                        throw core::custom_error("HTTP - invalid scheme \"" + uri.getScheme() + "\" requested in URL");
+#endif
+                } catch (const Poco::Exception &e) {
+                    throw core::custom_error("HTTP - " + std::string(e.what()));
+                }
+            }
+
+            void reset_()
+            {
+                working_url = url;
+                redirects = 0;
+
+                init_to_url(url.as_string());
+            }
+
+            void write_one_()
+            {
+#if 0
+                try
+                {
+                    core::value string_type(core::string_t(), core::blob);
+                    std::istream *in;
+
+                    if (is_https)
+                    {
+                        https->sendRequest(request);
+
+                        in = &https->receiveResponse(response);
+                    }
+                    else
+                    {
+                        http->sendRequest(request);
+
+                        in = &http->receiveResponse(response);
+                    }
+
+                    if (response.getStatus() / 100 >= 4)
+                        throw core::custom_error("HTTP - error \"" + response.getReason() + "\" while retrieving \"" + working_url.as_string() + "\"");
+                    else if (response.getStatus() / 100 == 3)
+                    {
+                        if (++redirects > maximum_redirects && maximum_redirects >= 0)
+                            throw core::custom_error("HTTP - request to \"" + url.as_string() + "\" failed with too many redirects");
+
+                        if (!response.has("location"))
+                            throw core::custom_error("HTTP - redirection from \"" + working_url.as_string() + "\" has no destination location");
+
+                        init_to_url(response.get("location"));
+                        return;
+                    }
+                    else
+                    {
+                        redirects = 0;
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                        for (const auto &header: response)
+                            string_type.add_attribute_at_end(core::value(header.first), core::value(header.second));
+#endif
+                    }
+
+                    get_output()->begin_string(string_type, core::stream_handler::unknown_size);
+                    while (true)
+                    {
+                        in->read(buffer.get(), core::buffer_size);
+
+                        if (*in)
+                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), core::buffer_size)));
+                        else if (in->eof())
+                        {
+                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), in->gcount())));
+                            get_output()->end_string(string_type);
+                            break;
+                        }
+                        else
+                            throw core::custom_error("HTTP - an error occured while retrieving \"" + working_url.as_string() + "\"");
+                    }
+                } catch (const Poco::Exception &e) {
+                    throw core::custom_error("HTTP - " + std::string(e.what()));
+                }
+#endif
+            }
+        };
+#endif
+
+        inline void http_initialize()
+        {
+
+        }
+
+        inline void http_deinitialize()
+        {
+
+        }
 
         class parser : public core::stream_input
         {

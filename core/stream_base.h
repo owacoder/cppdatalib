@@ -68,22 +68,25 @@ namespace cppdatalib
         protected:
             struct scope_data
             {
-                scope_data(type t, subtype_t s, bool parsed_key = false)
+                scope_data(type t, subtype_t s, core::int_t reported_size, bool parsed_key = false)
                     : type_(t)
                     , subtype_(s)
                     , parsed_key_(parsed_key)
                     , items_(0)
+                    , reported_size_(reported_size)
                 {}
 
                 type get_type() const {return type_;}
                 subtype_t get_subtype() const {return subtype_;}
-                size_t items_parsed() const {return items_;}
+                uintmax_t items_parsed() const {return items_;}
                 bool key_was_parsed() const {return parsed_key_;}
+                int_t reported_size() const {return reported_size_;}
 
                 type type_; // The type of container that is being parsed
                 subtype_t subtype_; // The subtype of container that is being parsed
                 bool parsed_key_; // false if the object key needs to be or is being parsed, true if it has already been parsed but the value associated with it has not
-                size_t items_; // The number of items parsed into this container
+                uintmax_t items_; // The number of items parsed into this container
+                int_t reported_size_; // The number of items reported to be in this container
             };
 
             bool active_;
@@ -117,15 +120,15 @@ namespace cppdatalib
             // an element to be written in a single write() call
             static const unsigned int requires_single_write = 0x7f;
 
-            stream_handler() : active_(false), is_key_(false)
-            {
-                nested_scopes.push_back(scope_data(null, normal));
-            }
-            virtual ~stream_handler() {}
-
             enum {
                 unknown_size = -1 // No other negative value besides unknown_size should be used for the `size` parameters of handlers
             };
+
+            stream_handler() : active_(false), is_key_(false)
+            {
+                nested_scopes.push_back(scope_data(null, normal, unknown_size));
+            }
+            virtual ~stream_handler() {}
 
             // Returns all the features required by this handler
             virtual unsigned int required_features() const {return requires_none;}
@@ -146,7 +149,8 @@ namespace cppdatalib
 
                 active_ = true;
                 nested_scopes = decltype(nested_scopes)();
-                nested_scopes.push_back(scope_data(null, normal));
+                nested_scopes.push_back(scope_data(null, normal, unknown_size));
+                out_of_order_buffer.clear();
                 is_key_ = false;
                 begin_();
             }
@@ -186,7 +190,10 @@ namespace cppdatalib
 
             // Container size is updated after the item was handled
             // (begins at 0 with no elements, the first element is handled, then it increments to 1)
-            size_t current_container_size() const {return nested_scopes.back().items_parsed();}
+            uintmax_t current_container_size() const {return nested_scopes.back().items_parsed();}
+
+            // Reported container size (if known, the exact reported size is returned, otherwise `unknown_size`)
+            int_t current_container_reported_size() const {return nested_scopes.back().reported_size();}
 
             // Returns true if this is an object and a value of a key/value pair is expected
             bool container_key_was_just_parsed() const {return nested_scopes.back().key_was_parsed();}
@@ -204,7 +211,7 @@ namespace cppdatalib
 
                 if (!write_(v, is_key))
                 {
-                    if ((v.is_array() || v.is_object()) && v.size() > 0)
+                    if (v.is_nonempty_array() || v.is_nonempty_object())
                         *this << v;
                     else
                     {
@@ -219,20 +226,20 @@ namespace cppdatalib
                         {
                             case string:
                                 begin_string_(v, v.size(), is_key);
-                                nested_scopes.push_back({string, v.get_subtype()});
+                                nested_scopes.push_back({string, v.get_subtype(), core::int_t(v.size())});
                                 remove_scope = true;
                                 string_data_(v, is_key);
                                 end_string_(v, is_key);
                                 break;
                             case array:
                                 begin_array_(v, 0, is_key);
-                                nested_scopes.push_back({array, v.get_subtype()});
+                                nested_scopes.push_back({array, v.get_subtype(), 0});
                                 remove_scope = true;
                                 end_array_(v, is_key);
                                 break;
                             case object:
                                 begin_object_(v, 0, is_key);
-                                nested_scopes.push_back({object, v.get_subtype()});
+                                nested_scopes.push_back({object, v.get_subtype(), 0});
                                 remove_scope = true;
                                 end_object_(v, is_key);
                                 break;
@@ -274,12 +281,63 @@ namespace cppdatalib
                 return true;
             }
 
+            // An API must call this when an out-of-order write is requested
+            // for an array write. This works for scalars or complex objects.
+            //
+            // Out-of-order writes can only be requested when writing arrays,
+            // and an exception will be thrown otherwise.
+            //
+            // This function checks that each index is used at most once, and
+            // throws an exception otherwise. It also detects writes beyond the
+            // reported array bounds immediately, and throws an exception otherwise.
+            //
+            // Returns true if value was handled, false otherwise
+            bool write_out_of_order(uint64_t idx, const value &v)
+            {
+                bool result = true;
+
+                if (current_container() != array)
+                    throw error("cppdatalib::core::stream_handler - An out-of-order write can only be performed while writing an array");
+                else if (current_container_reported_size() != unknown_size &&
+                         uintmax_t(current_container_reported_size()) <= idx)
+                    throw error("cppdatalib::core::stream_handler - An out-of-order write was attempted beyond reported array bounds");
+
+                if (write_out_of_order_(idx, v, false))
+                    return true;
+
+                if (current_container_size() == idx)
+                    result = write(v);
+                else if (current_container_size() < idx)
+                {
+                    if (!out_of_order_buffer.insert({idx, v}).second) // Already present in map?
+                        throw custom_error("cppdatalib::core::stream_handler - An out-of-order write on index " + std::to_string(idx) + " was performed more than once");
+                }
+                else
+                    throw custom_error("cppdatalib::core::stream_handler - An out-of-order write on index " + std::to_string(idx) + " was performed more than once");
+
+                while (out_of_order_buffer.size() && out_of_order_buffer.begin()->first == current_container_size())
+                {
+                    if (!write(out_of_order_buffer.begin()->second))
+                        return false;
+                    out_of_order_buffer.erase(out_of_order_buffer.begin());
+                }
+
+                return result;
+            }
+
         protected:
             // Called when write() is written
             // Return value from external routine:
             //     true: item was written, cancel write routine
             //     false: item was not written, continue write routine
             virtual bool write_(const core::value &v, bool is_key) {(void) v; (void) is_key; return false;}
+
+            // Called when write_out_of_order() is written
+            // Return value from external routine:
+            //     true: item was written, cancel write routine
+            //     false: item was not written, continue write routine
+            // is_key is always false
+            virtual bool write_out_of_order_(uint64_t idx, const core::value &v, bool is_key) {(void) idx; (void) v; (void) is_key; return false;}
 
             // Called when any non-key item is parsed
             virtual void begin_item_(const core::value &v) {(void) v;}
@@ -340,7 +398,7 @@ namespace cppdatalib
                     begin_string_(v, size, is_key_ = false);
                 }
 
-                nested_scopes.push_back({string, v.get_subtype()});
+                nested_scopes.push_back({string, v.get_subtype(), size});
             }
             void append_to_string(const core::string_t &v) {append_to_string(value(v));}
             void append_to_string(const core::value &v)
@@ -368,6 +426,10 @@ namespace cppdatalib
                 else if (!v.is_string())
                     throw error("cppdatalib::core::stream_handler - attempted to end string with non-string value");
 #endif
+
+                if (current_container_reported_size() != unknown_size &&
+                        uintmax_t(current_container_reported_size()) != current_container_size())
+                    throw error("cppdatalib::core::stream_handler - reported string size and actual string size do not match");
 
                 if (is_key_)
                 {
@@ -415,7 +477,7 @@ namespace cppdatalib
                     begin_array_(v, size, false);
                 }
 
-                nested_scopes.push_back({array, v.get_subtype()});
+                nested_scopes.push_back({array, v.get_subtype(), size});
             }
             void end_array(const core::array_t &v) {end_array(value(v));}
             void end_array(const core::value &v)
@@ -428,6 +490,31 @@ namespace cppdatalib
                 else if (!v.is_array())
                     throw error("cppdatalib::core::stream_handler - attempted to end array with non-array value");
 #endif
+
+                if (out_of_order_buffer.size())
+                {
+                    while (out_of_order_buffer.size())
+                    {
+                        if (current_container_size() < out_of_order_buffer.begin()->first)
+                            write(core::value());
+                        else // current_container_size() == out_of_order_buffer.begin()->first,
+                             // since elements in out_of_order_buffer are always cleared out by write_out_of_order() when possible
+                        {
+                            write(out_of_order_buffer.begin()->second);
+                            out_of_order_buffer.erase(out_of_order_buffer.begin());
+                        }
+                    }
+
+                    // If unknown size, assume the highest index written to is the end of the array
+                    // Otherwise, fill to the reported size
+                    if (current_container_reported_size() != unknown_size)
+                        while (current_container_size() < uintmax_t(current_container_reported_size()))
+                            write(core::value());
+                }
+
+                if (current_container_reported_size() != unknown_size &&
+                        uintmax_t(current_container_reported_size()) != current_container_size())
+                    throw error("cppdatalib::core::stream_handler - reported array size and actual array size do not match");
 
                 if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
                     !nested_scopes[nested_scopes.size() - 2].key_was_parsed())
@@ -464,6 +551,10 @@ namespace cppdatalib
                     throw error("cppdatalib::core::stream_handler - attempted to begin object with non-object value");
 #endif
 
+                if (current_container_reported_size() != unknown_size &&
+                        uintmax_t(current_container_reported_size()) != current_container_size())
+                    throw error("cppdatalib::core::stream_handler - reported object size and actual object size do not match");
+
                 if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
@@ -476,7 +567,7 @@ namespace cppdatalib
                     begin_object_(v, size, false);
                 }
 
-                nested_scopes.push_back({object, v.get_subtype()});
+                nested_scopes.push_back({object, v.get_subtype(), size});
             }
             void end_object(const core::object_t &v) {end_object(value(v));}
             void end_object(const core::value &v)
@@ -524,6 +615,7 @@ namespace cppdatalib
             virtual void end_object_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
             std::vector<scope_data> nested_scopes; // Used as a stack, but not a stack so we can peek below the top
+            std::map<uint64_t, core::value> out_of_order_buffer; // Used for out-of-order write buffering if it is not supported by the handler
         };
 
         /* The base class of all input formats. All input formats must inherit from this class */

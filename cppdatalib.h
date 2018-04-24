@@ -80,4 +80,35 @@
 #include "raw/filesystem.h"
 #endif
 
+namespace cppdatalib
+{
+    inline void initialize()
+    {
+#ifdef CPPDATALIB_INIT
+        CPPDATALIB_INIT;
+#endif
+
+        http::http_initialize();
+    }
+
+    inline void deinitialize()
+    {
+        http::http_deinitialize();
+
+#ifdef CPPDATALIB_DEINIT
+        CPPDATALIB_DEINIT;
+#endif
+    }
+
+    /*
+     * A single instance of this class should be instantiated at the highest scope possible, preferably main()
+     * This class should *not* be used as a static object
+     */
+    struct cleanup
+    {
+        cleanup() {initialize();}
+        ~cleanup() {deinitialize();}
+    };
+}
+
 #endif // CPPDATALIB_H

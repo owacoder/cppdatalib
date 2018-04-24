@@ -729,6 +729,28 @@ void test_attributes()
         using namespace cppdatalib::bson;
         using namespace cppdatalib::xml;
 
+        cppdatalib::json::stream_writer writer(std::cout);
+
+        writer.begin();
+        writer.begin_array(cppdatalib::core::array_t(), 11 /*cppdatalib::core::stream_handler::unknown_size*/);
+        //writer.write_out_of_order(1000000, 100);
+        writer.write_out_of_order(9, 10);
+        writer.write_out_of_order(6, 6);
+        writer.write_out_of_order(1, 1);
+        writer.write_out_of_order(3, 3);
+        writer.write_out_of_order(2, 2);
+        //writer.write_out_of_order(0, 0);
+        writer.write_out_of_order(4, 4);
+        writer.write_out_of_order(7, 7);
+        writer.write_out_of_order(5, 5);
+        writer.write_out_of_order(8, 8);
+        writer.write_out_of_order(10, 9);
+        writer.write_out_of_order(0, -1);
+        writer.end_array(cppdatalib::core::array_t());
+        writer.end();
+
+        return;
+
         cppdatalib::http::parser(cppdatalib::core::value("http://owacoder.com"),
                                  cppdatalib::core::poco_network_library,
                                  "GET",
