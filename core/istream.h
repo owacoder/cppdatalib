@@ -627,9 +627,15 @@ namespace cppdatalib
             size_t pos;
 
         public:
+            icstring_wrapper_stream(const char *string)
+                : string(string)
+                , len(strlen(string))
+                , pos(0)
+            {}
             icstring_wrapper_stream(const char *string, size_t len)
                 : string(string)
                 , len(len)
+                , pos(0)
             {}
 
             std::string str() const {return std::string(string, len);}
@@ -978,7 +984,7 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_int16_be(core::istream &strm, T &val)
         {
-            uint16_t temp;
+            uint16_t temp = 0;
             if (read_uint16_be(strm, temp))
             {
                 if (temp < 0x8000)
@@ -995,7 +1001,7 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_int16_le(core::istream &strm, T &val)
         {
-            uint16_t temp;
+            uint16_t temp = 0;
             if (read_uint16_le(strm, temp))
             {
                 if (temp < 0x8000)
@@ -1040,7 +1046,7 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_int32_be(core::istream &strm, T &val)
         {
-            uint32_t temp;
+            uint32_t temp = 0;
             if (read_uint32_be(strm, temp))
             {
                 if (temp < 0x80000000)
@@ -1057,7 +1063,7 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_int32_le(core::istream &strm, T &val)
         {
-            uint32_t temp;
+            uint32_t temp = 0;
             if (read_uint32_le(strm, temp))
             {
                 if (temp < 0x80000000)
@@ -1119,7 +1125,7 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_int64_le(core::istream &strm, T &val)
         {
-            uint64_t temp;
+            uint64_t temp = 0;
             if (read_uint64_le(strm, temp))
             {
                 if (temp < 0x8000000000000000)

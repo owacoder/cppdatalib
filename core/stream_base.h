@@ -1,7 +1,7 @@
 /*
  * stream_base.h
  *
- * Copyright © 2017 Oliver Adams
+ * Copyright © 2018 Oliver Adams
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the “Software”), to
@@ -200,6 +200,11 @@ namespace cppdatalib
 
             // An API must call this when a scalar value is encountered,
             // although it should operate correctly for any value.
+            //
+            // Comments and program instructions will be written as such,
+            // or discarded if the output format does not support them.
+            // They do not affect nesting, validity, or other constraints.
+            //
             // Returns true if value was handled, false otherwise
             bool write(const value &v)
             {
@@ -209,10 +214,24 @@ namespace cppdatalib
                         nested_scopes.back().type_ == object &&
                         !nested_scopes.back().key_was_parsed();
 
+                if (v.get_subtype() == comment && v.is_string())
+                {
+                    comment_(v);
+                    return true;
+                }
+                else if (v.get_subtype() == program_directive && v.is_string())
+                {
+                    directive_(v);
+                    return true;
+                }
+
                 if (!write_(v, is_key))
                 {
                     if (v.is_nonempty_array() || v.is_nonempty_object())
+                    {
                         *this << v;
+                        return true; // Skip post-processing, since the '<<' operator works all that out anyway
+                    }
                     else
                     {
                         bool remove_scope = false;
@@ -281,15 +300,45 @@ namespace cppdatalib
                 return true;
             }
 
+            // An API must call this when a comment is requested to be written.
+            // Comments are not guaranteed to be supported by the output format.
+            // The default implementation does nothing
+            void write_comment(const core::value &v)
+            {
+                comment_(v);
+            }
+
+            // An API must call this when a program directive is requested to be written.
+            // Program directives are not guaranteed to be supported by the output format.
+            // The default implementation does nothing
+            void write_program_directive(const core::value &v)
+            {
+                directive_(v);
+            }
+
             // An API must call this when an out-of-order write is requested
             // for an array write. This works for scalars or complex objects.
             //
             // Out-of-order writes can only be requested when writing arrays,
             // and an exception will be thrown otherwise.
             //
-            // This function checks that each index is used at most once, and
-            // throws an exception otherwise. It also detects writes beyond the
-            // reported array bounds immediately, and throws an exception otherwise.
+            // By default, this function checks that each index is used at most once, and
+            // throws an exception otherwise. If write_out_of_order_() is overloaded, this guarantee
+            // does not hold, and use of an index more than once results in format-specific behavior.
+            //
+            // It also detects writes beyond the reported array bounds immediately,
+            // and throws an exception otherwise. This behavior is always present.
+            //
+            // When the array is done being written, empty (unspecified) indexes have a normal
+            // null value written to them. This includes indexes past written values, up to the end of the array.
+            // The resulting array size is dependent on the reported array size:
+            //
+            //     If the reported size is unknown - The resulting array size is one larger than the highest written index
+            //     If the reported size is known - The resulting array size is equal to the reported size
+            //
+            // If `write_out_of_order_()` is thread-safe and returns true (note that this is not the default behavior),
+            // this function is also thread-safe, as long as no other begin_xxx(), end_xxx(), or write function is called on this instance
+            // in the meantime.
             //
             // Returns true if value was handled, false otherwise
             bool write_out_of_order(uint64_t idx, const value &v)
@@ -307,12 +356,7 @@ namespace cppdatalib
 
                 if (current_container_size() == idx)
                     result = write(v);
-                else if (current_container_size() < idx)
-                {
-                    if (!out_of_order_buffer.insert({idx, v}).second) // Already present in map?
-                        throw custom_error("cppdatalib::core::stream_handler - An out-of-order write on index " + std::to_string(idx) + " was performed more than once");
-                }
-                else
+                else if (current_container_size() > idx || !out_of_order_buffer.insert({idx, v}).second)
                     throw custom_error("cppdatalib::core::stream_handler - An out-of-order write on index " + std::to_string(idx) + " was performed more than once");
 
                 while (out_of_order_buffer.size() && out_of_order_buffer.begin()->first == current_container_size())
@@ -338,6 +382,12 @@ namespace cppdatalib
             //     false: item was not written, continue write routine
             // is_key is always false
             virtual bool write_out_of_order_(uint64_t idx, const core::value &v, bool is_key) {(void) idx; (void) v; (void) is_key; return false;}
+
+            // Called when write_comment() is written
+            virtual void comment_(const core::value &v) {(void) v;}
+
+            // Called when write_program_directive() is written
+            virtual void directive_(const core::value &v) {(void) v;}
 
             // Called when any non-key item is parsed
             virtual void begin_item_(const core::value &v) {(void) v;}
@@ -375,6 +425,12 @@ namespace cppdatalib
         public:
             // An API must call these when a long string is parsed. The number of bytes is passed in size, if possible
             // size == -1 means unknown size
+            //
+            // Comments and processing instructions will be passed as such to the resulting handler, but no special action is taken.
+            // If special action should be taken for a comment or processing instruction, the entire value should be passed as a string
+            // (with the proper subtype) to `write()`, or passed to `write_comment()` or `write_directive()`, respectively, regardless of
+            // whether it is a string or not. The latter options don't require values to be strings.
+            //
             // If the length of v is equal to size, the entire string is provided
             void begin_string(const core::string_t &v, core::int_t size) {begin_string(value(v), size);}
             void begin_string(const core::value &v, core::int_t size)
@@ -551,10 +607,6 @@ namespace cppdatalib
                     throw error("cppdatalib::core::stream_handler - attempted to begin object with non-object value");
 #endif
 
-                if (current_container_reported_size() != unknown_size &&
-                        uintmax_t(current_container_reported_size()) != current_container_size())
-                    throw error("cppdatalib::core::stream_handler - reported object size and actual object size do not match");
-
                 if (nested_scopes.back().type_ == object &&
                     !nested_scopes.back().key_was_parsed())
                 {
@@ -582,6 +634,10 @@ namespace cppdatalib
                 else if (!v.is_object())
                     throw error("cppdatalib::core::stream_handler - attempted to end object with non-object value");
 #endif
+
+                if (current_container_reported_size() != unknown_size &&
+                        uintmax_t(current_container_reported_size()) != current_container_size())
+                    throw error("cppdatalib::core::stream_handler - reported object size and actual object size do not match");
 
                 if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
                     !nested_scopes[nested_scopes.size() - 2].key_was_parsed())

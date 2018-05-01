@@ -95,7 +95,11 @@ namespace cppdatalib
 
                 if (nesting_depth() > 0 &&
                         get_output()->current_container() == core::object)
+                {
+                    if (get_output()->container_key_was_just_parsed())
+                        get_output()->write(core::value());
                     get_output()->end_object(core::value(core::object_t()));
+                }
             }
 
             void write_one_()
@@ -155,11 +159,13 @@ namespace cppdatalib
                             case nothing_was_read:
                                 break;
                             case comment_was_read:
-                                std::cout << "<!--" << string << "-->\n";
+                                get_output()->write_comment(core::value(string));
                                 break;
                             case processing_instruction_was_read:
+                                get_output()->write_program_directive(core::value(string));
+                                break;
                             default:
-                                break; // Discard, we don't need them right now
+                                break;
                         }
                     }
                     default: break;
@@ -207,6 +213,18 @@ namespace cppdatalib
             void end_key_(const core::value &v)
             {
                 write_attributes(v);
+            }
+
+            void comment_(const core::value &v)
+            {
+                if (v.is_string() && v.get_string_unchecked().find("--") == v.get_string_unchecked().npos)
+                    stream() << "<!--" << v.get_string_unchecked() << "-->";
+            }
+
+            void directive_(const core::value &v)
+            {
+                if (v.is_string() && v.get_string_unchecked().find("?>") == v.get_string_unchecked().npos)
+                    stream() << "<?" << v.get_string_unchecked() << "?>";
             }
 
             // Implementation of null_() does nothing
@@ -312,6 +330,18 @@ namespace cppdatalib
             void end_key_(const core::value &v)
             {
                 write_attributes(v);
+            }
+
+            void comment_(const core::value &v)
+            {
+                if (v.is_string() && v.get_string_unchecked().find("--") == v.get_string_unchecked().npos)
+                    stream() << "<!--" << v.get_string_unchecked() << "-->";
+            }
+
+            void directive_(const core::value &v)
+            {
+                if (v.is_string() && v.get_string_unchecked().find("?>") == v.get_string_unchecked().npos)
+                    stream() << "<?" << v.get_string_unchecked() << "?>";
             }
 
             // Implementation of null_() does nothing

@@ -256,7 +256,8 @@ namespace cppdatalib
             buffer_none = 0x00,
             buffer_strings = 0x01,
             buffer_arrays = 0x02,
-            buffer_objects = 0x04
+            buffer_objects = 0x04,
+            buffer_ignore_reported_sizes = 0x08
         };
 
         class buffer_filter : public impl::stream_filter_base
@@ -300,6 +301,9 @@ namespace cppdatalib
                     mask_out |= requires_prefix_array_size | requires_buffered_arrays;
                 if (flags & buffer_objects)
                     mask_out |= requires_prefix_object_size | requires_buffered_objects;
+                if (flags & buffer_ignore_reported_sizes) // No sizes are passed straight through unless they're part of a buffered object
+                    // TODO: what is the proper "required features" return value if the buffer does not pass-through reported sizes?
+                    mask_out = 0;
 
                 return stream_filter_base::required_features() & ~mask_out;
             }
@@ -363,7 +367,7 @@ namespace cppdatalib
                     cache.begin_array(v, size);
                 }
                 else
-                    output.begin_array(v, size);
+                    output.begin_array(v, flags & buffer_ignore_reported_sizes? core::int_t(core::stream_handler::unknown_size): size);
             }
             void end_array_(const value &v, bool is_key)
             {
@@ -403,7 +407,7 @@ namespace cppdatalib
                     cache.begin_object(v, size);
                 }
                 else
-                    output.begin_object(v, size);
+                    output.begin_object(v, flags & buffer_ignore_reported_sizes? core::int_t(core::stream_handler::unknown_size): size);
             }
             void end_object_(const value &v, bool is_key)
             {
@@ -443,7 +447,7 @@ namespace cppdatalib
                     cache.begin_string(v, size);
                 }
                 else
-                    output.begin_string(v, size);
+                    output.begin_string(v, flags & buffer_ignore_reported_sizes? core::int_t(core::stream_handler::unknown_size): size);
             }
             void string_data_(const value &v, bool)
             {
@@ -1297,7 +1301,7 @@ namespace cppdatalib
 
         public:
             select_from_array_filter(core::stream_handler &output, Selecter s = Selecter())
-                : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects), 1)
+                : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
                 , select(s)
             {}
 
@@ -1329,6 +1333,1448 @@ namespace cppdatalib
         {
             return select_from_array_filter<Selecter>(output, s);
         }
+
+        namespace impl
+        {
+            // This evaluator can only test objects (i.e. tuples must be represented as objects, not arrays)
+            // Tuple properties may be objects (that is, in the incoming data),
+            // but object values may not appear in any queries since objects are used for the query heirarchy.
+            //
+            // If values have the subtype "symbol", it refers to the field name, not a specific string.
+            // This means field names are only capable of referencing keys with the "normal" UTF-8 subtype.
+            //
+            // Equality compare:
+            //      {"eq": [value, value]}
+            // Inequality compare:
+            //      {"neq": [value, value]}
+            // Less-than compare:
+            //      {"lt": [value, value]}
+            // Greater-than compare:
+            //      {"gt": [value, value]}
+            // Less-than or equal to compare:
+            //      {"lte": [value, value]}
+            // Greater-than or equal to compare:
+            //      {"gte": [value, value]}
+            // Logical And (short-circuits, doesn't compute second value if first is false):
+            //      {"and": [value, value]}
+            // Logical Or (short-circuits, doesn't compute second value if first is true):
+            //      {"or": [value, value]}
+            // Between compare (first value is test value, second is start of range, third is end of range, all values inclusive):
+            //      {"between": [value, value, value]}
+            // In-set compare (first value is test value, second is list of options to match equality against):
+            //      {"in": [value, value]}
+            // Null compare (value is value to test for null):
+            //      {"nul": value}
+            // Not-null compare (value is value to test for non-null):
+            //      {"nnul": value}
+            // Not distinct from (both nulls or both equal):
+            //      {"ndistinct": [value, value]}
+            //
+            // The following are not specific operators, but rather a sort of mode of operation (used for sql_select_filter)
+            // `non_bool_result` must be non-null to use these fields
+            //
+            // Select only specific fields in tuple (values are either field names, or must be renamed with the "as" operator):
+            // The value should be null if all fields are requested, since an empty array means select nothing from the tuple
+            //      {"select": [value, ...]}
+            // Rename field in tuple (rename first (either name or expression) to second (must be a name):
+            //      {"as": [value, value]}
+            //
+            class sql_expression_evaluator
+            {
+                const core::value &query;
+
+                enum operator_type
+                {
+                    select,
+                    where,
+
+                    func,
+
+                    equals,
+                    nequals,
+                    less_than,
+                    greater_than,
+                    less_than_or_equal,
+                    greater_than_or_equal,
+                    in_set,
+                    not_distinct,
+                    is, // Is
+                    isnt, // Is not
+                    AND,
+                    OR,
+                    XOR,
+                    as,
+                    add,
+                    sub,
+                    mul,
+                    div,
+                    mod
+                };
+
+                bool compare(operator_type type, const core::value *one, const core::value *two, core::value *non_bool_result = nullptr)
+                {
+                    bool result = false;
+
+                    switch (type)
+                    {
+                        case equals:
+                        case not_distinct:
+                        {
+                            if (type == not_distinct && one->is_null() && two->is_null())
+                            {
+                                if (non_bool_result)
+                                    *non_bool_result = core::value(true);
+                                return true;
+                            }
+
+                            if (one->is_null() || two->is_null())
+                            {
+                                if (non_bool_result)
+                                    non_bool_result->set_null();
+                                return false;
+                            }
+
+                            if (one->is_string() && two->is_string())
+                                result = one->get_string_unchecked() == two->get_string_unchecked();
+                            else if (one->is_int())
+                            {
+                                if (two->is_int())
+                                    result = one->get_int() == two->get_int();
+                                else if (two->is_uint())
+                                    result = one->as_uint() == two->as_uint();
+                                else
+                                    result = one->as_real() == two->as_real();
+                            }
+                            else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                result = one->as_uint() == two->as_uint();
+                            else
+                                result = one->as_real() == two->as_real();
+
+                            break;
+                        }
+                        case is:
+                        {
+                            if (one->is_null() && two->is_null())
+                            {
+                                if (non_bool_result)
+                                    *non_bool_result = core::value(true);
+                                return true;
+                            }
+
+                            if (one->is_null() || two->is_null())
+                            {
+                                if (non_bool_result)
+                                    *non_bool_result = core::value(false);
+                                return false;
+                            }
+
+                            if (one->is_string() && two->is_string())
+                                result = one->get_string_unchecked() == two->get_string_unchecked();
+                            else if (one->is_int())
+                            {
+                                if (two->is_int())
+                                    result = one->get_int() == two->get_int();
+                                else if (two->is_uint())
+                                    result = one->as_uint() == two->as_uint();
+                                else
+                                    result = one->as_real() == two->as_real();
+                            }
+                            else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                result = one->as_uint() == two->as_uint();
+                            else
+                                result = one->as_real() == two->as_real();
+
+                            break;
+                        }
+                        case isnt:
+                        {
+                            if (one->is_null() && two->is_null())
+                            {
+                                if (non_bool_result)
+                                    *non_bool_result = core::value(false);
+                                return false;
+                            }
+
+                            if (one->is_null() || two->is_null())
+                            {
+                                if (non_bool_result)
+                                    *non_bool_result = core::value(true);
+                                return true;
+                            }
+
+                            if (one->is_string() && two->is_string())
+                                result = one->get_string_unchecked() != two->get_string_unchecked();
+                            else if (one->is_int())
+                            {
+                                if (two->is_int())
+                                    result = one->get_int() != two->get_int();
+                                else if (two->is_uint())
+                                    result = one->as_uint() != two->as_uint();
+                                else
+                                    result = one->as_real() != two->as_real();
+                            }
+                            else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                result = one->as_uint() != two->as_uint();
+                            else
+                                result = one->as_real() != two->as_real();
+
+                            break;
+                        }
+                        case nequals:
+                        {
+                            if (one->is_null() || two->is_null())
+                            {
+                                if (non_bool_result)
+                                    non_bool_result->set_null();
+                                return true;
+                            }
+
+                            if (one->is_string() && two->is_string())
+                                result = one->get_string_unchecked() != two->get_string_unchecked();
+                            else if (one->is_int())
+                            {
+                                if (two->is_int())
+                                    result = one->get_int() != two->get_int();
+                                else if (two->is_uint())
+                                    result = one->as_uint() != two->as_uint();
+                                else
+                                    result = one->as_real() != two->as_real();
+                            }
+                            else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                result = one->as_uint() != two->as_uint();
+                            else
+                                result = one->as_real() != two->as_real();
+
+                            break;
+                        }
+                        case less_than:
+                        {
+                            if (one->is_null() || two->is_null())
+                            {
+                                if (non_bool_result)
+                                    non_bool_result->set_null();
+                                return false;
+                            }
+
+                            if (one->is_string() && two->is_string())
+                                result = one->get_string_unchecked() < two->get_string_unchecked();
+                            else if (one->is_int())
+                            {
+                                if (two->is_int())
+                                    result = one->get_int() < two->get_int();
+                                else if (two->is_uint())
+                                    result = one->as_uint() < two->as_uint();
+                                else
+                                    result = one->as_real() < two->as_real();
+                            }
+                            else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                result = one->as_uint() < two->as_uint();
+                            else
+                                result = one->as_real() < two->as_real();
+
+                            break;
+                        }
+                        case greater_than:
+                        {
+                            if (one->is_null() || two->is_null())
+                            {
+                                if (non_bool_result)
+                                    non_bool_result->set_null();
+                                return false;
+                            }
+
+                            if (one->is_string() && two->is_string())
+                                result = one->get_string_unchecked() > two->get_string_unchecked();
+                            else if (one->is_int())
+                            {
+                                if (two->is_int())
+                                    result = one->get_int() > two->get_int();
+                                else if (two->is_uint())
+                                    result = one->as_uint() > two->as_uint();
+                                else
+                                    result = one->as_real() > two->as_real();
+                            }
+                            else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                result = one->as_uint() > two->as_uint();
+                            else
+                                result = one->as_real() > two->as_real();
+
+                            break;
+                        }
+                        case less_than_or_equal:
+                        {
+                            if (one->is_null() || two->is_null())
+                            {
+                                if (non_bool_result)
+                                    non_bool_result->set_null();
+                                return false;
+                            }
+
+                            if (one->is_string() && two->is_string())
+                                result = one->get_string_unchecked() <= two->get_string_unchecked();
+                            else if (one->is_int())
+                            {
+                                if (two->is_int())
+                                    result = one->get_int() <= two->get_int();
+                                else if (two->is_uint())
+                                    result = one->as_uint() <= two->as_uint();
+                                else
+                                    result = one->as_real() <= two->as_real();
+                            }
+                            else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                result = one->as_uint() <= two->as_uint();
+                            else
+                                result = one->as_real() <= two->as_real();
+
+                            break;
+                        }
+                        case greater_than_or_equal:
+                        {
+                            if (one->is_null() || two->is_null())
+                            {
+                                if (non_bool_result)
+                                    non_bool_result->set_null();
+                                return false;
+                            }
+
+                            if (one->is_string() && two->is_string())
+                                result = one->get_string_unchecked() >= two->get_string_unchecked();
+                            else if (one->is_int())
+                            {
+                                if (two->is_int())
+                                    result = one->get_int() >= two->get_int();
+                                else if (two->is_uint())
+                                    result = one->as_uint() >= two->as_uint();
+                                else
+                                    result = one->as_real() >= two->as_real();
+                            }
+                            else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                result = one->as_uint() >= two->as_uint();
+                            else
+                                result = one->as_real() >= two->as_real();
+
+                            break;
+                        }
+                        default:
+                            return false;
+                    }
+
+                    if (non_bool_result)
+                        *non_bool_result = core::value(result);
+
+                    return result;
+                }
+
+            public:
+                sql_expression_evaluator(const core::value &query) : query(query) {}
+
+                bool operator()(const core::value &test, core::value *non_bool_result = nullptr, bool order_is_important = false)
+                {
+                    if (query.is_null())
+                    {
+                        if (non_bool_result)
+                            *non_bool_result = true;
+                        return true;
+                    }
+
+                    bool result = false;
+                    operator_type operator_;
+
+                    if (!test.is_object())
+                        throw core::error("SQL - tuples must be represented as objects for 'SELECT' to work");
+
+                    const core::value *predicate;
+
+                    if ((operator_ = select, predicate = query.member_ptr("select")))
+                    {
+                        if (!non_bool_result)
+                            throw core::error("SQL - cannot use 'SELECT' as a predicate");
+
+                        if (predicate->is_null())
+                        {
+                            if (order_is_important)
+                            {
+                                non_bool_result->set_array(core::array_t());
+
+                                for (const auto &item: test.get_object_unchecked())
+                                    non_bool_result->push_back(core::value(core::object_t{{item.first, item.second}}));
+                            }
+                            else
+                                *non_bool_result = test;
+                            return true;
+                        }
+                        else if (predicate->is_array())
+                        {
+                            core::value temp_one;
+                            const core::value *one;
+
+                            if (order_is_important)
+                                non_bool_result->set_array(core::array_t());
+                            else
+                                non_bool_result->set_object(core::object_t());
+
+                            for (const auto &item: predicate->get_array_unchecked())
+                            {
+                                bool was_named_field = false;
+                                one = &item;
+
+                                if (one->is_string() && one->get_subtype() == core::symbol)
+                                {
+                                    was_named_field = true; // This query is a direct reference to a field
+                                    one = test.member_ptr(one->get_string_unchecked());
+                                    if (!one) // No member with specified name
+                                    {
+                                        *non_bool_result = core::value(false);
+                                        return false;
+                                    }
+                                }
+                                else if (one->is_object()) // Another predicate specified
+                                {
+                                    sql_expression_evaluator{*one}(test, &temp_one);
+
+                                    one = &temp_one;
+                                }
+
+                                // Now check the results of our expression
+                                if (order_is_important)
+                                {
+                                    if (was_named_field) // Is direct field selection
+                                        non_bool_result->push_back(core::value(core::object_t{{core::value(item.get_string_unchecked()), *one}}));
+                                    else if (one->is_object()) // Must be an 'AS' expression, providing the field name to write to
+                                        non_bool_result->push_back(*one);
+                                    else
+                                        non_bool_result->push_back(core::value(core::object_t{{core::value(std::to_string(non_bool_result->array_size())), *one}}));
+                                }
+                                else
+                                {
+                                    if (was_named_field) // Is direct field selection
+                                        non_bool_result->add_member_at_end(core::value(item.get_string_unchecked()), *one);
+                                    else if (one->is_object()) // Must be an 'AS' expression, providing the field name to write to
+                                        non_bool_result->add_member_at_end(one->get_object_unchecked().begin()->first,
+                                                                           one->get_object_unchecked().begin()->second);
+                                    else
+                                        non_bool_result->add_member_at_end(core::value(std::to_string(non_bool_result->object_size())), *one);
+                                }
+                            }
+
+                            return true;
+                        }
+                        else
+                            throw core::error("SQL - unknown operation requested in expression");
+                    }
+                    else if ((operator_ = func, predicate = query.member_ptr("func")))
+                    {
+                        if (!non_bool_result)
+                            throw core::error("SQL - cannot use a function call as a predicate");
+
+                        if (predicate->is_array())
+                        {
+                            size_t idx = 0;
+
+                            core::string_t function_name;
+                            core::value parameters; // Contains an array of parameters
+
+                            core::value temp_one;
+                            const core::value *one;
+
+                            for (const auto &item: predicate->get_array_unchecked())
+                            {
+                                if (idx == 0)
+                                {
+                                    if (!item.is_string())
+                                        throw core::error("SQL - function name must be a string");
+                                    function_name = item.get_string_unchecked();
+                                }
+                                else
+                                {
+                                    one = &item;
+
+                                    if (one->is_string() && one->get_subtype() == core::symbol)
+                                    {
+                                        one = test.member_ptr(one->get_string_unchecked());
+                                        if (!one) // No member with specified name
+                                        {
+                                            *non_bool_result = core::value(false);
+                                            return false;
+                                        }
+                                    }
+                                    else if (one->is_object()) // Another predicate specified
+                                    {
+                                        sql_expression_evaluator{*one}(test, &temp_one);
+
+                                        one = &temp_one;
+                                    }
+
+                                    parameters.push_back(*one);
+                                }
+
+                                ++idx;
+                            }
+
+                            throw core::custom_error("SQL - unknown function '" + function_name + "' being called with " + std::to_string(parameters.size()) + " argument(s)");
+
+                            return true;
+                        }
+                        else
+                            throw core::error("SQL - unknown operation requested in expression");
+                    }
+                    else if ((operator_ = where, predicate = query.member_ptr("where")))
+                    {
+                        if (predicate->is_object())
+                            result = sql_expression_evaluator{*predicate}(test);
+                    }
+
+                    //
+                    // Check for dual-argument expressions
+                    //
+                    else if ((operator_ = equals, predicate = query.member_ptr("eq")) ||
+                        (operator_ = nequals, predicate = query.member_ptr("neq")) ||
+                        (operator_ = less_than, predicate = query.member_ptr("lt")) ||
+                        (operator_ = greater_than, predicate = query.member_ptr("gt")) ||
+                        (operator_ = less_than_or_equal, predicate = query.member_ptr("lte")) ||
+                        (operator_ = greater_than_or_equal, predicate = query.member_ptr("gte")) ||
+                        (operator_ = in_set, predicate = query.member_ptr("in")) ||
+                        (operator_ = not_distinct, predicate = query.member_ptr("ndistinct")) ||
+                        (operator_ = AND, predicate = query.member_ptr("and")) ||
+                        (operator_ = OR, predicate = query.member_ptr("or")) ||
+                        (operator_ = XOR, predicate = query.member_ptr("xor")) ||
+                        (operator_ = is, predicate = query.member_ptr("is")) ||
+                        (operator_ = isnt, predicate = query.member_ptr("isnt")) ||
+                        (non_bool_result &&
+                         ((operator_ = add, predicate = query.member_ptr("add")) ||
+                          (operator_ = sub, predicate = query.member_ptr("sub")) ||
+                          (operator_ = mul, predicate = query.member_ptr("mul")) ||
+                          (operator_ = div, predicate = query.member_ptr("div")) ||
+                          (operator_ = mod, predicate = query.member_ptr("mod")) ||
+                          (operator_ = as, predicate = query.member_ptr("as")))))
+                    {
+                        if (predicate->is_array() && predicate->array_size() == 2)
+                        {
+                            core::value temp_one, temp_two;
+                            const core::value *one = &predicate->get_array_unchecked()[0];
+                            const core::value *two = &predicate->get_array_unchecked()[1];
+
+                            if (one->is_string() && one->get_subtype() == core::symbol)
+                            {
+                                one = test.member_ptr(one->get_string_unchecked());
+                                if (!one) // No member with specified name
+                                {
+                                    if (non_bool_result)
+                                        *non_bool_result = core::value(operator_ == nequals);
+                                    return operator_ == nequals;
+                                }
+                            }
+                            else if (one->is_object()) // Another predicate specified
+                            {
+                                sql_expression_evaluator{*one}(test, &temp_one);
+
+                                one = &temp_one;
+                            } // Otherwise a normal value is assumed
+
+                            if (two->is_string() && two->get_subtype() == core::symbol)
+                            {
+                                two = test.member_ptr(two->get_string_unchecked());
+                                if (operator_ == as)
+                                {
+                                    if (two)
+                                        throw core::error("SQL - cannot rename field with 'AS' because field already exists in source tuple");
+                                    two = &predicate->get_array_unchecked()[1]; // Reset back to the original value
+                                }
+                                else if (!two) // No member with specified name
+                                {
+                                    if (non_bool_result)
+                                        *non_bool_result = core::value(operator_ == nequals);
+                                    return operator_ == nequals;
+                                }
+                            }
+                            else if (two->is_object()) // Another predicate specified
+                            {
+                                if (operator_ == as)
+                                    throw core::error("SQL - invalid query has non-name specified as target of 'AS' expression");
+                                sql_expression_evaluator{*two}(test, &temp_two);
+
+                                two = &temp_two;
+                            } // Otherwise a normal value is assumed
+
+                            // Perform the operation
+                            switch (operator_)
+                            {
+                                case equals:
+                                case nequals:
+                                case less_than:
+                                case greater_than:
+                                case less_than_or_equal:
+                                case greater_than_or_equal:
+                                case not_distinct:
+                                case is:
+                                case isnt:
+                                    result = compare(operator_, one, two, non_bool_result);
+                                    break;
+                                case in_set:
+                                {
+                                    if (!two->is_array() || one->is_null())
+                                    {
+                                        if (non_bool_result)
+                                            non_bool_result->set_null();
+                                        return false;
+                                    }
+
+                                    for (const auto &item: two->get_array_unchecked())
+                                        if (compare(equals, one, &item, non_bool_result))
+                                            return true;
+
+                                    result = false;
+                                    break;
+                                }
+                                case AND:
+                                {
+                                    if (one->is_null() || two->is_null())
+                                    {
+                                        if (non_bool_result)
+                                            non_bool_result->set_null();
+                                        return false;
+                                    }
+                                    result = one->as_bool() && two->as_bool();
+                                    break;
+                                }
+                                case OR:
+                                {
+                                    if (one->is_null() || two->is_null())
+                                    {
+                                        if (non_bool_result)
+                                            non_bool_result->set_null();
+                                        return false;
+                                    }
+                                    result = one->as_bool() || two->as_bool();
+                                    break;
+                                }
+                                case XOR:
+                                {
+                                    if (one->is_null() || two->is_null())
+                                    {
+                                        if (non_bool_result)
+                                            non_bool_result->set_null();
+                                        return false;
+                                    }
+                                    result = one->as_bool() ^ two->as_bool();
+                                    break;
+                                }
+                                case as:
+                                {
+                                    non_bool_result->set_object(core::object_t());
+                                    non_bool_result->add_member_at_end(core::value(two->get_string_unchecked()), *one);
+
+                                    return true;
+                                }
+                                case add:
+                                {
+                                    if (one->is_null() || two->is_null())
+                                    {
+                                        non_bool_result->set_null();
+                                        return true;
+                                    }
+
+                                    if (one->is_int())
+                                    {
+                                        if (two->is_int())
+                                            non_bool_result->set_int(one->get_int() + two->get_int());
+                                        else if (two->is_uint())
+                                            non_bool_result->set_uint(one->as_uint() + two->as_uint());
+                                        else
+                                            non_bool_result->set_real(one->as_real() + two->as_real());
+                                    }
+                                    else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                        non_bool_result->set_uint(one->as_uint() + two->as_uint());
+                                    else
+                                        non_bool_result->set_real(one->as_real() + two->as_real());
+
+                                    return true;
+                                }
+                                case sub:
+                                {
+                                    if (one->is_null() || two->is_null())
+                                    {
+                                        non_bool_result->set_null();
+                                        return true;
+                                    }
+
+                                    if (one->is_int())
+                                    {
+                                        if (two->is_int())
+                                            non_bool_result->set_int(one->get_int() - two->get_int());
+                                        else if (two->is_uint())
+                                            non_bool_result->set_uint(one->as_uint() - two->as_uint());
+                                        else
+                                            non_bool_result->set_real(one->as_real() - two->as_real());
+                                    }
+                                    else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                        non_bool_result->set_uint(one->as_uint() - two->as_uint());
+                                    else
+                                        non_bool_result->set_real(one->as_real() - two->as_real());
+
+                                    return true;
+                                }
+                                case mul:
+                                {
+                                    if (one->is_null() || two->is_null())
+                                    {
+                                        non_bool_result->set_null();
+                                        return true;
+                                    }
+
+                                    if (one->is_int())
+                                    {
+                                        if (two->is_int())
+                                            non_bool_result->set_int(one->get_int() * two->get_int());
+                                        else if (two->is_uint())
+                                            non_bool_result->set_uint(one->as_uint() * two->as_uint());
+                                        else
+                                            non_bool_result->set_real(one->as_real() * two->as_real());
+                                    }
+                                    else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                        non_bool_result->set_uint(one->as_uint() * two->as_uint());
+                                    else
+                                        non_bool_result->set_real(one->as_real() * two->as_real());
+
+                                    return true;
+                                }
+                                case div:
+                                {
+                                    if (one->is_null() || two->is_null() || two->as_real() == 0.0)
+                                    {
+                                        non_bool_result->set_null();
+                                        return true;
+                                    }
+
+                                    if (one->is_int())
+                                    {
+                                        if (two->is_int())
+                                            non_bool_result->set_int(one->get_int() / two->get_int());
+                                        else if (two->is_uint())
+                                            non_bool_result->set_uint(one->as_uint() / two->as_uint());
+                                        else
+                                            non_bool_result->set_real(one->as_real() / two->as_real());
+                                    }
+                                    else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                        non_bool_result->set_uint(one->as_uint() / two->as_uint());
+                                    else
+                                        non_bool_result->set_real(one->as_real() / two->as_real());
+
+                                    return true;
+                                }
+                                case mod:
+                                {
+                                    if (one->is_null() || two->is_null() || two->as_real() == 0.0)
+                                    {
+                                        non_bool_result->set_null();
+                                        return true;
+                                    }
+
+                                    if (one->is_int())
+                                    {
+                                        if (two->is_int())
+                                            non_bool_result->set_int(one->get_int() % two->get_int());
+                                        else if (two->is_uint())
+                                            non_bool_result->set_uint(one->as_uint() % two->as_uint());
+                                        else
+                                            non_bool_result->set_real(fmod(one->as_real(), two->as_real()));
+                                    }
+                                    else if (one->is_uint() && (two->is_int() || two->is_uint()))
+                                        non_bool_result->set_uint(one->as_uint() % two->as_uint());
+                                    else
+                                        non_bool_result->set_real(fmod(one->as_real(), two->as_real()));
+
+                                    return true;
+                                }
+                                default:
+                                    break;
+                            }
+                        }
+                        else
+                            throw core::error("SQL - invalid number of arguments provided in expression");
+                    }
+                    else
+                        throw core::error("SQL - unknown or invalid operator encountered in expression");
+
+                    if (non_bool_result)
+                        *non_bool_result = core::value(result);
+
+                    return result;
+                }
+            };
+        }
+
+        namespace impl
+        {
+            class sql_parser : public stream_parser
+            {
+                core::value select, where;
+
+            public:
+                enum element
+                {
+                    select_element,
+                    where_element
+                };
+
+            private:
+                element state;
+
+            public:
+                sql_parser(core::istream_handle input, element parse = select_element)
+                    : stream_parser(input)
+                    , state(parse)
+                {}
+
+                core::value get_select() const {return core::value(core::object_t{{core::value("select"), select}});}
+                core::value get_where() const {return  core::value(core::object_t{{core::value("where"), where}});}
+
+            protected:
+                void reset_() {select.set_null(); where.set_null(); stream() >> std::skipws;}
+
+                void write_one_()
+                {
+                    char buffer[32];
+
+                    if (!stream().read(buffer, 6) || (ascii_lowercase(buffer, buffer + 6), 0) || memcmp(buffer, "select", 6))
+                        throw core::error("SQL - invalid statement");
+
+                    if (state == select_element)
+                    {
+                        get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                        get_output()->write(core::value("select"));
+                        get_output()->write(select = parse_select_expression());
+                        get_output()->end_object(core::value(core::object_t()));
+                    }
+                    else
+                        select = parse_select_expression();
+
+                    char c;
+                    stream() >> c;
+
+                    if (!stream())
+                        throw core::error("SQL - invalid statement");
+
+                    if (tolower(c) == 'w')
+                    {
+                        buffer[0] = c;
+                        if (!stream().read(buffer+1, 4) || (ascii_lowercase(buffer+1, buffer+5), 0) || memcmp(buffer, "where", 5))
+                            throw core::error("SQL - invalid 'WHERE' clause");
+
+                        if (state == where_element)
+                        {
+                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                            get_output()->write(core::value("where"));
+                            get_output()->write(where = parse_expression());
+                            get_output()->end_object(core::value(core::object_t()));
+                        }
+                        else
+                            where = parse_expression();
+                    }
+
+                    stream() >> c;
+                    if (stream())
+                        throw core::custom_error("SQL - unexpected '" + std::string(1, c) + "' in statement");
+                }
+
+                core::value parse_select_expression()
+                {
+                    core::value result;
+                    char c;
+
+                    stream() >> c;
+
+                    if (!stream())
+                        throw core::error("SQL - 'SELECT' must be followed by an expression");
+                    else if (c == '*')
+                        return core::value();
+                    else
+                    {
+                        stream().unget();
+
+                        result.set_array(core::array_t());
+                        do
+                        {
+                            result.push_back(parse_expression());
+                            stream() >> c;
+                        } while (stream() && c == ',');
+
+                        if (stream())
+                            stream().unget();
+
+                        return result;
+                    }
+                }
+
+                core::value parse_expression()
+                {
+                    char c;
+                    core::value operand_key;
+                    core::value result;
+
+                    result = parse_or();
+
+                    while (true)
+                    {
+                        stream() >> c;
+                        if (!stream())
+                            return result;
+
+                        if (isalpha(c & 0xff))
+                        {
+                            switch (tolower(c))
+                            {
+                                case 'a':
+                                    c = stream().get();
+                                    if (!stream() || tolower(c) != 's')
+                                        throw core::error("SQL - invalid operator in expression");
+
+                                    operand_key.set_string("as");
+                                    break;
+                                default:
+                                    stream().unget();
+                                    return result;
+                            }
+                        }
+                        else
+                        {
+                            stream().unget();
+                            return result;
+                        }
+
+                        result = core::value(core::object_t{{operand_key, core::value(core::array_t{result, parse_or()})}});
+                    }
+
+                    return result;
+                }
+
+                core::value parse_or()
+                {
+                    char c;
+                    core::value operand_key;
+                    core::value result;
+
+                    result = parse_xor();
+
+                    while (true)
+                    {
+                        stream() >> c;
+                        if (!stream())
+                            return result;
+
+                        if (isalpha(c & 0xff))
+                        {
+                            switch (tolower(c))
+                            {
+                                case 'o':
+                                    c = stream().peek();
+                                    if (!stream() || tolower(c) != 'r')
+                                    {
+                                        stream().unget();
+                                        return result;
+                                    }
+
+                                    stream().get();
+                                    operand_key.set_string("or");
+                                    break;
+                                default:
+                                    stream().unget();
+                                    return result;
+                            }
+                        }
+                        else if (c == '|' && stream().peek() == '|')
+                        {
+                            stream().get(); // Eat '|'
+                            operand_key.set_string("or");
+                        }
+                        else
+                        {
+                            stream().unget();
+                            return result;
+                        }
+
+                        result = core::value(core::object_t{{operand_key, core::value(core::array_t{result, parse_xor()})}});
+                    }
+
+                    return result;
+                }
+
+                core::value parse_xor()
+                {
+                    char c;
+                    core::value operand_key;
+                    core::value result;
+
+                    result = parse_and();
+
+                    while (true)
+                    {
+                        stream() >> c;
+                        if (!stream())
+                            return result;
+
+                        if (isalpha(c & 0xff))
+                        {
+                            switch (tolower(c))
+                            {
+                                case 'x':
+                                    c = stream().peek();
+                                    if (!stream() || tolower(c) != 'o')
+                                    {
+                                        stream().unget();
+                                        return result;
+                                    }
+
+                                    stream().get();
+                                    if (tolower(stream().get()) != 'r')
+                                        throw core::error("SQL - invalid operator in expression");
+
+                                    operand_key.set_string("xor");
+                                    break;
+                                default:
+                                    stream().unget();
+                                    return result;
+                            }
+                        }
+                        else
+                        {
+                            stream().unget();
+                            return result;
+                        }
+
+                        result = core::value(core::object_t{{operand_key, core::value(core::array_t{result, parse_and()})}});
+                    }
+
+                    return result;
+                }
+
+                core::value parse_and()
+                {
+                    char c;
+                    core::value operand_key;
+                    core::value result;
+
+                    result = parse_compare();
+
+                    while (true)
+                    {
+                        stream() >> c;
+                        if (!stream())
+                            return result;
+
+                        if (isalpha(c & 0xff))
+                        {
+                            switch (tolower(c))
+                            {
+                                case 'a':
+                                    c = stream().peek();
+                                    if (!stream() || tolower(c) != 'n')
+                                    {
+                                        stream().unget();
+                                        return result;
+                                    }
+
+                                    stream().get();
+                                    if (tolower(stream().get()) != 'd')
+                                        throw core::error("SQL - invalid operator in expression");
+
+                                    operand_key.set_string("and");
+                                    break;
+                                default:
+                                    stream().unget();
+                                    return result;
+                            }
+                        }
+                        else if (c == '&' && stream().peek() == '&')
+                        {
+                            stream().get(); // Eat '&'
+                            operand_key.set_string("and");
+                        }
+                        else
+                        {
+                            stream().unget();
+                            return result;
+                        }
+
+                        result = core::value(core::object_t{{operand_key, core::value(core::array_t{result, parse_compare()})}});
+                    }
+
+                    return result;
+                }
+
+                core::value parse_compare()
+                {
+                    char c;
+                    core::value operand_key;
+                    core::value result;
+
+                    result = parse_plus_minus();
+
+                    while (true)
+                    {
+                        stream() >> c;
+                        if (!stream())
+                            return result;
+
+                        if (c == '=')
+                            operand_key.set_string("eq");
+                        else if (c == '<')
+                        {
+                            c = stream().get();
+                            if (stream() && (c == '>' || c == '='))
+                            {
+                                if (c == '>')
+                                    operand_key.set_string("neq");
+                                else
+                                    operand_key.set_string("lte");
+                            }
+                            else
+                            {
+                                if (stream())
+                                    stream().unget();
+                                operand_key.set_string("lt");
+                            }
+                        }
+                        else if (c == '>')
+                        {
+                            if (stream().get() == '=')
+                                operand_key.set_string("gte");
+                            else
+                            {
+                                if (stream())
+                                    stream().unget();
+                                operand_key.set_string("gt");
+                            }
+                        }
+                        else if (c == '!' && stream().peek() == '=')
+                        {
+                            stream().get(); // Eat '='
+                            operand_key.set_string("neq");
+                        }
+                        else if (tolower(c) == 'i' && tolower(stream().peek()) == 's')
+                        {
+                            bool negate = false;
+                            std::string buffer;
+
+                            stream().get(); // Eat 's'
+                            if (!isspace(stream().peek()))
+                                throw core::error("SQL - unknown operator in expression");
+
+                            do
+                            {
+                                negate = buffer == "not";
+                                buffer.clear();
+
+                                stream() >> c;
+                                if (!stream() || !isalpha(c & 0xff))
+                                    throw core::error("SQL - missing argument in 'IS' expression");
+
+                                while (isalpha(c & 0xff) && stream())
+                                {
+                                    buffer.push_back(tolower(c & 0xff));
+                                    c = stream().get();
+                                }
+
+                                if (stream())
+                                    stream().unget();
+                            } while (buffer == "not" && !negate);
+
+                            // `buffer` now contains the word after 'IS', converted to lowercase
+                            if (buffer == "true")
+                                result = core::value(core::object_t{{core::value(negate? "isnt": "is"), core::value(core::array_t{result, core::value(true)})}});
+                            else if (buffer == "false")
+                                result = core::value(core::object_t{{core::value(negate? "isnt": "is"), core::value(core::array_t{result, core::value(false)})}});
+                            else if (buffer == "unknown" || buffer == "null")
+                                result = core::value(core::object_t{{core::value(negate? "isnt": "is"), core::value(core::array_t{result, core::value()})}});
+                            else
+                                throw core::custom_error("SQL - invalid option '" + buffer + "' specified after 'IS" + (negate? " NOT": "") + "'");
+                            continue;
+                        }
+                        else
+                        {
+                            stream().unget();
+                            return result;
+                        }
+
+                        result = core::value(core::object_t{{operand_key, core::value(core::array_t{result, parse_plus_minus()})}});
+                    }
+
+                    return result;
+                }
+
+                core::value parse_plus_minus()
+                {
+                    char c;
+                    core::value operand_key;
+                    core::value result;
+
+                    result = parse_times_div();
+
+                    while (true)
+                    {
+                        stream() >> c;
+                        if (!stream())
+                            return result;
+
+                        if (c == '+')
+                            operand_key.set_string("add");
+                        else if (c == '-')
+                            operand_key.set_string("sub");
+                        else
+                        {
+                            stream().unget();
+                            return result;
+                        }
+
+                        result = core::value(core::object_t{{operand_key, core::value(core::array_t{result, parse_times_div()})}});
+                    }
+
+                    return result;
+                }
+
+                core::value parse_times_div()
+                {
+                    char c;
+                    core::value operand_key;
+                    core::value result;
+
+                    result = parse_value();
+
+                    while (true)
+                    {
+                        stream() >> c;
+                        if (!stream())
+                            return result;
+
+                        if (c == '*')
+                            operand_key.set_string("mul");
+                        else if (c == '/')
+                            operand_key.set_string("div");
+                        else if (c == '%')
+                            operand_key.set_string("mod");
+                        else
+                        {
+                            stream().unget();
+                            return result;
+                        }
+
+                        result = core::value(core::object_t{{operand_key, core::value(core::array_t{result, parse_value()})}});
+                    }
+
+                    return result;
+                }
+
+                core::value parse_value(bool strictly_values = false)
+                {
+                    char c;
+
+                    stream() >> c;
+
+                    if (!stream())
+                        throw core::error("SQL - expected value");
+                    else if (c == '-')
+                    {
+                        core::value result = parse_value(strictly_values);
+
+                        if (result.is_int() || result.is_uint())
+                            result.set_int(-result.as_int());
+                        else
+                            result.set_real(-result.as_real());
+
+                        return result;
+                    }
+                    else if (c == '+')
+                    {
+                        core::value result = parse_value(strictly_values);
+
+                        if (!result.is_int() && !result.is_uint())
+                            result.convert_to_real();
+
+                        return result;
+                    }
+                    else if (c == '(' && !strictly_values)
+                    {
+                        core::value result = parse_expression();
+                        stream() >> c;
+                        if (!stream() || c != ')')
+                            throw core::error("SQL - expected ')'");
+
+                        return result;
+                    }
+                    else if (isalnum(c & 0xff))
+                    {
+                        std::string buffer;
+
+                        do
+                            buffer.push_back(tolower(c & 0xff));
+                        while (c = stream().get(), stream() && (isalnum(c & 0xff) ||
+                                                                c == '_' ||
+                                                                c == '$' ||
+                                                                (isdigit(buffer.front() & 0xff) && (c == '+' || c == '-' || c == '.')) ||
+                                                                ((c & 0xff) >= 0x80)));
+
+                        if (stream())
+                            stream().unget();
+
+                        // Attempt to read as an integer
+                        {
+                            core::istring_wrapper_stream temp_stream(buffer);
+                            core::int_t value;
+                            temp_stream >> value;
+                            if (!temp_stream.fail() && temp_stream.get() == EOF)
+                                return core::value(value);
+                        }
+
+                        // Attempt to read as an unsigned integer
+                        {
+                            core::istring_wrapper_stream temp_stream(buffer);
+                            core::uint_t value;
+                            temp_stream >> value;
+                            if (!temp_stream.fail() && temp_stream.get() == EOF)
+                                return core::value(value);
+                        }
+
+                        // Attempt to read as a real
+                        if (buffer.find_first_of("eE.") != std::string::npos)
+                        {
+                            core::istring_wrapper_stream temp_stream(buffer);
+                            core::real_t value;
+                            temp_stream >> value;
+                            if (!temp_stream.fail() && temp_stream.get() == EOF)
+                                return core::value(value);
+                        }
+
+                        // Revert to string, check if it is a function
+                        stream() >> c;
+                        if (stream() && c == '(')
+                        {
+                            core::value name_and_params;
+
+                            name_and_params.set_array(core::array_t());
+                            name_and_params.push_back(core::value(buffer));
+
+                            stream() >> c;
+                            if (stream() && c != ')')
+                            {
+                                stream().unget();
+
+                                do
+                                {
+                                    name_and_params.push_back(parse_expression());
+                                    stream() >> c;
+                                } while (stream() && c == ',');
+                            }
+
+                            if (c != ')')
+                                throw core::error("SQL - expected ')' closing function call");
+
+                            return core::value(core::object_t{{core::value("func"), name_and_params}});
+                        }
+                        else if (stream())
+                            stream().unget();
+
+                        if (buffer == "null")
+                            return core::value();
+                        return core::value(buffer, core::symbol);
+                    }
+                    else
+                        throw core::custom_error("SQL - expected value but found unexpected '" + ucs_to_utf8(c) + "'");
+
+                    // Never reached
+                    return core::value();
+                }
+            };
+        }
+
+        // sql_select_where_filter tests tuples for whether they should be included in the output (equivalent to the SQL 'WHERE' clause)
+        //
+        // This filter can only test arrays of objects (i.e. tuples must be represented as objects, not arrays)
+        // See impl::sql_expression_evaluator for details
+        class sql_select_where_filter : public core::buffer_filter
+        {
+            impl::sql_expression_evaluator select;
+
+        public:
+            sql_select_where_filter(core::stream_handler &output, const core::value &query)
+                : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
+                , select(query)
+            {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::select_where_filter(" + output.name() + ")";
+            }
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                if (select(v))
+                    buffer_filter::write_buffered_value_(v, is_key);
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                if (current_container() != core::array)
+                    return false;
+
+                if (select(v))
+                    return buffer_filter::write_(v, is_key);
+                return true; // The value was handled, so don't keep processing it
+            }
+        };
+
+        // sql_select_filter modifies tuples to only contain the appropriate elements (equivalent to the SQL 'SELECT' statement, without extra modifications)
+        //
+        // This filter can only test arrays of objects (i.e. tuples must be represented as objects, not arrays)
+        // See impl::sql_expression_evaluator for details
+        class sql_select_filter : public core::buffer_filter
+        {
+            core::value select, where;
+            bool selection_order_is_important;
+
+        public:
+            sql_select_filter(core::stream_handler &output, const std::string &sql, bool selection_order_is_important = false)
+                : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
+                , selection_order_is_important(selection_order_is_important)
+            {
+                impl::sql_parser parser(sql);
+                parser >> select; // Parse "SELECT" field into select, but other clauses are parsed as well
+                where = parser.get_where(); // This value was parsed via the expression in the line above
+            }
+
+            sql_select_filter(core::stream_handler &output, const core::value &select_query, const core::value &where_clause = core::value(), bool selection_order_is_important = false)
+                : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
+                , select(select_query)
+                , where(where_clause)
+                , selection_order_is_important(selection_order_is_important)
+            {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::sql_select_filter(" + output.name() + ")";
+            }
+
+        protected:
+            void write_buffered_value_(const value &v, bool is_key)
+            {
+                core::value copy;
+                if (impl::sql_expression_evaluator{where}(v) &&
+                    impl::sql_expression_evaluator{select}(v, &copy, selection_order_is_important))
+                    buffer_filter::write_buffered_value_(copy, is_key);
+            }
+
+            bool write_(const value &v, bool is_key)
+            {
+                if (current_container() != core::array)
+                    return false;
+
+                core::value copy;
+                if (impl::sql_expression_evaluator{where}(v) &&
+                    impl::sql_expression_evaluator{select}(v, &copy, selection_order_is_important))
+                    return buffer_filter::write_(copy, is_key);
+                return true; // The value was handled, so don't keep processing it
+            }
+        };
 
 #ifndef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
         template<core::type from, core::type to>
@@ -1424,6 +2870,41 @@ namespace cppdatalib
         {
             return custom_converter_filter<measure, Converter>(output, c);
         }
+
+#ifndef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+        class string_converter_filter : public impl::stream_filter_base
+        {
+            struct string_converter_filter_impl
+            {
+                void operator()(core::value &v)
+                {
+                    v.convert_to_string();
+                }
+            } convert;
+
+        public:
+            string_converter_filter(core::stream_handler &output)
+                : stream_filter_base(output)
+            {}
+
+            std::string name() const
+            {
+                return "cppdatalib::core::string_converter_filter(" + output.name() + ")";
+            }
+
+        protected:
+            bool write_(const value &v, bool is_key)
+            {
+                if (!v.is_string())
+                {
+                    value copy(v);
+                    convert(copy);
+                    return stream_filter_base::write_(copy, is_key);
+                }
+                return false;
+            }
+        };
+#endif
 
         // TODO: Currently, conversions from arrays and objects are not supported.
         //       This is because conversion of arrays and objects would require a cache of the entire stream,

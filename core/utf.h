@@ -43,6 +43,17 @@ namespace cppdatalib
             }
         }
 
+        template<typename It>
+        void ascii_lowercase(It begin, It end)
+        {
+            for (; begin != end; ++begin)
+            {
+                unsigned char c = *begin;
+                if (c < 0x80)
+                    *begin = tolower(c);
+            }
+        }
+
         // Returns string with ASCII characters converted to lowercase
         std::string ascii_lowercase_copy(const std::string &str)
         {
@@ -62,12 +73,43 @@ namespace cppdatalib
             }
         }
 
+        template<typename It>
+        void ascii_uppercase(It begin, It end)
+        {
+            for (; begin != end; ++begin)
+            {
+                unsigned char c = *begin;
+                if (c < 0x80)
+                    *begin = toupper(c);
+            }
+        }
+
         // Returns string with ASCII characters converted to uppercase
         std::string ascii_uppercase_copy(const std::string &str)
         {
             std::string copy(str);
             ascii_uppercase(copy);
             return copy;
+        }
+
+        encoding encoding_from_name(const char *encoding_name)
+        {
+            if (!strcmp(encoding_name, "UTF-8"))
+                return utf8;
+            else if (!strcmp(encoding_name, "UTF-16BE"))
+                return utf16_big_endian;
+            else if (!strcmp(encoding_name, "UTF-16LE"))
+                return utf16_little_endian;
+            else if (!strcmp(encoding_name, "UTF-32BE"))
+                return utf32_big_endian;
+            else if (!strcmp(encoding_name, "UTF-32LE"))
+                return utf32_little_endian;
+            else if (!strcmp(encoding_name, "UTF-32-2143"))
+                return utf32_2143_endian;
+            else if (!strcmp(encoding_name, "UTF-32-3412"))
+                return utf32_3412_endian;
+            else
+                return unknown;
         }
 
         // Returns empty string if invalid codepoint is encountered
@@ -757,26 +799,6 @@ namespace cppdatalib
                 result.push_back(utf_to_ucs(s, mode, i, i));
 
             return result;
-        }
-
-        encoding encoding_from_name(const char *encoding_name)
-        {
-            if (!strcmp(encoding_name, "UTF-8"))
-                return utf8;
-            else if (!strcmp(encoding_name, "UTF-16BE"))
-                return utf16_big_endian;
-            else if (!strcmp(encoding_name, "UTF-16LE"))
-                return utf16_little_endian;
-            else if (!strcmp(encoding_name, "UTF-32BE"))
-                return utf32_big_endian;
-            else if (!strcmp(encoding_name, "UTF-32LE"))
-                return utf32_little_endian;
-            else if (!strcmp(encoding_name, "UTF-32-2143"))
-                return utf32_2143_endian;
-            else if (!strcmp(encoding_name, "UTF-32-3412"))
-                return utf32_3412_endian;
-            else
-                return unknown;
         }
 
         std::vector<uint32_t> utf_to_ucs(const std::string &s, const char *encoding_name)

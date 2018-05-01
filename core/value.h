@@ -114,6 +114,8 @@ namespace cppdatalib
             uuid, // A generic UUID value (unknown text encoding)
             function, // A generic function value (unknown text encoding or language)
             javascript, // A section of executable JavaScript code (unknown text encoding, likely UTF-8)
+            comment, // A comment, not to be used as an actual string (where supported by the output format)
+            program_directive, // A program instruction or directive, not to be used as an actual string (where supported by the output format)
 
             // Binary strings
             blob = -199, // A chunk of binary data
@@ -248,6 +250,8 @@ namespace cppdatalib
                 case uuid: return "UUID";
                 case function: return "function";
                 case javascript: return "JavaScript";
+                case comment: return "comment";
+                case program_directive: return "program directive";
 
                 case blob: return "binary (unknown data)";
                 case binary_symbol: return "binary symbol";
@@ -997,6 +1001,12 @@ namespace cppdatalib
             explicit
 #endif
             operator Template<N, Ts...>() const {return cast_sized_template_from_cppdatalib<Template, N, Ts...>(*this);}
+
+            // Returns the memory (in bytes of a platform-dependent bit width) consumed by this value
+            // Note that this value may be inaccurate, and should only be used as a rough estimate
+            // This algorithm will not be accurate if small-value-optimization is used, or in the case of objects,
+            // what kind of tree is used under the hood
+            uint64_t memory_consumed() const;
 
         private:
             // WARNING: DO NOT CALL mutable_clear() anywhere but the destructor!
@@ -2613,6 +2623,57 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             delete attr_; attr_ = nullptr;
 #endif
+        }
+
+        inline uint64_t value::memory_consumed() const
+        {
+            class traverser
+            {
+                uint64_t size_;
+
+            public:
+                traverser() : size_(0) {}
+
+                uint64_t size() const {return size_;}
+
+                bool operator()(const core::value *arg, core::value::traversal_ancestry_finder arg_finder, bool prefix)
+                {
+                    (void) arg_finder;
+
+                    if (prefix)
+                    {
+                        size_ += sizeof(value);
+
+                        switch (arg->get_type())
+                        {
+#ifdef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+                            case string: size_ += sizeof(string_t) + arg->get_string_unchecked().capacity(); break;
+#else
+                            case string: size_ += arg->get_string_unchecked().capacity(); break;
+#endif
+                            case array: size_ += sizeof(array_t) + sizeof(value) * (arg->get_array_unchecked().data().capacity() - arg->get_array_unchecked().size()); break;
+                            case object: size_ += sizeof(object_t) + sizeof(void*) * 2 * arg->get_object_unchecked().size(); break;
+                            default: break;
+                        }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                        if (arg->attr_)
+                        {
+                            size_ += sizeof(object_t) + sizeof(void*) * 2 * arg->attr_->size();
+
+                            for (const auto &attr: *arg->attr_)
+                                size_ += attr.first.memory_consumed() + attr.second.memory_consumed();
+                        }
+#endif
+                    }
+
+                    return true;
+                }
+            };
+
+            traverser t;
+            traverse(t);
+            return t.size();
         }
 
         namespace impl

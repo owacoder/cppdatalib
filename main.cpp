@@ -8,7 +8,7 @@
 #define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
 //#define CPPDATALIB_ENABLE_BOOST_DYNAMIC_BITSET
 #define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
-#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
+//#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
 #define CPPDATALIB_THROW_IF_WRONG_TYPE
 #undef CPPDATALIB_ENABLE_MYSQL
@@ -739,20 +739,19 @@ void test_attributes()
         writer.write_out_of_order(1, 1);
         writer.write_out_of_order(3, 3);
         writer.write_out_of_order(2, 2);
-        //writer.write_out_of_order(0, 0);
+        writer.write_out_of_order(0, 0);
         writer.write_out_of_order(4, 4);
-        writer.write_out_of_order(7, 7);
+        //writer.write_out_of_order(7, 7);
         writer.write_out_of_order(5, 5);
         writer.write_out_of_order(8, 8);
         writer.write_out_of_order(10, 9);
-        writer.write_out_of_order(0, -1);
         writer.end_array(cppdatalib::core::array_t());
         writer.end();
 
         return;
 
         cppdatalib::http::parser(cppdatalib::core::value("http://owacoder.com"),
-                                 cppdatalib::core::poco_network_library,
+                                 cppdatalib::core::default_network_library,
                                  "GET",
                                  cppdatalib::core::object_t(),
                                  1,
@@ -813,11 +812,11 @@ void test_attributes()
         stream.str(str);
         std::cout << cppdatalib::core::ucs_to_utf(0xD1, "UTF-8");
 
-        cppdatalib::core::iencodingstream encstream(stream, cppdatalib::core::encoding_from_name("UTF-8"));
+        /*cppdatalib::core::iencodingstream encstream(stream, cppdatalib::core::encoding_from_name("UTF-8"));
 
         xml << cppdatalib::xml::parser(encstream, true);
         std::cout << xml;
-        cppdatalib::xml::stream_writer(std::cout) << xml;
+        cppdatalib::xml::stream_writer(std::cout) << xml;*/
 
         return;
 
@@ -856,7 +855,7 @@ void test_mmap()
 
 #include <qtapp.h>
 
-int main(int argc, char **argv)
+int rmain(int argc, char **argv)
 {
     //return readme_simple_test4();
 
@@ -1005,4 +1004,149 @@ int main(int argc, char **argv)
 	system("pause");
 #endif
     return 0;
+}
+
+int main(int argc, char **argv)
+{
+    std::unique_ptr<std::ifstream> infile;
+    std::unique_ptr<std::ofstream> outfile;
+    std::unique_ptr<cppdatalib::core::stream_input> input;
+    std::unique_ptr<cppdatalib::core::stream_handler> output;
+
+    std::string in, out;
+    std::string in_scheme, out_scheme;
+    std::string in_extension, out_extension;
+
+    if (argc != 3)
+    {
+        std::cerr << "usage: cppdatalib <input> <output>\n";
+        return 1;
+    }
+
+    try
+    {
+        using namespace cppdatalib::json;
+
+        cppdatalib::core::value tree, where;
+        const char *sql = "select second where second";
+        tree << cppdatalib::core::impl::sql_parser(sql, cppdatalib::core::impl::sql_parser::select_element);
+        where << cppdatalib::core::impl::sql_parser(sql, cppdatalib::core::impl::sql_parser::where_element);
+        cppdatalib::core::value data = "[{\"impl\": 3, \"second\": 76.3, \"third\": 3}, {\"impl\": 2, \"second\": 90.9987, \"third\": 1.4},  {\"impl\": 4, \"second\": null, \"third\": 2.4}]"_json;
+        std::cout << tree << where << "\n";
+        cppdatalib::core::dump::stream_writer writer(std::cout, 2);
+        cppdatalib::core::sql_select_filter(writer, sql, false) << data;
+    } catch (const cppdatalib::core::error &e) {
+        std::cout << e.what() << std::endl;
+    }
+    return 0;
+
+    in = argv[1];
+    out = argv[2];
+
+    // Get input scheme
+    size_t in_colon = in.find(':');
+    if (in_colon != in.npos)
+        if (in.substr(in_colon, 3) == "://")
+            in_scheme = in.substr(0, in_colon);
+
+    // Get output scheme
+    size_t out_colon = out.find(':');
+    if (out_colon != out.npos)
+        if (out.substr(out_colon, 3) == "://")
+            out_scheme = out.substr(0, out_colon);
+
+    if (in_scheme.empty() || in_scheme == "file")
+    {
+        // Get input file extension
+        size_t in_filetype = in.rfind('.');
+        size_t in_path = in.rfind('/');
+
+        if (in_filetype == in.npos || (in_path != in.npos && in_path > in_filetype))
+        {
+            std::cerr << "cppdatalib - input file has no type specified\n";
+            return 1;
+        }
+
+        in_extension = in.substr(in_filetype + 1);
+        if (in_scheme.size())
+            in = in.substr(in_scheme.size() + 3);
+
+        infile.reset(new std::ifstream());
+        infile.get()->open(in, std::ios_base::binary | std::ios_base::in);
+        if (!*infile.get())
+        {
+            std::cerr << "cppdatalib - input file is not readable\n";
+            return 1;
+        }
+
+        if (in_extension == "benc") input.reset(new cppdatalib::bencode::parser(*infile.get()));
+        else if (in_extension == "binn") input.reset(new cppdatalib::binn::parser(*infile.get()));
+        else if (in_extension == "bson") input.reset(new cppdatalib::bson::parser(*infile.get()));
+        else if (in_extension == "csv") input.reset(new cppdatalib::csv::parser(*infile.get()));
+        else if (in_extension == "tsv") input.reset(new cppdatalib::tsv::parser(*infile.get()));
+        else if (in_extension == "json") input.reset(new cppdatalib::json::parser(*infile.get()));
+        else if (in_extension == "mpk") input.reset(new cppdatalib::message_pack::parser(*infile.get()));
+        else if (in_extension == "ubjson") input.reset(new cppdatalib::ubjson::parser(*infile.get()));
+        else if (in_extension == "xml") input.reset(new cppdatalib::xml::parser(*infile.get(), false));
+        else
+        {
+            std::cerr << "cppdatalib - unknown input file format\n";
+            return 1;
+        }
+    }
+
+    if (out_scheme.empty() || out_scheme == "file")
+    {
+        // Get output file extension
+        size_t out_filetype = out.rfind('.');
+        size_t out_path = out.rfind('/');
+
+        if (out_filetype == out.npos || (out_path != out.npos && out_path > out_filetype))
+        {
+            std::cerr << "cppdatalib - output file has no type specified\n";
+            return 1;
+        }
+
+        out_extension = out.substr(out_filetype + 1);
+        if (out_scheme.size())
+            out = out.substr(out_scheme.size() + 3);
+
+        outfile.reset(new std::ofstream());
+        outfile.get()->open(out, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+
+        if (out_extension == "benc") output.reset(new cppdatalib::bencode::stream_writer(*outfile.get()));
+        else if (out_extension == "binn") output.reset(new cppdatalib::binn::stream_writer(*outfile.get()));
+        else if (out_extension == "bjson") output.reset(new cppdatalib::bjson::stream_writer(*outfile.get()));
+        else if (out_extension == "csv") output.reset(new cppdatalib::csv::stream_writer(*outfile.get()));
+        else if (out_extension == "tsv") output.reset(new cppdatalib::tsv::stream_writer(*outfile.get()));
+        else if (out_extension == "json") output.reset(new cppdatalib::json::stream_writer(*outfile.get()));
+        else if (out_extension == "mpk") output.reset(new cppdatalib::message_pack::stream_writer(*outfile.get()));
+        else if (out_extension == "netstrings") output.reset(new cppdatalib::netstrings::stream_writer(*outfile.get()));
+        else if (out_extension == "ubjson") output.reset(new cppdatalib::ubjson::stream_writer(*outfile.get()));
+        else if (out_extension == "xlsx") output.reset(new cppdatalib::xml_xls::document_writer(*outfile.get(), "Worksheet 1"));
+        else if (out_extension == "xml") output.reset(new cppdatalib::xml::document_writer(*outfile.get()));
+        else
+        {
+            std::cerr << "cppdatalib - unknown output file format\n";
+            return 1;
+        }
+    }
+
+    try
+    {
+        cppdatalib::core::value v;
+        *input.get() >> v;
+        std::cout << "Estimated memory usage: " << std::flush;
+        std::cout << v.memory_consumed() << std::endl;
+        *output.get() << v;
+        /*input.get()->begin(*output.get());
+        do
+        {
+            input.get()->write_one();
+        } while (input.get()->busy());
+        input.get()->end();*/
+    } catch (const cppdatalib::core::error &e) {
+        std::cerr << "cppdatalib: " << e.what() << "\n";
+        return 1;
+    }
 }
