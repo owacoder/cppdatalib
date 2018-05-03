@@ -1336,6 +1336,30 @@ namespace cppdatalib
 
         namespace impl
         {
+            struct sql_function
+            {
+                // Args should be equal to (-n - 1) for a minimum number of arguments equal to n.
+                // Args should be equal to n for an exact number of arguments equal to n.
+                sql_function(long args,
+                             std::function<core::value (const core::value &)> impl)
+                    : args(args)
+                    , impl(impl)
+                {}
+
+                bool proper_number_of_arguments(size_t passed_args) const
+                {
+                    if (args < 0)
+                        return size_t(-args) - 1 <= passed_args;
+                    else
+                        return size_t(args) == passed_args;
+                }
+
+                long args;
+                std::function<core::value (const core::value &)> impl;
+            };
+
+            typedef std::map<std::string, sql_function> sql_function_list;
+
             // This evaluator can only test objects (i.e. tuples must be represented as objects, not arrays)
             // Tuple properties may be objects (that is, in the incoming data),
             // but object values may not appear in any queries since objects are used for the query heirarchy.
@@ -1381,6 +1405,7 @@ namespace cppdatalib
             //
             class sql_expression_evaluator
             {
+                const sql_function_list &functions_;
                 const core::value &query;
 
                 enum operator_type
@@ -1411,7 +1436,7 @@ namespace cppdatalib
                     mod
                 };
 
-                bool compare(operator_type type, const core::value *one, const core::value *two, core::value *non_bool_result = nullptr)
+                static bool compare(operator_type type, const core::value *one, const core::value *two, core::value *non_bool_result = nullptr)
                 {
                     bool result = false;
 
@@ -1666,7 +1691,9 @@ namespace cppdatalib
                 }
 
             public:
-                sql_expression_evaluator(const core::value &query) : query(query) {}
+                sql_expression_evaluator(const sql_function_list &functions, const core::value &query) : functions_(functions), query(query) {}
+
+                static bool are_equal(const core::value &one, const core::value &two) {return compare(equals, &one, &two);}
 
                 bool operator()(const core::value &test, core::value *non_bool_result = nullptr, bool order_is_important = false)
                 {
@@ -1730,7 +1757,7 @@ namespace cppdatalib
                                 }
                                 else if (one->is_object()) // Another predicate specified
                                 {
-                                    sql_expression_evaluator{*one}(test, &temp_one);
+                                    sql_expression_evaluator{functions_, *one}(test, &temp_one);
 
                                     one = &temp_one;
                                 }
@@ -1800,7 +1827,7 @@ namespace cppdatalib
                                     }
                                     else if (one->is_object()) // Another predicate specified
                                     {
-                                        sql_expression_evaluator{*one}(test, &temp_one);
+                                        sql_expression_evaluator{functions_, *one}(test, &temp_one);
 
                                         one = &temp_one;
                                     }
@@ -1811,7 +1838,18 @@ namespace cppdatalib
                                 ++idx;
                             }
 
-                            throw core::custom_error("SQL - unknown function '" + function_name + "' being called with " + std::to_string(parameters.size()) + " argument(s)");
+                            auto n = functions_.find(function_name);
+                            if (n != functions_.end())
+                            {
+                                if (!n->second.proper_number_of_arguments(parameters.size()))
+                                    throw core::custom_error("SQL - function '" + ascii_uppercase_copy(function_name) + "' being called improperly with " + std::to_string(parameters.size()) + " argument(s)");
+
+                                *non_bool_result = n->second.impl(parameters);
+                            }
+                            else
+                            {
+                                throw core::custom_error("SQL - unknown function '" + ascii_uppercase_copy(function_name) + "' being called with " + std::to_string(parameters.size()) + " argument(s)");
+                            }
 
                             return true;
                         }
@@ -1821,7 +1859,7 @@ namespace cppdatalib
                     else if ((operator_ = where, predicate = query.member_ptr("where")))
                     {
                         if (predicate->is_object())
-                            result = sql_expression_evaluator{*predicate}(test);
+                            result = sql_expression_evaluator{functions_, *predicate}(test);
                     }
 
                     //
@@ -1866,7 +1904,7 @@ namespace cppdatalib
                             }
                             else if (one->is_object()) // Another predicate specified
                             {
-                                sql_expression_evaluator{*one}(test, &temp_one);
+                                sql_expression_evaluator{functions_, *one}(test, &temp_one);
 
                                 one = &temp_one;
                             } // Otherwise a normal value is assumed
@@ -1891,7 +1929,8 @@ namespace cppdatalib
                             {
                                 if (operator_ == as)
                                     throw core::error("SQL - invalid query has non-name specified as target of 'AS' expression");
-                                sql_expression_evaluator{*two}(test, &temp_two);
+
+                                sql_expression_evaluator{functions_, *two}(test, &temp_two);
 
                                 two = &temp_two;
                             } // Otherwise a normal value is assumed
@@ -2102,6 +2141,257 @@ namespace cppdatalib
                     return result;
                 }
             };
+
+            inline sql_function_list make_sql_function_list()
+            {
+                sql_function_list result;
+
+                result.insert({"abs", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_int()? core::value(abs(v.as_int())): !v.is_real() && !v.is_string()? v: core::value(fabs(v.as_real()));
+                               })});
+                result.insert({"acos", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::real_t r = v.as_real();
+                                   return v.is_null() || r < -1.0 || r > 1.0? core::value(): core::value(acos(r));
+                               })});
+                result.insert({"ascii", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::string_t s = v.as_string();
+                                   return v.is_null()? v: s.empty()? core::value(0): core::value(s.front() & 0xff);
+                               })});
+                result.insert({"asin", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::real_t r = v.as_real();
+                                   return v.is_null() || r < -1.0 || r > 1.0? core::value(): core::value(asin(r));
+                               })});
+                result.insert({"atan", sql_function(-2, [](const core::value &params)
+                               {
+                                   if (params.size() == 1)
+                                   {
+                                       core::value v = params.const_element(0);
+                                       core::real_t r = v.as_real();
+                                       return v.is_null()? core::value(): core::value(atan(r));
+                                   }
+                                   else if (params.size() == 2)
+                                   {
+                                       core::value y = params.const_element(0);
+                                       core::value x = params.const_element(1);
+                                       return y.is_null() || x.is_null()? core::value(): core::value(atan2(y.as_real(), x.as_real()));
+                                   }
+                                   else
+                                       throw core::error("SQL - function 'ATAN' not called with one or two arguments");
+                               })});
+                result.insert({"atan2", sql_function(2, [](const core::value &params)
+                               {
+                                   core::value y = params.const_element(0);
+                                   core::value x = params.const_element(1);
+                                   return y.is_null() || x.is_null()? core::value(): core::value(atan2(y.as_real(), x.as_real()));
+                               })});
+                // TODO: `BIN()`
+                result.insert({"bit_length", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_null()? v: core::value(v.as_string().size() * 8);
+                               })});
+                result.insert({"ceil", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return !v.is_real() && !v.is_string()? v: core::value(ceil(v.as_real()));
+                               })});
+                result.insert({"ceiling", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return !v.is_real() && !v.is_string()? v: core::value(ceil(v.as_real()));
+                               })});
+                // TODO: `CHAR()`
+                result.insert({"char_length", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::string_t s = v.as_string();
+                                   if (v.is_null())
+                                       return v;
+
+                                   size_t count = 0;
+                                   for (size_t i = 0; i < s.size(); ++count)
+                                       core::utf8_to_ucs(s, i, i);
+                                   return core::value(count);
+                               })});
+                result.insert({"character_length", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::string_t s = v.as_string();
+                                   if (v.is_null())
+                                       return v;
+
+                                   size_t count = 0;
+                                   for (size_t i = 0; i < s.size(); ++count)
+                                       core::utf8_to_ucs(s, i, i);
+                                   return core::value(count);
+                               })});
+                result.insert({"concat", sql_function(-2, [](const core::value &params)
+                               {
+                                   core::value result;
+
+                                   for (const auto &item: params.get_array_unchecked())
+                                   {
+                                       if (item.is_null())
+                                           return core::value();
+
+                                       result.get_string_ref() += item.as_string();
+                                   }
+
+                                   return result;
+                               })});
+                result.insert({"concat_ws", sql_function(-3, [](const core::value &params)
+                               {
+                                   core::value result;
+                                   core::value separator = params.const_element(0);
+                                   size_t idx = 0;
+
+                                   if (separator.is_null())
+                                       return separator;
+                                   separator.convert_to_string();
+
+                                   for (const auto &item: params.get_array_unchecked())
+                                   {
+                                       if (++idx <= 1 || item.is_null())
+                                           continue;
+
+                                       if (idx > 2)
+                                           result.get_string_ref() += separator.get_string_unchecked();
+
+                                       result.get_string_ref() += item.as_string();
+                                   }
+
+                                   return result;
+                               })});
+                // TODO: `CONV()`
+                result.insert({"cos", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_null()? v: core::value(cos(v.as_real()));
+                               })});
+                result.insert({"cot", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_null()? v: core::value(1.0 / tan(v.as_real()));
+                               })});
+                // TODO: `CRC32()`
+                result.insert({"degrees", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_null()? v: core::value(v.as_real() / M_PI * 180);
+                               })});
+                result.insert({"elt", sql_function(-2, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   if (v.is_null() || v.as_int() < 1 || v.as_uint() >= params.size())
+                                       return core::value();
+
+                                   return core::value(params.const_element(v.as_uint()).as_string());
+                               })});
+                result.insert({"exp", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_null()? v: core::value(exp(v.as_real()));
+                               })});
+                // TODO: `EXPORT_SET()`
+                result.insert({"floor", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return !v.is_real() && !v.is_string()? v: core::value(floor(v.as_real()));
+                               })});
+                // TODO: `FORMAT()`
+                // TODO: `HEX()`
+                result.insert({"if", sql_function(3, [](const core::value &params)
+                               {
+                                   core::value predicate = params.const_element(0);
+                                   return predicate.is_null() || predicate.as_real() == 0.0? params.const_element(2): params.const_element(1);
+                               })});
+                result.insert({"ifnull", sql_function(2, [](const core::value &params)
+                               {
+                                   core::value predicate = params.const_element(0);
+                                   return predicate.is_null()? params.const_element(1): predicate;
+                               })});
+                result.insert({"nullif", sql_function(2, [](const core::value &params)
+                               {
+                                   core::value one = params.const_element(0);
+                                   core::value two = params.const_element(1);
+                                   return impl::sql_expression_evaluator::are_equal(one, two)? core::value(): one;
+                               })});
+                result.insert({"ln", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::real_t r = v.as_real();
+                                   return v.is_null() || r < 0.0? core::value(): core::value(log(r));
+                               })});
+                // TODO: `LOG()`
+                result.insert({"log2", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::real_t r = v.as_real();
+                                   return v.is_null() || r < 0.0? core::value(): core::value(log2(r));
+                               })});
+                result.insert({"log10", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::real_t r = v.as_real();
+                                   return v.is_null() || r < 0.0? core::value(): core::value(log(r));
+                               })});
+                // TODO: `MOD()`
+                result.insert({"pi", sql_function(0, [](const core::value &)
+                               {
+                                   return core::value(M_PI);
+                               })});
+                result.insert({"pow", sql_function(2, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::value w = params.const_element(1);
+                                   return v.is_null() || w.is_null()? core::value(): core::value(pow(v.as_real(), w.as_real()));
+                               })});
+                result.insert({"power", sql_function(2, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::value w = params.const_element(1);
+                                   return v.is_null() || w.is_null()? core::value(): core::value(pow(v.as_real(), w.as_real()));
+                               })});
+                result.insert({"radians", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_null()? v: core::value(v.as_real() / 180 * M_PI);
+                               })});
+                // TODO: `RAND()`
+                // TODO: `ROUND()`
+                // TODO: `SIGN()`
+                result.insert({"sin", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_null()? v: core::value(sin(v.as_real()));
+                               })});
+                result.insert({"sqrt", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   core::real_t r = v.as_real();
+                                   return v.is_null() || r < 0.0? core::value(): core::value(sqrt(r));
+                               })});
+                result.insert({"tan", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   return v.is_null()? v: core::value(tan(v.as_real()));
+                               })});
+                // TODO: `TRUNCATE()`
+                result.insert({"version", sql_function(0, [](const core::value &)
+                               {
+                                   return core::value("1.0.0");
+                               })});
+
+                return result;
+            }
         }
 
         namespace impl
@@ -2601,6 +2891,48 @@ namespace cppdatalib
 
                         return result;
                     }
+                    else if (c == '\'' || c == '"' || c == '`')
+                    {
+                        core::string_t buffer;
+                        char str_type = c;
+
+                        while (c = stream().get(), stream())
+                        {
+                            if (c == '\\')
+                            {
+                                c = stream().get();
+                                if (!stream())
+                                    throw core::error("SQL - unexpected end of string");
+
+                                switch (c)
+                                {
+                                    case '0': buffer.push_back(0); break;
+                                    case 'b': buffer.push_back('\b'); break;
+                                    case 'n': buffer.push_back('\n'); break;
+                                    case 'r': buffer.push_back('\r'); break;
+                                    case 't': buffer.push_back('\r'); break;
+                                    case 'Z': buffer.push_back(26); break;
+                                    case '%':
+                                    case '_':
+                                        buffer.push_back('\\');
+                                        // Fallthrough
+                                    default:
+                                        buffer.push_back(c); break;
+                                }
+                            }
+                            else if (c == str_type)
+                            {
+                                if (stream().peek() == str_type)
+                                    buffer.push_back(stream().get());
+                                else
+                                    break; // Done with string
+                            }
+                            else
+                                buffer.push_back(c & 0xff);
+                        }
+
+                        return core::value(buffer, str_type == '`'? core::symbol: core::normal);
+                    }
                     else if (isalnum(c & 0xff))
                     {
                         std::string buffer;
@@ -2692,12 +3024,14 @@ namespace cppdatalib
         // See impl::sql_expression_evaluator for details
         class sql_select_where_filter : public core::buffer_filter
         {
+            impl::sql_function_list functions;
             impl::sql_expression_evaluator select;
 
         public:
             sql_select_where_filter(core::stream_handler &output, const core::value &query)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
-                , select(query)
+                , functions(impl::make_sql_function_list())
+                , select(functions, query)
             {}
 
             std::string name() const
@@ -2729,12 +3063,14 @@ namespace cppdatalib
         // See impl::sql_expression_evaluator for details
         class sql_select_filter : public core::buffer_filter
         {
+            impl::sql_function_list functions;
             core::value select, where;
             bool selection_order_is_important;
 
         public:
             sql_select_filter(core::stream_handler &output, const std::string &sql, bool selection_order_is_important = false)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
+                , functions(impl::make_sql_function_list())
                 , selection_order_is_important(selection_order_is_important)
             {
                 impl::sql_parser parser(sql);
@@ -2744,6 +3080,7 @@ namespace cppdatalib
 
             sql_select_filter(core::stream_handler &output, const core::value &select_query, const core::value &where_clause = core::value(), bool selection_order_is_important = false)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
+                , functions(impl::make_sql_function_list())
                 , select(select_query)
                 , where(where_clause)
                 , selection_order_is_important(selection_order_is_important)
@@ -2758,8 +3095,8 @@ namespace cppdatalib
             void write_buffered_value_(const value &v, bool is_key)
             {
                 core::value copy;
-                if (impl::sql_expression_evaluator{where}(v) &&
-                    impl::sql_expression_evaluator{select}(v, &copy, selection_order_is_important))
+                if (impl::sql_expression_evaluator{functions, where}(v) &&
+                    impl::sql_expression_evaluator{functions, select}(v, &copy, selection_order_is_important))
                     buffer_filter::write_buffered_value_(copy, is_key);
             }
 
@@ -2769,8 +3106,8 @@ namespace cppdatalib
                     return false;
 
                 core::value copy;
-                if (impl::sql_expression_evaluator{where}(v) &&
-                    impl::sql_expression_evaluator{select}(v, &copy, selection_order_is_important))
+                if (impl::sql_expression_evaluator{functions, where}(v) &&
+                    impl::sql_expression_evaluator{functions, select}(v, &copy, selection_order_is_important))
                     return buffer_filter::write_(copy, is_key);
                 return true; // The value was handled, so don't keep processing it
             }

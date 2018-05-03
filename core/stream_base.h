@@ -201,12 +201,17 @@ namespace cppdatalib
             // An API must call this when a scalar value is encountered,
             // although it should operate correctly for any value.
             //
-            // Comments and program instructions will be written as such,
+            // If `comments_and_directives_pass_through` is true,
+            // comments and program instructions will be written as such,
             // or discarded if the output format does not support them.
             // They do not affect nesting, validity, or other constraints.
             //
+            // Otherwise, if `comments_and_directives_pass_through` is false,
+            // comments and program instructions will be written as actual values,
+            // affecting nesting, validity, and other constraints.
+            //
             // Returns true if value was handled, false otherwise
-            bool write(const value &v)
+            bool write(const value &v, bool comments_and_directives_pass_through = false)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
@@ -214,15 +219,18 @@ namespace cppdatalib
                         nested_scopes.back().type_ == object &&
                         !nested_scopes.back().key_was_parsed();
 
-                if (v.get_subtype() == comment && v.is_string())
+                if (comments_and_directives_pass_through)
                 {
-                    comment_(v);
-                    return true;
-                }
-                else if (v.get_subtype() == program_directive && v.is_string())
-                {
-                    directive_(v);
-                    return true;
+                    if (v.get_subtype() == comment && v.is_string())
+                    {
+                        comment_(v);
+                        return true;
+                    }
+                    else if (v.get_subtype() == program_directive && v.is_string())
+                    {
+                        directive_(v);
+                        return true;
+                    }
                 }
 
                 if (!write_(v, is_key))

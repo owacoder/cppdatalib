@@ -1028,7 +1028,7 @@ int main(int argc, char **argv)
         using namespace cppdatalib::json;
 
         cppdatalib::core::value tree, where;
-        const char *sql = "select second where second";
+        const char *sql = "select ELT(1, 'Aa', 'Bb', 'Cc', 'Dd'), power(ifnull(second, 2), 0.5) as '' where second != null";
         tree << cppdatalib::core::impl::sql_parser(sql, cppdatalib::core::impl::sql_parser::select_element);
         where << cppdatalib::core::impl::sql_parser(sql, cppdatalib::core::impl::sql_parser::where_element);
         cppdatalib::core::value data = "[{\"impl\": 3, \"second\": 76.3, \"third\": 3}, {\"impl\": 2, \"second\": 90.9987, \"third\": 1.4},  {\"impl\": 4, \"second\": null, \"third\": 2.4}]"_json;
