@@ -29,8 +29,13 @@
 #include <set> // For duplicate_key_check_filter
 #include <algorithm> // For sorting and specialty filters
 #include <functional> // For sorting
+#include <cmath> // For M_PI and math functions
 
 #include <cassert>
+
+#ifndef M_PI
+#define M_PI 3.141592653589793238462642795
+#endif
 
 namespace cppdatalib
 {
@@ -1460,7 +1465,23 @@ namespace cppdatalib
                             }
 
                             if (one->is_string() && two->is_string())
-                                result = one->get_string_unchecked() == two->get_string_unchecked();
+                            {
+                                // Compare binary strings as case sensitive
+                                if (!core::subtype_is_text_string(one->get_subtype()) ||
+                                        !core::subtype_is_text_string(two->get_subtype()))
+                                    result = one->get_string_unchecked() == two->get_string_unchecked();
+                                // Compare text strings as case insensitive
+                                else if (one->get_string_unchecked().size() != two->get_string_unchecked().size())
+                                    result = false;
+                                else
+                                {
+                                    result = true;
+
+                                    for (size_t i = 0; i < one->get_string_unchecked().size(); ++i)
+                                        if (tolower(one->get_string_unchecked()[i] & 0xff) != tolower(two->get_string_unchecked()[i] & 0xff))
+                                            result = false;
+                                }
+                            }
                             else if (one->is_int())
                             {
                                 if (two->is_int())
@@ -1494,7 +1515,23 @@ namespace cppdatalib
                             }
 
                             if (one->is_string() && two->is_string())
-                                result = one->get_string_unchecked() == two->get_string_unchecked();
+                            {
+                                // Compare binary strings as case sensitive
+                                if (!core::subtype_is_text_string(one->get_subtype()) ||
+                                        !core::subtype_is_text_string(two->get_subtype()))
+                                    result = one->get_string_unchecked() == two->get_string_unchecked();
+                                // Compare text strings as case insensitive
+                                else if (one->get_string_unchecked().size() != two->get_string_unchecked().size())
+                                    result = false;
+                                else
+                                {
+                                    result = true;
+
+                                    for (size_t i = 0; i < one->get_string_unchecked().size(); ++i)
+                                        if (tolower(one->get_string_unchecked()[i] & 0xff) != tolower(two->get_string_unchecked()[i] & 0xff))
+                                            result = false;
+                                }
+                            }
                             else if (one->is_int())
                             {
                                 if (two->is_int())
@@ -1528,7 +1565,23 @@ namespace cppdatalib
                             }
 
                             if (one->is_string() && two->is_string())
-                                result = one->get_string_unchecked() != two->get_string_unchecked();
+                            {
+                                // Compare binary strings as case sensitive
+                                if (!core::subtype_is_text_string(one->get_subtype()) ||
+                                        !core::subtype_is_text_string(two->get_subtype()))
+                                    result = one->get_string_unchecked() != two->get_string_unchecked();
+                                // Compare text strings as case insensitive
+                                else if (one->get_string_unchecked().size() != two->get_string_unchecked().size())
+                                    result = true;
+                                else
+                                {
+                                    result = false;
+
+                                    for (size_t i = 0; i < one->get_string_unchecked().size(); ++i)
+                                        if (tolower(one->get_string_unchecked()[i] & 0xff) != tolower(two->get_string_unchecked()[i] & 0xff))
+                                            result = true;
+                                }
+                            }
                             else if (one->is_int())
                             {
                                 if (two->is_int())
@@ -1555,7 +1608,23 @@ namespace cppdatalib
                             }
 
                             if (one->is_string() && two->is_string())
-                                result = one->get_string_unchecked() != two->get_string_unchecked();
+                            {
+                                // Compare binary strings as case sensitive
+                                if (!core::subtype_is_text_string(one->get_subtype()) ||
+                                        !core::subtype_is_text_string(two->get_subtype()))
+                                    result = one->get_string_unchecked() != two->get_string_unchecked();
+                                // Compare text strings as case insensitive
+                                else if (one->get_string_unchecked().size() != two->get_string_unchecked().size())
+                                    result = true;
+                                else
+                                {
+                                    result = false;
+
+                                    for (size_t i = 0; i < one->get_string_unchecked().size(); ++i)
+                                        if (tolower(one->get_string_unchecked()[i] & 0xff) != tolower(two->get_string_unchecked()[i] & 0xff))
+                                            result = true;
+                                }
+                            }
                             else if (one->is_int())
                             {
                                 if (two->is_int())
@@ -1582,7 +1651,38 @@ namespace cppdatalib
                             }
 
                             if (one->is_string() && two->is_string())
-                                result = one->get_string_unchecked() < two->get_string_unchecked();
+                            {
+                                // Compare binary strings as case sensitive
+                                if (!core::subtype_is_text_string(one->get_subtype()) ||
+                                        !core::subtype_is_text_string(two->get_subtype()))
+                                    result = one->get_string_unchecked() < two->get_string_unchecked();
+                                // Compare text strings as case insensitive
+                                else
+                                {
+                                    result = false;
+
+                                    for (size_t i = 0; i < std::min(one->get_string_unchecked().size(), two->get_string_unchecked().size()); ++i)
+                                    {
+                                        int a = tolower(one->get_string_unchecked()[i] & 0xff);
+                                        int b = tolower(two->get_string_unchecked()[i] & 0xff);
+                                        if (a < b)
+                                        {
+                                            if (non_bool_result)
+                                                *non_bool_result = core::value(result);
+                                            return true;
+                                        }
+                                        else if (b < a)
+                                        {
+                                            if (non_bool_result)
+                                                *non_bool_result = core::value(result);
+                                            return false;
+                                        }
+                                    }
+
+                                    if (one->get_string_unchecked().size() < two->get_string_unchecked().size())
+                                        result = true;
+                                }
+                            }
                             else if (one->is_int())
                             {
                                 if (two->is_int())
@@ -1609,7 +1709,38 @@ namespace cppdatalib
                             }
 
                             if (one->is_string() && two->is_string())
-                                result = one->get_string_unchecked() > two->get_string_unchecked();
+                            {
+                                // Compare binary strings as case sensitive
+                                if (!core::subtype_is_text_string(one->get_subtype()) ||
+                                        !core::subtype_is_text_string(two->get_subtype()))
+                                    result = one->get_string_unchecked() > two->get_string_unchecked();
+                                // Compare text strings as case insensitive
+                                else
+                                {
+                                    result = false;
+
+                                    for (size_t i = 0; i < std::min(one->get_string_unchecked().size(), two->get_string_unchecked().size()); ++i)
+                                    {
+                                        int a = tolower(one->get_string_unchecked()[i] & 0xff);
+                                        int b = tolower(two->get_string_unchecked()[i] & 0xff);
+                                        if (a > b)
+                                        {
+                                            if (non_bool_result)
+                                                *non_bool_result = core::value(result);
+                                            return true;
+                                        }
+                                        else if (b > a)
+                                        {
+                                            if (non_bool_result)
+                                                *non_bool_result = core::value(result);
+                                            return false;
+                                        }
+                                    }
+
+                                    if (one->get_string_unchecked().size() > two->get_string_unchecked().size())
+                                        result = true;
+                                }
+                            }
                             else if (one->is_int())
                             {
                                 if (two->is_int())
@@ -1636,7 +1767,38 @@ namespace cppdatalib
                             }
 
                             if (one->is_string() && two->is_string())
-                                result = one->get_string_unchecked() <= two->get_string_unchecked();
+                            {
+                                // Compare binary strings as case sensitive
+                                if (!core::subtype_is_text_string(one->get_subtype()) ||
+                                        !core::subtype_is_text_string(two->get_subtype()))
+                                    result = one->get_string_unchecked() <= two->get_string_unchecked();
+                                // Compare text strings as case insensitive
+                                else
+                                {
+                                    result = false;
+
+                                    for (size_t i = 0; i < std::min(one->get_string_unchecked().size(), two->get_string_unchecked().size()); ++i)
+                                    {
+                                        int a = tolower(one->get_string_unchecked()[i] & 0xff);
+                                        int b = tolower(two->get_string_unchecked()[i] & 0xff);
+                                        if (a < b)
+                                        {
+                                            if (non_bool_result)
+                                                *non_bool_result = core::value(result);
+                                            return true;
+                                        }
+                                        else if (b < a)
+                                        {
+                                            if (non_bool_result)
+                                                *non_bool_result = core::value(result);
+                                            return false;
+                                        }
+                                    }
+
+                                    if (one->get_string_unchecked().size() <= two->get_string_unchecked().size())
+                                        result = true;
+                                }
+                            }
                             else if (one->is_int())
                             {
                                 if (two->is_int())
@@ -1663,7 +1825,38 @@ namespace cppdatalib
                             }
 
                             if (one->is_string() && two->is_string())
-                                result = one->get_string_unchecked() >= two->get_string_unchecked();
+                            {
+                                // Compare binary strings as case sensitive
+                                if (!core::subtype_is_text_string(one->get_subtype()) ||
+                                        !core::subtype_is_text_string(two->get_subtype()))
+                                    result = one->get_string_unchecked() >= two->get_string_unchecked();
+                                // Compare text strings as case insensitive
+                                else
+                                {
+                                    result = false;
+
+                                    for (size_t i = 0; i < std::min(one->get_string_unchecked().size(), two->get_string_unchecked().size()); ++i)
+                                    {
+                                        int a = tolower(one->get_string_unchecked()[i] & 0xff);
+                                        int b = tolower(two->get_string_unchecked()[i] & 0xff);
+                                        if (a > b)
+                                        {
+                                            if (non_bool_result)
+                                                *non_bool_result = core::value(result);
+                                            return true;
+                                        }
+                                        else if (b > a)
+                                        {
+                                            if (non_bool_result)
+                                                *non_bool_result = core::value(result);
+                                            return false;
+                                        }
+                                    }
+
+                                    if (one->get_string_unchecked().size() >= two->get_string_unchecked().size())
+                                        result = true;
+                                }
+                            }
                             else if (one->is_int())
                             {
                                 if (two->is_int())
@@ -2148,34 +2341,34 @@ namespace cppdatalib
 
                 result.insert({"abs", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_int()? core::value(abs(v.as_int())): !v.is_real() && !v.is_string()? v: core::value(fabs(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_int()? core::value(abs(v->as_int())): !v->is_real() && !v->is_string()? *v: core::value(fabs(v->as_real()));
                                })});
                 result.insert({"acos", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   core::real_t r = v.as_real();
-                                   return v.is_null() || r < -1.0 || r > 1.0? core::value(): core::value(acos(r));
+                                   const core::value *v = params.element_ptr(0);
+                                   core::real_t r = v->as_real();
+                                   return v->is_null() || r < -1.0 || r > 1.0? core::value(): core::value(acos(r));
                                })});
                 result.insert({"ascii", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   core::string_t s = v.as_string();
-                                   return v.is_null()? v: s.empty()? core::value(0): core::value(s.front() & 0xff);
+                                   const core::value *v = params.element_ptr(0);
+                                   core::string_t s = v->as_string();
+                                   return v->is_null()? *v: s.empty()? core::value(0): core::value(s.front() & 0xff);
                                })});
                 result.insert({"asin", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   core::real_t r = v.as_real();
-                                   return v.is_null() || r < -1.0 || r > 1.0? core::value(): core::value(asin(r));
+                                   const core::value *v = params.element_ptr(0);
+                                   core::real_t r = v->as_real();
+                                   return v->is_null() || r < -1.0 || r > 1.0? core::value(): core::value(asin(r));
                                })});
                 result.insert({"atan", sql_function(-2, [](const core::value &params)
                                {
                                    if (params.size() == 1)
                                    {
-                                       core::value v = params.const_element(0);
-                                       core::real_t r = v.as_real();
-                                       return v.is_null()? core::value(): core::value(atan(r));
+                                       const core::value *v = params.element_ptr(0);
+                                       core::real_t r = v->as_real();
+                                       return v->is_null()? core::value(): core::value(atan(r));
                                    }
                                    else if (params.size() == 2)
                                    {
@@ -2195,26 +2388,26 @@ namespace cppdatalib
                 // TODO: `BIN()`
                 result.insert({"bit_length", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_null()? v: core::value(v.as_string().size() * 8);
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_null()? *v: core::value(v->as_string().size() * 8);
                                })});
                 result.insert({"ceil", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return !v.is_real() && !v.is_string()? v: core::value(ceil(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return !v->is_real() && !v->is_string()? *v: core::value(ceil(v->as_real()));
                                })});
                 result.insert({"ceiling", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return !v.is_real() && !v.is_string()? v: core::value(ceil(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return !v->is_real() && !v->is_string()? *v: core::value(ceil(v->as_real()));
                                })});
                 // TODO: `CHAR()`
                 result.insert({"char_length", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   core::string_t s = v.as_string();
-                                   if (v.is_null())
-                                       return v;
+                                   const core::value *v = params.element_ptr(0);
+                                   core::string_t s = v->as_string();
+                                   if (v->is_null())
+                                       return core::value();
 
                                    size_t count = 0;
                                    for (size_t i = 0; i < s.size(); ++count)
@@ -2223,10 +2416,10 @@ namespace cppdatalib
                                })});
                 result.insert({"character_length", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   core::string_t s = v.as_string();
-                                   if (v.is_null())
-                                       return v;
+                                   const core::value *v = params.element_ptr(0);
+                                   core::string_t s = v->as_string();
+                                   if (v->is_null())
+                                       return core::value();
 
                                    size_t count = 0;
                                    for (size_t i = 0; i < s.size(); ++count)
@@ -2241,6 +2434,8 @@ namespace cppdatalib
                                    {
                                        if (item.is_null())
                                            return core::value();
+                                       else if (item.is_string() && !core::subtype_is_text_string(item.get_subtype()))
+                                           result.set_subtype(core::blob);
 
                                        result.get_string_ref() += item.as_string();
                                    }
@@ -2261,6 +2456,8 @@ namespace cppdatalib
                                    {
                                        if (++idx <= 1 || item.is_null())
                                            continue;
+                                       else if (item.is_string() && !core::subtype_is_text_string(item.get_subtype()))
+                                           result.set_subtype(core::blob);
 
                                        if (idx > 2)
                                            result.get_string_ref() += separator.get_string_unchecked();
@@ -2273,38 +2470,42 @@ namespace cppdatalib
                 // TODO: `CONV()`
                 result.insert({"cos", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_null()? v: core::value(cos(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_null()? *v: core::value(cos(v->as_real()));
                                })});
                 result.insert({"cot", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_null()? v: core::value(1.0 / tan(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_null()? *v: core::value(1.0 / tan(v->as_real()));
                                })});
                 // TODO: `CRC32()`
                 result.insert({"degrees", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_null()? v: core::value(v.as_real() / M_PI * 180);
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_null()? *v: core::value(v->as_real() / M_PI * 180);
                                })});
                 result.insert({"elt", sql_function(-2, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   if (v.is_null() || v.as_int() < 1 || v.as_uint() >= params.size())
+                                   const core::value *v = params.element_ptr(0);
+                                   if (v->is_null() || v->as_int() < 1 || v->as_uint() >= params.size())
                                        return core::value();
 
-                                   return core::value(params.const_element(v.as_uint()).as_string());
+                                   v = params.element_ptr(size_t(v->as_uint()));
+                                   if (v->is_string())
+                                       return *v;
+
+                                   return core::value(v->as_string());
                                })});
                 result.insert({"exp", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_null()? v: core::value(exp(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_null()? core::value(): core::value(exp(v->as_real()));
                                })});
                 // TODO: `EXPORT_SET()`
                 result.insert({"floor", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return !v.is_real() && !v.is_string()? v: core::value(floor(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return !v->is_real() && !v->is_string()? *v: core::value(floor(v->as_real()));
                                })});
                 // TODO: `FORMAT()`
                 // TODO: `HEX()`
@@ -2324,24 +2525,44 @@ namespace cppdatalib
                                    core::value two = params.const_element(1);
                                    return impl::sql_expression_evaluator::are_equal(one, two)? core::value(): one;
                                })});
-                result.insert({"ln", sql_function(1, [](const core::value &params)
+                result.insert({"lcase", sql_function(1, [](const core::value &params)
                                {
                                    core::value v = params.const_element(0);
-                                   core::real_t r = v.as_real();
-                                   return v.is_null() || r < 0.0? core::value(): core::value(log(r));
+                                   if (v.is_null())
+                                       return core::value();
+
+                                   v.convert_to_string();
+                                   ascii_lowercase(v.get_string_ref().begin(), v.get_string_ref().end());
+                                   return v;
+                               })});
+                result.insert({"ln", sql_function(1, [](const core::value &params)
+                               {
+                                   const core::value *v = params.element_ptr(0);
+                                   core::real_t r = v->as_real();
+                                   return v->is_null() || r < 0.0? core::value(): core::value(log(r));
+                               })});
+                result.insert({"lower", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   if (v.is_null())
+                                       return core::value();
+
+                                   v.convert_to_string();
+                                   ascii_lowercase(v.get_string_ref().begin(), v.get_string_ref().end());
+                                   return v;
                                })});
                 // TODO: `LOG()`
                 result.insert({"log2", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   core::real_t r = v.as_real();
-                                   return v.is_null() || r < 0.0? core::value(): core::value(log2(r));
+                                   const core::value *v = params.element_ptr(0);
+                                   core::real_t r = v->as_real();
+                                   return v->is_null() || r < 0.0? core::value(): core::value(log2(r));
                                })});
                 result.insert({"log10", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   core::real_t r = v.as_real();
-                                   return v.is_null() || r < 0.0? core::value(): core::value(log(r));
+                                   const core::value *v = params.element_ptr(0);
+                                   core::real_t r = v->as_real();
+                                   return v->is_null() || r < 0.0? core::value(): core::value(log(r));
                                })});
                 // TODO: `MOD()`
                 result.insert({"pi", sql_function(0, [](const core::value &)
@@ -2350,41 +2571,76 @@ namespace cppdatalib
                                })});
                 result.insert({"pow", sql_function(2, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
+                                   const core::value *v = params.element_ptr(0);
                                    core::value w = params.const_element(1);
-                                   return v.is_null() || w.is_null()? core::value(): core::value(pow(v.as_real(), w.as_real()));
+                                   return v->is_null() || w.is_null()? core::value(): core::value(pow(v->as_real(), w.as_real()));
                                })});
                 result.insert({"power", sql_function(2, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
+                                   const core::value *v = params.element_ptr(0);
                                    core::value w = params.const_element(1);
-                                   return v.is_null() || w.is_null()? core::value(): core::value(pow(v.as_real(), w.as_real()));
+                                   return v->is_null() || w.is_null()? core::value(): core::value(pow(v->as_real(), w.as_real()));
                                })});
                 result.insert({"radians", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_null()? v: core::value(v.as_real() / 180 * M_PI);
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_null()? core::value(): core::value(v->as_real() / 180 * M_PI);
                                })});
                 // TODO: `RAND()`
+                result.insert({"repeat", sql_function(2, [](const core::value &params)
+                               {
+                                   core::value str = params.const_element(0);
+                                   core::value times = params.const_element(1);
+                                   core::value result("");
+                                   if (str.is_null() || times.is_null())
+                                       return core::value();
+                                   else if (times.as_int() < 1)
+                                       return result;
+
+                                   for (core::uint_t i = times.as_uint(); i; --i)
+                                       result.get_string_ref() += str.get_string_unchecked();
+
+                                   return result;
+                               })});
                 // TODO: `ROUND()`
                 // TODO: `SIGN()`
                 result.insert({"sin", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_null()? v: core::value(sin(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_null()? core::value(): core::value(sin(v->as_real()));
                                })});
                 result.insert({"sqrt", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   core::real_t r = v.as_real();
-                                   return v.is_null() || r < 0.0? core::value(): core::value(sqrt(r));
+                                   const core::value *v = params.element_ptr(0);
+                                   core::real_t r = v->as_real();
+                                   return v->is_null() || r < 0.0? core::value(): core::value(sqrt(r));
                                })});
                 result.insert({"tan", sql_function(1, [](const core::value &params)
                                {
-                                   core::value v = params.const_element(0);
-                                   return v.is_null()? v: core::value(tan(v.as_real()));
+                                   const core::value *v = params.element_ptr(0);
+                                   return v->is_null()? core::value(): core::value(tan(v->as_real()));
                                })});
                 // TODO: `TRUNCATE()`
+                result.insert({"ucase", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   if (v.is_null())
+                                       return core::value();
+
+                                   v.convert_to_string();
+                                   ascii_uppercase(v.get_string_ref().begin(), v.get_string_ref().end());
+                                   return v;
+                               })});
+                result.insert({"upper", sql_function(1, [](const core::value &params)
+                               {
+                                   core::value v = params.const_element(0);
+                                   if (v.is_null())
+                                       return core::value();
+
+                                   v.convert_to_string();
+                                   ascii_uppercase(v.get_string_ref().begin(), v.get_string_ref().end());
+                                   return v;
+                               })});
                 result.insert({"version", sql_function(0, [](const core::value &)
                                {
                                    return core::value("1.0.0");
@@ -2417,7 +2673,7 @@ namespace cppdatalib
                 {}
 
                 core::value get_select() const {return core::value(core::object_t{{core::value("select"), select}});}
-                core::value get_where() const {return  core::value(core::object_t{{core::value("where"), where}});}
+                core::value get_where() const {return core::value(core::object_t{{core::value("where"), where}});}
 
             protected:
                 void reset_() {select.set_null(); where.set_null(); stream() >> std::skipws;}
@@ -3007,6 +3263,15 @@ namespace cppdatalib
 
                         if (buffer == "null")
                             return core::value();
+                        else if (buffer == "binary")
+                        {
+                            core::value result = parse_value(strictly_values);
+
+                            if (result.is_string())
+                                result.set_subtype(core::blob);
+
+                            return result;
+                        }
                         return core::value(buffer, core::symbol);
                     }
                     else

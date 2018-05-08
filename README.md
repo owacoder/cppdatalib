@@ -1,6 +1,14 @@
 # cppdatalib
 
-A header-only, C++11 data conversion library
+A header-only, C++11 data conversion library. cppdatalib includes multiple input and output formats, filters, extensions, and adapters for
+use with a variety of frameworks and tools. Things it supports:
+
+   - Parsing a variety of formats to output streams (SAX-style) or internal representations (DOM-style)
+   - Writing a variety of formats
+   - Conversions to and from built-in and custom types with low syntax overhead, including complex data trees
+   - Filters for performing a number of operations on data before or after it's used
+   - A limited SQL engine for greater flexibility
+   - Extremely low memory overhead when converting most formats
 
 ## Features
 
@@ -48,6 +56,24 @@ Language formats include
    - Transenc
    - CBOR
 
+### Unimplemented adapter features
+
+The adapter for the STL is missing some features to seamlessly integrate with standard types. For example, the following libraries and technologies are not currently supported as seamless conversions out-of-the-box:
+
+   - The Chrono library
+   - The complex-number library
+   - Function objects (i.e. `std::function`)
+   - The Locale library
+   - `std::auto_ptr` which is deprecated anyway
+   - The random-number generators
+   - Ratio values
+   - Regular expressions
+   - Atomic types
+   - Wide strings
+   - I/O streams
+
+Obviously the other adapters for third-party libraries are not complete either, but are there to get you started.
+
 ### Filters
 
 cppdatalib offers a variety of filters that can be applied to stream handlers. These include the following:
@@ -82,6 +108,10 @@ cppdatalib offers a variety of filters that can be applied to stream handlers. T
      Converts the specified internal type, using the user-specified converter functor. This filter supports varying output types, including the same type as the input
    - `generic_converter_filter`<br/>
      Sends all scalar values to a user-specified functor for conversion. Arrays and objects cannot be converted with this filter
+   - `sql_select_where_filter`<br/>
+     Basically executes a SQL query equivalent to `SELECT * WHERE <predicate>`, where `<predicate>` is any specified structure. Note the absence of and a lack of support for a `FROM` clause.
+   - `sql_select_filter`<br/>
+     Executes a SQL query equivalent to `SELECT <selection> [WHERE <predicate>]`. The `<selection>` can be any combination and ordering of field names or supported expressions (including the `AS` operator for renaming expressions), and the optional `<predicate>` specifies which fields to include in the output. Note the absence of and a lack of support for a `FROM` clause.
 
 Filters can be assigned on top of other filters. How many filters are permitted is limited only by the runtime environment.
 

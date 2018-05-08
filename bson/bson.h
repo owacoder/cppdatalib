@@ -411,9 +411,11 @@ namespace cppdatalib
                 decrement_counter(str.size() + 1);
             }
 
-            void decrement_counter(int32_t amount, bool allow_popping = false)
+            void decrement_counter(size_t amount, bool allow_popping = false)
             {
-                containers.back().size_ -= amount;
+				if (amount > INT32_MAX)
+					throw core::error("BSON - invalid size prefix specified on document");
+                containers.back().size_ -= int32_t(amount);
                 if (containers.back().size_ < 0)
                     throw core::error("BSON - invalid size prefix specified on document");
                 else if (containers.back().size_ == 0)

@@ -10,6 +10,7 @@
 #include <valarray>
 #include <bitset>
 #include <tuple>
+#include <ratio>
 
 #include <set>
 #include <unordered_set>

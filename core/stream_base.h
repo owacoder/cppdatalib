@@ -68,6 +68,13 @@ namespace cppdatalib
         protected:
             struct scope_data
             {
+                scope_data()
+                    : type_(null)
+                    , subtype_(normal)
+                    , parsed_key_(false)
+                    , items_(0)
+                    , reported_size_(-1)
+                {}
                 scope_data(type t, subtype_t s, core::int_t reported_size, bool parsed_key = false)
                     : type_(t)
                     , subtype_(s)
@@ -678,7 +685,7 @@ namespace cppdatalib
             virtual void begin_object_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void end_object_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
-            std::vector<scope_data> nested_scopes; // Used as a stack, but not a stack so we can peek below the top
+            core::cache_vector_n<scope_data, core::cache_size> nested_scopes; // Used as a stack, but not a stack so we can peek below the top
             std::map<uint64_t, core::value> out_of_order_buffer; // Used for out-of-order write buffering if it is not supported by the handler
         };
 
@@ -1324,7 +1331,7 @@ namespace cppdatalib
                 istream::int_type peek() {
                     if (entity_buffers.size())
                     {
-                        istream::int_type c;
+                        istream::int_type c = EOF;
                         while (entity_buffers.size() && (c = entity_buffers.back().second.peek(), c == EOF))
                             entity_buffers.pop_back();
 
@@ -1338,7 +1345,7 @@ namespace cppdatalib
                 istream::int_type get() {
                     if (entity_buffers.size())
                     {
-                        istream::int_type c;
+                        istream::int_type c = EOF;
                         while (entity_buffers.size() && (c = entity_buffers.back().second.get(), c == EOF))
                             entity_buffers.pop_back();
 
@@ -1473,7 +1480,7 @@ namespace cppdatalib
                             {
                                 c = get_from_current_level_only();
                                 if (isxdigit(c))
-                                    code = (code << 4) + (strchr(hexchars, tolower(c)) - hexchars);
+                                    code = (code << 4) + uint32_t(strchr(hexchars, tolower(c)) - hexchars);
                                 else
                                     break;
                             }
@@ -1857,7 +1864,9 @@ namespace cppdatalib
 
                     istream::int_type c = peek();
 
-                    if (c < 0x80 && isspace(c) && !parsing_inside_element)
+                    if (c == EOF)
+                        read = eof_was_reached;
+                    else if (c < 0x80 && isspace(c) && !parsing_inside_element)
                     {
                         read = nothing_was_read;
                         return read_spaces(1);
@@ -2095,8 +2104,6 @@ namespace cppdatalib
                                 element_stack.push_back(value);
                         }
                     }
-                    else if (c == EOF)
-                        read = eof_was_reached;
                     else // Must be content! Any entities found here are parsable as content, and should be
                     {
                         read = content_was_read;

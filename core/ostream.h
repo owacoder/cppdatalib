@@ -60,7 +60,7 @@ namespace cppdatalib
             ostream() : fmtflags_(0), precision_(0) {}
 
             ostream &put(char c) {putc_(c); return *this;}
-            ostream &write(const char *c, streamsize n) {write_(c, n); return *this;}
+            ostream &write(const char *c, streamsize n) {if (n > 0) write_(c, size_t(n)); return *this;}
 
             friend ostream &operator<<(ostream &out, char ch);
             friend ostream &operator<<(ostream &out, signed char ch);

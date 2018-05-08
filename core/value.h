@@ -868,6 +868,7 @@ namespace cppdatalib
             value &operator[](size_t pos);
             value const_element(size_t pos) const;
             value element(size_t pos) const;
+            const value *element_ptr(size_t pos) const;
             value &element(size_t pos);
             void erase_element(size_t pos);
 
@@ -958,8 +959,9 @@ namespace cppdatalib
             object_t &convert_to_object();
 #endif
 
+			// Use of `this->` silences MSVC
             template<typename T>
-            typename std::remove_cv<typename std::remove_reference<T>::type>::type cast() const {return operator typename std::remove_cv<typename std::remove_reference<T>::type>::type();}
+            typename std::remove_cv<typename std::remove_reference<T>::type>::type cast() const {return this->operator typename std::remove_cv<typename std::remove_reference<T>::type>::type();}
 
             template<typename T, typename UserData>
             typename std::remove_cv<typename std::remove_reference<T>::type>::type cast(UserData userdata) const;
@@ -2507,6 +2509,12 @@ namespace cppdatalib
         inline value &value::operator[](size_t pos) {return element(pos);}
         inline value value::const_element(size_t pos) const {return is_nonempty_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
         inline value value::element(size_t pos) const {return const_element(pos);}
+        inline const value *value::element_ptr(size_t pos) const
+        {
+            if (is_nonempty_array() && pos < arr_ref_().size())
+                return std::addressof(arr_ref_().data()[pos]);
+            return NULL;
+        }
         inline value &value::element(size_t pos)
         {
             clear(array);

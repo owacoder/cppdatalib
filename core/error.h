@@ -31,7 +31,7 @@ namespace cppdatalib
 {
     namespace core
     {
-        struct error
+        struct error : public std::exception
         {
         protected:
             error() : what_("") {}
@@ -40,7 +40,7 @@ namespace cppdatalib
             error(const char *reason) : what_(reason) {}
             virtual ~error() {}
 
-            virtual const char *what() const {return what_;}
+            virtual const char *what() const noexcept {return what_;}
 
         private:
             const char *what_;
@@ -52,7 +52,7 @@ namespace cppdatalib
             custom_error(const std::string &reason) : what_(reason) {}
             custom_error(std::string &&reason) : what_(std::move(reason)) {}
 
-            const char *what() const {return what_.c_str();}
+            const char *what() const noexcept {return what_.c_str();}
 
         private:
             std::string what_;

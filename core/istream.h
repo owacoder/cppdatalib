@@ -411,7 +411,7 @@ namespace cppdatalib
                         ungetc_();
 
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
-                    if (negative == last_read_)
+                    if (streamsize(negative) == last_read_)
                         flags_ |= fail_bit;
 #else
                     if (!read)
@@ -700,8 +700,8 @@ namespace cppdatalib
             {}
 
         protected:
-            int_type getc_() {return stream_->sbumpc() & 0xff;}
-            int_type peekc_() {return stream_->sgetc() & 0xff;}
+            int_type getc_() {return stream_->sbumpc();}
+            int_type peekc_() {return stream_->sgetc();}
             void ungetc_()
             {
                 if (stream_->sungetc() == EOF)

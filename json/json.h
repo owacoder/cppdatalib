@@ -69,7 +69,7 @@ namespace cppdatalib
                                     if (c == EOF) throw core::error("JSON - unexpected end of string");
                                     size_t pos = hex.find(toupper(c));
                                     if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
-                                    code = (code << 4) | pos;
+                                    code = (code << 4) | uint32_t(pos);
                                 }
 
                                 if (code >= 0xd800 && code <= 0xdbff)
@@ -85,7 +85,7 @@ namespace cppdatalib
                                         if (c == EOF) throw core::error("JSON - unexpected end of string");
                                         size_t pos = hex.find(toupper(c));
                                         if (pos == std::string::npos) throw core::error("JSON - invalid character escape sequence");
-                                        code2 = (code2 << 4) | pos;
+                                        code2 = (code2 << 4) | uint32_t(pos);
                                     }
 
                                     if (code2 < 0xdc00 || code2 > 0xdfff)
@@ -323,21 +323,30 @@ namespace cppdatalib
                                     throw core::error("JSON - invalid UTF-8 string");
                                 else if (c > 0x80)
                                 {
-                                    char buf[13];
+                                    char buf[16];
 
                                     buf[0] = '\\';
                                     buf[1] = 'u';
 
                                     if (c <= 0xffff)
-                                        std::sprintf(buf+2, "%04x", (unsigned) c);
+#ifdef CPPDATALIB_MSVC
+                                        sprintf_s(buf+2, 5, "%04x", (unsigned) c);
+#else
+										std::sprintf(buf+2, "%04x", (unsigned) c);
+#endif
                                     else
                                     {
                                         c -= 0x10000;
                                         c = ((c << 6) & 0x3ff0000) | (c & 0x3ff); // Place top ten and lower ten bits in proper positions
                                         c += 0xd800dc00; // Add UTF-16 surrogate values
 
+#ifdef CPPDATALIB_MSVC
+										sprintf_s(buf+2, 5, "%04x", (unsigned) (c >> 16));
+										sprintf_s(buf+8, 5, "%04x", (unsigned) (c & 0xffff));
+#else
                                         std::sprintf(buf+2, "%04x", (unsigned) (c >> 16));
                                         std::sprintf(buf+8, "%04x", (unsigned) (c & 0xffff));
+#endif
 
                                         // This assignments must be done afterward because the first sprintf will write a NUL to buf[6]
                                         buf[6] = '\\';

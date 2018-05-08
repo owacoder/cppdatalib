@@ -67,7 +67,7 @@ namespace cppdatalib
                                     if (c == EOF) throw core::error("Plain Text Property List - unexpected end of string");
                                     size_t pos = hex.find(toupper(c));
                                     if (pos == std::string::npos) throw core::error("Plain Text Property List - invalid character escape sequence");
-                                    code = (code << 4) | pos;
+                                    code = (code << 4) | uint32_t(pos);
                                 }
 
 #ifdef CPPDATALIB_MSVC

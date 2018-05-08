@@ -2,6 +2,12 @@
 
 //#include "adapters/stl.h"
 
+#ifndef CPPDATALIB_ENABLE_ATTRIBUTES
+#define CPPDATALIB_ENABLE_ATTRIBUTES
+#endif
+#ifndef CPPDATALIB_ENABLE_XML
+#define CPPDATALIB_ENABLE_XML
+#endif
 #define CPPDATALIB_ENABLE_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
@@ -727,7 +733,7 @@ void test_attributes()
     {
         using namespace cppdatalib::json;
         using namespace cppdatalib::bson;
-        using namespace cppdatalib::xml;
+        //using namespace cppdatalib::xml;
 
         cppdatalib::json::stream_writer writer(std::cout);
 
@@ -853,15 +859,17 @@ void test_mmap()
 #endif
 #endif
 
-#include <qtapp.h>
+//#include <qtapp.h>
 
 int rmain(int argc, char **argv)
 {
+    (void) argc, (void) argv;
+
     //return readme_simple_test4();
 
     //test_mmap();
 
-    return qtapp_main(argc, argv, test_attributes);
+    //return qtapp_main(argc, argv, test_attributes);
 
     //return 0;
 
@@ -918,7 +926,7 @@ int rmain(int argc, char **argv)
     return 0;
 #endif
 
-    srand(std::time(NULL));
+    srand((unsigned int) std::time(NULL));
 
     test_decision_tree();
     //make_k_nearest();
@@ -1011,7 +1019,7 @@ int main(int argc, char **argv)
     std::unique_ptr<std::ifstream> infile;
     std::unique_ptr<std::ofstream> outfile;
     std::unique_ptr<cppdatalib::core::stream_input> input;
-    std::unique_ptr<cppdatalib::core::stream_handler> output;
+    std::unique_ptr<cppdatalib::core::stream_handler> output(new cppdatalib::core::stream_handler());
 
     std::string in, out;
     std::string in_scheme, out_scheme;
@@ -1023,12 +1031,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
+#if 0
     try
     {
         using namespace cppdatalib::json;
 
         cppdatalib::core::value tree, where;
-        const char *sql = "select ELT(1, 'Aa', 'Bb', 'Cc', 'Dd'), power(ifnull(second, 2), 0.5) as '' where second != null";
+        const char *sql = "select 'ALABASTER' = concat('alabaster', binary ''), power(ifnull(second, 2), 0.5) as '' where second != null";
         tree << cppdatalib::core::impl::sql_parser(sql, cppdatalib::core::impl::sql_parser::select_element);
         where << cppdatalib::core::impl::sql_parser(sql, cppdatalib::core::impl::sql_parser::where_element);
         cppdatalib::core::value data = "[{\"impl\": 3, \"second\": 76.3, \"third\": 3}, {\"impl\": 2, \"second\": 90.9987, \"third\": 1.4},  {\"impl\": 4, \"second\": null, \"third\": 2.4}]"_json;
@@ -1039,6 +1048,7 @@ int main(int argc, char **argv)
         std::cout << e.what() << std::endl;
     }
     return 0;
+#endif
 
     in = argv[1];
     out = argv[2];
@@ -1095,7 +1105,7 @@ int main(int argc, char **argv)
         }
     }
 
-    if (out_scheme.empty() || out_scheme == "file")
+    if ((out_scheme.empty() || out_scheme == "file") && out != "null")
     {
         // Get output file extension
         size_t out_filetype = out.rfind('.');
@@ -1134,18 +1144,32 @@ int main(int argc, char **argv)
 
     try
     {
+#if 0
         cppdatalib::core::value v;
         *input.get() >> v;
         std::cout << "Estimated memory usage: " << std::flush;
         std::cout << v.memory_consumed() << std::endl;
         *output.get() << v;
-        /*input.get()->begin(*output.get());
+#elif 0
+        input.get()->begin(*output.get());
         do
         {
             input.get()->write_one();
         } while (input.get()->busy());
-        input.get()->end();*/
-    } catch (const cppdatalib::core::error &e) {
+        input.get()->end();
+#else
+        clock_t start = clock();
+
+        cppdatalib::core::automatic_buffer_filter buffer(*output.get());
+        *input.get() >> buffer;
+
+		double dur = double(clock() - start) / CLOCKS_PER_SEC;
+		std::cout << std::setprecision(16);
+		std::cout << "Total Input: " << uint64_t(infile.get()->tellg()) << " bytes in " << dur << " seconds (" << uint64_t(infile.get()->tellg() / dur) << " Bytes/S)\n";
+		if (outfile.get())
+			std::cout << "Total Output: " << uint64_t(outfile.get()->tellp()) << " bytes in " << dur << " seconds (" << uint64_t(outfile.get()->tellp() / dur) << " Bytes/S)\n";
+#endif
+    } catch (const std::exception &e) {
         std::cerr << "cppdatalib: " << e.what() << "\n";
         return 1;
     }

@@ -180,7 +180,7 @@ namespace cppdatalib
                             // Set string in string_type to preserve the subtype
                             string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                             get_output()->append_to_string(string_type);
-                            size -= static_cast<size_t>(buffer_size);
+                            size -= static_cast<uint32_t>(buffer_size);
                         }
                         string_type.set_string("");
                         get_output()->end_string(string_type);
@@ -275,7 +275,7 @@ namespace cppdatalib
                             // Set string in string_type to preserve the subtype
                             string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
                             get_output()->append_to_string(string_type);
-                            size -= static_cast<size_t>(buffer_size);
+                            size -= static_cast<uint32_t>(buffer_size);
                         }
                         string_type.set_string("");
                         get_output()->end_string(string_type);
