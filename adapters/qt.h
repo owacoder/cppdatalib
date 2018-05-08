@@ -878,7 +878,6 @@ public:
         QVariant result;
         switch (bind.get_type())
         {
-            default:
             case cppdatalib::core::null: result = QVariant(); break;
             case cppdatalib::core::boolean: result = bind.get_bool_unchecked(); break;
             case cppdatalib::core::integer: result = qlonglong(bind.get_int_unchecked()); break;

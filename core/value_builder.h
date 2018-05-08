@@ -184,6 +184,7 @@ namespace cppdatalib
             switch (src.get_type())
             {
                 case null: dst.set_null(src.get_subtype()); break;
+                case link: dst.set_link(src.get_link_unchecked(), src.get_subtype() == strong_link? normal: src.get_subtype()); break;
                 case boolean: dst.set_bool(src.get_bool_unchecked(), src.get_subtype()); break;
                 case integer: dst.set_int(src.get_int_unchecked(), src.get_subtype()); break;
                 case uinteger: dst.set_uint(src.get_uint_unchecked(), src.get_subtype()); break;
@@ -196,7 +197,6 @@ namespace cppdatalib
                     builder << src;
                     break;
                 }
-                default: dst.set_null(src.get_subtype()); break;
             }
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
@@ -218,6 +218,7 @@ namespace cppdatalib
             dst.clear(src.get_type());
             switch (src.get_type())
             {
+                case null: break;
                 case boolean: dst.bool_ = std::move(src.bool_); break;
                 case integer: dst.int_ = std::move(src.int_); break;
                 case uinteger: dst.uint_ = std::move(src.uint_); break;
@@ -229,10 +230,10 @@ namespace cppdatalib
 #endif
                 case array:
                 case object:
+                case link:
                     dst.ptr_ = src.ptr_;
                     src.ptr_ = nullptr;
                     break;
-                default: break;
             }
             dst.subtype_ = src.get_subtype();
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES

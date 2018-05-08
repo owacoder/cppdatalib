@@ -2,12 +2,13 @@
 
 //#include "adapters/stl.h"
 
+/*
 #ifndef CPPDATALIB_ENABLE_ATTRIBUTES
 #define CPPDATALIB_ENABLE_ATTRIBUTES
 #endif
 #ifndef CPPDATALIB_ENABLE_XML
 #define CPPDATALIB_ENABLE_XML
-#endif
+#endif*/
 #define CPPDATALIB_ENABLE_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
@@ -1031,6 +1032,25 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    using namespace cppdatalib;
+    core::value value(core::object_t{{"key1", core::null_t{}}});
+    core::value lk(&value);
+    core::value lk2(new core::value(value), core::strong_link);
+    lk = lk2;
+    lk2.set_weak_link(&lk);
+    lk.set_weak_link(&lk2);
+    //lk.set_strong_link(new core::value(value));
+    //lk.set_global_link_name(core::object_t{{"link1", true}});
+    //lk.set_local_link_name("ref1");
+
+    std::cout << lk;
+    std::cout << lk2;
+    if (!lk.link_cycle_exists())
+        std::cout << lk.deref_all_links();
+    if (!lk2.link_cycle_exists())
+        std::cout << lk2.deref_all_links();
+    return 0;
+
 #if 0
     try
     {
@@ -1097,7 +1117,9 @@ int main(int argc, char **argv)
         else if (in_extension == "json") input.reset(new cppdatalib::json::parser(*infile.get()));
         else if (in_extension == "mpk") input.reset(new cppdatalib::message_pack::parser(*infile.get()));
         else if (in_extension == "ubjson") input.reset(new cppdatalib::ubjson::parser(*infile.get()));
+#ifdef CPPDATALIB_ENABLE_XML
         else if (in_extension == "xml") input.reset(new cppdatalib::xml::parser(*infile.get(), false));
+#endif
         else
         {
             std::cerr << "cppdatalib - unknown input file format\n";
@@ -1133,8 +1155,10 @@ int main(int argc, char **argv)
         else if (out_extension == "mpk") output.reset(new cppdatalib::message_pack::stream_writer(*outfile.get()));
         else if (out_extension == "netstrings") output.reset(new cppdatalib::netstrings::stream_writer(*outfile.get()));
         else if (out_extension == "ubjson") output.reset(new cppdatalib::ubjson::stream_writer(*outfile.get()));
+#ifdef CPPDATALIB_ENABLE_XML
         else if (out_extension == "xlsx") output.reset(new cppdatalib::xml_xls::document_writer(*outfile.get(), "Worksheet 1"));
         else if (out_extension == "xml") output.reset(new cppdatalib::xml::document_writer(*outfile.get()));
+#endif
         else
         {
             std::cerr << "cppdatalib - unknown output file format\n";

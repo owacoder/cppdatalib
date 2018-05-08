@@ -35,6 +35,18 @@
 #define CPPDATALIB_WINDOWS
 #endif
 
+#if __cplusplus >= 201703L
+#define CPPDATALIB_CPP17
+#endif
+
+#if __cplusplus >= 201402L
+#define CPPDATALIB_CPP14
+#endif
+
+#if __cplusplus >= 201103L
+#define CPPDATALIB_CPP11
+#endif
+
 namespace cppdatalib
 {
     namespace core

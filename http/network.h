@@ -647,6 +647,9 @@ namespace cppdatalib
 
             void set_interface(core::network_library interface)
             {
+                (void) context;
+                (void) s_context;
+
                 if (this->interface != interface)
                 {
                     this->interface = interface;

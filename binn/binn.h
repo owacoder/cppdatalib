@@ -477,6 +477,8 @@ namespace cppdatalib
                         {
                             switch (arg->get_type())
                             {
+                                case core::link:
+                                    throw core::error("Binn - links are not supported by this format");
                                 case core::null:
                                 case core::boolean:
                                     if (prefix)

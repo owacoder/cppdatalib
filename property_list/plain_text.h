@@ -418,7 +418,9 @@ finish:
                 {
                     case core::date:
                     case core::time:
-                    case core::datetime: stream() << "<*D"; break;
+                    case core::datetime:
+                        stream() << "<*D";
+                        break;
                     default:
                         if (!core::subtype_is_text_string(v.get_subtype()))
                             stream().put('<');
@@ -545,7 +547,9 @@ finish:
                 {
                     case core::date:
                     case core::time:
-                    case core::datetime: stream() << "<*D"; break;
+                    case core::datetime:
+                        stream() << "<*D";
+                        break;
                     default:
                         if (!core::subtype_is_text_string(v.get_subtype()))
                             stream().put('<');

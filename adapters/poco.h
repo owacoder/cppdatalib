@@ -550,7 +550,6 @@ public:
         Poco::Dynamic::Var result;
         switch (bind.get_type())
         {
-            default:
             case cppdatalib::core::null: result = Poco::Dynamic::Var(); break;
             case cppdatalib::core::boolean: result = bind.get_bool_unchecked(); break;
             case cppdatalib::core::integer: result = Poco::Int64(bind.get_int_unchecked()); break;

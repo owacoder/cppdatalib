@@ -287,6 +287,7 @@ namespace cppdatalib
                                     case integer: integer_(v); break;
                                     case uinteger: uinteger_(v); break;
                                     case real: real_(v); break;
+                                    case link: link_(v); break;
                                     default: return false;
                                 }
 
@@ -430,6 +431,9 @@ namespace cppdatalib
 
             // Called when a scalar real is parsed
             virtual void real_(const core::value &v) {(void) v;}
+
+            // Called when a reference to another value is parsed
+            virtual void link_(const core::value &v) {(void) v;}
 
             // Called when a scalar string is parsed
             // If the length of v is equal to size, the entire string is provided
@@ -1058,7 +1062,9 @@ namespace cppdatalib
                                     case array:
                                     case object:
                                     case null:
-                                    default:
+                                        break;
+                                    case link:
+                                        compare = (uintptr_t(arg->get_link_unchecked()) < uintptr_t(arg2->get_link_unchecked()));
                                         break;
                                 }
 
@@ -1129,7 +1135,9 @@ namespace cppdatalib
                                     case array:
                                     case object:
                                     case null:
-                                    default:
+                                        break;
+                                    case link:
+                                        compare = (uintptr_t(arg->get_link_unchecked()) > uintptr_t(arg2->get_link_unchecked())) - (uintptr_t(arg->get_link_unchecked()) < uintptr_t(arg2->get_link_unchecked()));
                                         break;
                                 }
                             }
@@ -1192,7 +1200,9 @@ namespace cppdatalib
                                     equal = (arg->size() == arg2->size());
                                     break;
                                 case null:
-                                default:
+                                    break;
+                                case link:
+                                    equal = (arg->get_link_unchecked() == arg2->get_link_unchecked());
                                     break;
                             }
                         }
@@ -1219,6 +1229,7 @@ namespace cppdatalib
             }
         };
 
+#ifdef CPPDATALIB_ENABLE_XML
         namespace xml_impl
         {
             class xml_base
@@ -2169,6 +2180,7 @@ namespace cppdatalib
                         switch (attr.second.get_type())
                         {
                             case core::null: break;
+                            case core::link: link_(attr.second); break;
                             case core::boolean: bool_(attr.second); break;
                             case core::integer: integer_(attr.second); break;
                             case core::uinteger: uinteger_(attr.second); break;
@@ -2284,6 +2296,7 @@ namespace cppdatalib
                 }
             };
         }
+#endif
     }
 }
 

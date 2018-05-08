@@ -38,7 +38,6 @@ namespace cppdatalib
 
         public:
             error(const char *reason) : what_(reason) {}
-            virtual ~error() {}
 
             virtual const char *what() const noexcept {return what_;}
 

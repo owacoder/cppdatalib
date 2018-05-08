@@ -25,7 +25,7 @@
 #ifndef FILESYSTEM_H
 #define FILESYSTEM_H
 
-#if __cplusplus >= 201703L
+#ifdef CPPDATALIB_CPP17
 
 #include "../core/core.h"
 #include <filesystem>
@@ -43,12 +43,12 @@
 
 #include <chrono>
 
-#if __cplusplus >= 201402L
+#ifdef CPPDATALIB_CPP14
 namespace cppdatalib
 {
     namespace filesystem
     {
-#if __cplusplus >= 201703L
+#ifdef CPPDATALIB_CPP17
         namespace fs = std::filesystem;
 #else
         namespace fs = std::experimental::filesystem;

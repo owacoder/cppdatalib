@@ -57,6 +57,8 @@ namespace cppdatalib
                         {
                             switch (arg->get_type())
                             {
+                                case core::link:
+                                    throw core::error("Netstrings - links are not supported by this format");
                                 case core::null:
                                     if (prefix)
                                         size.top() += 3; // "0:,"

@@ -21,7 +21,7 @@
 #include <stack>
 #include <queue>
 
-#if __cplusplus >= 201703L
+#ifdef CPPDATALIB_CPP17
 #include <variant>
 #include <optional>
 #include <any>
@@ -840,7 +840,7 @@ namespace cppdatalib { namespace core {
     };
 }}
 
-#if __cplusplus >= 201703L
+#ifdef CPPDATALIB_CPP17
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::optional, Ts...>
 {
@@ -1323,7 +1323,7 @@ public:
     }
 };
 
-#if __cplusplus >= 201703L
+#ifdef CPPDATALIB_CPP17
 #include <filesystem>
 
 template<typename... Ts>
@@ -1353,7 +1353,6 @@ public:
         std::any result;
         switch (bind.get_type())
         {
-            default:
             case core::null: result = std::any(); break;
             case core::boolean: result = bind.get_bool_unchecked(); break;
             case core::integer: result = bind.get_int_unchecked(); break;

@@ -27,6 +27,8 @@
 
 #include "../core/core.h"
 
+#ifdef CPPDATALIB_ENABLE_XML
+
 namespace cppdatalib
 {
     namespace xml_xls
@@ -48,6 +50,7 @@ namespace cppdatalib
 
                 switch (v.get_type())
                 {
+                    case core::link: throw core::error("XML XLS - links are not supported by this format");
                     case core::null: type = "String"; break;
                     case core::boolean: type = "Boolean"; break;
                     case core::integer:
@@ -66,7 +69,7 @@ namespace cppdatalib
                             break; // No need to do anything for the top-level array
                         stream() << "<Row>";
                         break;
-                    default: break;
+                    case core::object: break;
                 }
 
                 if (type)
@@ -201,5 +204,7 @@ namespace cppdatalib
         inline std::string to_xml_xls(const core::value &v, const std::string &worksheet_name) {return to_xml_xls_document(v, worksheet_name);}
     }
 }
+
+#endif // CPPDATALIB_ENABLE_XML
 
 #endif // CPPDATALIB_XML_XLS_H

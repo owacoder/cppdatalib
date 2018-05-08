@@ -35,6 +35,7 @@
 
 #include <vector>
 #include <map>
+#include <set>
 
 #include <stack>
 #include <cmath>
@@ -77,8 +78,17 @@ namespace cppdatalib
             uinteger,
             real,
             string,
+
+#ifdef CPPDATALIB_CPP17
+            string_view,
+#endif
+
             array,
-            object
+            object,
+            link // That is, a link (pointer) to another value structure, that may be linked to other values as well
+            // If CPPDATALIB_ENABLE_ATTRIBUTES is defined, the normal null attribute of the target refers to the name of the reference
+            // If the target has no normal null attribute, the link object itself is tested for the same value, and it is used as the reference name instead if available.
+            // Otherwise, reference names are not supported
         };
 
         // Value map:
@@ -93,11 +103,13 @@ namespace cppdatalib
         //     -199 to -130: subtypes applicable to strings, encoded as some form of binary value
         //     -209 to -200: subtypes applicable to arrays
         //     -219 to -200: subtypes applicable to objects
-        //     -255 to -220: undefined, reserved
+        //     -229 to -220: subtypes applicable to links
+        //     -255 to -230: undefined, reserved
         //     minimum to -256: format-specified reserved subtypes
         enum subtype
         {
             normal = -1, // Normal strings are encoded with valid UTF-8. Use blob or clob for other generic types of strings.
+            // Normal links are weak links, that is, they don't own the object they point to
 
             // Integers
             unix_timestamp = -29, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds
@@ -135,6 +147,10 @@ namespace cppdatalib
             // Objects
             map = -219, // A normal object with integral keys
             hash, // A hash lookup (not supported as such in the value class, but can be used as a tag for external variant classes)
+
+            // Links
+            strong_link = -229,
+            parent_link,
 
             // Other reserved values (32,513 options)
             reserved = INT16_MIN,
@@ -183,6 +199,14 @@ namespace cppdatalib
         typedef CPPDATALIB_STRING_T string_t;
 #else
         typedef std::string string_t;
+#endif
+
+#ifdef CPPDATALIB_CPP17
+#ifdef CPPDATALIB_STRING_VIEW_T
+        typedef CPPDATALIB_STRING_VIEW_T string_view_t;
+#else
+        typedef std::string_view string_view_t;
+#endif
 #endif
 
         class array_t;
@@ -260,12 +284,15 @@ namespace cppdatalib
                 case binary_time: return "binary time";
                 case binary_bignum: return "binary bignum";
                 case binary_uuid: return "binary UUID";
-                case binary_regexp: return "binary regexp";
+                case binary_regexp: return "binary regular expression";
 
                 case sexp: return "s-expression";
 
                 case map: return "map";
                 case hash: return "hash";
+
+                case strong_link: return "strong link";
+                case parent_link: return "parent link";
 
                 default:
                     if (subtype <= reserved_max)
@@ -278,7 +305,18 @@ namespace cppdatalib
         }
 
         /* The core value class for all of cppdatalib.
+         * Provides a sort of tagged union for data storage, includes a type specifier and a subtype specifier.
+         * If CPPDATALIB_ENABLE_ATTRIBUTES is defined, it also includes a pointer to an attributes object.
          *
+         * This class does not have a call-stack-limited recursion depth for arrays and objects.
+         * The recursion depth is only limited to the available memory and addressing capability of the target machine.
+         *
+         * However, there is no protection against call-stack overflow with a large number of nested links. Links are not automatically
+         * followed, but with a series of strong links (strong link -> strong link -> strong link -> etc.) there is
+         * *definitely* a risk of buffer overflow when the destructor is called. Watch your strong link recursion depth!
+         *
+         * Also, there is no protection against attributes having attributes having attributes, etc.
+         * If you keep nesting excessively in this manner, stack-overflow is bound to occur.
          */
 
         class value
@@ -364,12 +402,6 @@ namespace cppdatalib
             template<typename PrefixPredicate, typename PostfixPredicate>
             void parallel_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const;
 
-            // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2, core::value::traversal_ancestry_finder arg_finder, core::value::traversal_ancestry_finder arg2_finder`
-            // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
-            // If return value is non-zero, processing continues, otherwise processing aborts immediately
-            template<typename PrefixPredicate, typename PostfixPredicate>
-            void parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const;
-
             value() : type_(null), subtype_(core::normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
@@ -381,6 +413,15 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {}
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(value *v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {link_init(subtype, v);}
 
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
@@ -698,6 +739,7 @@ namespace cppdatalib
                     swap(subtype_, other.subtype_);
                     switch (type_)
                     {
+                        case null:
                         case boolean: swap(bool_, other.bool_); break;
                         case integer: swap(int_, other.int_); break;
                         case uinteger: swap(uint_, other.uint_); break;
@@ -707,9 +749,9 @@ namespace cppdatalib
 #else
                         case string:
 #endif
+                        case link:
                         case array:
                         case object: swap(ptr_, other.ptr_); break;
-                        default: break;
                     }
                 }
                 else
@@ -721,6 +763,8 @@ namespace cppdatalib
             }
 
             subtype_t get_subtype() const {return subtype_;}
+            // WARNING: it is highly discouraged to modify the subtype of a link value!
+            // Do so at your own risk.
             subtype_t &get_subtype_ref() {return subtype_;}
             void set_subtype(subtype_t _type) {subtype_ = _type;}
 
@@ -732,6 +776,7 @@ namespace cppdatalib
 
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
+            bool_t is_link() const {return type_ == link;}
             bool_t is_int() const {return type_ == integer;}
             bool_t is_uint() const {return type_ == uinteger;}
             bool_t is_real() const {return type_ == real;}
@@ -749,9 +794,11 @@ namespace cppdatalib
             }
             bool_t is_nonempty_array() const {return type_ == array && ptr_ != nullptr;}
             bool_t is_nonempty_object() const {return type_ == object && ptr_ != nullptr;}
+            bool_t is_nonnull_link() const {return type_ == link && ptr_ != nullptr;}
 
             // The following seven functions exhibit UNDEFINED BEHAVIOR if the value is not the requested type
             bool_t get_bool_unchecked() const {return bool_;}
+            value *get_link_unchecked() const {return reinterpret_cast<value *>(ptr_);}
             int_t get_int_unchecked() const {return int_;}
             uint_t get_uint_unchecked() const {return uint_;}
             real_t get_real_unchecked() const {return real_;}
@@ -768,6 +815,121 @@ namespace cppdatalib
             object_t &get_object_ref() {clear(object); return obj_ref_();}
 
             void set_null() {clear(null);}
+
+            // WARNING: weaken_link() and strengthen_link() should only be used by those who know what they're doing
+            // Misusing these functions may result in double-frees or memory leaks
+            // Only use weaken_links() if you are going to take ownership of the current link (pointer)
+            void weaken_link()
+            {
+                if (is_strong_link())
+                {
+                    set_subtype(normal);
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    if (is_nonnull_link())
+                        deref().erase_attribute(parent_link_id());
+#endif
+                }
+            }
+            // WARNING: weaken_link() and strengthen_link() should only be used by those who know what they're doing
+            // Misusing these functions may result in double-frees or memory leaks
+            // Only use strengthen_link() if you immediately relinquish ownership of the link (pointer) and you know no-one else owns it.
+            void strengthen_link()
+            {
+                if (is_link() && get_subtype() != strong_link)
+                    set_strong_link(static_cast<value *>(ptr_));
+            }
+
+            // Transfers ownership of the link from the other value (`rhs`) to the current value
+            value &transfer_link_from(value &rhs)
+            {
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                if (rhs.is_link())
+                    set_link(rhs.get_link_unchecked(), rhs.get_subtype());
+                else
+                    *this = rhs;
+#else
+                if (rhs.is_strong_link())
+                {
+                    set_strong_link(rhs.get_link_unchecked());
+                    rhs.weaken_link();
+                }
+                else
+                    *this = rhs;
+#endif
+
+                return *this;
+            }
+
+            // With attributes enabled (and if the special values are not modified):
+            //    It is safe to set link_target when a strong link is currently held
+            //    It is safe to set link_target equal to the currently held link, whether weak or strong
+            //    It is safe to set link_target to the value of `this`
+            //    It is unsafe to set link_target as a sub-value of the currently held strong link, although it is safe to do so if the currently held link is weak.
+            //    It is unsafe to set link_target as a super-value of the currently held strong link, although it is safe to do so if the currently held link is weak.
+            // With attributes disabled:
+            //    It is safe to set link_target when a strong link is currently held
+            //    It is safe to set link_target equal to the currently held link, whether weak or strong
+            //    It is safe to set link_target to the value of `this`
+            //    It is unsafe to set link_target as a sub-value of the currently held strong link, although it is safe to do so if the currently held link is weak.
+            //    It is unsafe to set link_target as a super-value of the currently held strong link, although it is safe to do so if the currently held link is weak.
+            // When attempting to perform one of the above "unsafe" actions, you should weaken the existing link first. However, weakening a link on a "safe" case will result in a memory leak.
+            void set_weak_link(value *link_target)
+            {
+                clear(link);
+                // Protect against re-assignment
+                if (link_target != ptr_)
+                {
+                    destroy_strong_link();
+                    ptr_ = link_target;
+                }
+                subtype_ = normal;
+            }
+            // With attributes enabled (and if the special values are not modified):
+            //    It is safe to set link_target when a strong link is currently held
+            //    It is safe to set link_target equal to the currently held link, whether weak or strong
+            //    It is safe to set link_target to the value of `this`, but the link will decay to a weak link
+            //    It is safe to call this function even if another value is strongly linked to link_target
+            //    It is safe to set link_target as a sub-value of the currently held link, whether weak or strong
+            //    It is unsafe to set link_target as a super-value of the currently held strong link, although it is safe to do so if the currently held link is weak.
+            // With attributes disabled:
+            //    It is safe to set link_target when a strong link is currently held
+            //    It is safe to set link_target equal to the currently held link, whether weak or strong
+            //    It is safe to set link_target to the value of `this`, but the link will decay to a weak link
+            //    It is unsafe to call this function if another value is strongly linked to link_target
+            //    It is unsafe to set link_target as a sub-value of the currently held strong link, although it is safe to do so if the currently held link is weak.
+            //    It is unsafe to set link_target as a super-value of the currently held strong link, although it is safe to do so if the currently held link is weak.
+            //
+            // When attempting to perform one of the above "unsafe" actions, you should weaken the existing link first. However, weakening a link on a "safe" case will result in a memory leak.
+            //
+            // This value takes ownership of link_target, unless it is equal to the value of `this` (self-assignment).
+            void set_strong_link(value *link_target)
+            {
+                clear(link);
+                // Protect against double-frees with sub-value assignment
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                if (link_target)
+                {
+                    value current_parent = link_target->const_attribute(parent_link_id());
+                    if (current_parent.is_nonnull_link())
+                        current_parent.get_link_unchecked()->weaken_link();
+                }
+#endif
+                // Protect against re-assignment
+                if (link_target != ptr_)
+                {
+                    destroy_strong_link();
+                    ptr_ = link_target;
+                }
+
+                // Protect against self-assignment
+                subtype_ = link_target == this? normal: strong_link;
+
+                // Reinitialize parent of linked-to value
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                if (link_target)
+                    link_target->attribute(parent_link_id()) = core::value(this, core::parent_link);
+#endif
+            }
             void set_bool(bool_t v) {clear(boolean); bool_ = v;}
             void set_int(int_t v) {clear(integer); int_ = v;}
             void set_uint(uint_t v) {clear(uinteger); uint_ = v;}
@@ -778,6 +940,16 @@ namespace cppdatalib
             void set_object(const object_t &v);
 
             void set_null(subtype_t subtype) {clear(null); subtype_ = subtype;}
+            void set_link(value *link_target, subtype_t subtype)
+            {
+                if (subtype == strong_link)
+                    set_strong_link(link_target);
+                else
+                {
+                    set_weak_link(link_target);
+                    set_subtype(subtype);
+                }
+            }
             void set_bool(bool_t v, subtype_t subtype) {clear(boolean); bool_ = v; subtype_ = subtype;}
             void set_int(int_t v, subtype_t subtype) {clear(integer); int_ = v; subtype_ = subtype;}
             void set_uint(uint_t v, subtype_t subtype) {clear(uinteger); uint_ = v; subtype_ = subtype;}
@@ -872,6 +1044,128 @@ namespace cppdatalib
             value &element(size_t pos);
             void erase_element(size_t pos);
 
+            const value *operator->() const
+            {
+                if (is_nonnull_link())
+                    return reinterpret_cast<const value *>(ptr_);
+                return this;
+            }
+            value *operator->()
+            {
+                if (is_nonnull_link())
+                    return reinterpret_cast<value *>(ptr_);
+                return this;
+            }
+            const value &operator*() const {return deref();}
+            const value &deref() const
+            {
+                if (is_nonnull_link())
+                    return *reinterpret_cast<const value *>(ptr_);
+                return *this;
+            }
+            value &operator*() {return deref();}
+            value &deref()
+            {
+                if (is_nonnull_link())
+                    return *reinterpret_cast<value *>(ptr_);
+                return *this;
+            }
+            bool_t is_strong_link() const {return is_link() && get_subtype() == strong_link;}
+
+            const value &deref_strong_links() const
+            {
+                const value *p = this;
+                while (p->is_nonnull_link() && p->is_strong_link())
+                    p = &p->deref();
+                return *p;
+            }
+            value &deref_strong_links()
+            {
+                value *p = this;
+                while (p->is_nonnull_link() && p->is_strong_link())
+                    p = &p->deref();
+                return *p;
+            }
+
+            const value &deref_all_links() const
+            {
+                const value *p = this;
+                while (p->is_nonnull_link())
+                    p = &p->deref();
+                return *p;
+            }
+            value &deref_all_links()
+            {
+                value *p = this;
+                while (p->is_nonnull_link())
+                    p = &p->deref();
+                return *p;
+            }
+
+            bool_t link_cycle_exists() const
+            {
+                std::set<const value *> found;
+                const value *p = this;
+                found.insert(p);
+                while (p->is_nonnull_link())
+                {
+                    p = &p->deref();
+                    if (found.find(p) != found.end())
+                        return true;
+                }
+                return false;
+            }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            bool_t link_name_is_global() const
+            {
+                if (is_nonnull_link())
+                    return (*this)->is_attribute(core::value());
+                return false;
+            }
+            core::value get_link_name() const
+            {
+                if (is_nonnull_link())
+                {
+                    const core::value *ptr = (*this)->attribute_ptr(core::value());
+                    if (ptr)
+                        return *ptr;
+                }
+
+                const core::value *ptr = attribute_ptr(core::value());
+                if (ptr)
+                    return *ptr;
+
+                return core::value();
+            }
+
+            // Returns link to owner
+            core::value get_owning_link() const
+            {
+                return const_attribute(core::value(static_cast<value *>(nullptr), core::parent_link));
+            }
+
+            // Note that the local link name is not guaranteed to be used.
+            void set_local_link_name(const core::value &link_name)
+            {
+                attribute(core::value()) = link_name;
+            }
+
+            // Note that the global link name will be used before the local link name.
+            void set_global_link_name(const core::value &link_name)
+            {
+                if (is_nonnull_link())
+                    (*this)->attribute(core::value()) = link_name;
+            }
+
+            // Removes the global link name
+            void remove_global_link_name()
+            {
+                if (is_nonnull_link())
+                    (*this)->erase_attribute(core::value());
+            }
+#endif
+
             // The following are convenience conversion functions
 #ifdef CPPDATALIB_THROW_IF_WRONG_TYPE
             bool_t get_bool(bool_t = false) const
@@ -879,6 +1173,12 @@ namespace cppdatalib
                 if (is_bool())
                     return bool_;
                 throw core::error("cppdatalib::core::value - get_bool() called on non-boolean value");
+            }
+            value *get_link(value * = nullptr) const
+            {
+                if (is_link())
+                    return reinterpret_cast<value *>(ptr_);
+                throw core::error("cppdatalib::core::value - get_link() called on non-link value");
             }
             int_t get_int(int_t = 0) const
             {
@@ -916,6 +1216,7 @@ namespace cppdatalib
             object_t get_object() const;
 #else
             bool_t get_bool(bool_t default_ = false) const {return is_bool()? bool_: default_;}
+            value *get_link(value *default_ = nullptr) const {return is_link()? reinterpret_cast<value *>(ptr_): default_;}
             int_t get_int(int_t default_ = 0) const {return is_int()? int_: default_;}
             uint_t get_uint(uint_t default_ = 0) const {return is_uint()? uint_: default_;}
             real_t get_real(real_t default_ = 0.0) const {return is_real()? real_: default_;}
@@ -929,6 +1230,7 @@ namespace cppdatalib
 
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
             bool_t as_bool(bool_t default_ = false) const {return get_bool(default_);}
+            value *as_link(value *default_ = nullptr) const {return get_link(default_);}
             int_t as_int(int_t default_ = 0) const {return get_int(default_);}
             uint_t as_uint(uint_t default_ = 0) const {return get_uint(default_);}
             real_t as_real(real_t default_ = 0.0) const {return get_real(default_);}
@@ -939,6 +1241,7 @@ namespace cppdatalib
             object_t as_object() const;
 #else
             bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, default_).bool_;}
+            value *as_link(value *default_ = nullptr) const {return reinterpret_cast<value *>(value(*this).convert_to(link, default_).ptr_);}
             int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, default_).int_;}
             uint_t as_uint(uint_t default_ = 0) const {return value(*this).convert_to(uinteger, default_).uint_;}
             real_t as_real(real_t default_ = 0.0) const {return value(*this).convert_to(real, default_).real_;}
@@ -1004,12 +1307,6 @@ namespace cppdatalib
 #endif
             operator Template<N, Ts...>() const {return cast_sized_template_from_cppdatalib<Template, N, Ts...>(*this);}
 
-            // Returns the memory (in bytes of a platform-dependent bit width) consumed by this value
-            // Note that this value may be inaccurate, and should only be used as a rough estimate
-            // This algorithm will not be accurate if small-value-optimization is used, or in the case of objects,
-            // what kind of tree is used under the hood
-            uint64_t memory_consumed() const;
-
         private:
             // WARNING: DO NOT CALL mutable_clear() anywhere but the destructor!
             // It violates const-correctness for the sole purpose of allowing
@@ -1027,6 +1324,14 @@ namespace cppdatalib
                 init(new_type, normal);
             }
 
+            static core::value parent_link_id() {return core::value(static_cast<value *>(nullptr), core::parent_link);}
+
+            void destroy_strong_link()
+            {
+                if (is_strong_link())
+                    delete reinterpret_cast<value *>(ptr_);
+            }
+
             void init(type new_type, subtype_t new_subtype);
 
             template<typename... Args>
@@ -1035,6 +1340,14 @@ namespace cppdatalib
                 new (&bool_) bool_t(args...);
                 type_ = boolean;
                 subtype_ = new_subtype;
+            }
+
+            template<typename... Args>
+            void link_init(subtype_t new_subtype, Args... args)
+            {
+                new (&ptr_) value*(args...);
+                type_ = link;
+                set_link(args..., new_subtype);
             }
 
             template<typename... Args>
@@ -1101,8 +1414,12 @@ namespace cppdatalib
 
                 switch (type_)
                 {
-                    default:
-                    case null: *this = default_value; break;
+                    case null:
+                    case array:
+                    case object:
+                    case link:
+                        *this = default_value;
+                        break;
                     case boolean:
                     {
                         switch (new_type)
@@ -2001,146 +2318,6 @@ namespace cppdatalib
             }
         }
 
-        // Predicates must be callables with argument type `const core::value *arg, const core::value *arg2, core::value::traversal_ancestry_finder arg_finder, core::value::traversal_ancestry_finder arg2_finder`
-        // and return value bool. Either argument may be NULL, but both arguments will never be NULL simultaneously.
-        // If return value is non-zero, processing continues, otherwise processing aborts immediately
-        template<typename PrefixPredicate, typename PostfixPredicate>
-        void value::parallel_diff_traverse(const value &other, PrefixPredicate &prefix, PostfixPredicate &postfix) const
-        {
-            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> references;
-            std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> other_references;
-            const value *p = this, *other_p = &other;
-
-            while (!references.empty() || !other_references.empty() || p != NULL || other_p != NULL)
-            {
-                if (p != NULL || other_p != NULL)
-                {
-                    bool p_frozen = false, other_p_frozen = false;
-
-                    auto save_refs = references;
-                    auto save_other_refs = other_references;
-
-                    if (!save_refs.empty() && !save_refs.top().is_array() && !save_refs.top().is_object())
-                        save_refs.pop();
-
-                    if (!save_other_refs.empty() && !save_other_refs.top().is_array() && !save_other_refs.top().is_object())
-                        save_other_refs.pop();
-
-                    traversal_reference save_ref = save_refs.empty()? traversal_reference(NULL, array_const_iterator_t(), object_const_iterator_t(), false): save_refs.top();
-                    traversal_reference save_other_ref = save_other_refs.empty()? traversal_reference(NULL, array_const_iterator_t(), object_const_iterator_t(), false): save_other_refs.top();
-
-                    if (save_ref.is_object() && save_other_ref.is_object())
-                    {
-                        p_frozen = false;
-                        other_p_frozen = false;
-                        if (*save_ref.get_object_key() < *save_other_ref.get_object_key())
-                            other_p_frozen = true;
-                        else if (*save_other_ref.get_object_key() < *save_ref.get_object_key())
-                            p_frozen = true;
-                    }
-
-                    if (!prefix(p_frozen? NULL: p, other_p_frozen? NULL: other_p, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
-                        return;
-
-                    if (p != NULL)
-                    {
-                        if (p->is_array())
-                        {
-                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false, p_frozen));
-                            if (!p->get_array_unchecked().empty() && !p_frozen)
-                                p = std::addressof(*references.top().array++);
-                            else
-                                p = NULL;
-                        }
-                        else if (p->is_object())
-                        {
-                            references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true, p_frozen));
-                            if (!p->get_object_unchecked().empty() && !p_frozen)
-                                p = std::addressof(references.top().object->first);
-                            else
-                                p = NULL;
-                        }
-                        else
-                        {
-                            references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false, p_frozen));
-                            p = NULL;
-                        }
-                    }
-
-                    if (other_p != NULL)
-                    {
-                        if (other_p->is_array())
-                        {
-                            other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin(), object_const_iterator_t(), false, other_p_frozen));
-                            if (!other_p->get_array_unchecked().empty() && !other_p_frozen)
-                                other_p = std::addressof(*other_references.top().array++);
-                            else
-                                other_p = NULL;
-                        }
-                        else if (other_p->is_object())
-                        {
-                            other_references.push(traversal_reference(other_p, array_const_iterator_t(), other_p->get_object_unchecked().begin(), true, other_p_frozen));
-                            if (!other_p->get_object_unchecked().empty() && !other_p_frozen)
-                                other_p = std::addressof(other_references.top().object->first);
-                            else
-                                other_p = NULL;
-                        }
-                        else
-                        {
-                            other_references.push(traversal_reference(other_p, array_const_iterator_t(), object_const_iterator_t(), false, other_p_frozen));
-                            other_p = NULL;
-                        }
-                    }
-                }
-                else // p and other_p are both NULL here
-                {
-                    const value *peek = references.empty()? NULL: references.top().p;
-                    const value *other_peek = other_references.empty()? NULL: other_references.top().p;
-                    bool p_was_frozen = peek? references.top().frozen: false;
-                    bool other_p_was_frozen = peek? other_references.top().frozen: false;
-
-                    if (peek)
-                    {
-                        if (references.top().frozen)
-                            p = references.top().p;
-                        else if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                            p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
-                        {
-                            if (!references.top().traversed_key_already)
-                                p = std::addressof(references.top().object->first);
-                            else
-                                p = std::addressof((references.top().object++)->second);
-
-                            references.top().traversed_key_already = !references.top().traversed_key_already;
-                        }
-                    }
-
-                    if (other_peek)
-                    {
-                        if (other_references.top().frozen)
-                            other_p = other_references.top().p;
-                        else if (other_peek->is_array() && other_references.top().array != other_peek->get_array_unchecked().end())
-                            other_p = std::addressof(*other_references.top().array++);
-                        else if (other_peek->is_object() && other_references.top().object != other_peek->get_object_unchecked().end())
-                        {
-                            if (!other_references.top().traversed_key_already)
-                                other_p = std::addressof(other_references.top().object->first);
-                            else
-                                other_p = std::addressof((other_references.top().object++)->second);
-
-                            other_references.top().traversed_key_already = !other_references.top().traversed_key_already;
-                        }
-                    }
-
-                    if (peek != NULL) references.pop();
-                    if (other_peek != NULL) other_references.pop();
-                    if (!postfix(p_was_frozen? NULL: peek, other_p_was_frozen? NULL: other_peek, traversal_ancestry_finder(references), traversal_ancestry_finder(other_references)))
-                        return;
-                }
-            }
-        }
-
         inline value::value(const array_t &v, subtype_t subtype)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             : attr_(nullptr)
@@ -2189,6 +2366,7 @@ namespace cppdatalib
         {
             switch (other.type_)
             {
+                case null: break;
                 case boolean: new (&bool_) bool_t(std::move(other.bool_)); break;
                 case integer: new (&int_) int_t(std::move(other.int_)); break;
                 case uinteger: new (&uint_) uint_t(std::move(other.uint_)); break;
@@ -2212,7 +2390,11 @@ namespace cppdatalib
                     ptr_ = other.ptr_;
                     other.ptr_ = nullptr;
                     break;
-                default: break;
+                case link:
+                    new (&ptr_) value*();
+                    ptr_ = other.ptr_;
+                    other.ptr_ = nullptr;
+                    break;
             }
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             std::swap(attr_, other.attr_);
@@ -2567,6 +2749,13 @@ namespace cppdatalib
 
             switch (type_)
             {
+                case null:
+                    break;
+                case link:
+                    if (is_strong_link())
+                        delete reinterpret_cast<value *>(ptr_);
+                    ptr_.~ptr();
+                    break;
                 case boolean: bool_.~bool_t(); break;
                 case integer: int_.~int_t(); break;
                 case uinteger: uint_.~uint_t(); break;
@@ -2578,7 +2767,6 @@ namespace cppdatalib
 #endif
                 case array: delete reinterpret_cast<array_t*>(ptr_); ptr_.~ptr(); break;
                 case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
-                default: break;
             }
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             delete attr_; attr_ = nullptr;
@@ -2590,6 +2778,7 @@ namespace cppdatalib
         {
             switch (new_type)
             {
+                case null: break;
                 case boolean: new (&bool_) bool_t(); break;
                 case integer: new (&int_) int_t(); break;
                 case uinteger: new (&uint_) uint_t(); break;
@@ -2601,7 +2790,7 @@ namespace cppdatalib
 #endif
                 case array: new (&ptr_) array_t*(); ptr_ = nullptr; break;
                 case object: new (&ptr_) object_t*(); ptr_ = nullptr; break;
-                default: break;
+                case link: new (&ptr_) value*(); ptr_ = nullptr; break;
             }
             type_ = new_type;
             subtype_ = new_subtype;
@@ -2613,6 +2802,12 @@ namespace cppdatalib
 
             switch (type_)
             {
+                case null:
+                    break;
+                case link:
+                    destroy_strong_link();
+                    ptr_.~ptr();
+                    break;
                 case boolean: bool_.~bool_t(); break;
                 case integer: int_.~int_t(); break;
                 case uinteger: uint_.~uint_t(); break;
@@ -2624,64 +2819,12 @@ namespace cppdatalib
 #endif
                 case array: delete reinterpret_cast<array_t*>(ptr_); ptr_.~ptr(); break;
                 case object: delete reinterpret_cast<object_t*>(ptr_); ptr_.~ptr(); break;
-                default: break;
             }
             type_ = null;
             subtype_ = normal;
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             delete attr_; attr_ = nullptr;
 #endif
-        }
-
-        inline uint64_t value::memory_consumed() const
-        {
-            class traverser
-            {
-                uint64_t size_;
-
-            public:
-                traverser() : size_(0) {}
-
-                uint64_t size() const {return size_;}
-
-                bool operator()(const core::value *arg, core::value::traversal_ancestry_finder arg_finder, bool prefix)
-                {
-                    (void) arg_finder;
-
-                    if (prefix)
-                    {
-                        size_ += sizeof(value);
-
-                        switch (arg->get_type())
-                        {
-#ifdef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                            case string: size_ += sizeof(string_t) + arg->get_string_unchecked().capacity(); break;
-#else
-                            case string: size_ += arg->get_string_unchecked().capacity(); break;
-#endif
-                            case array: size_ += sizeof(array_t) + sizeof(value) * (arg->get_array_unchecked().data().capacity() - arg->get_array_unchecked().size()); break;
-                            case object: size_ += sizeof(object_t) + sizeof(void*) * 2 * arg->get_object_unchecked().size(); break;
-                            default: break;
-                        }
-
-#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-                        if (arg->attr_)
-                        {
-                            size_ += sizeof(object_t) + sizeof(void*) * 2 * arg->attr_->size();
-
-                            for (const auto &attr: *arg->attr_)
-                                size_ += attr.first.memory_consumed() + attr.second.memory_consumed();
-                        }
-#endif
-                    }
-
-                    return true;
-                }
-            };
-
-            traverser t;
-            traverse(t);
-            return t.size();
         }
 
         namespace impl

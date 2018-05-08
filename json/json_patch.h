@@ -36,6 +36,8 @@ namespace cppdatalib
         {
             inline core::value diff(const core::value &from, const core::value &to)
             {
+                (void) from, (void) to;
+
                 struct traverse_diff
                 {
                     core::value diff;
@@ -141,9 +143,9 @@ namespace cppdatalib
                 };
 
                 traverse_diff traverser;
-                traverse_diff_postfix postfix;
+                //traverse_diff_postfix postfix;
 
-                from.parallel_diff_traverse(to, traverser, postfix);
+                //from.parallel_diff_traverse(to, traverser, postfix);
 
                 return traverser.get_diff();
             }

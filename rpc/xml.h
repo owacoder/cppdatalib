@@ -27,10 +27,10 @@
 
 #include "../core/core.h"
 
+#ifdef CPPDATALIB_ENABLE_XML
+
 namespace cppdatalib
 {
-    // TODO: per stream, change single character writes to put() calls, and string writes to write() calls
-
     namespace xml_rpc
     {
         class stream_writer : public core::xml_impl::stream_writer_base
@@ -254,5 +254,7 @@ namespace cppdatalib
         }
     }
 }
+
+#endif // CPPDATALIB_ENABLE_XML
 
 #endif // CPPDATALIB_XML_RPC_H

@@ -131,7 +131,6 @@ namespace cppdatalib
                                 case string: value.set_string(""); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
-                                default: value.set_null(); break;
                             }
                             break;
                         case boolean:
@@ -144,7 +143,6 @@ namespace cppdatalib
                                 case string: value.set_string(value.get_bool_unchecked()? "true": "false"); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
-                                default: value.set_null(); break;
                             }
                             break;
                         case integer:
@@ -157,7 +155,6 @@ namespace cppdatalib
                                 case string: value.convert_to_string(); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
-                                default: value.set_null(); break;
                             }
                             break;
                         case uinteger:
@@ -170,7 +167,6 @@ namespace cppdatalib
                                 case string: value.convert_to_string(); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
-                                default: value.set_null(); break;
                             }
                             break;
                         case real:
@@ -183,7 +179,6 @@ namespace cppdatalib
                                 case string: value.convert_to_string(); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
-                                default: value.set_null(); break;
                             }
                             break;
                         case string:
@@ -196,7 +191,6 @@ namespace cppdatalib
                                 case real: value.convert_to_real(); break;
                                 case array: value.set_array(array_t()); break;
                                 case object: value.set_object(object_t()); break;
-                                default: value.set_null(); break;
                             }
                             break;
                         case array:
@@ -221,7 +215,6 @@ namespace cppdatalib
                                     value = obj;
                                     break;
                                 }
-                                default: value.set_null(); break;
                             }
                             break;
                         case object:
@@ -246,10 +239,8 @@ namespace cppdatalib
                                     value.set_array(arr);
                                     break;
                                 }
-                                default: value.set_null(); break;
                             }
                             break;
-                        default: break;
                     }
                 }
             };
@@ -2342,7 +2333,7 @@ namespace cppdatalib
                 result.insert({"abs", sql_function(1, [](const core::value &params)
                                {
                                    const core::value *v = params.element_ptr(0);
-                                   return v->is_int()? core::value(abs(v->as_int())): !v->is_real() && !v->is_string()? *v: core::value(fabs(v->as_real()));
+                                   return v->is_int()? core::value(std::abs(v->as_int())): !v->is_real() && !v->is_string()? *v: core::value(fabs(v->as_real()));
                                })});
                 result.insert({"acos", sql_function(1, [](const core::value &params)
                                {

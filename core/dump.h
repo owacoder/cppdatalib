@@ -76,11 +76,12 @@ namespace cppdatalib
                         return stream;
                     }
 
-                    core::ostream &write_type(core::ostream &stream, core::subtype_t subtype)
+                    core::ostream &write_type(core::ostream &stream, core::type type)
                     {
-                        switch (subtype)
+                        switch (type)
                         {
                             case null: return stream << "null.";
+                            case link: return stream << "link.";
                             case boolean: return stream << "boolean.";
                             case integer: return stream << "integer.";
                             case uinteger: return stream << "uinteger.";
@@ -88,8 +89,9 @@ namespace cppdatalib
                             case string: return stream << "string.";
                             case array: return stream << "array.";
                             case object: return stream << "object.";
-                            default: return stream << "unknown.";
                         }
+
+                        return stream << "unknown.";
                     }
 
                     core::ostream &write_subtype(core::ostream &stream, core::subtype_t subtype)
@@ -107,6 +109,8 @@ namespace cppdatalib
 
                 class attribute_stream_writer : public impl::stream_writer_base
                 {
+                    bool is_link_name;
+
                 public:
                     attribute_stream_writer(core::ostream_handle output)
                         : stream_writer_base(output)
@@ -115,7 +119,7 @@ namespace cppdatalib
                     std::string name() const {return "cppdatalib::dump::attribute_stream_writer";}
 
                 protected:
-                    void begin_() {stream().precision(CPPDATALIB_REAL_DIG);}
+                    void begin_() {stream().precision(CPPDATALIB_REAL_DIG); is_link_name = false;}
 
                     void begin_item_(const core::value &v)
                     {
@@ -157,6 +161,27 @@ namespace cppdatalib
                     }
 
                     void null_(const core::value &) {stream() << "null";}
+                    void link_(const core::value &v)
+                    {
+                        if (v.is_strong_link())
+                        {
+                            impl::attribute_stream_writer writer(stream());
+                            writer << *v;
+                        }
+                        else
+                        {
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                            if (v.link_name_is_global())
+                            {
+                                stream() << "global(";
+                                impl::attribute_stream_writer writer(stream());
+                                writer << v.get_link_name();
+                                stream() << ").";
+                            }
+#endif
+                            stream() << reinterpret_cast<uint64_t>(v.get_link_unchecked());
+                        }
+                    }
                     void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
                     void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
                     void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
@@ -186,6 +211,7 @@ namespace cppdatalib
                 std::unique_ptr<char []> buffer;
                 size_t indent_width;
                 size_t current_indent;
+                bool nested;
 
                 void output_padding(size_t padding)
                 {
@@ -200,12 +226,21 @@ namespace cppdatalib
                     }
                 }
 
+                stream_writer(core::ostream_handle output, size_t indent_width, size_t current_indent)
+                    : stream_writer_base(output)
+                    , buffer(new char [core::buffer_size])
+                    , indent_width(indent_width)
+                    , current_indent(current_indent)
+                    , nested(true)
+                {}
+
             public:
                 stream_writer(core::ostream_handle output, size_t indent_width)
                     : stream_writer_base(output)
                     , buffer(new char [core::buffer_size])
                     , indent_width(indent_width)
                     , current_indent(0)
+                    , nested(false)
                 {}
 
                 size_t indent() {return indent_width;}
@@ -213,8 +248,20 @@ namespace cppdatalib
                 std::string name() const {return "cppdatalib::dump::stream_writer";}
 
             protected:
-                void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG); stream() << "=== CPPDATALIB DUMP ===\n";}
-                void end_() {stream() << "\n=== END CPPDATALIB DUMP ===\n";}
+                void begin_()
+                {
+                    if (!nested)
+                    {
+                        current_indent = 0;
+                        stream().precision(CPPDATALIB_REAL_DIG);
+                        stream() << "=== CPPDATALIB DUMP ===\n";
+                    }
+                }
+                void end_()
+                {
+                    if (!nested)
+                        stream() << "\n=== END CPPDATALIB DUMP ===\n";
+                }
 
                 void begin_item_(const core::value &v)
                 {
@@ -261,6 +308,27 @@ namespace cppdatalib
                 }
 
                 void null_(const core::value &) {stream() << "null";}
+                void link_(const core::value &v)
+                {
+                    if (v.is_strong_link())
+                    {
+                        stream_writer writer(stream(), indent_width, current_indent);
+                        writer << *v;
+                    }
+                    else
+                    {
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                        if (v.link_name_is_global())
+                        {
+                            stream() << "global(";
+                            impl::attribute_stream_writer writer(stream());
+                            writer << v.get_link_name();
+                            stream() << ").";
+                        }
+#endif
+                        stream() << reinterpret_cast<uint64_t>(v.get_link_unchecked());
+                    }
+                }
                 void bool_(const core::value &v) {stream() << (v.get_bool_unchecked()? "true": "false");}
                 void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
                 void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
