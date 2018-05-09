@@ -994,6 +994,18 @@ namespace cppdatalib
             value &add_member_at_end(value &&key, value &&val);
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            // WARNING: if you are using links, it is recommended to NOT TOUCH certain attribute values,
+            // but to leave them unchanged:
+            //
+            // The `core::value()` (default null) attribute
+            // The `core::value(static_cast<core::value *>(nullptr), core::parent_link)` attribute
+            // The `core::value(static_cast<core::value *>(nullptr), core::normal)` attribute
+            //
+            // Thus, it is recommended to avoid `set_attributes()`, `erase_attributes()`, and modifying those specific values
+            // via any other function.
+            //
+            // All other attribute values are available to the end user.
+
             const object_t &get_attributes() const {return attr_ref_();}
             void set_attributes(const object_t &attributes);
             void set_attributes(object_t &&attributes);
