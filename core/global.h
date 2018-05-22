@@ -82,7 +82,255 @@ namespace cppdatalib
             , default_network_library = 0
 #endif
         };
-    }
-}
+
+#ifdef CPPDATALIB_BOOL_T
+        typedef CPPDATALIB_BOOL_T bool_t;
+#else
+        typedef bool bool_t;
+#endif
+
+#ifdef CPPDATALIB_INT_T
+        typedef CPPDATALIB_INT_T int_t;
+#else
+        typedef int64_t int_t;
+#endif
+
+#ifdef CPPDATALIB_UINT_T
+        typedef CPPDATALIB_UINT_T uint_t;
+#else
+        typedef uint64_t uint_t;
+#endif
+
+#ifdef CPPDATALIB_REAL_T
+        typedef CPPDATALIB_REAL_T real_t;
+#else
+        typedef double real_t;
+#define CPPDATALIB_REAL_DIG DBL_DIG
+#endif
+
+#ifdef CPPDATALIB_CSTRING_T
+        typedef CPPDATALIB_CSTRING_T cstring_t;
+#else
+        typedef const char *cstring_t;
+#endif
+
+#ifdef CPPDATALIB_STRING_T
+        typedef CPPDATALIB_STRING_T string_t;
+#else
+        typedef std::string string_t;
+#endif
+
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+#ifdef CPPDATALIB_STRING_VIEW_T
+        typedef CPPDATALIB_STRING_VIEW_T string_view_t;
+#elif defined(CPPDATALIB_CPP17)
+        typedef std::string_view string_view_t;
+#else
+        namespace impl
+        {
+            template<typename T>
+            class string_view_t
+            {
+            public:
+                typedef T value_type;
+                typedef T *pointer;
+                typedef const T *const_pointer;
+                typedef T &reference;
+                typedef const T &const_reference;
+                typedef const_pointer const_iterator;
+                typedef const_iterator iterator;
+                typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+                typedef const_reverse_iterator reverse_iterator;
+                typedef std::size_t size_type;
+                typedef std::ptrdiff_t difference_type;
+
+                static constexpr size_type npos = -1;
+
+                string_view_t() noexcept : data_(nullptr), size_(0) {}
+                string_view_t(const string_view_t &other) noexcept = default;
+                string_view_t(const_pointer nul_terminated) : data_(nul_terminated), size_(strlen(nul_terminated)) {}
+                string_view_t(const_pointer data, size_type size) : data_(data), size_(size) {}
+                string_view_t(const string_t &str) : data_(str.data()), size_(str.size()) {}
+
+                explicit operator std::basic_string<value_type>() const {return std::basic_string<value_type>(data(), size());}
+
+                constexpr const_iterator begin() const noexcept {return data_;}
+                constexpr const_iterator end() const noexcept {return data_ + size();}
+                constexpr const_iterator cbegin() const noexcept {return data_;}
+                constexpr const_iterator cend() const noexcept {return data_ + size();}
+                constexpr const_reverse_iterator rbegin() const noexcept {return const_reverse_iterator(end());}
+                constexpr const_reverse_iterator rend() const noexcept {return const_reverse_iterator(begin());}
+                constexpr const_reverse_iterator crbegin() const noexcept {return const_reverse_iterator(end());}
+                constexpr const_reverse_iterator crend() const noexcept {return const_reverse_iterator(begin());}
+
+                constexpr const_pointer data() const noexcept {return data_;}
+                constexpr const_reference operator[](size_type idx) const {return data_[idx];}
+                constexpr const_reference at(size_type idx) const {return idx >= size()? (throw std::out_of_range("impl::string_view_t - element access is out of bounds"), front()): data_[idx];}
+
+                void remove_prefix(size_type n) {data_ += n;}
+                void remove_suffix(size_type n) {size_ -= n;}
+                void swap(string_view_t &other)
+                {
+                    using namespace std;
+                    swap(data_, other.data_);
+                    swap(size_, other.size_);
+                }
+
+                constexpr const_reference front() const {return *data_;}
+                constexpr const_reference back() const {return data_[size() - 1];}
+
+                constexpr size_type size() const {return size_;}
+                constexpr size_type length() const {return size_;}
+
+                constexpr size_type max_length() const {return npos - 1;}
+
+                constexpr bool empty() const {return size() == 0;}
+
+                size_type copy(value_type *dest,
+                               size_type count,
+                               size_type pos = 0) const
+                {
+                    using namespace std;
+
+                    if (pos > size())
+                        throw std::out_of_range("impl::string_view_t - element access is out of bounds");
+
+                    count = min(count, size() - pos);
+                    for (size_type idx = pos; idx < pos + count; ++idx)
+                        *dest++ = data_[idx];
+
+                    return count;
+                }
+
+                constexpr string_view_t substr(size_type pos = 0, size_type count = npos) const
+                {
+                    return pos > size()? (throw std::out_of_range("impl::string_view_t - element access is out of bounds"), string_view_t()):
+                                         string_view_t(data_ + pos, pos + std::min(count, size() - pos));
+                }
+
+                // TODO: compare()
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                int compare(string_view_t v) const noexcept
+                {
+                    using namespace std;
+
+                    for (size_type i = 0; i < min(size(), v.size()); ++i)
+                    {
+                        if (data_[i] < v[i])
+                            return -1;
+                        else if (v[i] < data_[i])
+                            return 1;
+                    }
+
+                    if (size() == v.size())
+                        return 0;
+                    else if (size() < v.size())
+                        return -1;
+                    else // (size() > v.size())
+                        return 1;
+                }
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                int compare(size_type pos1, size_type count1, string_view_t v) const {return substr(pos1, count1).compare(v);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                int compare(size_type pos1, size_type count1, string_view_t v, size_type pos2, size_type count2) const {return substr(pos1, count1).compare(v.substr(pos2, count2));}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                int compare(const_pointer s) const {return compare(string_view_t(s));}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                int compare(size_type pos, size_type count1, const_pointer s) const {return substr(pos, count1).compare(string_view_t(s));}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                int compare(size_type pos, size_type count1, const_pointer s, size_type count2) const {return substr(pos, count1).compare(string_view_t(s, count2));}
+
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                bool starts_with(string_view_t v) const noexcept {return size() >= v.size() && compare(0, v.size(), v) == 0;}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                bool starts_with(value_type v) const noexcept {return size() > 0 && compare(0, 1, string_view_t(&v, 1)) == 0;}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                bool starts_with(const_pointer s) const {return starts_with(string_view_t(s));}
+
+                // TODO: ends_with()
+
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find(string_view_t v, size_type pos = 0) const noexcept
+                {
+                    if (v.size() > size())
+                        return npos;
+
+                    for (; pos + v.size() <= size(); ++pos)
+                        if (compare(pos, v.size(), v) == 0)
+                            return pos;
+
+                    return npos;
+                }
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find(value_type v, size_type pos = 0) const noexcept {return find(string_view_t(&v, 1), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find(const_pointer v, size_type pos, size_type count) const noexcept {return find(string_view_t(v, count), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find(const_pointer s, size_type pos = 0) const noexcept {return find(string_view_t(s), pos);}
+
+                // TODO: rfind()
+
+                // TODO: find_first_of()
+                // TODO: find_last_of()
+                // TODO: find_first_not_of()
+                // TODO: find_last_not_of()
+
+                bool operator==(string_view_t b) const {return compare(b) == 0;}
+                bool operator!=(string_view_t b) const {return compare(b) != 0;}
+                bool operator<=(string_view_t b) const {return compare(b) <= 0;}
+                bool operator>=(string_view_t b) const {return compare(b) >= 0;}
+                bool operator<(string_view_t b) const {return compare(b) < 0;}
+                bool operator>(string_view_t b) const {return compare(b) > 0;}
+
+            private:
+                const_pointer data_;
+                size_type size_;
+            };
+        }
+
+        typedef impl::string_view_t<char> string_view_t;
+
+    } // Namespace core
+} // Namespace cppdatalib
+
+inline cppdatalib::core::string_t &operator+=(cppdatalib::core::string_t &lhs, cppdatalib::core::string_view_t rhs) {return lhs.append(rhs.data(), rhs.size());}
+inline std::ostream &operator<<(std::ostream &os, cppdatalib::core::string_view_t rhs) {return os.write(rhs.data(), rhs.size());}
+
+namespace cppdatalib
+{
+    namespace core
+    {
+#endif // CPPDATALIB_STRING_VIEW_T
+#else
+        typedef const core::string_t &string_view_t;
+#endif // CPPDATALIB_DISABLE_TEMP_STRING
+    } // Namespace core
+} // Namespace cppdatalib
 
 #endif // CPPDATALIB_GLOBAL_H

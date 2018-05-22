@@ -78,11 +78,9 @@ namespace cppdatalib
             uinteger,
             real,
             string,
-
-#ifdef CPPDATALIB_CPP17
-            string_view,
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            temporary_string,
 #endif
-
             array,
             object,
             link // That is, a link (pointer) to another value structure, that may be linked to other values as well
@@ -99,8 +97,8 @@ namespace cppdatalib
         //     -39 to -30: subtypes applicable only to signed integers
         //     -49 to -40: subtypes applicable only to unsigned integers
         //     -59 to -50: subtypes applicable to floating-point values
-        //     -129 to -60: subtypes applicable to strings, encoded as some form of text
-        //     -199 to -130: subtypes applicable to strings, encoded as some form of binary value
+        //     -129 to -60: subtypes applicable to strings or temporary strings, encoded as some form of text
+        //     -199 to -130: subtypes applicable to strings or temporary strings, encoded as some form of binary value
         //     -209 to -200: subtypes applicable to arrays
         //     -219 to -200: subtypes applicable to objects
         //     -229 to -220: subtypes applicable to links
@@ -163,51 +161,6 @@ namespace cppdatalib
 
         class value_builder;
         class stream_handler;
-
-#ifdef CPPDATALIB_BOOL_T
-        typedef CPPDATALIB_BOOL_T bool_t;
-#else
-        typedef bool bool_t;
-#endif
-
-#ifdef CPPDATALIB_INT_T
-        typedef CPPDATALIB_INT_T int_t;
-#else
-        typedef int64_t int_t;
-#endif
-
-#ifdef CPPDATALIB_UINT_T
-        typedef CPPDATALIB_UINT_T uint_t;
-#else
-        typedef uint64_t uint_t;
-#endif
-
-#ifdef CPPDATALIB_REAL_T
-        typedef CPPDATALIB_REAL_T real_t;
-#else
-        typedef double real_t;
-#define CPPDATALIB_REAL_DIG DBL_DIG
-#endif
-
-#ifdef CPPDATALIB_CSTRING_T
-        typedef CPPDATALIB_CSTRING_T cstring_t;
-#else
-        typedef const char *cstring_t;
-#endif
-
-#ifdef CPPDATALIB_STRING_T
-        typedef CPPDATALIB_STRING_T string_t;
-#else
-        typedef std::string string_t;
-#endif
-
-#ifdef CPPDATALIB_CPP17
-#ifdef CPPDATALIB_STRING_VIEW_T
-        typedef CPPDATALIB_STRING_VIEW_T string_view_t;
-#else
-        typedef std::string_view string_view_t;
-#endif
-#endif
 
         class array_t;
         class object_t;
@@ -462,11 +415,23 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(cstring_t v, subtype_t subtype = core::normal)
+            value(cstring_t v, subtype_t subtype = core::normal, bool make_temporary = false)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 : attr_(nullptr)
 #endif
             {
+                (void) make_temporary;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                if (make_temporary)
+                {
+                    if (*v)
+                        temp_string_init(subtype, v);
+                    else
+                        init(temporary_string, subtype);
+
+                    return;
+                }
+#endif
                 if (*v)
                     string_init(subtype, v);
                 else
@@ -476,11 +441,60 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const string_t &v, subtype_t subtype = core::normal)
+            value(cstring_t v, size_t size, subtype_t subtype = core::normal, bool make_temporary = false)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 : attr_(nullptr)
 #endif
             {
+                (void) make_temporary;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                if (make_temporary)
+                {
+                    if (size)
+                        temp_string_init(subtype, v, size);
+                    else
+                        init(temporary_string, subtype);
+
+                    return;
+                }
+#endif
+                if (size)
+                    string_init(subtype, v, size);
+                else
+                    init(string, subtype);
+            }
+
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(string_view_t v, subtype_t subtype = core::normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {temp_string_init(subtype, v);}
+#endif // CPPDATALIB_DISABLE_TEMP_STRING
+
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(const string_t &v, subtype_t subtype = core::normal, bool make_temporary = false)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                : attr_(nullptr)
+#endif
+            {
+                (void) make_temporary;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                if (make_temporary)
+                {
+                    if (!v.empty())
+                        temp_string_init(subtype, v.data(), v.size());
+                    else
+                        init(temporary_string, subtype);
+
+                    return;
+                }
+#endif
                 if (!v.empty())
                     string_init(subtype, v);
                 else
@@ -744,6 +758,9 @@ namespace cppdatalib
                         case integer: swap(int_, other.int_); break;
                         case uinteger: swap(uint_, other.uint_); break;
                         case real: swap(real_, other.real_); break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                        case temporary_string: swap(tstr_, other.tstr_); break;
+#endif
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                         case string: swap(str_, other.str_); break;
 #else
@@ -772,7 +789,11 @@ namespace cppdatalib
             size_t size() const;
             size_t array_size() const;
             size_t object_size() const;
-            size_t string_size() const {return is_nonempty_string()? str_ref_().size(): 0;}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            size_t string_size() const {return is_temp_string()? tstr_.size(): is_nonnull_owned_string()? str_ref_().size(): 0;}
+#else
+            size_t string_size() const {return is_nonnull_owned_string()? str_ref_().size(): 0;}
+#endif
 
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
@@ -780,29 +801,45 @@ namespace cppdatalib
             bool_t is_int() const {return type_ == integer;}
             bool_t is_uint() const {return type_ == uinteger;}
             bool_t is_real() const {return type_ == real;}
-            bool_t is_string() const {return type_ == string;}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            bool_t is_temp_string() const {return type_ == temporary_string;}
+            bool_t is_string() const {return is_temp_string() || is_owned_string();}
+#else
+            bool_t is_string() const {return is_owned_string();}
+#endif
+            bool_t is_owned_string() const {return type_ == string;}
             bool_t is_array() const {return type_ == array;}
             bool_t is_object() const {return type_ == object;}
 
-            bool_t is_nonempty_string() const
+            bool_t is_nonnull_owned_string() const
             {
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                return type_ == string;
+                return type_ == string && !str_ref_().empty();
 #else
-                return type_ == string && ptr_ != nullptr;
+                return type_ == string && ptr_ != nullptr && !str_ref_().empty();
 #endif
             }
-            bool_t is_nonempty_array() const {return type_ == array && ptr_ != nullptr;}
-            bool_t is_nonempty_object() const {return type_ == object && ptr_ != nullptr;}
+            bool_t is_nonnull_array() const {return type_ == array && ptr_ != nullptr;}
+            bool_t is_nonnull_object() const {return type_ == object && ptr_ != nullptr;}
             bool_t is_nonnull_link() const {return type_ == link && ptr_ != nullptr;}
 
-            // The following seven functions exhibit UNDEFINED BEHAVIOR if the value is not the requested type
+            // The following group of functions exhibit UNDEFINED BEHAVIOR if the value is not the requested type
             bool_t get_bool_unchecked() const {return bool_;}
             value *get_link_unchecked() const {return reinterpret_cast<value *>(ptr_);}
             int_t get_int_unchecked() const {return int_;}
             uint_t get_uint_unchecked() const {return uint_;}
             real_t get_real_unchecked() const {return real_;}
-            const string_t &get_string_unchecked() const {return str_ref_();}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            string_view_t get_temp_string_unchecked() const {return tstr_;}
+            string_view_t get_string_unchecked() const
+            {
+                return is_temp_string()? get_temp_string_unchecked():
+                                         string_view_t(get_owned_string_unchecked().data(), get_owned_string_unchecked().size());
+            }
+#else
+            const string_t &get_string_unchecked() const {return get_owned_string_unchecked();}
+#endif
+            const string_t &get_owned_string_unchecked() const {return str_ref_();}
             const array_t &get_array_unchecked() const {return arr_ref_();}
             const object_t &get_object_unchecked() const {return obj_ref_();}
 
@@ -810,7 +847,10 @@ namespace cppdatalib
             int_t &get_int_ref() {clear(integer); return int_;}
             uint_t &get_uint_ref() {clear(uinteger); return uint_;}
             real_t &get_real_ref() {clear(real); return real_;}
-            string_t &get_string_ref() {clear(string); return str_ref_();}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            string_view_t &get_temp_string_ref() {clear(temporary_string); return tstr_;}
+#endif
+            string_t &get_owned_string_ref() {clear(string); return str_ref_();}
             array_t &get_array_ref() {clear(array); return arr_ref_();}
             object_t &get_object_ref() {clear(object); return obj_ref_();}
 
@@ -934,6 +974,10 @@ namespace cppdatalib
             void set_int(int_t v) {clear(integer); int_ = v;}
             void set_uint(uint_t v) {clear(uinteger); uint_ = v;}
             void set_real(real_t v) {clear(real); real_ = v;}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            void set_temp_string(string_view_t v) {clear(temporary_string); tstr_ = v;}
+            void set_temp_string(const string_t &v) {clear(temporary_string); tstr_ = string_view_t(v.data(), v.size());}
+#endif
             void set_string(cstring_t v) {clear(string); str_ref_() = v;}
             void set_string(const string_t &v) {clear(string); str_ref_() = v;}
             void set_array(const array_t &v);
@@ -954,6 +998,10 @@ namespace cppdatalib
             void set_int(int_t v, subtype_t subtype) {clear(integer); int_ = v; subtype_ = subtype;}
             void set_uint(uint_t v, subtype_t subtype) {clear(uinteger); uint_ = v; subtype_ = subtype;}
             void set_real(real_t v, subtype_t subtype) {clear(real); real_ = v; subtype_ = subtype;}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            void set_temp_string(string_view_t v, subtype_t subtype) {clear(temporary_string); tstr_ = v; subtype_ = subtype;}
+            void set_temp_string(const string_t &v, subtype_t subtype) {clear(temporary_string); tstr_ = string_view_t(v.data(), v.size()); subtype_ = subtype;}
+#endif
             void set_string(cstring_t v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
             void set_string(const string_t &v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
             void set_array(const array_t &v, subtype_t subtype);
@@ -961,37 +1009,41 @@ namespace cppdatalib
 
             value operator[](cstring_t key) const;
             value &operator[](cstring_t key);
-            value operator[](const string_t &key) const;
-            value &operator[](const string_t &key);
+            value operator[](string_view_t key) const;
+            value &operator[](string_view_t key);
             value const_member(cstring_t key) const;
-            value const_member(const string_t &key) const;
+            value const_member(string_view_t key) const;
             value const_member(const value &key) const;
             value member(cstring_t key) const;
-            value member(const string_t &key) const;
+            value member(string_view_t key) const;
             value member(const value &key) const;
             value &member(cstring_t key);
-            value &member(const string_t &key);
+            value &member(string_view_t key);
             value &member(const value &key);
             const value *member_ptr(const value &key) const;
             bool_t is_member(cstring_t key) const;
-            bool_t is_member(const string_t &key) const;
+            bool_t is_member(string_view_t key) const;
             bool_t is_member(const value &key) const;
             size_t member_count(cstring_t key) const;
-            size_t member_count(const string_t &key) const;
+            size_t member_count(string_view_t key) const;
             size_t member_count(const value &key) const;
             void erase_member(cstring_t key);
-            void erase_member(const string_t &key);
+            void erase_member(string_view_t key);
             void erase_member(const value &key);
 
             value &add_member(const value &key);
             value &add_member(value &&key);
             value &add_member(const value &key, const value &val);
             value &add_member(value &&key, value &&val);
+            value &add_member(value &&key, const value &val);
+            value &add_member(const value &key, value &&val);
 
             value &add_member_at_end(const value &key);
             value &add_member_at_end(value &&key);
             value &add_member_at_end(const value &key, const value &val);
             value &add_member_at_end(value &&key, value &&val);
+            value &add_member_at_end(value &&key, const value &val);
+            value &add_member_at_end(const value &key, value &&val);
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             // WARNING: if you are using links, it is recommended to NOT TOUCH certain attribute values,
@@ -1013,23 +1065,23 @@ namespace cppdatalib
             size_t attributes_size() const;
 
             value const_attribute(cstring_t key) const;
-            value const_attribute(const string_t &key) const;
+            value const_attribute(string_view_t key) const;
             value const_attribute(const value &key) const;
             value attribute(cstring_t key) const;
-            value attribute(const string_t &key) const;
+            value attribute(string_view_t key) const;
             value attribute(const value &key) const;
             value &attribute(cstring_t key);
-            value &attribute(const string_t &key);
+            value &attribute(string_view_t key);
             value &attribute(const value &key);
             const value *attribute_ptr(const value &key) const;
             bool_t is_attribute(cstring_t key) const;
-            bool_t is_attribute(const string_t &key) const;
+            bool_t is_attribute(string_view_t key) const;
             bool_t is_attribute(const value &key) const;
             size_t attribute_count(cstring_t key) const;
-            size_t attribute_count(const string_t &key) const;
+            size_t attribute_count(string_view_t key) const;
             size_t attribute_count(const value &key) const;
             void erase_attribute(cstring_t key);
-            void erase_attribute(const string_t &key);
+            void erase_attribute(string_view_t key);
             void erase_attribute(const value &key);
             void erase_attributes();
 
@@ -1037,11 +1089,15 @@ namespace cppdatalib
             value &add_attribute(value &&key);
             value &add_attribute(const value &key, const value &val);
             value &add_attribute(value &&key, value &&val);
+            value &add_attribute(value &&key, const value &val);
+            value &add_attribute(const value &key, value &&val);
 
             value &add_attribute_at_end(const value &key);
             value &add_attribute_at_end(value &&key);
             value &add_attribute_at_end(const value &key, const value &val);
             value &add_attribute_at_end(value &&key, value &&val);
+            value &add_attribute_at_end(value &&key, const value &val);
+            value &add_attribute_at_end(const value &key, value &&val);
 #endif // CPPDATALIB_DISABLE_ATTRIBUTES
 
             void push_back(const value &v);
@@ -1212,15 +1268,33 @@ namespace cppdatalib
             }
             cstring_t get_cstring(cstring_t = "") const
             {
-                if (is_string())
+                if (is_owned_string())
                     return str_ref_().c_str();
                 throw core::error("cppdatalib::core::value - get_cstring() called on non-string value");
             }
-            string_t get_string(const string_t & = string_t()) const
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            string_view_t get_temp_string(string_view_t = string_view_t()) const
             {
-                if (is_string())
-                    return is_nonempty_string()? str_ref_(): string_t();
+                if (is_temp_string())
+                    return tstr_;
+                throw core::error("cppdatalib::core::value - get_temp_string() called on non-temporary-string value");
+            }
+            string_view_t get_string(string_view_t = string_view_t()) const
+            {
+                if (is_temp_string())
+                    return tstr_;
+                else if (is_owned_string())
+                    return string_view_t(str_ref_().data(), str_ref_().size());
                 throw core::error("cppdatalib::core::value - get_string() called on non-string value");
+            }
+#else
+            string_t get_string(const string_t & = string_t()) const {return get_owned_string();}
+#endif
+            string_t get_owned_string(const string_t & = string_t()) const
+            {
+                if (is_owned_string())
+                    return is_nonnull_owned_string()? str_ref_(): string_t();
+                throw core::error("cppdatalib::core::value - get_owned_string() called on non-string value");
             }
             array_t get_array(const array_t &default_) const;
             object_t get_object(const object_t &default_) const;
@@ -1233,7 +1307,14 @@ namespace cppdatalib
             uint_t get_uint(uint_t default_ = 0) const {return is_uint()? uint_: default_;}
             real_t get_real(real_t default_ = 0.0) const {return is_real()? real_: default_;}
             cstring_t get_cstring(cstring_t default_ = "") const {return is_string()? str_ref_().c_str(): default_;}
-            string_t get_string(const string_t &default_ = string_t()) const {return is_string()? str_ref_(): default_;}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            string_view_t get_temp_string(string_view_t default_ = string_view_t()) const {return is_temp_string()? tstr_: default_;}
+            string_view_t get_string(string_view_t default_ = string_view_t()) const {return is_string()? string_view_t(str_ref_().data(), str_ref_().size()):
+                                                                                                               is_temp_string()? get_temp_string(default_): default_;}
+#else
+            string_t get_string(const string_t &default_ = string_t()) const {return get_owned_string(default_);}
+#endif
+            string_t get_owned_string(const string_t &default_ = string_t()) const {return is_owned_string()? str_ref_(): default_;}
             array_t get_array(const array_t &default_) const;
             object_t get_object(const object_t &default_) const;
             array_t get_array() const;
@@ -1246,7 +1327,7 @@ namespace cppdatalib
             int_t as_int(int_t default_ = 0) const {return get_int(default_);}
             uint_t as_uint(uint_t default_ = 0) const {return get_uint(default_);}
             real_t as_real(real_t default_ = 0.0) const {return get_real(default_);}
-            string_t as_string(const string_t &default_ = string_t()) const {return get_string(default_);}
+            string_t as_string(const string_t &default_ = string_t()) const {return static_cast<string_t>(get_string(default_));}
             array_t as_array(const array_t &default_) const;
             object_t as_object(const object_t &default_) const;
             array_t as_array() const;
@@ -1397,6 +1478,16 @@ namespace cppdatalib
                 type_ = string;
                 subtype_ = new_subtype;
             }
+
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            template<typename... Args>
+            void temp_string_init(subtype_t new_subtype, Args... args)
+            {
+                new (&tstr_) string_view_t(args...);
+                type_ = temporary_string;
+                subtype_ = new_subtype;
+            }
+#endif
 
             template<typename... Args>
             void array_init(subtype_t new_subtype, Args... args);
@@ -1598,6 +1689,67 @@ namespace cppdatalib
                         }
                         break;
                     }
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                    case temporary_string:
+                    {
+                        switch (new_type)
+                        {
+                            case boolean: set_bool(tstr_ == "true"); break;
+                            case integer:
+                            {
+                                std::istringstream str(static_cast<std::string>(tstr_));
+                                clear(integer);
+                                str >> int_;
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
+                                if (!str)
+                                    int_ = 0;
+#else
+                                if (!str)
+                                    throw core::error("cppdatalib::core::value - attempt to convert string to integer results in data loss");
+#endif
+                                break;
+                            }
+                            case uinteger:
+                            {
+                                std::istringstream str(static_cast<std::string>(tstr_));
+                                clear(uinteger);
+                                str >> uint_;
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
+                                if (!str)
+                                    uint_ = 0;
+#else
+                                if (!str)
+                                    throw core::error("cppdatalib::core::value - attempt to convert string to uinteger results in data loss");
+#endif
+                                break;
+                            }
+                            case real:
+                            {
+                                std::istringstream str(static_cast<std::string>(tstr_));
+                                clear(real);
+                                str >> real_;
+#ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
+                                if (!str)
+                                    real_ = 0.0;
+#else
+                                if (!str)
+                                    throw core::error("cppdatalib::core::value - attempt to convert string to real results in data loss");
+#endif
+                                break;
+                            }
+                            case string:
+                            {
+                                core::string_t str(tstr_.data(), tstr_.size());
+                                clear(string);
+                                if (str.size())
+                                    str_ref_() = std::move(str);
+                                break;
+                            }
+                            default: *this = default_value; break;
+                        }
+                        break;
+                    }
+#endif
                 }
 
                 return *this;
@@ -1624,6 +1776,9 @@ namespace cppdatalib
                 int_t int_;
                 uint_t uint_;
                 real_t real_;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                string_view_t tstr_;
+#endif
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 string_t str_;
 #endif
@@ -2383,6 +2538,9 @@ namespace cppdatalib
                 case integer: new (&int_) int_t(std::move(other.int_)); break;
                 case uinteger: new (&uint_) uint_t(std::move(other.uint_)); break;
                 case real: new (&real_) real_t(std::move(other.real_)); break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                case temporary_string: new (&tstr_) string_view_t(other.tstr_); break;
+#endif
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 case string: new (&str_) string_t(std::move(other.str_)); break;
 #else
@@ -2415,8 +2573,8 @@ namespace cppdatalib
 
         inline value::~value()
         {
-            if ((is_nonempty_array() && arr_ref_().size() > 0) ||
-                (is_nonempty_object() && obj_ref_().size() > 0))
+            if ((is_nonnull_array() && arr_ref_().size() > 0) ||
+                (is_nonnull_object() && obj_ref_().size() > 0))
                 traverse(traverse_node_null, traverse_node_mutable_clear);
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
@@ -2494,11 +2652,15 @@ namespace cppdatalib
 
         inline size_t value::size() const
         {
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            if (is_temp_string())
+                return tstr_.size();
+#endif
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-            if (is_string())
+            if (is_owned_string())
                 return str_ref_().size();
 #else
-            if (is_string())
+            if (is_owned_string())
                 return ptr_ == nullptr? 0: str_ref_().size();
 #endif
 
@@ -2509,8 +2671,8 @@ namespace cppdatalib
 
             return 0;
         }
-        inline size_t value::array_size() const {return is_nonempty_array()? arr_ref_().size(): 0;}
-        inline size_t value::object_size() const {return is_nonempty_object()? obj_ref_().size(): 0;}
+        inline size_t value::array_size() const {return is_nonnull_array()? arr_ref_().size(): 0;}
+        inline size_t value::object_size() const {return is_nonnull_object()? obj_ref_().size(): 0;}
 
         inline void value::set_array(const array_t &v) {clear(array); arr_ref_() = v;}
         inline void value::set_object(const object_t &v) {clear(object); obj_ref_() = v;}
@@ -2519,13 +2681,13 @@ namespace cppdatalib
 
         inline value value::operator[](cstring_t key) const {return member(value(key));}
         inline value &value::operator[](cstring_t key) {return member(value(key));}
-        inline value value::operator[](const string_t &key) const {return member(value(key));}
-        inline value &value::operator[](const string_t &key) {return member(value(key));}
+        inline value value::operator[](string_view_t key) const {return member(value(static_cast<string_t>(key)));}
+        inline value &value::operator[](string_view_t key) {return member(value(static_cast<string_t>(key)));}
         inline value value::const_member(cstring_t key) const {return const_member(value(key));}
-        inline value value::const_member(const string_t &key) const {return const_member(value(key));}
+        inline value value::const_member(string_view_t key) const {return const_member(value(static_cast<string_t>(key)));}
         inline value value::const_member(const value &key) const
         {
-            if (is_nonempty_object())
+            if (is_nonnull_object())
             {
                 auto it = obj_ref_().data().find(key);
                 if (it != obj_ref_().end())
@@ -2534,10 +2696,10 @@ namespace cppdatalib
             return value();
         }
         inline value value::member(cstring_t key) const {return const_member(key);}
-        inline value value::member(const string_t &key) const {return const_member(key);}
+        inline value value::member(string_view_t key) const {return const_member(key);}
         inline value value::member(const value &key) const {return const_member(key);}
         inline value &value::member(cstring_t key) {return member(value(key));}
-        inline value &value::member(const string_t &key) {return member(value(key));}
+        inline value &value::member(string_view_t key) {return member(value(static_cast<string_t>(key)));}
         inline value &value::member(const value &key)
         {
             clear(object);
@@ -2549,7 +2711,7 @@ namespace cppdatalib
         }
         inline const value *value::member_ptr(const value &key) const
         {
-            if (is_nonempty_object())
+            if (is_nonnull_object())
             {
                 auto it = obj_ref_().data().find(key);
                 if (it != obj_ref_().end())
@@ -2557,15 +2719,15 @@ namespace cppdatalib
             }
             return NULL;
         }
-        inline bool_t value::is_member(cstring_t key) const {return is_nonempty_object() && obj_ref_().data().find(value(key)) != obj_ref_().end();}
-        inline bool_t value::is_member(const string_t &key) const {return is_nonempty_object() && obj_ref_().data().find(value(key)) != obj_ref_().end();}
-        inline bool_t value::is_member(const value &key) const {return is_nonempty_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        inline size_t value::member_count(cstring_t key) const {return is_nonempty_object()? obj_ref_().data().count(value(key)): 0;}
-        inline size_t value::member_count(const string_t &key) const {return is_nonempty_object()? obj_ref_().data().count(value(key)): 0;}
-        inline size_t value::member_count(const value &key) const {return is_nonempty_object()? obj_ref_().data().count(key): 0;}
-        inline void value::erase_member(cstring_t key) {if (is_nonempty_object()) obj_ref_().data().erase(value(key));}
-        inline void value::erase_member(const string_t &key) {if (is_nonempty_object()) obj_ref_().data().erase(value(key));}
-        inline void value::erase_member(const value &key) {if (is_nonempty_object()) obj_ref_().data().erase(key);}
+        inline bool_t value::is_member(cstring_t key) const {return is_nonnull_object() && obj_ref_().data().find(value(key)) != obj_ref_().end();}
+        inline bool_t value::is_member(string_view_t key) const {return is_nonnull_object() && obj_ref_().data().find(value(static_cast<string_t>(key))) != obj_ref_().end();}
+        inline bool_t value::is_member(const value &key) const {return is_nonnull_object() && obj_ref_().data().find(key) != obj_ref_().end();}
+        inline size_t value::member_count(cstring_t key) const {return is_nonnull_object()? obj_ref_().data().count(value(key)): 0;}
+        inline size_t value::member_count(string_view_t key) const {return is_nonnull_object()? obj_ref_().data().count(value(static_cast<string_t>(key))): 0;}
+        inline size_t value::member_count(const value &key) const {return is_nonnull_object()? obj_ref_().data().count(key): 0;}
+        inline void value::erase_member(cstring_t key) {if (is_nonnull_object()) obj_ref_().data().erase(value(key));}
+        inline void value::erase_member(string_view_t key) {if (is_nonnull_object()) obj_ref_().data().erase(value(static_cast<string_t>(key)));}
+        inline void value::erase_member(const value &key) {if (is_nonnull_object()) obj_ref_().data().erase(key);}
 
         inline value &value::add_member(const value &key)
         {
@@ -2586,6 +2748,16 @@ namespace cppdatalib
         {
             clear(object);
             return obj_ref_().data().insert(std::make_pair(std::move(key), std::move(val)))->second;
+        }
+        inline value &value::add_member(value &&key, const value &val)
+        {
+            clear(object);
+            return obj_ref_().data().insert(std::make_pair(std::move(key), val))->second;
+        }
+        inline value &value::add_member(const value &key, value &&val)
+        {
+            clear(object);
+            return obj_ref_().data().insert(std::make_pair(key, std::move(val)))->second;
         }
 
         inline value &value::add_member_at_end(const value &key)
@@ -2608,10 +2780,20 @@ namespace cppdatalib
             clear(object);
             return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(std::move(key), std::move(val)))->second;
         }
+        inline value &value::add_member_at_end(value &&key, const value &val)
+        {
+            clear(object);
+            return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(std::move(key), val))->second;
+        }
+        inline value &value::add_member_at_end(const value &key, value &&val)
+        {
+            clear(object);
+            return obj_ref_().data().insert(obj_ref_().end().data(), std::make_pair(key, std::move(val)))->second;
+        }
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
         inline value value::const_attribute(cstring_t key) const {return const_attribute(core::value(key));}
-        inline value value::const_attribute(const string_t &key) const {return const_attribute(core::value(key));}
+        inline value value::const_attribute(string_view_t key) const {return const_attribute(core::value(static_cast<string_t>(key)));}
         inline value value::const_attribute(const value &key) const
         {
             auto it = attr_ref_().data().find(key);
@@ -2620,10 +2802,10 @@ namespace cppdatalib
             return value();
         }
         inline value value::attribute(cstring_t key) const {return const_attribute(value(key));}
-        inline value value::attribute(const string_t &key) const {return const_attribute(value(key));}
+        inline value value::attribute(string_view_t key) const {return const_attribute(value(static_cast<string_t>(key)));}
         inline value value::attribute(const value &key) const {return const_attribute(key);}
         inline value &value::attribute(cstring_t key) {return attribute(value(key));}
-        inline value &value::attribute(const string_t &key) {return attribute(value(key));}
+        inline value &value::attribute(string_view_t key) {return attribute(value(static_cast<string_t>(key)));}
         inline value &value::attribute(const value &key)
         {
             auto it = attr_ref_().data().lower_bound(key);
@@ -2640,13 +2822,13 @@ namespace cppdatalib
             return NULL;
         }
         inline bool_t value::is_attribute(cstring_t key) const {return attr_ref_().data().find(value(key)) != attr_ref_().end();}
-        inline bool_t value::is_attribute(const string_t &key) const {return attr_ref_().data().find(value(key)) != attr_ref_().end();}
+        inline bool_t value::is_attribute(string_view_t key) const {return attr_ref_().data().find(value(static_cast<string_t>(key))) != attr_ref_().end();}
         inline bool_t value::is_attribute(const value &key) const {return attr_ref_().data().find(key) != attr_ref_().end();}
         inline size_t value::attribute_count(cstring_t key) const {return attr_ref_().data().count(value(key));}
-        inline size_t value::attribute_count(const string_t &key) const {return attr_ref_().data().count(value(key));}
+        inline size_t value::attribute_count(string_view_t key) const {return attr_ref_().data().count(value(static_cast<string_t>(key)));}
         inline size_t value::attribute_count(const value &key) const {return attr_ref_().data().count(key);}
         inline void value::erase_attribute(cstring_t key) {attr_ref_().data().erase(value(key));}
-        inline void value::erase_attribute(const string_t &key) {attr_ref_().data().erase(value(key));}
+        inline void value::erase_attribute(string_view_t key) {attr_ref_().data().erase(value(static_cast<string_t>(key)));}
         inline void value::erase_attribute(const value &key) {attr_ref_().data().erase(key);}
         inline void value::erase_attributes() {attr_ref_().data().clear();}
 
@@ -2666,6 +2848,14 @@ namespace cppdatalib
         {
             return attr_ref_().data().insert(std::make_pair(std::move(key), std::move(val)))->second;
         }
+        inline value &value::add_attribute(value &&key, const value &val)
+        {
+            return attr_ref_().data().insert(std::make_pair(std::move(key), val))->second;
+        }
+        inline value &value::add_attribute(const value &key, value &&val)
+        {
+            return attr_ref_().data().insert(std::make_pair(key, std::move(val)))->second;
+        }
 
         inline value &value::add_attribute_at_end(const value &key)
         {
@@ -2682,6 +2872,14 @@ namespace cppdatalib
         inline value &value::add_attribute_at_end(value &&key, value &&val)
         {
             return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(std::move(key), std::move(val)))->second;
+        }
+        inline value &value::add_attribute_at_end(value &&key, const value &val)
+        {
+            return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(std::move(key), val))->second;
+        }
+        inline value &value::add_attribute_at_end(const value &key, value &&val)
+        {
+            return attr_ref_().data().insert(attr_ref_().end().data(), std::make_pair(key, std::move(val)))->second;
         }
 #endif // CPPDATALIB_DISABLE_ATTRIBUTES
 
@@ -2701,11 +2899,11 @@ namespace cppdatalib
 
         inline value value::operator[](size_t pos) const {return element(pos);}
         inline value &value::operator[](size_t pos) {return element(pos);}
-        inline value value::const_element(size_t pos) const {return is_nonempty_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
+        inline value value::const_element(size_t pos) const {return is_nonnull_array() && pos < arr_ref_().size()? arr_ref_()[pos]: value();}
         inline value value::element(size_t pos) const {return const_element(pos);}
         inline const value *value::element_ptr(size_t pos) const
         {
-            if (is_nonempty_array() && pos < arr_ref_().size())
+            if (is_nonnull_array() && pos < arr_ref_().size())
                 return std::addressof(arr_ref_().data()[pos]);
             return NULL;
         }
@@ -2716,7 +2914,7 @@ namespace cppdatalib
                 arr_ref_().data().insert(arr_ref_().end().data(), pos - arr_ref_().size() + 1, core::null_t());
             return arr_ref_()[pos];
         }
-        inline void value::erase_element(size_t pos) {if (is_nonempty_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
+        inline void value::erase_element(size_t pos) {if (is_nonnull_array()) arr_ref_().data().erase(arr_ref_().begin().data() + pos);}
 
 #ifdef CPPDATALIB_THROW_IF_WRONG_TYPE
         inline array_t value::get_array(const array_t &) const {return get_array();}
@@ -2724,20 +2922,20 @@ namespace cppdatalib
         inline array_t value::get_array() const
         {
             if (is_array())
-                return is_nonempty_array()? arr_ref_(): array_t();
+                return is_nonnull_array()? arr_ref_(): array_t();
             throw core::error("cppdatalib::core::value - get_array() called on non-array value");
         }
         inline object_t value::get_object() const
         {
             if (is_object())
-                return is_nonempty_object()? obj_ref_(): object_t();
+                return is_nonnull_object()? obj_ref_(): object_t();
             throw core::error("cppdatalib::core::value - get_object() called on non-object value");
         }
 #else
         inline array_t value::get_array(const array_t &default_) const {return is_array()? arr_ref_(): default_;}
         inline object_t value::get_object(const object_t &default_) const {return is_object()? obj_ref_(): default_;}
-        inline array_t value::get_array() const {return is_nonempty_array()? arr_ref_(): array_t();}
-        inline object_t value::get_object() const {return is_nonempty_object()? obj_ref_(): object_t();}
+        inline array_t value::get_array() const {return is_nonnull_array()? arr_ref_(): array_t();}
+        inline object_t value::get_object() const {return is_nonnull_object()? obj_ref_(): object_t();}
 #endif
 
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
@@ -2772,6 +2970,9 @@ namespace cppdatalib
                 case integer: int_.~int_t(); break;
                 case uinteger: uint_.~uint_t(); break;
                 case real: real_.~real_t(); break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                case temporary_string: tstr_.~string_view_t(); break;
+#endif
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 case string: str_.~string_t(); break;
 #else
@@ -2795,6 +2996,9 @@ namespace cppdatalib
                 case integer: new (&int_) int_t(); break;
                 case uinteger: new (&uint_) uint_t(); break;
                 case real: new (&real_) real_t(); break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                case temporary_string: new (&tstr_) string_view_t(); break;
+#endif
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 case string: new (&str_) string_t(); break;
 #else
@@ -2824,6 +3028,9 @@ namespace cppdatalib
                 case integer: int_.~int_t(); break;
                 case uinteger: uint_.~uint_t(); break;
                 case real: real_.~real_t(); break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                case temporary_string: tstr_.~string_view_t(); break;
+#endif
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
                 case string: str_.~string_t(); break;
 #else

@@ -39,7 +39,7 @@ namespace cppdatalib
                 stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
             protected:
-                core::ostream &write_string(core::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, core::string_view_t str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {

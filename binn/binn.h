@@ -102,7 +102,7 @@ namespace cppdatalib
             uint32_t read_size(core::istream &input)
             {
                 uint32_t size = 0;
-                int chr = input.get();
+                core::istream::int_type chr = input.get();
                 if (chr == EOF)
                     throw core::error("Binn - expected size specifier");
 
@@ -544,6 +544,9 @@ namespace cppdatalib
                                     break;
                                 }
                                 case core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                case core::temporary_string:
+#endif
                                 {
                                     if (prefix)
                                     {
@@ -686,6 +689,7 @@ namespace cppdatalib
                 }
                 else if (v.is_int())
                 {
+                    // TODO: is this valid for signed numbers?
                     core::int_t i = v.get_int_unchecked();
                     uint64_t out;
 
@@ -818,7 +822,7 @@ namespace cppdatalib
 
                 write_size(stream(), size);
             }
-            void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
+            void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
             void end_string_(const core::value &, bool is_key) {if (core::subtype_is_text_string(current_container_subtype()) && !is_key) stream().put(0);}
 
             void begin_array_(const core::value &v, core::int_t size, bool)

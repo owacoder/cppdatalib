@@ -555,7 +555,12 @@ public:
             case cppdatalib::core::integer: result = Poco::Int64(bind.get_int_unchecked()); break;
             case cppdatalib::core::uinteger: result = Poco::UInt64(bind.get_uint_unchecked()); break;
             case cppdatalib::core::real: result = bind.get_real_unchecked(); break;
-            case cppdatalib::core::string: result = bind.get_string_unchecked(); break;
+            case cppdatalib::core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            case cppdatalib::core::temporary_string:
+#endif
+                result = bind.get_string_unchecked();
+                break;
             case cppdatalib::core::array: result = bind.operator Poco::Dynamic::Vector(); break;
             case cppdatalib::core::object: result = bind.operator Poco::Dynamic::Struct<Poco::Dynamic::Var>(); break;
         }

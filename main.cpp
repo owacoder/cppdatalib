@@ -1021,6 +1021,7 @@ int main(int argc, char **argv)
     std::unique_ptr<std::ofstream> outfile;
     std::unique_ptr<cppdatalib::core::stream_input> input;
     std::unique_ptr<cppdatalib::core::stream_handler> output(new cppdatalib::core::stream_handler());
+    cppdatalib::core::value outvalue;
 
     std::string in, out;
     std::string in_scheme, out_scheme;
@@ -1043,6 +1044,7 @@ int main(int argc, char **argv)
     //lk.set_global_link_name(core::object_t{{"link1", true}});
     //lk.set_local_link_name("ref1");
 
+#if 0
     std::cout << lk;
     std::cout << lk2;
     if (!lk.link_cycle_exists())
@@ -1050,6 +1052,7 @@ int main(int argc, char **argv)
     if (!lk2.link_cycle_exists())
         std::cout << lk2.deref_all_links();
     return 0;
+#endif
 
 #if 0
     try
@@ -1127,7 +1130,11 @@ int main(int argc, char **argv)
         }
     }
 
-    if ((out_scheme.empty() || out_scheme == "file") && out != "null")
+    if (out == "internal")
+    {
+        output.reset(new cppdatalib::core::value_builder(outvalue));
+    }
+    else if ((out_scheme.empty() || out_scheme == "file") && out != "null")
     {
         // Get output file extension
         size_t out_filetype = out.rfind('.');
@@ -1189,7 +1196,7 @@ int main(int argc, char **argv)
 
 		double dur = double(clock() - start) / CLOCKS_PER_SEC;
 		std::cout << std::setprecision(16);
-		std::cout << "Total Input: " << uint64_t(infile.get()->tellg()) << " bytes in " << dur << " seconds (" << uint64_t(infile.get()->tellg() / dur) << " Bytes/S)\n";
+        std::cout << "Total Input: " << dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream().used_buffer() << " bytes in " << dur << " seconds (" << uint64_t(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream().used_buffer() / dur) << " Bytes/S)\n";
 		if (outfile.get())
 			std::cout << "Total Output: " << uint64_t(outfile.get()->tellp()) << " bytes in " << dur << " seconds (" << uint64_t(outfile.get()->tellp() / dur) << " Bytes/S)\n";
 #endif

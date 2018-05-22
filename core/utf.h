@@ -55,11 +55,10 @@ namespace cppdatalib
         }
 
         // Returns string with ASCII characters converted to lowercase
-        std::string ascii_lowercase_copy(const std::string &str)
+        std::string ascii_lowercase_copy(std::string str)
         {
-            std::string copy(str);
-            ascii_lowercase(copy);
-            return copy;
+            ascii_lowercase(str);
+            return str;
         }
 
         // Converts ASCII characters in string to uppercase
@@ -85,11 +84,10 @@ namespace cppdatalib
         }
 
         // Returns string with ASCII characters converted to uppercase
-        std::string ascii_uppercase_copy(const std::string &str)
+        std::string ascii_uppercase_copy(std::string str)
         {
-            std::string copy(str);
-            ascii_uppercase(copy);
-            return copy;
+            ascii_uppercase(str);
+            return str;
         }
 
         encoding encoding_from_name(const char *encoding_name)
@@ -272,7 +270,7 @@ namespace cppdatalib
 
         // Returns -1 on conversion failure, invalid codepoint, overlong encoding, or truncated input
         // Returns codepoint on success, with updated `idx` stored in `new_pos`
-        uint32_t utf8_to_ucs(const std::string &s, size_t idx, size_t &new_pos)
+        uint32_t utf8_to_ucs(string_view_t s, size_t idx, size_t &new_pos)
         {
             uint32_t result = 0;
             int c = s[idx] & 0xff;

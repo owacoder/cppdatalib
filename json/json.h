@@ -42,10 +42,11 @@ namespace cppdatalib
             {
                 static const std::string hex = "0123456789ABCDEF";
 
+                core::value str_type((const char *) "", core::normal, true);
                 core::istream::int_type c;
                 char *write = buffer.get();
 
-                writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+                writer.begin_string(str_type, core::stream_handler::unknown_size);
                 while (c = stream.get(), c != '"' && c != EOF)
                 {
                     if (c == '\\')
@@ -112,7 +113,7 @@ namespace cppdatalib
                     if (write - buffer.get() >= core::buffer_size)
                     {
                         *write = 0;
-                        writer.append_to_string(core::value(core::string_t(buffer.get(), write - buffer.get())));
+                        writer.append_to_string(core::value(buffer.get(), write - buffer.get(), core::normal, true));
                         write = buffer.get();
                     }
                 }
@@ -123,9 +124,9 @@ namespace cppdatalib
                 if (write != buffer.get())
                 {
                     *write = 0;
-                    writer.append_to_string(core::value(core::string_t(buffer.get(), write - buffer.get())));
+                    writer.append_to_string(core::value(buffer.get(), write - buffer.get(), core::normal, true));
                 }
-                writer.end_string(core::string_t());
+                writer.end_string(str_type);
                 return stream;
             }
 
@@ -218,11 +219,12 @@ namespace cppdatalib
                                 bool is_float = false;
                                 std::string buffer = std::string(1, chr);
 
-                                int c;
-                                while (c = stream().get(), c != EOF && strchr("0123456789.eE+-", c))
+                                core::istream::int_type c;
+                                while (c = stream().get(), c != EOF && c < 0x80 && (isdigit(c) || strchr(".eE+-", c)))
                                 {
                                     buffer.push_back(c);
-                                    is_float = c == '.' || tolower(c) == 'e';
+                                    if (!is_float && (c == '.' || c == 'e' || c == 'E'))
+                                        is_float = true;
                                 }
                                 stream().unget();
                                 delimiter_required = true;
@@ -253,9 +255,8 @@ namespace cppdatalib
                                         }
                                     }
                                 }
-
                                 // Attempt to read as a real
-                                if (buffer.find_first_of("eE.") != std::string::npos)
+                                else
                                 {
                                     core::istring_wrapper_stream temp_stream(buffer);
                                     core::real_t value = 0.0;
@@ -288,14 +289,11 @@ namespace cppdatalib
                 stream_writer_base(core::ostream_handle &stream) : core::stream_writer(stream) {}
 
             protected:
-                core::ostream &write_string(core::ostream &stream, const std::string &str)
+                core::ostream &write_string(core::ostream &stream, core::string_view_t str)
                 {
                     for (size_t i = 0; i < str.size();)
                     {
                         uint32_t c = core::utf8_to_ucs(str, i, i);
-
-                        if (c == uint32_t(-1))
-                            throw core::error("JSON - invalid UTF-8 string");
 
                         switch (c)
                         {
@@ -305,23 +303,28 @@ namespace cppdatalib
                                 stream.put(c);
                                 break;
                             default:
-                                if (c < 0x80 && iscntrl(c))
+                                if (c < 0x80)
                                 {
-                                    switch (c)
+                                    if (iscntrl(c))
                                     {
-                                        case '\b': stream.write("\\b", 2); break;
-                                        case '\f': stream.write("\\f", 2); break;
-                                        case '\n': stream.write("\\n", 2); break;
-                                        case '\r': stream.write("\\r", 2); break;
-                                        case '\t': stream.write("\\t", 2); break;
-                                        default:
-                                            hex::write(stream.write("\\u00", 4), c);
-                                            break;
+                                        switch (c)
+                                        {
+                                            case '\b': stream.write("\\b", 2); break;
+                                            case '\f': stream.write("\\f", 2); break;
+                                            case '\n': stream.write("\\n", 2); break;
+                                            case '\r': stream.write("\\r", 2); break;
+                                            case '\t': stream.write("\\t", 2); break;
+                                            default:
+                                                hex::write(stream.write("\\u00", 4), c);
+                                                break;
+                                        }
                                     }
+                                    else
+                                        stream.put(c);
                                 }
                                 else if (c >= 0xd800 && c <= 0xdfff)
                                     throw core::error("JSON - invalid UTF-8 string");
-                                else if (c > 0x80)
+                                else // c >= 0x80
                                 {
                                     char buf[16];
 
@@ -355,16 +358,16 @@ namespace cppdatalib
 
                                     stream << buf;
                                 }
-                                else
-                                    stream.put(c);
                                 break;
+                            case uint32_t(-1):
+                                throw core::error("JSON - invalid UTF-8 string");
                         }
                     }
 
                     return stream;
                 }
 
-                core::ostream &write_blob_string(core::ostream &stream, const std::string &str)
+                core::ostream &write_blob_string(core::ostream &stream, core::string_view_t str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {

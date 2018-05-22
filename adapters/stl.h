@@ -1358,7 +1358,12 @@ public:
             case core::integer: result = bind.get_int_unchecked(); break;
             case core::uinteger: result = bind.get_uint_unchecked(); break;
             case core::real: result = bind.get_real_unchecked(); break;
-            case core::string: result = bind.get_string_unchecked(); break;
+            case core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            case cppdatalib::core::temporary_string:
+#endif
+                result = bind.get_string_unchecked();
+                break;
             case core::array: result = bind.get_array_unchecked(); break;
             case core::object: result = bind.get_object_unchecked(); break;
         }

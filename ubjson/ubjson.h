@@ -50,27 +50,14 @@ namespace cppdatalib
             std::unique_ptr<char []> buffer;
             std::stack<container_data, std::vector<container_data>> containers;
 
-            inline char size_specifier(core::int_t min, core::int_t max)
-            {
-                if (min >= 0 && max <= UINT8_MAX)
-                    return 'U';
-                else if (min >= INT8_MIN && max <= INT8_MAX)
-                    return 'i';
-                else if (min >= INT16_MIN && max <= INT16_MAX)
-                    return 'I';
-                else if (min >= INT32_MIN && max <= INT32_MAX)
-                    return 'l';
-                else
-                    return 'L';
-            }
-
             inline core::istream &read_int(core::int_t &i, char specifier)
             {
                 uint64_t temp;
                 bool negative = false;
-                int c = stream().get();
+                core::istream::int_type c = stream().get();
 
-                if (c == EOF) throw core::error("UBJSON - expected integer value after type specifier");
+                if (c == EOF)
+                    throw core::error("UBJSON - expected integer value after type specifier");
                 temp = c & 0xff;
 
                 switch (specifier)
@@ -135,7 +122,7 @@ namespace cppdatalib
             {
                 core::real_t r;
                 uint64_t temp;
-                int c = stream().get();
+                core::istream::int_type c = stream().get();
 
                 if (c == EOF) throw core::error("UBJSON - expected floating-point value after type specifier");
                 temp = c & 0xff;
@@ -187,40 +174,44 @@ namespace cppdatalib
                 else if (specifier == 'H')
                 {
                     core::int_t size;
+                    core::value string_type("", 0, core::bignum, true);
 
                     read_int(size, c);
                     if (size < 0) throw core::error("UBJSON - invalid negative size specified for high-precision number");
 
-                    writer.begin_string(core::value(core::string_t(), core::bignum), size);
+                    writer.begin_string(string_type, size);
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
                         stream().read(buffer.get(), buffer_size);
                         if (stream().fail())
                             throw core::error("UBJSON - expected high-precision number value after type specifier");
-                        writer.append_to_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                        string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                        writer.append_to_string(string_type);
                         size -= buffer_size;
                     }
-                    writer.end_string(core::value(core::string_t(), core::bignum));
+                    writer.end_string(string_type);
                 }
                 else if (specifier == 'S')
                 {
                     core::int_t size;
+                    core::value string_type("", 0, core::bignum, true);
 
                     read_int(size, c);
                     if (size < 0) throw core::error("UBJSON - invalid negative size specified for string");
 
-                    writer.begin_string(core::value(core::string_t(), core::clob), size);
+                    writer.begin_string(string_type, size);
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
                         stream().read(buffer.get(), buffer_size);
                         if (stream().fail())
                             throw core::error("UBJSON - expected string value after type specifier");
-                        writer.append_to_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                        string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                        writer.append_to_string(string_type);
                         size -= buffer_size;
                     }
-                    writer.end_string(core::value(core::string_t(), core::clob));
+                    writer.end_string(string_type);
                 }
                 else
                     throw core::error("UBJSON - invalid string specifier found in input");
@@ -264,7 +255,7 @@ namespace cppdatalib
                         --containers.top().remaining_size;
                     if (get_output()->current_container() == core::object && chr != 'N' && chr != '}' && !get_output()->container_key_was_just_parsed())
                     {
-                        // Parse key here, remap read character to 'N' (the no-op instruction)
+                        // Parse key here, remap the character that was read to 'N' (the no-op instruction)
                         if (!containers.top().content_type)
                             stream().unget();
                         read_string('S', *get_output());
@@ -356,7 +347,7 @@ namespace cppdatalib
                         break;
                     case '{':
                     {
-                        int type = 0;
+                        core::istream::int_type type = 0;
                         core::int_t size = -1;
 
                         chr = stream().get();
@@ -431,36 +422,30 @@ namespace cppdatalib
 
                     if (force_bits == 0 && (i >= 0 && i <= UINT8_MAX))
                     {
-                        stream << (add_specifier? "U": "");
+                        if (add_specifier)
+                            stream.put('U');
                         stream.put(static_cast<char>(i));
                     }
                     else if (force_bits <= 1 && (i >= INT8_MIN && i < 0))
                     {
-                        stream << (add_specifier? "i": "");
+                        if (add_specifier)
+                            stream.put('i');
                         stream.put(0x80 | ((~std::abs(i) & 0xff) + 1));
                     }
                     else if (force_bits <= 2 && (i >= INT16_MIN && i <= INT16_MAX))
                     {
-                        uint16_t t;
+                        uint16_t t = static_cast<uint16_t>(i);
 
-                        if (i < 0)
-                            t = 0x8000u | ((~std::abs(i) & 0xffffu) + 1);
-                        else
-                            t = static_cast<uint16_t>(i);
-
-                        stream << (add_specifier? "I": "");
+                        if (add_specifier)
+                            stream.put('I');
                         stream.put(t >> 8).put(t & 0xff);
                     }
                     else if (force_bits <= 3 && (i >= INT32_MIN && i <= INT32_MAX))
                     {
-                        uint32_t t;
+                        uint32_t t = static_cast<uint32_t>(i);
 
-                        if (i < 0)
-                            t = 0x80000000u | ((~std::abs(i) & 0xffffffffu) + 1);
-                        else
-                            t = static_cast<uint32_t>(i);
-
-                        stream << (add_specifier? "l": "");
+                        if (add_specifier)
+                            stream.put('l');
                         stream.put(t >> 24)
                                 .put((t >> 16) & 0xff)
                                 .put((t >>  8) & 0xff)
@@ -468,14 +453,10 @@ namespace cppdatalib
                     }
                     else
                     {
-                        uint64_t t;
+                        uint64_t t = static_cast<uint64_t>(i);
 
-                        if (i < 0)
-                            t = 0x8000000000000000u | ((~std::abs(i) & 0xffffffffffffffffu) + 1);
-                        else
-                            t = i;
-
-                        stream << (add_specifier? "L": "");
+                        if (add_specifier)
+                            stream.put('L');
                         stream.put(t >> 56)
                                 .put((t >> 48) & 0xff)
                                 .put((t >> 40) & 0xff)
@@ -501,7 +482,8 @@ namespace cppdatalib
                     {
                         uint32_t t = core::float_to_ieee_754(static_cast<float>(f));
 
-                        stream << (add_specifier? "d": "");
+                        if (add_specifier)
+                            stream.put('d');
                         stream.put(t >> 24)
                                 .put((t >> 16) & 0xff)
                                 .put((t >>  8) & 0xff)
@@ -511,7 +493,8 @@ namespace cppdatalib
                     {
                         uint64_t t = core::double_to_ieee_754(f);
 
-                        stream << (add_specifier? "D": "");
+                        if (add_specifier)
+                            stream.put('D');
                         stream.put(t >> 56)
                                 .put((t >> 48) & 0xff)
                                 .put((t >> 40) & 0xff)
@@ -549,8 +532,14 @@ namespace cppdatalib
             void uinteger_(const core::value &v)
             {
                 if (v.get_uint_unchecked() > static_cast<core::uint_t>(std::numeric_limits<core::int_t>::max()))
-                    throw core::error("UBJSON - 'integer' value is out of range of output format");
-                write_int(stream(), v.get_uint_unchecked(), true);
+                {
+                    std::string str = std::to_string(v.get_uint_unchecked());
+                    stream().put('H');
+                    write_int(stream(), str.size(), true);
+                    stream() << str;
+                }
+                else
+                    write_int(stream(), v.get_uint_unchecked(), true);
             }
             void real_(const core::value &v) {write_float(stream(), v.get_real_unchecked(), true);}
             void begin_string_(const core::value &v, core::int_t size, bool is_key)

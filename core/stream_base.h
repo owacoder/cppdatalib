@@ -242,7 +242,7 @@ namespace cppdatalib
 
                 if (!write_(v, is_key))
                 {
-                    if (v.is_nonempty_array() || v.is_nonempty_object())
+                    if (v.is_nonnull_array() || v.is_nonnull_object())
                     {
                         *this << v;
                         return true; // Skip post-processing, since the '<<' operator works all that out anyway
@@ -259,8 +259,11 @@ namespace cppdatalib
                         switch (v.get_type())
                         {
                             case string:
-                                begin_string_(v, v.size(), is_key);
-                                nested_scopes.push_back({string, v.get_subtype(), core::int_t(v.size())});
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                            case temporary_string:
+#endif
+                                begin_string_(v, v.string_size(), is_key);
+                                nested_scopes.push_back({v.get_type(), v.get_subtype(), core::int_t(v.string_size())});
                                 remove_scope = true;
                                 string_data_(v, is_key);
                                 end_string_(v, is_key);
@@ -437,6 +440,9 @@ namespace cppdatalib
 
             // Called when a scalar string is parsed
             // If the length of v is equal to size, the entire string is provided
+            // Note that the provided string may be a temporary_string, which MUST be converted to a real string!
+            // Note that if begin_string_() is provided the entire string (size equal to specified size) it may be assumed there will be no more input.
+            // Note that string_data_() and end_string_() require that `v` be of the same subtype as the original string passed to begin_string_()
             virtual void begin_string_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void string_data_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
             virtual void end_string_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
@@ -481,7 +487,11 @@ namespace cppdatalib
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
 #ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
-                if (nested_scopes.back().get_type() != string)
+                if (nested_scopes.back().get_type() != string
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                        && nested_scopes.back().get_type() != temporary_string
+#endif
+                        )
                     throw error("cppdatalib::core::stream_handler - attempted to append to string that was never begun");
                 else if (!v.is_string())
                     throw error("cppdatalib::core::stream_handler - attempted to append non-string value to string");
@@ -496,7 +506,11 @@ namespace cppdatalib
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
 #ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
-                if (nested_scopes.back().get_type() != string)
+                if (nested_scopes.back().get_type() != string
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                        && nested_scopes.back().get_type() != temporary_string
+#endif
+                        )
                     throw error("cppdatalib::core::stream_handler - attempted to end string that was never begun");
                 else if (!v.is_string())
                     throw error("cppdatalib::core::stream_handler - attempted to end string with non-string value");
@@ -682,10 +696,16 @@ namespace cppdatalib
 
         protected:
             // Overloads to detect beginnings and ends of arrays
+            // If the size of v is equal to `size`, the entire array is provided
+            // Note that if begin_array_() is provided the entire array (size equal to specified size) it may be assumed there will be no more input for this array.
+            // Note that end_array_() requires that `v` be of the same subtype as the original array passed to begin_array_()
             virtual void begin_array_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void end_array_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
             // Overloads to detect beginnings and ends of objects
+            // If the size of v is equal to `size`, the entire object is provided
+            // Note that if begin_object_() is provided the entire object (size equal to specified size) it may be assumed there will be no more input for this object.
+            // Note that end_object_() requires that `v` be of the same subtype as the original object passed to begin_object_()
             virtual void begin_object_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void end_object_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
@@ -1059,6 +1079,11 @@ namespace cppdatalib
                                     case string:
                                         compare = (arg->get_string_unchecked() < arg2->get_string_unchecked());
                                         break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                    case temporary_string:
+                                        compare = (arg->get_temp_string_unchecked() < arg2->get_temp_string_unchecked());
+                                        break;
+#endif
                                     case array:
                                     case object:
                                     case null:
@@ -1132,6 +1157,11 @@ namespace cppdatalib
                                     case string:
                                         compare = (arg->get_string_unchecked() > arg2->get_string_unchecked()) - (arg->get_string_unchecked() < arg2->get_string_unchecked());
                                         break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                    case temporary_string:
+                                        compare = (arg->get_temp_string_unchecked() > arg2->get_temp_string_unchecked()) - (arg->get_temp_string_unchecked() < arg2->get_temp_string_unchecked());
+                                        break;
+#endif
                                     case array:
                                     case object:
                                     case null:
@@ -1195,6 +1225,11 @@ namespace cppdatalib
                                 case string:
                                     equal = (arg->get_string_unchecked() == arg2->get_string_unchecked());
                                     break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                case temporary_string:
+                                    equal = (arg->get_temp_string_unchecked() == arg2->get_temp_string_unchecked());
+                                    break;
+#endif
                                 case array:
                                 case object:
                                     equal = (arg->size() == arg2->size());
@@ -1805,7 +1840,7 @@ namespace cppdatalib
                             (!read_spaces(0)) ||
                             (!match('=')) ||
                             (!read_spaces(0)) ||
-                            (!read_attribute_value(deref_no_entities, attributes["version"].get_string_ref())) ||
+                            (!read_attribute_value(deref_no_entities, attributes["version"].get_owned_string_ref())) ||
                             (!read_spaces(0)))
                         {
                             last_error_ = "invalid prolog; " + last_error_;
@@ -1822,7 +1857,7 @@ namespace cppdatalib
                             (!read_spaces(0)) ||
                             (!match('=')) ||
                             (!read_spaces(0)) ||
-                            (!read_attribute_value(deref_no_entities, attributes["encoding"].get_string_ref())))
+                            (!read_attribute_value(deref_no_entities, attributes["encoding"].get_owned_string_ref())))
                         {
                             last_error_ = "invalid prolog; " + last_error_;
                             return false;
@@ -1838,7 +1873,7 @@ namespace cppdatalib
                             (!read_spaces(0)) ||
                             (!match('=')) ||
                             (!read_spaces(0)) ||
-                            (!read_attribute_value(deref_no_entities, attributes["standalone"].get_string_ref())))
+                            (!read_attribute_value(deref_no_entities, attributes["standalone"].get_owned_string_ref())))
                         {
                             last_error_ = "invalid prolog; " + last_error_;
                             return false;
@@ -2185,7 +2220,11 @@ namespace cppdatalib
                             case core::integer: integer_(attr.second); break;
                             case core::uinteger: uinteger_(attr.second); break;
                             case core::real: real_(attr.second); break;
-                            case core::string: write_attribute_content(stream(), attr.second.get_string_unchecked()); break;
+                            case core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                            case core::temporary_string:
+#endif
+                                write_attribute_content(stream(), attr.second.get_string_unchecked()); break;
                             case core::array:
                             case core::object: throw core::error("XML - cannot write attribute with 'array' or 'object' value");
                         }

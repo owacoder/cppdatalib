@@ -102,6 +102,9 @@ namespace cppdatalib
                                     break;
                                 }
                                 case core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                case core::temporary_string:
+#endif
                                 {
                                     if (prefix)
                                         size.top() += 2 + arg->string_size() + std::to_string(arg->string_size()).size();
@@ -193,7 +196,7 @@ namespace cppdatalib
                 stream() << size;
                 stream().put(':');
             }
-            void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
+            void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
             void end_string_(const core::value &, bool) {stream().put(',');}
 
             void begin_array_(const core::value &v, core::int_t size, bool)

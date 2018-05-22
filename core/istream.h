@@ -136,6 +136,10 @@ namespace cppdatalib
             streamsize gcount() const {return last_read_;}
 #endif
 
+            virtual const char *current_buffer_begin() const {return nullptr;}
+            virtual streamsize used_buffer() const = 0;
+            virtual streamsize remaining_buffer() const = 0;
+
             int_type peek()
             {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
@@ -505,7 +509,6 @@ namespace cppdatalib
                     flags_ = fail_bit | eof_bit;
                 else
                 {
-                    f = 0;
                     while (c != EOF && c < 0x80 && (isdigit(c) || strchr(".eE+-", c)))
                     {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
@@ -606,6 +609,10 @@ namespace cppdatalib
                 , pos(0)
             {}
 
+            const char *current_buffer_begin() const {return string.data() + pos;}
+            streamsize used_buffer() const {return pos;}
+            streamsize remaining_buffer() const {return string.size() - pos;}
+
             const std::string &str() const {return string;}
 
         protected:
@@ -637,6 +644,10 @@ namespace cppdatalib
                 , len(len)
                 , pos(0)
             {}
+
+            const char *current_buffer_begin() const {return string + pos;}
+            streamsize used_buffer() const {return pos;}
+            streamsize remaining_buffer() const {return len - pos;}
 
             std::string str() const {return std::string(string, len);}
 
@@ -675,8 +686,12 @@ namespace cppdatalib
                 , pos(0)
             {}
 
+            const char *current_buffer_begin() const {return string.data() + pos;}
+            streamsize used_buffer() const {return pos;}
+            streamsize remaining_buffer() const {return string.size() - pos;}
+
             const std::string &str() const {return string;}
-            void str(const std::string &s) {string = s; pos = 0; flags_ = 0;}
+            void str(std::string s) {string = std::move(s); pos = 0; flags_ = 0;}
 
         protected:
             int_type getc_() {return pos < string.size()? string[pos++] & 0xff: EOF;}
@@ -692,20 +707,27 @@ namespace cppdatalib
 
         class istd_streambuf_wrapper : public istream
         {
+            size_t pos_;
             std::streambuf *stream_;
 
         public:
             istd_streambuf_wrapper(std::streambuf *stream)
-                : stream_(stream)
+                : pos_(0)
+                , stream_(stream)
             {}
 
+            streamsize used_buffer() const {return pos_;}
+            streamsize remaining_buffer() const {return -1;}
+
         protected:
-            int_type getc_() {return stream_->sbumpc();}
+            int_type getc_() {++pos_; return stream_->sbumpc();}
             int_type peekc_() {return stream_->sgetc();}
             void ungetc_()
             {
                 if (stream_->sungetc() == EOF)
                     flags_ |= bad_bit;
+                else
+                    --pos_;
             }
         };
 
@@ -720,6 +742,10 @@ namespace cppdatalib
                 , size_(buffer_size)
                 , pos_(0)
             {}
+
+            const char *current_buffer_begin() const {return mem_ + pos_;}
+            streamsize used_buffer() const {return pos_;}
+            streamsize remaining_buffer() const {return size_ - pos_;}
 
             const char *buffer() const {return mem_;}
             size_t buffer_size() const {return size_;}
@@ -773,6 +799,10 @@ namespace cppdatalib
             {
                 munmap((void *) stream.buffer(), stream.buffer_size());
             }
+
+            const char *current_buffer_begin() const {return stream.current_buffer_begin();}
+            streamsize used_buffer() const {return stream.used_buffer();}
+            streamsize remaining_buffer() const {return stream.remaining_buffer();}
 
             const char *buffer() const {return stream.buffer();}
             size_t buffer_size() const {return stream.buffer_size();}
@@ -834,6 +864,7 @@ namespace cppdatalib
             int_type peek_;
             bool use_peek_next;
             encoding current_encoding_;
+            size_t pos_;
 
         public:
             iencodingstream(core::istream &stream, encoding encoding_type = unknown)
@@ -843,7 +874,11 @@ namespace cppdatalib
                 , peek_(0)
                 , use_peek_next(false)
                 , current_encoding_(encoding_type)
+                , pos_(0)
             {}
+
+            streamsize used_buffer() const {return pos_;}
+            streamsize remaining_buffer() const {return -1;}
 
             encoding get_encoding() const {return current_encoding_;}
             void set_encoding(const char *encoding_name) {current_encoding_ = encoding_from_name(encoding_name);}
@@ -854,17 +889,21 @@ namespace cppdatalib
             {
                 if (use_buffer_next)
                 {
+                    ++pos_;
                     use_buffer_next = false;
                     return last_;
                 }
                 else if (use_peek_next)
                 {
+                    ++pos_;
                     use_peek_next = false;
                     return peek_;
                 }
 
                 bool eof;
                 uint32_t codepoint = utf_to_ucs(*underlying_stream_, current_encoding_, &eof);
+
+                pos_ += !eof;
 
                 if (eof)
                     return EOF;
@@ -879,7 +918,10 @@ namespace cppdatalib
                 if (use_buffer_next)
                     flags_ |= fail_bit;
                 else
+                {
                     use_buffer_next = true;
+                    --pos_;
+                }
             }
 
             int_type peekc_()

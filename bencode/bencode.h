@@ -86,7 +86,7 @@ namespace cppdatalib
                         if (chr < 0x80 && isdigit(chr))
                         {
                             core::int_t size;
-                            core::value string_type(core::string_t(), core::clob);
+                            core::value string_type("", 0, core::clob, true);
 
                             stream().unget();
                             stream() >> size;
@@ -101,7 +101,7 @@ namespace cppdatalib
                                 if (stream().fail())
                                     throw core::error("Bencode - unexpected end of string");
                                 // Set string in string_type to preserve the subtype
-                                string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                                string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                                 get_output()->append_to_string(string_type);
                                 size -= buffer_size;
                             }

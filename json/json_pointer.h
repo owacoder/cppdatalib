@@ -204,20 +204,22 @@ namespace cppdatalib
                         // Dereference
                         if (reference->is_object())
                         {
+                            core::value member_name(path_node);
+
                             if (destroy_element && idx > pointer.size())
                             {
-                                reference->erase_member(path_node);
+                                reference->erase_member(member_name);
                                 return reference;
                             }
-                            else if (reference->is_member(path_node))
+                            else if (reference->is_member(member_name))
                             {
                                 parent = reference;
-                                reference = &reference->member(core::value(path_node));
+                                reference = &reference->member(member_name);
                             }
                             else if (allow_add_element && idx > pointer.size())
                             {
                                 parent = reference;
-                                return &reference->member(core::value(path_node));
+                                return &reference->member(member_name);
                             }
                             else if (throw_on_errors)
                                 throw core::error("JSON Pointer - Attempted to dereference non-existent member in object");

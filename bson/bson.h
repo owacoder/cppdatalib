@@ -307,11 +307,11 @@ namespace cppdatalib
 
                         read_name();
 
-                        if (!read_cstring(str.get_string_ref()))
+                        if (!read_cstring(str.get_owned_string_ref()))
                             throw core::error("BSON - expected regular expression");
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-                        if (!read_cstring(str.attribute("options").get_string_ref()))
+                        if (!read_cstring(str.attribute("options").get_owned_string_ref()))
                             throw core::error("BSON - expected regular expression options");
 #else
                         core::string_t temp;
@@ -396,7 +396,7 @@ namespace cppdatalib
             {
                 core::istream::int_type c;
                 core::value str(core::string_t(), core::clob);
-                core::string_t &ref = str.get_string_ref();
+                core::string_t &ref = str.get_owned_string_ref();
 
                 while (c = stream().get(), c != EOF && c != 0 && c <= 0xff)
                     ref.push_back(c);

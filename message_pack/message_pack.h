@@ -49,30 +49,6 @@ namespace cppdatalib
             std::stack<container_data, std::vector<container_data>> containers;
             bool written;
 
-            uint32_t read_size(core::istream &input)
-            {
-                uint32_t size = 0;
-                int chr = input.get();
-                if (chr == EOF)
-                    throw core::error("Binn - expected size specifier");
-
-                size = chr;
-                if (chr >> 7) // If topmost bit is set, the size is specified in 4 bytes, not 1. The topmost bit is not included in the size
-                {
-                    size &= 0x7f;
-                    for (int i = 0; i < 3; ++i)
-                    {
-                        chr = input.get();
-                        if (chr == EOF)
-                            throw core::error("Binn - expected size specifier");
-                        size <<= 8;
-                        size |= chr;
-                    }
-                }
-
-                return size;
-            }
-
         public:
             parser(core::istream_handle input)
                 : core::stream_parser(input)
@@ -94,7 +70,7 @@ namespace cppdatalib
 
             void write_one_()
             {
-                int chr;
+                core::istream::int_type chr;
 
                 while (containers.size() > 0 && !get_output()->container_key_was_just_parsed() && containers.top().remaining_size == 0)
                 {
@@ -122,7 +98,7 @@ namespace cppdatalib
                     throw core::error("MessagePack - unexpected end of stream, expected type specifier");
 
                 if (chr < 0x80) // Positive fixint
-                    get_output()->write(core::value(core::int_t(chr)));
+                    get_output()->write(core::value(core::uint_t(chr)));
                 else if (chr < 0x90) // Fixmap
                 {
                     chr &= 0xf;
@@ -142,9 +118,9 @@ namespace cppdatalib
 
                     stream().read(buf, chr);
                     if (stream().fail())
-                        throw core::error("MessagePack - unexpected end of string");
+                        throw core::error("MessagePack - unexpected end of UTF-8 string");
 
-                    get_output()->write(core::value(core::string_t(buf, chr)));
+                    get_output()->write(core::value(buf, chr, core::normal, true));
                 }
                 else if (chr >= 0xe0) // Negative fixint
                     get_output()->write(core::value(-core::int_t((~unsigned(chr) + 1) & 0xff)));
@@ -162,12 +138,12 @@ namespace cppdatalib
                     case 0xc6:
                     {
                         uint32_t size;
-                        core::value string_type = core::value("");
+                        core::value string_type = core::value("", 0, core::normal, true);
 
                         if ((chr == 0xc4 && !core::read_uint8(stream(), size)) ||
                             (chr == 0xc5 && !core::read_uint16_be(stream(), size)) ||
                             (chr == 0xc6 && !core::read_uint32_be(stream(), size)))
-                            throw core::error("MessagePack - expected 'binary data' length");
+                            throw core::error("MessagePack - expected binary string length");
 
                         string_type.set_subtype(core::blob);
                         get_output()->begin_string(string_type, size);
@@ -176,9 +152,9 @@ namespace cppdatalib
                             core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
                             stream().read(buffer.get(), buffer_size);
                             if (stream().fail())
-                                throw core::error("MessagePack - unexpected end of string");
+                                throw core::error("MessagePack - unexpected end of binary string");
                             // Set string in string_type to preserve the subtype
-                            string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                            string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                             get_output()->append_to_string(string_type);
                             size -= static_cast<uint32_t>(buffer_size);
                         }
@@ -258,12 +234,12 @@ namespace cppdatalib
                     case 0xdb:
                     {
                         uint32_t size;
-                        core::value string_type = core::value("");
+                        core::value string_type = core::value("", 0, core::normal, true);
 
                         if ((chr == 0xd9 && !core::read_uint8(stream(), size)) ||
                             (chr == 0xda && !core::read_uint16_be(stream(), size)) ||
                             (chr == 0xdb && !core::read_uint32_be(stream(), size)))
-                            throw core::error("MessagePack - expected 'binary data' length");
+                            throw core::error("MessagePack - expected UTF-8 string length");
 
                         get_output()->begin_string(string_type, size);
                         while (size > 0)
@@ -271,9 +247,9 @@ namespace cppdatalib
                             core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
                             stream().read(buffer.get(), buffer_size);
                             if (stream().fail())
-                                throw core::error("MessagePack - unexpected end of string");
+                                throw core::error("MessagePack - unexpected end of UTF-8 string");
                             // Set string in string_type to preserve the subtype
-                            string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                            string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                             get_output()->append_to_string(string_type);
                             size -= static_cast<uint32_t>(buffer_size);
                         }
@@ -353,20 +329,18 @@ namespace cppdatalib
                 {
                     if (i >= 0)
                     {
-                        if (i <= UINT8_MAX / 2)
-                            return stream.put(static_cast<char>(i));
-                        else if (i <= UINT8_MAX)
-                            return stream.put(static_cast<unsigned char>(0xcc)).put(static_cast<char>(i));
+                        if (i <= UINT8_MAX)
+                            return stream.put(static_cast<unsigned char>(0xd0)).put(static_cast<char>(i));
                         else if (i <= UINT16_MAX)
-                            return stream.put(static_cast<unsigned char>(0xcd)).put(static_cast<char>(i >> 8)).put(i & 0xff);
+                            return stream.put(static_cast<unsigned char>(0xd1)).put(static_cast<char>(i >> 8)).put(i & 0xff);
                         else if (i <= UINT32_MAX)
-                            return stream.put(static_cast<unsigned char>(0xce))
+                            return stream.put(static_cast<unsigned char>(0xd2))
                                     .put(static_cast<char>(i >> 24))
                                     .put((i >> 16) & 0xff)
                                     .put((i >> 8) & 0xff)
                                     .put(i & 0xff);
                         else
-                            return stream.put(static_cast<unsigned char>(0xcf))
+                            return stream.put(static_cast<unsigned char>(0xd3))
                                     .put((i >> 56) & 0xff)
                                     .put((i >> 48) & 0xff)
                                     .put((i >> 40) & 0xff)
@@ -462,7 +436,7 @@ namespace cppdatalib
                                     .put((str_size >> 8) & 0xff)
                                     .put(str_size & 0xff);
                         else
-                            throw core::error("MessagePack - 'blob' value is too long");
+                            throw core::error("MessagePack - binary 'string' value is too long");
                     }
                     // Normal string?
                     else
@@ -515,7 +489,7 @@ namespace cppdatalib
 
                 write_string_size(stream(), static_cast<size_t>(size), v.get_subtype());
             }
-            void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
+            void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
 
             void begin_array_(const core::value &, core::int_t size, bool)
             {

@@ -112,10 +112,10 @@ namespace cppdatalib
 
                 if (proxy_settings.object_size())
                     manager->setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,
-                                                    QString::fromStdString(proxy_settings.const_member("host").get_string()),
+                                                    QString::fromStdString(proxy_settings.const_member("host").as_string()),
                                                     proxy_settings.const_member("port").as_uint(),
-                                                    QString::fromStdString(proxy_settings.const_member("username").get_string()),
-                                                    QString::fromStdString(proxy_settings.const_member("password").get_string())));
+                                                    QString::fromStdString(proxy_settings.const_member("username").as_string()),
+                                                    QString::fromStdString(proxy_settings.const_member("password").as_string())));
                 else
                     manager->setProxy(QNetworkProxy());
 

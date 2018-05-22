@@ -66,7 +66,7 @@ namespace cppdatalib
             friend ostream &operator<<(ostream &out, signed char ch);
             friend ostream &operator<<(ostream &out, unsigned char ch);
             friend ostream &operator<<(ostream &out, const char *s);
-            friend ostream &operator<<(ostream &out, const std::string &s);
+            friend ostream &operator<<(ostream &out, string_view_t s);
 
             friend ostream &operator<<(ostream &out, bool val);
 
@@ -177,7 +177,7 @@ namespace cppdatalib
         inline ostream &operator<<(ostream &out, unsigned char ch) {return out.write_formatted_char(ch);}
 
         inline ostream &operator<<(ostream &out, const char *s) {return out.write_formatted_string(s);}
-        inline ostream &operator<<(ostream &out, const std::string &s) {return out.write_formatted_string(s.c_str(), s.size());}
+        inline ostream &operator<<(ostream &out, string_view_t s) {return out.write_formatted_string(s.data(), s.size());}
 
         inline ostream &operator<<(ostream &out, bool val) {return out.write_formatted_bool(val);}
 

@@ -47,7 +47,7 @@ namespace cppdatalib
             // WARNING: Underlying container type of `keys` MUST be able to maintain element positions
             // so their addresses don't change (i.e. NOT VECTOR)
             std::stack<core::value, std::list<core::value>> keys;
-            std::stack<core::value *, std::vector<core::value *>> references;
+            core::cache_vector_n<core::value *, core::cache_size> references;
 
         public:
             value_builder(core::value &bind) : v(bind) {}
@@ -82,21 +82,21 @@ namespace cppdatalib
                 references = decltype(references)();
 
                 v.set_null();
-                references.push(&this->v);
+                references.push_back(&this->v);
             }
 
             // begin_key_() just queues a new object key in the stack
             void begin_key_(const core::value &v)
             {
                 keys.push(v);
-                references.push(&keys.top());
+                references.push_back(&keys.top());
             }
             void end_key_(const core::value &)
             {
                 if (references.empty())
                     end(), begin();
 
-                references.pop();
+                references.pop_back();
             }
 
             // begin_scalar_() pushes the item to the array if the object to be modified is an array,
@@ -107,18 +107,14 @@ namespace cppdatalib
                     end(), begin();
 
                 if (!is_key && current_container() == array)
-                    references.top()->push_back(v);
+                    references.back()->push_back(v);
                 else if (!is_key && current_container() == object)
                 {
-                    references.top()->add_member(keys.top(), v);
+                    references.back()->add_member(std::move(keys.top()), v);
                     keys.pop();
                 }
                 else
-                    *references.top() = v;
-
-#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-                references.top()->set_attributes(v.get_attributes());
-#endif
+                    *references.back() = v;
             }
 
             void string_data_(const core::value &v, bool)
@@ -126,38 +122,43 @@ namespace cppdatalib
                 if (references.empty())
                     end(), begin();
 
-                references.top()->get_string_ref() += v.get_string_unchecked();
+                references.back()->get_owned_string_ref() += v.get_string_unchecked();
             }
 
             // begin_container() operates similarly to begin_scalar_(), but pushes a reference to the container as well
-            void begin_container(const core::value &v, core::int_t, bool is_key)
+            void begin_container(const core::value &v, core::int_t size, bool is_key)
             {
                 if (references.empty())
                     end(), begin();
 
                 if (!is_key && current_container() == array)
                 {
-                    references.top()->push_back(core::null_t());
-                    references.push(&references.top()->get_array_ref().data().back());
+                    references.back()->push_back(core::null_t());
+                    references.push_back(&references.back()->get_array_ref().data().back());
                 }
                 else if (!is_key && current_container() == object)
                 {
-                    references.push(&references.top()->add_member(keys.top()));
+                    references.push_back(&references.back()->add_member(std::move(keys.top())));
                     keys.pop();
                 }
 
-                // WARNING: If one tries to perform the following assignment `*references.top() = v` here,
+                // WARNING: If one tries to perform the following assignment `*references.back() = v` here,
                 // an infinite recursion will result, because the `core::value` assignment operator and the
                 // `core::value` copy constructor use this class to build complex (array or object) types.
                 if (v.is_array())
-                    references.top()->set_array(core::array_t(), v.get_subtype());
+                {
+                    references.back()->set_array(core::array_t(), v.get_subtype());
+                    if (size != unknown_size)
+                        references.back()->get_array_ref().data().reserve(size_t(size));
+                }
                 else if (v.is_object())
-                    references.top()->set_object(core::object_t(), v.get_subtype());
+                    references.back()->set_object(core::object_t(), v.get_subtype());
                 else if (v.is_string())
-                    references.top()->set_string(core::string_t(), v.get_subtype());
+                    references.back()->set_string(core::string_t(), v.get_subtype());
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-                references.top()->set_attributes(v.get_attributes());
+                if (v.attributes_size())
+                    references.back()->set_attributes(v.get_attributes());
 #endif
             }
 
@@ -168,7 +169,7 @@ namespace cppdatalib
                     end(), begin();
 
                 if (!is_key)
-                    references.pop();
+                    references.pop_back();
             }
 
             void begin_string_(const core::value &v, int_t size, bool is_key) {begin_container(v, size, is_key);}
@@ -184,17 +185,36 @@ namespace cppdatalib
             switch (src.get_type())
             {
                 case null: dst.set_null(src.get_subtype()); break;
-                case link: dst.set_link(src.get_link_unchecked(), src.get_subtype() == strong_link? normal: src.get_subtype()); break;
+                case link: dst.set_link(src.get_link_unchecked(), src.get_subtype() == strong_link? normal: (subtype) src.get_subtype()); break;
                 case boolean: dst.set_bool(src.get_bool_unchecked(), src.get_subtype()); break;
                 case integer: dst.set_int(src.get_int_unchecked(), src.get_subtype()); break;
                 case uinteger: dst.set_uint(src.get_uint_unchecked(), src.get_subtype()); break;
                 case real: dst.set_real(src.get_real_unchecked(), src.get_subtype()); break;
-                case string: dst.set_string(src.get_string_unchecked(), src.get_subtype()); break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                case temporary_string: dst.set_temp_string(src.get_temp_string_unchecked(), src.get_subtype()); break;
+#endif
+                case string:
+                {
+                    if (src.is_nonnull_owned_string())
+                        dst.set_string(static_cast<core::string_t>(src.get_string_unchecked()), src.get_subtype());
+                    else
+                        dst.set_string(core::string_t(), src.get_subtype());
+                    break;
+                }
                 case array:
+                {
+                    if (src.is_nonnull_array())
+                        value_builder(dst) << src;
+                    else
+                        dst.set_array(core::array_t(), src.get_subtype());
+                    break;
+                }
                 case object:
                 {
-                    value_builder builder(dst);
-                    builder << src;
+                    if (src.is_nonnull_object())
+                        value_builder(dst) << src;
+                    else
+                        dst.set_object(core::object_t(), src.get_subtype());
                     break;
                 }
             }
@@ -223,8 +243,14 @@ namespace cppdatalib
                 case integer: dst.int_ = std::move(src.int_); break;
                 case uinteger: dst.uint_ = std::move(src.uint_); break;
                 case real: dst.real_ = std::move(src.real_); break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                case temporary_string: dst.tstr_ = src.tstr_; break;
+#endif
 #ifndef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
-                case string: dst.str_ref_() = std::move(src.str_ref_()); break;
+                case string:
+                    if (src.string_size())
+                        dst.str_ref_() = std::move(src.str_ref_());
+                    break;
 #else
                 case string:
 #endif
@@ -319,7 +345,7 @@ namespace cppdatalib
         {
             value::traverse_less_than_compare_prefix prefix;
 
-            if (lhs.is_nonempty_array() || lhs.is_nonempty_object() || rhs.is_nonempty_array() || rhs.is_nonempty_object())
+            if (lhs.is_nonnull_array() || lhs.is_nonnull_object() || rhs.is_nonnull_array() || rhs.is_nonnull_object())
             {
                 value::traverse_compare_postfix postfix;
 
@@ -335,7 +361,7 @@ namespace cppdatalib
         {
             value::traverse_compare_prefix prefix;
 
-            if (lhs.is_nonempty_array() || lhs.is_nonempty_object() || rhs.is_nonempty_array() || rhs.is_nonempty_object())
+            if (lhs.is_nonnull_array() || lhs.is_nonnull_object() || rhs.is_nonnull_array() || rhs.is_nonnull_object())
             {
                 value::traverse_compare_postfix postfix;
 
@@ -351,7 +377,7 @@ namespace cppdatalib
         {
             value::traverse_equality_compare_prefix prefix;
 
-            if (lhs.is_nonempty_array() || lhs.is_nonempty_object() || rhs.is_nonempty_array() || rhs.is_nonempty_object())
+            if (lhs.is_nonnull_array() || lhs.is_nonnull_object() || rhs.is_nonnull_array() || rhs.is_nonnull_object())
             {
                 value::traverse_compare_postfix postfix;
 

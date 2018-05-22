@@ -1994,7 +1994,7 @@ namespace cppdatalib
                                 {
                                     if (!item.is_string())
                                         throw core::error("SQL - function name must be a string");
-                                    function_name = item.get_string_unchecked();
+                                    function_name = static_cast<core::string_t>(item.get_string_unchecked());
                                 }
                                 else
                                 {
@@ -2428,7 +2428,7 @@ namespace cppdatalib
                                        else if (item.is_string() && !core::subtype_is_text_string(item.get_subtype()))
                                            result.set_subtype(core::blob);
 
-                                       result.get_string_ref() += item.as_string();
+                                       result.get_owned_string_ref() += item.as_string();
                                    }
 
                                    return result;
@@ -2451,9 +2451,9 @@ namespace cppdatalib
                                            result.set_subtype(core::blob);
 
                                        if (idx > 2)
-                                           result.get_string_ref() += separator.get_string_unchecked();
+                                           result.get_owned_string_ref() += separator.get_string_unchecked();
 
-                                       result.get_string_ref() += item.as_string();
+                                       result.get_owned_string_ref() += item.as_string();
                                    }
 
                                    return result;
@@ -2523,7 +2523,7 @@ namespace cppdatalib
                                        return core::value();
 
                                    v.convert_to_string();
-                                   ascii_lowercase(v.get_string_ref().begin(), v.get_string_ref().end());
+                                   ascii_lowercase(v.get_owned_string_ref().begin(), v.get_owned_string_ref().end());
                                    return v;
                                })});
                 result.insert({"ln", sql_function(1, [](const core::value &params)
@@ -2539,7 +2539,7 @@ namespace cppdatalib
                                        return core::value();
 
                                    v.convert_to_string();
-                                   ascii_lowercase(v.get_string_ref().begin(), v.get_string_ref().end());
+                                   ascii_lowercase(v.get_owned_string_ref().begin(), v.get_owned_string_ref().end());
                                    return v;
                                })});
                 // TODO: `LOG()`
@@ -2589,7 +2589,7 @@ namespace cppdatalib
                                        return result;
 
                                    for (core::uint_t i = times.as_uint(); i; --i)
-                                       result.get_string_ref() += str.get_string_unchecked();
+                                       result.get_owned_string_ref() += str.get_string_unchecked();
 
                                    return result;
                                })});
@@ -2619,7 +2619,7 @@ namespace cppdatalib
                                        return core::value();
 
                                    v.convert_to_string();
-                                   ascii_uppercase(v.get_string_ref().begin(), v.get_string_ref().end());
+                                   ascii_uppercase(v.get_owned_string_ref().begin(), v.get_owned_string_ref().end());
                                    return v;
                                })});
                 result.insert({"upper", sql_function(1, [](const core::value &params)
@@ -2629,7 +2629,7 @@ namespace cppdatalib
                                        return core::value();
 
                                    v.convert_to_string();
-                                   ascii_uppercase(v.get_string_ref().begin(), v.get_string_ref().end());
+                                   ascii_uppercase(v.get_owned_string_ref().begin(), v.get_owned_string_ref().end());
                                    return v;
                                })});
                 result.insert({"version", sql_function(0, [](const core::value &)

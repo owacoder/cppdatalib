@@ -156,6 +156,9 @@ namespace cppdatalib
                                     break;
                                 }
                                 case core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                case core::temporary_string:
+#endif
                                 {
                                     if (prefix)
                                     {
@@ -329,7 +332,7 @@ namespace cppdatalib
 
                 write_size(stream(), initial_type, size);
             }
-            void string_data_(const core::value &v, bool) {stream().write(v.get_string_unchecked().c_str(), v.get_string_unchecked().size());}
+            void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
 
             void begin_array_(const core::value &v, core::int_t size, bool)
             {

@@ -46,7 +46,7 @@ namespace cppdatalib
             return stream.put(' ');
         }
 
-        inline core::ostream &debug_write(core::ostream &stream, const std::string &str)
+        inline core::ostream &debug_write(core::ostream &stream, core::string_view_t str)
         {
             for (auto c: str)
                 debug_write(stream, c);
@@ -71,7 +71,7 @@ namespace cppdatalib
             return stream;
         }
 
-        inline core::ostream &write(core::ostream &stream, const std::string &str)
+        inline core::ostream &write(core::ostream &stream, core::string_view_t str)
         {
             for (auto c: str)
                 write(stream, c);
@@ -79,7 +79,7 @@ namespace cppdatalib
             return stream;
         }
 
-        inline std::string encode(const std::string &str)
+        inline std::string encode(core::string_view_t str)
         {
             core::ostringstream stream;
             write(stream, str);
