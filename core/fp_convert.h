@@ -28,6 +28,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
+#include "global.h"
 
 namespace cppdatalib
 {
@@ -55,6 +56,117 @@ namespace cppdatalib
 
             result.input = f;
             return result.output;
+        }
+
+        inline uint64_t double_cast_to_ieee_754(double d)
+        {
+            union
+            {
+                uint64_t output;
+                double input;
+            } result;
+
+            result.input = d;
+            return result.output;
+        }
+
+        inline double double_cast_from_ieee_754(uint64_t d)
+        {
+            union
+            {
+                uint64_t input;
+                double output;
+            } result;
+
+            result.input = d;
+            return result.output;
+        }
+
+        template<typename Float>
+        inline Float fp_from_string(const char *begin, char **after)
+        {
+            Float value = 0.0;
+
+            using namespace std;
+            bool negative = false;
+
+            // Skip leading whitespace
+            for (; *begin == ' ' || *begin == '\t'; ++begin)
+                ;
+
+            if (!*begin)
+                goto cleanup;
+
+            // Parse sign
+            if (*begin == '+' || *begin == '-')
+            {
+                negative = *begin == '-';
+                ++begin;
+            }
+
+            if (!*begin)
+                goto cleanup;
+
+            // Parse initial integral value
+            for (; isdigit(*begin); ++begin)
+                value = (value * 10.0) + Float(*begin - '0');
+
+            // Parse fractional value
+            if (*begin == '.')
+            {
+                Float fraction = 0.0;
+                unsigned long places = 0;
+                ++begin; // Skip '.'
+
+                if (!*begin)
+                    goto cleanup;
+
+                for (; isdigit(*begin); ++begin)
+                {
+                    fraction = (fraction * 10.0) + Float(*begin - '0');
+                    ++places;
+                }
+
+                value += fraction / pow(10.0, Float(places));
+            }
+
+            // Parse exponent value
+            if (*begin == 'e' || *begin == 'E')
+            {
+                Float exponent = 0.0;
+                bool negative_exp = false;
+
+                ++begin; // Skip 'E'
+                if (*begin == '+' || *begin == '-')
+                {
+                    negative_exp = *begin == '-';
+                    ++begin; // Skip sign
+                }
+
+                if (!*begin)
+                    goto cleanup;
+
+                for (; isdigit(*begin); ++begin)
+                    exponent = (exponent * 10.0) + Float(*begin - '0');
+
+                value *= pow(10.0, negative_exp? 1.0 / exponent: exponent);
+            }
+
+            if (after != nullptr)
+                *after = const_cast<char *>(begin);
+
+            if (isinf(value) || isnan(value))
+            {
+                errno = ERANGE;
+                return negative? -HUGE_VAL: HUGE_VAL;
+            }
+
+            return negative? -value: value;
+
+        cleanup:
+            if (after)
+                *after = const_cast<char *>(begin);
+            return 0.0;
         }
 
         inline float float_from_ieee_754_half(uint16_t f)
@@ -138,6 +250,12 @@ namespace cppdatalib
             return result;
         }
 
+#ifdef CPPDATALIB_X86
+        inline float float_from_ieee_754(uint32_t f) {return float_cast_from_ieee_754(f);}
+        inline uint32_t float_to_ieee_754(float f) {return float_cast_to_ieee_754(f);}
+        inline double double_from_ieee_754(uint64_t d) {return double_cast_from_ieee_754(d);}
+        inline uint64_t double_to_ieee_754(double d) {return double_cast_to_ieee_754(d);}
+#else
         inline float float_from_ieee_754(uint32_t f)
         {
             const int32_t mantissa_mask = 0x7fffff;
@@ -217,30 +335,6 @@ namespace cppdatalib
             result |= static_cast<uint32_t>(std::round(f)) & 0x7fffff;
 
             return result;
-        }
-
-        inline uint64_t double_cast_to_ieee_754(double d)
-        {
-            union
-            {
-                uint64_t output;
-                double input;
-            } result;
-
-            result.input = d;
-            return result.output;
-        }
-
-        inline double double_cast_from_ieee_754(uint64_t d)
-        {
-            union
-            {
-                uint64_t input;
-                double output;
-            } result;
-
-            result.input = d;
-            return result.output;
         }
 
         inline double double_from_ieee_754(uint64_t f)
@@ -323,6 +417,7 @@ namespace cppdatalib
 
             return result;
         }
+#endif // CPPDATALIB_X86
     }
 }
 

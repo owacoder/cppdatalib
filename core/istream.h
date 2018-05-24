@@ -548,9 +548,9 @@ namespace cppdatalib
         inline istream &operator>>(istream &in, unsigned long &val) {return in.read_formatted_unsigned_int(val);}
         inline istream &operator>>(istream &in, unsigned long long &val) {return in.read_formatted_unsigned_int(val);}
 
-        inline istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, strtof);}
-        inline istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, strtod);}
-        inline istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, strtold);}
+        inline istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, &core::fp_from_string<float>);}
+        inline istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, &core::fp_from_string<double>);}
+        inline istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, &core::fp_from_string<long double>);}
 
         inline istream &operator>>(istream &in, std::streambuf *buf)
         {
