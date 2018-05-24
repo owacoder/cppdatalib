@@ -445,6 +445,7 @@ namespace cppdatalib
             // Note that string_data_() and end_string_() require that `v` be of the same subtype as the original string passed to begin_string_()
             virtual void begin_string_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void string_data_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
+            virtual void string_data_(core::value &&v, bool is_key) {string_data_(v, is_key);}
             virtual void end_string_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
         public:
@@ -457,7 +458,10 @@ namespace cppdatalib
             // whether it is a string or not. The latter options don't require values to be strings.
             //
             // If the length of v is equal to size, the entire string is provided
-            void begin_string(const core::string_t &v, core::int_t size) {begin_string(value(v), size);}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            void begin_string(string_view_t v, core::int_t size) {begin_string(value(v), size);}
+#endif
+            void begin_string(const string_t &v, core::int_t size) {begin_string(value(v), size);}
             void begin_string(const core::value &v, core::int_t size)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -481,7 +485,10 @@ namespace cppdatalib
 
                 nested_scopes.push_back({string, v.get_subtype(), size});
             }
-            void append_to_string(const core::string_t &v) {append_to_string(value(v));}
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            void append_to_string(string_view_t v) {append_to_string(value(v));}
+#endif
+            void append_to_string(const string_t &v) {append_to_string(value(v));}
             void append_to_string(const core::value &v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -500,7 +507,29 @@ namespace cppdatalib
                 string_data_(v, is_key_);
                 nested_scopes.back().items_ += v.string_size();
             }
-            void end_string(const core::string_t &v) {end_string(value(v));}
+            void append_to_string(core::value &&v)
+            {
+                assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
+
+#ifndef CPPDATALIB_DISABLE_WRITE_CHECKS
+                if (nested_scopes.back().get_type() != string
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                        && nested_scopes.back().get_type() != temporary_string
+#endif
+                        )
+                    throw error("cppdatalib::core::stream_handler - attempted to append to string that was never begun");
+                else if (!v.is_string())
+                    throw error("cppdatalib::core::stream_handler - attempted to append non-string value to string");
+#endif
+
+                const size_t str_size = v.string_size();
+                string_data_(std::move(v), is_key_);
+                nested_scopes.back().items_ += str_size;
+            }
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            void end_string(string_view_t v) {end_string(value(v));}
+#endif
+            void end_string(const string_t &v) {end_string(value(v));}
             void end_string(const core::value &v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());

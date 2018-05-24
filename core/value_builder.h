@@ -125,6 +125,17 @@ namespace cppdatalib
                 references.back()->get_owned_string_ref() += v.get_string_unchecked();
             }
 
+            void string_data_(core::value &&v, bool)
+            {
+                if (references.empty())
+                    end(), begin();
+
+                if (v.is_owned_string() && references.back()->string_size() == 0)
+                    references.back()->get_owned_string_ref() = std::move(v.get_owned_string_ref());
+                else
+                    references.back()->get_owned_string_ref() += v.get_string_unchecked();
+            }
+
             // begin_container() operates similarly to begin_scalar_(), but pushes a reference to the container as well
             void begin_container(const core::value &v, core::int_t size, bool is_key)
             {

@@ -82,6 +82,8 @@ namespace cppdatalib
             return result.output;
         }
 
+        // If `**after == 0` on returning from this function, success!
+        // If `*after == nullptr` on returning from this function, failure.
         template<typename Float>
         inline Float fp_from_string(const char *begin, char **after)
         {
@@ -165,7 +167,96 @@ namespace cppdatalib
 
         cleanup:
             if (after)
+                *after = nullptr;
+            return 0.0;
+        }
+
+        // If `*after == end` on returning from this function, success!
+        // If `*after == nullptr` on returning from this function, failure.
+        template<typename Float>
+        inline Float fp_from_in_string(const char *begin, const char *end, char **after)
+        {
+            Float value = 0.0;
+
+            using namespace std;
+            bool negative = false;
+
+            // Skip leading whitespace
+            for (; begin != end && (*begin == ' ' || *begin == '\t'); ++begin)
+                ;
+
+            if (begin == end)
+                goto cleanup;
+
+            // Parse sign
+            if (*begin == '+' || *begin == '-')
+            {
+                negative = *begin == '-';
+                ++begin;
+            }
+
+            if (begin == end)
+                goto cleanup;
+
+            // Parse initial integral value
+            for (; begin != end && isdigit(*begin); ++begin)
+                value = (value * 10.0) + Float(*begin - '0');
+
+            // Parse fractional value
+            if (begin != end && *begin == '.')
+            {
+                Float fraction = 0.0;
+                Float places = 1.0;
+                ++begin; // Skip '.'
+
+                if (begin == end)
+                    goto cleanup;
+
+                for (; begin != end && isdigit(*begin); ++begin)
+                {
+                    fraction = (fraction * 10.0) + Float(*begin - '0');
+                    places *= 10.0;
+                }
+
+                value += fraction / places;
+            }
+
+            // Parse exponent value
+            if (begin != end && (*begin == 'e' || *begin == 'E'))
+            {
+                Float exponent = 0.0;
+                bool negative_exp = false;
+
+                ++begin; // Skip 'E'
+                if (begin != end && (*begin == '+' || *begin == '-'))
+                {
+                    negative_exp = *begin == '-';
+                    ++begin; // Skip sign
+                }
+
+                if (begin == end)
+                    goto cleanup;
+
+                for (; begin != end && isdigit(*begin); ++begin)
+                    exponent = (exponent * 10.0) + Float(*begin - '0');
+
+                value *= pow(10.0, negative_exp? 1.0 / exponent: exponent);
+            }
+
+            if (after != nullptr)
                 *after = const_cast<char *>(begin);
+
+            if (isinf(value) || isnan(value))
+            {
+                errno = ERANGE;
+                return negative? -HUGE_VAL: HUGE_VAL;
+            }
+
+            return negative? -value: value;
+
+        cleanup:
+            if (after)
+                *after = nullptr;
             return 0.0;
         }
 

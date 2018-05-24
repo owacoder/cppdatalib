@@ -269,7 +269,7 @@ namespace cppdatalib
                                 }
 
                                 // Revert to bignum
-                                get_output()->write(core::value(buffer, core::bignum));
+                                get_output()->write(core::value(std::move(buffer), core::bignum));
                             }
                             else
                                 throw core::error("JSON - expected value");

@@ -1176,12 +1176,6 @@ int main(int argc, char **argv)
     try
     {
 #if 0
-        cppdatalib::core::value v;
-        *input.get() >> v;
-        std::cout << "Estimated memory usage: " << std::flush;
-        std::cout << v.memory_consumed() << std::endl;
-        *output.get() << v;
-#elif 0
         input.get()->begin(*output.get());
         do
         {
@@ -1196,7 +1190,7 @@ int main(int argc, char **argv)
 
 		double dur = double(clock() - start) / CLOCKS_PER_SEC;
 		std::cout << std::setprecision(16);
-        std::cout << "Total Input: " << dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream().used_buffer() << " bytes in " << dur << " seconds (" << uint64_t(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream().used_buffer() / dur) << " Bytes/S)\n";
+        std::cout << "Total Input: " << cppdatalib::core::used_buffer(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream()) << " bytes in " << dur << " seconds (" << uint64_t(cppdatalib::core::used_buffer(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream()) / dur) << " Bytes/S)\n";
 		if (outfile.get())
 			std::cout << "Total Output: " << uint64_t(outfile.get()->tellp()) << " bytes in " << dur << " seconds (" << uint64_t(outfile.get()->tellp() / dur) << " Bytes/S)\n";
 #endif

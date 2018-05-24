@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <vector>
 #include <array>
+#include <limits>
 
 #if defined(__linux) || defined(__linux__)
 #define CPPDATALIB_LINUX
@@ -112,7 +113,7 @@ namespace cppdatalib
         typedef CPPDATALIB_REAL_T real_t;
 #else
         typedef double real_t;
-#define CPPDATALIB_REAL_DIG DBL_DIG
+#define CPPDATALIB_REAL_DIG std::numeric_limits<double>::max_digits10
 #endif
 
 #ifdef CPPDATALIB_CSTRING_T

@@ -64,6 +64,9 @@ namespace cppdatalib
         };
 
 #ifdef CPPDATALIB_ENABLE_FAST_IO
+        class istream;
+        const char *current_buffer_begin(const istream &stream);
+
         class istream
         {
         public:
@@ -487,13 +490,15 @@ namespace cppdatalib
                 return *this;
             }
 
-            template<typename T, typename Converter>
-            istream &read_formatted_real(T &f, Converter convert)
+            template<typename T, typename Converter, typename Alt_Converter>
+            istream &read_formatted_real(T &f, Converter convert, Alt_Converter instr_convert)
             {
                 std::string str;
 
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                 last_read_ = 0;
+#else
+                size_t len = 0;
 #endif
 
                 sentry s(*this, skip_ws);
@@ -509,18 +514,32 @@ namespace cppdatalib
                     flags_ = fail_bit | eof_bit;
                 else
                 {
+                    const char *buffer = current_buffer_begin();
+
                     while (c != EOF && c < 0x80 && (isdigit(c) || strchr(".eE+-", c)))
                     {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                         ++last_read_;
+#else
+                        ++len;
 #endif
-                        str.push_back(c);
+                        if (buffer == nullptr)
+                            str.push_back(c);
                         c = getc_();
                     }
 
                     errno = 0;
                     char *end;
-                    f = convert(str.c_str(), &end);
+                    if (buffer == nullptr)
+                        f = convert(str.c_str(), &end);
+                    else
+                    {
+#ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
+                        f = instr_convert(buffer, buffer + last_read_, &end);
+#else
+                        f = instr_convert(buffer, buffer + len, &end);
+#endif
+                    }
                     if (errno == ERANGE || *end != 0)
                         flags_ |= fail_bit;
 
@@ -548,9 +567,9 @@ namespace cppdatalib
         inline istream &operator>>(istream &in, unsigned long &val) {return in.read_formatted_unsigned_int(val);}
         inline istream &operator>>(istream &in, unsigned long long &val) {return in.read_formatted_unsigned_int(val);}
 
-        inline istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, &core::fp_from_string<float>);}
-        inline istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, &core::fp_from_string<double>);}
-        inline istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, &core::fp_from_string<long double>);}
+        inline istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, &core::fp_from_string<float>, &core::fp_from_in_string<float>);}
+        inline istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, &core::fp_from_string<double>, &core::fp_from_in_string<double>);}
+        inline istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, &core::fp_from_string<long double>, &core::fp_from_in_string<long double>);}
 
         inline istream &operator>>(istream &in, std::streambuf *buf)
         {
@@ -601,11 +620,17 @@ namespace cppdatalib
         class istring_wrapper_stream : public istream
         {
             const std::string &string;
+            std::string my_string;
             size_t pos;
 
         public:
             istring_wrapper_stream(const std::string &string)
                 : string(string)
+                , pos(0)
+            {}
+            istring_wrapper_stream(std::string &&string)
+                : string(my_string)
+                , my_string(std::move(string))
                 , pos(0)
             {}
 
@@ -946,6 +971,10 @@ namespace cppdatalib
                 return peek_ = codepoint;
             }
         };
+
+        const char *current_buffer_begin(const istream &stream) {return stream.current_buffer_begin();}
+        istream::streamsize used_buffer(const istream &stream) {return stream.used_buffer();}
+        istream::streamsize remaining_buffer(const istream &stream) {return stream.remaining_buffer();}
 #else
         typedef std::istream istream;
         typedef std::istringstream istringstream;
@@ -977,6 +1006,10 @@ namespace cppdatalib
             // std_stream() returns NULL if not created from a standard stream
             std::istream *std_stream() {return std_;}
         };
+
+        const char *current_buffer_begin(const istream &) {return nullptr;}
+        std::streamsize used_buffer(istream &stream) {return stream.tellg();}
+        std::streamsize remaining_buffer(const istream &) {return -1;}
 #endif
 
         template<typename T>
