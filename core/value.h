@@ -1178,7 +1178,7 @@ namespace cppdatalib
                 while (p->is_nonnull_link())
                 {
                     p = &p->deref();
-                    if (found.find(p) != found.end())
+                    if (!found.insert(p).second)
                         return true;
                 }
                 return false;

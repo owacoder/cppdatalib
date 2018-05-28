@@ -27,6 +27,7 @@
 
 #include "value_builder.h"
 #include <set> // For duplicate_key_check_filter
+#include <list> // For duplicate_key_check filter
 #include <algorithm> // For sorting and specialty filters
 #include <functional> // For sorting
 #include <cmath> // For M_PI and math functions

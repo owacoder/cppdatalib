@@ -357,7 +357,8 @@ Enable/Disable flags are listed below:
    - `CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS` - Disables raw pointer and std::weak_ptr conversions to core::values. Note that defining this flag will not result in compile-time errors when attempting to convert a weakly-defined pointer. It will be implicitly converted to bool instead. As this may not be what you want, use at your own risk.
    - `CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS` - Disables implicit conversions between types and removes the convert_to_xxx() member functions of core::value. The as_xxx() member functions of core::value are remapped to be identical to the get_xxx() member functions. The MySQL format requires that this be undefined
    - `CPPDATALIB_THROW_IF_WRONG_TYPE` - Makes the get_xxx() member functions of core::value throw an error if the currently stored type is not the requested type. The "default value" parameter is irrelevant if this is defined. Some internal library code may throw errors with this flag defined, so use at your own risk
-   - `CPPDATALIB_ENABLE_ATTRIBUTES` - Enables API for attachment of attributes to any core::value instance. Attributes consist of an object with arbitrary-type keys and values, and each of those keys or values may have attributes of their own. NOTE: This must be defined for the standard XML format. The filesystem library requires this to be defined for file metadata (permissions and modification time) to be available. WARNING: Stack-overflow protection is not extended to attributes having attributes having attributes, etc. Please limit how many nesting levels of attributes a given attribute has.
+   - `CPPDATALIB_ENABLE_ATTRIBUTES` - Enables API for attachment of attributes to any core::value instance. Attributes consist of an object with arbitrary-type keys and values, and each of those keys or values may have attributes of their own. NOTE: This must be defined for the standard XML format. The filesystem library requires this to be defined for file metadata (permissions and modification time) to be available. WARNING: Stack-overflow protection is not extended to attributes having attributes having attributes, etc. Please limit how many nesting levels of attributes a given attribute has. NOTE: defining this value increases the size of a `value` instance
+   - `CPPDATALIB_DISABLE_TEMP_STRING` - Disables the use of a standard or custom `string_view` class. If defined, all strings will be of type `string`. If not defined, strings may be of type `string` or `temporary_string`. Saves space if not defined, saves time if defined
    - `CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS` - If defined, this flag makes all core::value constructors (except for core::null_t) and all core::value type conversion operators `explicit`. User code and future formats should compile with this flag defined, although the library is much easier to use with it undefined
    - `CPPDATALIB_DISABLE_CONVERSION_LOSS` - If defined, this flag makes internal core::value converters throw errors if data loss would result, including loss of precision by converting to or from "real"
    - `CPPDATALIB_ENABLE_BOOST_COMPUTE` - Enables the [Boost.Compute](http://www.boost.org/doc/libs/1_66_0/libs/compute/doc/html/index.html) adapters, to smoothly integrate with Boost.Compute types. The Boost source tree must be in the include path
@@ -371,6 +372,20 @@ Enable/Disable flags are listed below:
    - `CPPDATALIB_DISABLE_HTTPS_IF_POSSIBLE` - To reduce dependencies, define this flag if HTTPS support is not needed for your application.
    - `CPPDATALIB_ENABLE_QT_NETWORK` - Enables the [Qt](https://www.qt.io/) network adapter, for use with the `cppdatalib::http::parser` class. This defines the value `qt_network_library` to be used with `CPPDATALIB_DEFAULT_NETWORK_LIBRARY`. The Qt source tree must be in the include path
    - `CPPDATALIB_ENABLE_POCO_NETWORK` - Enables the [POCO](https://pocoproject.org/) network adapter, for use with the `cppdatalib::http::parser` class. This defines the value `poco_network_library` to be used with `CPPDATALIB_DEFAULT_NETWORK_LIBRARY`. The "Poco" source tree must be in the include path
+
+For best space savings, do the following before including `cppdatalib.h`:
+
+    #define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+    #undef CPPDATALIB_ENABLE_ATTRIBUTES
+    #define CPPDATALIB_DISABLE_TEMP_STRING
+
+For best compatibility and time savings, do the following before including `cppdatalib.h`:
+
+    #undef CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
+    #define CPPDATALIB_ENABLE_ATTRIBUTES
+    #undef CPPDATALIB_DISABLE_TEMP_STRING
+
+Some features do require attributes, so keep that in mind when working with compile-time flags.
 
 Please note that custom datatypes are a work-in-progress. Defining custom types may work, or may not work at all.
 

@@ -1038,11 +1038,11 @@ int main(int argc, char **argv)
     core::value lk(&value);
     core::value lk2(new core::value(value), core::strong_link);
     lk = lk2;
-    //lk2.set_weak_link(&lk);
-    //lk.set_weak_link(&lk2);
-    //lk.set_strong_link(new core::value(value));
-    //lk.set_global_link_name(core::object_t{{"link1", true}});
-    //lk.set_local_link_name("ref1");
+    /*lk2.set_weak_link(&lk);
+    lk.set_weak_link(&lk2);
+    lk.set_strong_link(new core::value(value));
+    lk.set_global_link_name(core::object_t{{"global link name", true}});
+    lk.set_local_link_name("local link name");*/
 
 #if 0
     std::cout << lk;

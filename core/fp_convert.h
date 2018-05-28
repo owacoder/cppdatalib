@@ -151,7 +151,10 @@ namespace cppdatalib
                 for (; isdigit(*begin); ++begin)
                     exponent = (exponent * 10.0) + Float(*begin - '0');
 
-                value *= pow(10.0, negative_exp? 1.0 / exponent: exponent);
+                if (negative_exp)
+                    value /= pow(10.0, exponent);
+                else
+                    value *= pow(10.0, exponent);
             }
 
             if (after != nullptr)
@@ -240,7 +243,10 @@ namespace cppdatalib
                 for (; begin != end && isdigit(*begin); ++begin)
                     exponent = (exponent * 10.0) + Float(*begin - '0');
 
-                value *= pow(10.0, negative_exp? 1.0 / exponent: exponent);
+                if (negative_exp)
+                    value /= pow(10.0, exponent);
+                else
+                    value *= pow(10.0, exponent);
             }
 
             if (after != nullptr)

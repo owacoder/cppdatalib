@@ -86,9 +86,9 @@ namespace cppdatalib
             }
 
             // begin_key_() just queues a new object key in the stack
-            void begin_key_(const core::value &v)
+            void begin_key_(const core::value &)
             {
-                keys.push(v);
+                keys.push(core::value());
                 references.push_back(&keys.top());
             }
             void end_key_(const core::value &)
