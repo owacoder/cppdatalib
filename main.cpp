@@ -1185,7 +1185,7 @@ int main(int argc, char **argv)
 #else
         cppdatalib::core::automatic_buffer_filter buffer(*output.get());
         cppdatalib::json::pretty_stream_writer json(std::cout, 2);
-        cppdatalib::core::sql_select_filter sql(json, std::string("select name, phone"));
+        cppdatalib::core::sql_select_filter sql(json, "select name, phone");
 
         clock_t start = clock();
 

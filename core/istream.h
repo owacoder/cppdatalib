@@ -845,45 +845,6 @@ namespace cppdatalib
             void ungetc_() {stream.unget();}
         };
 #endif
-
-        class istream_handle
-        {
-            std::istream *std_; // Original standard stream reference
-            std::shared_ptr<istream> d_; // Handle to created custom istream
-
-            istream *predef_; // Handle to already-defined custom istream
-            istream *p_; // Same as either d_ or predef_, whichever is used
-
-        public:
-            istream_handle(core::istream &stream) : std_(NULL), d_(NULL), predef_(&stream), p_(predef_) {}
-            istream_handle(std::istream &stream) : std_(&stream), d_(NULL), predef_(NULL)
-            {
-                d_ = std::make_shared<istd_streambuf_wrapper>(stream.rdbuf());
-                p_ = d_.get();
-            }
-            istream_handle(const char *string) : std_(NULL), d_(NULL)
-            {
-                d_ = std::make_shared<icstring_wrapper_stream>(string, strlen(string));
-                p_ = d_.get();
-            }
-            istream_handle(const char *string, size_t len) : std_(NULL), d_(NULL)
-            {
-                d_ = std::make_shared<icstring_wrapper_stream>(string, len);
-                p_ = d_.get();
-            }
-            istream_handle(const std::string &string) : std_(NULL), d_(NULL), predef_(NULL)
-            {
-                d_ = std::make_shared<istring_wrapper_stream>(string);
-                p_ = d_.get();
-            }
-
-            operator core::istream &() {return *p_;}
-            core::istream &stream() {return *p_;}
-
-            // std_stream() returns NULL if not created from a standard stream
-            std::istream *std_stream() {return std_;}
-        };
-
         uint32_t utf_to_ucs(core::istream &stream, encoding mode, bool *eof);
         std::string ucs_to_utf(uint32_t codepoint, encoding mode);
         encoding encoding_from_name(const char *name);
@@ -979,6 +940,44 @@ namespace cppdatalib
             }
         };
 
+        class istream_handle
+        {
+            std::istream *std_; // Original standard stream reference
+            std::shared_ptr<istream> d_; // Handle to created custom istream
+
+            istream *predef_; // Handle to already-defined custom istream
+            istream *p_; // Same as either d_ or predef_, whichever is used
+
+        public:
+            istream_handle(core::istream &stream) : std_(NULL), d_(NULL), predef_(&stream), p_(predef_) {}
+            istream_handle(std::istream &stream) : std_(&stream), d_(NULL), predef_(NULL)
+            {
+                d_ = std::make_shared<istd_streambuf_wrapper>(stream.rdbuf());
+                p_ = d_.get();
+            }
+            istream_handle(const char *string) : std_(NULL), d_(NULL)
+            {
+                d_ = std::make_shared<icstring_wrapper_stream>(string, strlen(string));
+                p_ = d_.get();
+            }
+            istream_handle(const char *string, size_t len) : std_(NULL), d_(NULL)
+            {
+                d_ = std::make_shared<icstring_wrapper_stream>(string, len);
+                p_ = d_.get();
+            }
+            istream_handle(core::string_view_t string) : std_(NULL), d_(NULL), predef_(NULL)
+            {
+                d_ = std::make_shared<icstring_wrapper_stream>(string.data(), string.size());
+                p_ = d_.get();
+            }
+
+            operator core::istream &() {return *p_;}
+            core::istream &stream() {return *p_;}
+
+            // std_stream() returns NULL if not created from a standard stream
+            std::istream *std_stream() {return std_;}
+        };
+
         const char *current_buffer_begin(const istream &stream) {return stream.current_buffer_begin();}
         istream::streamsize used_buffer(const istream &stream) {return stream.used_buffer();}
         istream::streamsize remaining_buffer(const istream &stream) {return stream.remaining_buffer();}
@@ -1002,9 +1001,9 @@ namespace cppdatalib
             {
                 d_ = std::make_shared<istringstream>(std::string(string, len));
             }
-            istream_handle(const std::string &string) : std_(NULL), d_(NULL)
+            istream_handle(core::string_view_t string) : std_(NULL), d_(NULL)
             {
-                d_ = std::make_shared<istringstream>(string);
+                d_ = std::make_shared<istringstream>(static_cast<std::string>(string));
             }
 
             operator core::istream &() {return std_? *std_: *d_;}

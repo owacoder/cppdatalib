@@ -3330,17 +3330,15 @@ namespace cppdatalib
             bool selection_order_is_important;
 
         public:
-            sql_select_filter(core::stream_handler &output, const std::string &sql, bool selection_order_is_important = false)
+            sql_select_filter(core::stream_handler &output, core::string_view_t sql_query = core::string_view_t(), bool selection_order_is_important = false)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
                 , functions(impl::make_sql_function_list())
                 , selection_order_is_important(selection_order_is_important)
             {
-                impl::sql_parser parser(sql);
-                parser >> select; // Parse "SELECT" field into select, but other clauses are parsed as well
-                where = parser.get_where(); // This value was parsed via the expression in the line above
+                set_query(sql_query);
             }
 
-            sql_select_filter(core::stream_handler &output, const core::value &select_query, const core::value &where_clause = core::value(), bool selection_order_is_important = false)
+            sql_select_filter(core::stream_handler &output, const core::value &select_query, const core::value &where_clause, bool selection_order_is_important)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
                 , functions(impl::make_sql_function_list())
                 , select(select_query)
@@ -3352,6 +3350,20 @@ namespace cppdatalib
             {
                 return "cppdatalib::core::sql_select_filter(" + output.name() + ")";
             }
+
+            void set_query(core::string_view_t sql_query)
+            {
+                if (sql_query.empty())
+                    select = where = core::value();
+                else
+                {
+                    impl::sql_parser parser(sql_query);
+                    parser >> select; // Parse "SELECT" field into select, but other clauses are parsed as well
+                    where = parser.get_where(); // This value was parsed via the expression in the line above
+                }
+            }
+            void set_functions(const impl::sql_function_list &funcs) {functions = funcs;}
+            const impl::sql_function_list &get_functions() const {return functions;}
 
             const core::value &get_select() const {return select;}
             const core::value &get_where() const {return where;}
