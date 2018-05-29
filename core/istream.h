@@ -372,7 +372,10 @@ namespace cppdatalib
 
                 int_type c = s.get_last_char();
                 if (c == '-')
-                    negative = true, c = getc_();
+                {
+                    negative = true;
+                    c = getc_();
+                }
 
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;

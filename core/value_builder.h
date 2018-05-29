@@ -94,7 +94,10 @@ namespace cppdatalib
             void end_key_(const core::value &)
             {
                 if (references.empty())
-                    end(), begin();
+                {
+                    end();
+                    begin();
+                }
 
                 references.pop_back();
             }
@@ -104,7 +107,10 @@ namespace cppdatalib
             void begin_scalar_(const core::value &v, bool is_key)
             {
                 if (references.empty())
-                    end(), begin();
+                {
+                    end();
+                    begin();
+                }
 
                 if (!is_key && current_container() == array)
                     references.back()->push_back(v);
@@ -120,7 +126,10 @@ namespace cppdatalib
             void string_data_(const core::value &v, bool)
             {
                 if (references.empty())
-                    end(), begin();
+                {
+                    end();
+                    begin();
+                }
 
                 references.back()->get_owned_string_ref() += v.get_string_unchecked();
             }
@@ -128,7 +137,10 @@ namespace cppdatalib
             void string_data_(core::value &&v, bool)
             {
                 if (references.empty())
-                    end(), begin();
+                {
+                    end();
+                    begin();
+                }
 
                 if (v.is_owned_string() && references.back()->string_size() == 0)
                     references.back()->get_owned_string_ref() = std::move(v.get_owned_string_ref());
@@ -140,7 +152,10 @@ namespace cppdatalib
             void begin_container(const core::value &v, core::int_t size, bool is_key)
             {
                 if (references.empty())
-                    end(), begin();
+                {
+                    end();
+                    begin();
+                }
 
                 if (!is_key && current_container() == array)
                 {
@@ -177,7 +192,10 @@ namespace cppdatalib
             void end_container(bool is_key)
             {
                 if (references.empty())
-                    end(), begin();
+                {
+                    end();
+                    begin();
+                }
 
                 if (!is_key)
                     references.pop_back();

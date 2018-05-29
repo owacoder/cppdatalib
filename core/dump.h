@@ -274,7 +274,10 @@ namespace cppdatalib
                         stream().put(',');
 
                     if (current_container() == core::array)
-                        stream().put('\n'), output_padding(current_indent);
+                    {
+                        stream().put('\n');
+                        output_padding(current_indent);
+                    }
 
                     write_type(stream(), v.get_type());
                     write_subtype(stream(), v.get_subtype());
@@ -294,7 +297,8 @@ namespace cppdatalib
                     if (current_container_size() > 0)
                         stream().put(',');
 
-                    stream().put('\n'), output_padding(current_indent);
+                    stream().put('\n');
+                    output_padding(current_indent);
 
                     write_type(stream(), v.get_type());
                     write_subtype(stream(), v.get_subtype());
@@ -358,7 +362,10 @@ namespace cppdatalib
                     current_indent -= indent_width;
 
                     if (current_container_size() > 0)
-                        stream().put('\n'), output_padding(current_indent);
+                    {
+                        stream().put('\n');
+                        output_padding(current_indent);
+                    }
 
                     stream().put(']');
                 }
@@ -373,7 +380,10 @@ namespace cppdatalib
                     current_indent -= indent_width;
 
                     if (current_container_size() > 0)
-                        stream().put('\n'), output_padding(current_indent);
+                    {
+                        stream().put('\n');
+                        output_padding(current_indent);
+                    }
 
                     stream().put('}');
                 }

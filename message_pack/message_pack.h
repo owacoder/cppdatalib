@@ -137,7 +137,7 @@ namespace cppdatalib
                     case 0xc5:
                     case 0xc6:
                     {
-                        uint32_t size;
+                        uint32_t size = 0;
                         core::value string_type = core::value("", 0, core::normal, true);
 
                         if ((chr == 0xc4 && !core::read_uint8(stream(), size)) ||
@@ -194,7 +194,7 @@ namespace cppdatalib
                     case 0xce:
                     case 0xcf:
                     {
-                        core::uint_t val;
+                        core::uint_t val = 0;
                         if ((chr == 0xcc && !core::read_uint8(stream(), val)) ||
                             (chr == 0xcd && !core::read_uint16_be(stream(), val)) ||
                             (chr == 0xce && !core::read_uint32_be(stream(), val)) ||
@@ -233,7 +233,7 @@ namespace cppdatalib
                     case 0xda:
                     case 0xdb:
                     {
-                        uint32_t size;
+                        uint32_t size = 0;
                         core::value string_type = core::value("", 0, core::normal, true);
 
                         if ((chr == 0xd9 && !core::read_uint8(stream(), size)) ||
@@ -261,7 +261,7 @@ namespace cppdatalib
                     case 0xdc:
                     case 0xdd:
                     {
-                        uint32_t size;
+                        uint32_t size = 0;
 
                         if ((chr == 0xdc && !core::read_uint16_be(stream(), size)) ||
                             (chr == 0xdd && !core::read_uint32_be(stream(), size)))
@@ -275,7 +275,7 @@ namespace cppdatalib
                     case 0xde:
                     case 0xdf:
                     {
-                        uint32_t size;
+                        uint32_t size = 0;
 
                         if ((chr == 0xde && !core::read_uint16_be(stream(), size)) ||
                             (chr == 0xdf && !core::read_uint32_be(stream(), size)))
