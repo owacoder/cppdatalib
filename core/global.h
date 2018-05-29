@@ -216,7 +216,6 @@ namespace cppdatalib
                                          string_view_t(data_ + pos, pos + std::min(count, size() - pos));
                 }
 
-                // TODO: compare()
 #ifdef CPPDATALIB_CPP14
                 constexpr
 #endif

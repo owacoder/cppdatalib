@@ -89,6 +89,22 @@ namespace cppdatalib
             // Otherwise, reference names are not supported
         };
 
+        inline type get_domain(type t)
+        {
+            switch (t)
+            {
+                default:
+                    return t;
+                case integer:
+                case uinteger:
+                    return real;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                case temporary_string:
+                    return string;
+#endif
+            }
+        }
+
         // Value map:
         //     0 to maximum: format- or user-specified subtypes
         //     -9 to -1: generic subtypes applicable to all types
@@ -108,6 +124,10 @@ namespace cppdatalib
         {
             normal = -1, // Normal strings are encoded with valid UTF-8. Use blob or clob for other generic types of strings.
             // Normal links are weak links, that is, they don't own the object they point to
+
+            // The `comparable` types should not be used in actual data values, but are intented to be used to find a specific value in a dataset
+            domain_comparable = -3, // Domain comparables are not compared by type or subtype, but are compared by value in a specific domain (i.e. compare by numbers or compare by strings)
+            generic_subtype_comparable = -4, // Generic subtype comparables are only compared by type and value, not by subtype.
 
             // Integers
             unix_timestamp = -29, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds
@@ -215,7 +235,11 @@ namespace cppdatalib
             {
                 case normal: return "normal";
 
+                case domain_comparable: return "<domain-comparable>";
+                case generic_subtype_comparable: return "<no subtype>";
+
                 case unix_timestamp: return "UNIX timestamp";
+                case utc_timestamp: return "UTC timestamp";
 
                 case clob: return "text (unknown encoding)";
                 case symbol: return "symbol";
@@ -235,9 +259,11 @@ namespace cppdatalib
                 case binary_datetime: return "binary date/time";
                 case binary_date: return "binary date";
                 case binary_time: return "binary time";
+                case binary_regexp: return "binary regular expression";
                 case binary_bignum: return "binary bignum";
                 case binary_uuid: return "binary UUID";
-                case binary_regexp: return "binary regular expression";
+                case binary_function: return "binary function";
+                case binary_object_id: return "binary ObjectID";
 
                 case sexp: return "s-expression";
 

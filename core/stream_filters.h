@@ -1933,7 +1933,7 @@ namespace cppdatalib
                                 if (one->is_string() && one->get_subtype() == core::symbol)
                                 {
                                     was_named_field = true; // This query is a direct reference to a field
-                                    one = test.member_ptr(static_cast<core::string_t>(one->get_string_unchecked()));
+                                    one = test.member_ptr(core::value(one->get_string_unchecked(), core::domain_comparable));
                                     if (!one) // No member with specified name
                                     {
                                         *non_bool_result = core::value(false);
@@ -2003,7 +2003,7 @@ namespace cppdatalib
 
                                     if (one->is_string() && one->get_subtype() == core::symbol)
                                     {
-                                        one = test.member_ptr(static_cast<core::string_t>(one->get_string_unchecked()));
+                                        one = test.member_ptr(core::value(one->get_string_unchecked(), core::domain_comparable));
                                         if (!one) // No member with specified name
                                         {
                                             *non_bool_result = core::value(false);
@@ -2081,7 +2081,7 @@ namespace cppdatalib
 
                             if (one->is_string() && one->get_subtype() == core::symbol)
                             {
-                                one = test.member_ptr(static_cast<core::string_t>(one->get_string_unchecked()));
+                                one = test.member_ptr(core::value(one->get_string_unchecked(), core::domain_comparable));
                                 if (!one) // No member with specified name
                                 {
                                     if (non_bool_result)
@@ -2098,7 +2098,7 @@ namespace cppdatalib
 
                             if (two->is_string() && two->get_subtype() == core::symbol)
                             {
-                                two = test.member_ptr(static_cast<core::string_t>(two->get_string_unchecked()));
+                                two = test.member_ptr(core::value(two->get_string_unchecked(), core::domain_comparable));
                                 if (operator_ == as)
                                 {
                                     if (two)

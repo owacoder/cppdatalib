@@ -214,6 +214,7 @@ namespace cppdatalib
             switch (src.get_type())
             {
                 case null: dst.set_null(src.get_subtype()); break;
+                // Links are weakened in the destination when copying a link object (i.e. the destination is a weak link to the source, which is a strong link)
                 case link: dst.set_link(src.get_link_unchecked(), src.get_subtype() == strong_link? normal: (subtype) src.get_subtype()); break;
                 case boolean: dst.set_bool(src.get_bool_unchecked(), src.get_subtype()); break;
                 case integer: dst.set_int(src.get_int_unchecked(), src.get_subtype()); break;

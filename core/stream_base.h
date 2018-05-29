@@ -1079,52 +1079,98 @@ namespace cppdatalib
                         compare = 1;
                     else if (arg != NULL && arg2 != NULL)
                     {
-                        if (arg->get_type() < arg2->get_type())
+                        if (arg->get_subtype() == domain_comparable ||
+                                arg2->get_subtype() == domain_comparable)
+                        {
+                            type domain = arg->get_type();
+                            type domain2 = arg2->get_type();
+
+                            domain = get_domain(domain);
+                            domain2 = get_domain(domain2);
+
+                            if (domain < domain2)
+                                compare = -1;
+                            else if (domain > domain2)
+                                compare = 1;
+                            else
+                            {
+                                switch (domain)
+                                {
+                                    case boolean: compare = arg->get_bool_unchecked() < arg2->get_bool_unchecked(); break;
+                                    case real:
+                                        if (arg->get_type() == integer && arg2->get_type() == integer)
+                                            compare = arg->get_int_unchecked() < arg2->get_int_unchecked();
+                                        else if (arg->get_type() == uinteger && arg2->get_type() == uinteger)
+                                            compare = arg->get_uint_unchecked() < arg2->get_uint_unchecked();
+                                        else if (arg->get_type() == integer && arg2->get_type() == uinteger)
+                                            compare = arg2->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? 1: arg->get_int_unchecked() < core::int_t(arg2->get_uint_unchecked());
+                                        else if (arg->get_type() == uinteger && arg2->get_type() == integer)
+                                            compare = arg->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? -1: core::int_t(arg->get_uint_unchecked()) < arg2->get_int_unchecked();
+                                        else
+                                            compare = arg->as_real() < arg2->as_real();
+                                        break;
+                                    case string: compare = arg->get_string_unchecked() < arg2->get_string_unchecked(); break;
+                                    case link: compare = (uintptr_t(arg->get_link_unchecked()) < uintptr_t(arg2->get_link_unchecked())); break;
+                                    default:
+                                        break;
+                                }
+
+                                // Invert true cases above to -1 instead
+                                compare = -compare;
+                            }
+                        }
+                        else if (arg->get_type() < arg2->get_type())
                             compare = -1;
                         else if (arg->get_type() > arg2->get_type())
                             compare = 1;
                         else
                         {
-                            if (arg->get_subtype() < arg2->get_subtype())
-                                compare = -1;
-                            else if (arg->get_subtype() > arg2->get_subtype())
-                                compare = 1;
-                            else
+                            if (arg->get_subtype() != generic_subtype_comparable &&
+                                    arg2->get_subtype() != generic_subtype_comparable)
                             {
-                                switch (arg->get_type())
+                                if (arg->get_subtype() < arg2->get_subtype())
                                 {
-                                    case boolean:
-                                        compare = (arg->get_bool_unchecked() < arg2->get_bool_unchecked());
-                                        break;
-                                    case integer:
-                                        compare = (arg->get_int_unchecked() < arg2->get_int_unchecked());
-                                        break;
-                                    case uinteger:
-                                        compare = (arg->get_uint_unchecked() < arg2->get_uint_unchecked());
-                                        break;
-                                    case real:
-                                        compare = (arg->get_real_unchecked() < arg2->get_real_unchecked());
-                                        break;
-                                    case string:
-                                        compare = (arg->get_string_unchecked() < arg2->get_string_unchecked());
-                                        break;
-#ifndef CPPDATALIB_DISABLE_TEMP_STRING
-                                    case temporary_string:
-                                        compare = (arg->get_temp_string_unchecked() < arg2->get_temp_string_unchecked());
-                                        break;
-#endif
-                                    case array:
-                                    case object:
-                                    case null:
-                                        break;
-                                    case link:
-                                        compare = (uintptr_t(arg->get_link_unchecked()) < uintptr_t(arg2->get_link_unchecked()));
-                                        break;
+                                    compare = -1;
+                                    return;
                                 }
-
-								// Invert true cases above to -1 instead
-								compare = -compare;
+                                else if (arg->get_subtype() > arg2->get_subtype())
+                                {
+                                    compare = 1;
+                                    return;
+                                }
                             }
+
+                            switch (arg->get_type())
+                            {
+                                case boolean:
+                                    compare = (arg->get_bool_unchecked() < arg2->get_bool_unchecked());
+                                    break;
+                                case integer:
+                                    compare = (arg->get_int_unchecked() < arg2->get_int_unchecked());
+                                    break;
+                                case uinteger:
+                                    compare = (arg->get_uint_unchecked() < arg2->get_uint_unchecked());
+                                    break;
+                                case real:
+                                    compare = (arg->get_real_unchecked() < arg2->get_real_unchecked());
+                                    break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                case temporary_string:
+#endif
+                                case string:
+                                    compare = (arg->get_string_unchecked() < arg2->get_string_unchecked());
+                                    break;
+                                case array:
+                                case object:
+                                case null:
+                                    break;
+                                case link:
+                                    compare = (uintptr_t(arg->get_link_unchecked()) < uintptr_t(arg2->get_link_unchecked()));
+                                    break;
+                            }
+
+                            // Invert true cases above to -1 instead
+                            compare = -compare;
                         }
                     }
                 }
@@ -1157,48 +1203,94 @@ namespace cppdatalib
                         compare = 1;
                     else if (arg != NULL && arg2 != NULL)
                     {
-                        if (arg->get_type() < arg2->get_type())
+                        if (arg->get_subtype() == domain_comparable ||
+                                arg2->get_subtype() == domain_comparable)
+                        {
+                            type domain = arg->get_type();
+                            type domain2 = arg2->get_type();
+
+                            domain = get_domain(domain);
+                            domain2 = get_domain(domain2);
+
+                            if (domain < domain2)
+                                compare = -1;
+                            else if (domain > domain2)
+                                compare = 1;
+                            else
+                            {
+                                switch (domain)
+                                {
+                                    case boolean: compare = (arg->get_bool_unchecked() > arg2->get_bool_unchecked()) - (arg->get_bool_unchecked() < arg2->get_bool_unchecked()); break;
+                                    case real:
+                                        if (arg->get_type() == integer && arg2->get_type() == integer)
+                                            compare = (arg->get_int_unchecked() > arg2->get_int_unchecked()) - (arg->get_int_unchecked() < arg2->get_int_unchecked());
+                                        else if (arg->get_type() == uinteger && arg2->get_type() == uinteger)
+                                            compare = (arg->get_uint_unchecked() > arg2->get_uint_unchecked()) - (arg->get_uint_unchecked() > arg2->get_uint_unchecked());
+                                        else if (arg->get_type() == integer && arg2->get_type() == uinteger)
+                                            compare = arg2->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? -1: (arg->get_int_unchecked() > core::int_t(arg2->get_uint_unchecked())) - (arg->get_int_unchecked() < core::int_t(arg2->get_uint_unchecked()));
+                                        else if (arg->get_type() == uinteger && arg2->get_type() == integer)
+                                            compare = arg->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? 1: (core::int_t(arg->get_uint_unchecked()) > arg2->get_int_unchecked()) - (core::int_t(arg->get_uint_unchecked()) < arg2->get_int_unchecked());
+                                        else
+                                        {
+                                            core::real_t x = arg->as_real(), y = arg2->as_real();
+                                            compare = (x > y) - (x < y);
+                                        }
+                                        break;
+                                    case string: compare = (arg->get_string_unchecked() > arg2->get_string_unchecked()) - (arg->get_string_unchecked() < arg2->get_string_unchecked()); break;
+                                    case link: compare = (uintptr_t(arg->get_link_unchecked()) > uintptr_t(arg2->get_link_unchecked())) - (uintptr_t(arg->get_link_unchecked()) < uintptr_t(arg2->get_link_unchecked())); break;
+                                    default:
+                                        break;
+                                }
+                            }
+                        }
+                        else if (arg->get_type() < arg2->get_type())
                             compare = -1;
                         else if (arg->get_type() > arg2->get_type())
                             compare = 1;
                         else
                         {
-                            if (arg->get_subtype() < arg2->get_subtype())
-                                compare = -1;
-                            else if (arg->get_subtype() > arg2->get_subtype())
-                                compare = 1;
-                            else
+                            if (arg->get_subtype() != generic_subtype_comparable &&
+                                    arg2->get_subtype() != generic_subtype_comparable)
                             {
-                                switch (arg->get_type())
+                                if (arg->get_subtype() < arg2->get_subtype())
                                 {
-                                    case boolean:
-                                        compare = (arg->get_bool_unchecked() > arg2->get_bool_unchecked()) - (arg->get_bool_unchecked() < arg2->get_bool_unchecked());
-                                        break;
-                                    case integer:
-                                        compare = (arg->get_int_unchecked() > arg2->get_int_unchecked()) - (arg->get_int_unchecked() < arg2->get_int_unchecked());
-                                        break;
-                                    case uinteger:
-                                        compare = (arg->get_uint_unchecked() > arg2->get_uint_unchecked()) - (arg->get_uint_unchecked() < arg2->get_uint_unchecked());
-                                        break;
-                                    case real:
-                                        compare = (arg->get_real_unchecked() > arg2->get_real_unchecked()) - (arg->get_real_unchecked() < arg2->get_real_unchecked());
-                                        break;
-                                    case string:
-                                        compare = (arg->get_string_unchecked() > arg2->get_string_unchecked()) - (arg->get_string_unchecked() < arg2->get_string_unchecked());
-                                        break;
-#ifndef CPPDATALIB_DISABLE_TEMP_STRING
-                                    case temporary_string:
-                                        compare = (arg->get_temp_string_unchecked() > arg2->get_temp_string_unchecked()) - (arg->get_temp_string_unchecked() < arg2->get_temp_string_unchecked());
-                                        break;
-#endif
-                                    case array:
-                                    case object:
-                                    case null:
-                                        break;
-                                    case link:
-                                        compare = (uintptr_t(arg->get_link_unchecked()) > uintptr_t(arg2->get_link_unchecked())) - (uintptr_t(arg->get_link_unchecked()) < uintptr_t(arg2->get_link_unchecked()));
-                                        break;
+                                    compare = -1;
+                                    return;
                                 }
+                                else if (arg->get_subtype() > arg2->get_subtype())
+                                {
+                                    compare = 1;
+                                    return;
+                                }
+                            }
+
+                            switch (arg->get_type())
+                            {
+                                case boolean:
+                                    compare = (arg->get_bool_unchecked() > arg2->get_bool_unchecked()) - (arg->get_bool_unchecked() < arg2->get_bool_unchecked());
+                                    break;
+                                case integer:
+                                    compare = (arg->get_int_unchecked() > arg2->get_int_unchecked()) - (arg->get_int_unchecked() < arg2->get_int_unchecked());
+                                    break;
+                                case uinteger:
+                                    compare = (arg->get_uint_unchecked() > arg2->get_uint_unchecked()) - (arg->get_uint_unchecked() < arg2->get_uint_unchecked());
+                                    break;
+                                case real:
+                                    compare = (arg->get_real_unchecked() > arg2->get_real_unchecked()) - (arg->get_real_unchecked() < arg2->get_real_unchecked());
+                                    break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                case temporary_string:
+#endif
+                                case string:
+                                    compare = (arg->get_string_unchecked() > arg2->get_string_unchecked()) - (arg->get_string_unchecked() < arg2->get_string_unchecked());
+                                    break;
+                                case array:
+                                case object:
+                                case null:
+                                    break;
+                                case link:
+                                    compare = (uintptr_t(arg->get_link_unchecked()) > uintptr_t(arg2->get_link_unchecked())) - (uintptr_t(arg->get_link_unchecked()) < uintptr_t(arg2->get_link_unchecked()));
+                                    break;
                             }
                         }
                     }
@@ -1232,43 +1324,82 @@ namespace cppdatalib
                         equal = false;
                     else if (arg != NULL && arg2 != NULL)
                     {
-                        if (arg->get_type() != arg2->get_type() ||
-                                arg->get_subtype() != arg2->get_subtype())
-                            equal = false;
-                        else
+                        if (arg->get_subtype() == domain_comparable ||
+                                arg2->get_subtype() == domain_comparable)
                         {
-                            switch (arg->get_type())
+                            type domain = arg->get_type();
+                            type domain2 = arg2->get_type();
+
+                            domain = get_domain(domain);
+                            domain2 = get_domain(domain2);
+
+                            if (domain == domain2)
                             {
-                                case boolean:
-                                    equal = (arg->get_bool_unchecked() == arg2->get_bool_unchecked());
-                                    break;
-                                case integer:
-                                    equal = (arg->get_int_unchecked() == arg2->get_int_unchecked());
-                                    break;
-                                case uinteger:
-                                    equal = (arg->get_uint_unchecked() == arg2->get_uint_unchecked());
-                                    break;
-                                case real:
-                                    equal = (arg->get_real_unchecked() == arg2->get_real_unchecked());
-                                    break;
-                                case string:
-                                    equal = (arg->get_string_unchecked() == arg2->get_string_unchecked());
-                                    break;
-#ifndef CPPDATALIB_DISABLE_TEMP_STRING
-                                case temporary_string:
-                                    equal = (arg->get_temp_string_unchecked() == arg2->get_temp_string_unchecked());
-                                    break;
-#endif
-                                case array:
-                                case object:
-                                    equal = (arg->size() == arg2->size());
-                                    break;
-                                case null:
-                                    break;
-                                case link:
-                                    equal = (arg->get_link_unchecked() == arg2->get_link_unchecked());
-                                    break;
+                                switch (domain)
+                                {
+                                    case boolean: equal = arg->get_bool_unchecked() == arg2->get_bool_unchecked(); break;
+                                    case real:
+                                        if (arg->get_type() == integer && arg2->get_type() == integer)
+                                            equal = arg->get_int_unchecked() == arg2->get_int_unchecked();
+                                        else if (arg->get_type() == uinteger && arg2->get_type() == uinteger)
+                                            equal = arg->get_uint_unchecked() == arg2->get_uint_unchecked();
+                                        else if (arg->get_type() == integer && arg2->get_type() == uinteger)
+                                            equal = arg2->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? false: arg->get_int_unchecked() == core::int_t(arg2->get_uint_unchecked());
+                                        else if (arg->get_type() == uinteger && arg2->get_type() == integer)
+                                            equal = arg->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? false: core::int_t(arg->get_uint_unchecked()) == arg2->get_int_unchecked();
+                                        else
+                                            equal = arg->as_real() == arg2->as_real();
+                                        break;
+                                    case string: equal = arg->get_string_unchecked() == arg2->get_string_unchecked(); break;
+                                    case link: equal = (uintptr_t(arg->get_link_unchecked()) == uintptr_t(arg2->get_link_unchecked())); break;
+                                    default:
+                                        break;
+                                }
                             }
+                            else
+                                equal = false;
+
+                            return;
+                        }
+
+                        if (arg->get_type() != arg2->get_type() ||
+                                (arg->get_subtype() != generic_subtype_comparable &&
+                                 arg2->get_subtype() != generic_subtype_comparable &&
+                                 arg->get_subtype() != arg2->get_subtype()))
+                        {
+                            equal = false;
+                            return;
+                        }
+
+                        switch (arg->get_type())
+                        {
+                            case boolean:
+                                equal = (arg->get_bool_unchecked() == arg2->get_bool_unchecked());
+                                break;
+                            case integer:
+                                equal = (arg->get_int_unchecked() == arg2->get_int_unchecked());
+                                break;
+                            case uinteger:
+                                equal = (arg->get_uint_unchecked() == arg2->get_uint_unchecked());
+                                break;
+                            case real:
+                                equal = (arg->get_real_unchecked() == arg2->get_real_unchecked());
+                                break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                            case temporary_string:
+#endif
+                            case string:
+                                equal = (arg->get_string_unchecked() == arg2->get_string_unchecked());
+                                break;
+                            case array:
+                            case object:
+                                equal = (arg->size() == arg2->size());
+                                break;
+                            case null:
+                                break;
+                            case link:
+                                equal = (arg->get_link_unchecked() == arg2->get_link_unchecked());
+                                break;
                         }
                     }
                 }

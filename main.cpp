@@ -1184,10 +1184,12 @@ int main(int argc, char **argv)
         input.get()->end();
 #else
         cppdatalib::core::automatic_buffer_filter buffer(*output.get());
+        cppdatalib::json::pretty_stream_writer json(std::cout, 2);
+        cppdatalib::core::sql_select_filter sql(json, std::string("select name, phone"));
 
         clock_t start = clock();
 
-        *input.get() >> buffer;
+        *input.get() >> sql;
 
 		double dur = double(clock() - start) / CLOCKS_PER_SEC;
 		std::cout << std::setprecision(16);
