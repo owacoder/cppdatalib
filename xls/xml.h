@@ -56,6 +56,9 @@ namespace cppdatalib
                     case core::integer:
                     case core::uinteger:
                     case core::real: type = "Number"; break;
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                    case core::temporary_string:
+#endif
                     case core::string:
                         if (v.get_subtype() == core::date ||
                             v.get_subtype() == core::time ||

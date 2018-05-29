@@ -1183,9 +1183,10 @@ int main(int argc, char **argv)
         } while (input.get()->busy());
         input.get()->end();
 #else
+        cppdatalib::core::automatic_buffer_filter buffer(*output.get());
+
         clock_t start = clock();
 
-        cppdatalib::core::automatic_buffer_filter buffer(*output.get());
         *input.get() >> buffer;
 
 		double dur = double(clock() - start) / CLOCKS_PER_SEC;
@@ -1194,7 +1195,8 @@ int main(int argc, char **argv)
 		if (outfile.get())
 			std::cout << "Total Output: " << uint64_t(outfile.get()->tellp()) << " bytes in " << dur << " seconds (" << uint64_t(outfile.get()->tellp() / dur) << " Bytes/S)\n";
 #endif
-    } catch (const std::exception &e) {
+    }
+    catch (const std::exception &e) {
         std::cerr << "cppdatalib: " << e.what() << "\n";
         return 1;
     }

@@ -1933,7 +1933,7 @@ namespace cppdatalib
                                 if (one->is_string() && one->get_subtype() == core::symbol)
                                 {
                                     was_named_field = true; // This query is a direct reference to a field
-                                    one = test.member_ptr(one->get_string_unchecked());
+                                    one = test.member_ptr(static_cast<core::string_t>(one->get_string_unchecked()));
                                     if (!one) // No member with specified name
                                     {
                                         *non_bool_result = core::value(false);
@@ -2003,7 +2003,7 @@ namespace cppdatalib
 
                                     if (one->is_string() && one->get_subtype() == core::symbol)
                                     {
-                                        one = test.member_ptr(one->get_string_unchecked());
+                                        one = test.member_ptr(static_cast<core::string_t>(one->get_string_unchecked()));
                                         if (!one) // No member with specified name
                                         {
                                             *non_bool_result = core::value(false);
@@ -2043,7 +2043,9 @@ namespace cppdatalib
                     }
                     else if ((operator_ = where, predicate = query.member_ptr("where")))
                     {
-                        if (predicate->is_object())
+                        if (predicate->is_null())
+                            result = true;
+                        else if (predicate->is_object())
                             result = sql_expression_evaluator{functions_, *predicate}(test);
                     }
 
@@ -2079,7 +2081,7 @@ namespace cppdatalib
 
                             if (one->is_string() && one->get_subtype() == core::symbol)
                             {
-                                one = test.member_ptr(one->get_string_unchecked());
+                                one = test.member_ptr(static_cast<core::string_t>(one->get_string_unchecked()));
                                 if (!one) // No member with specified name
                                 {
                                     if (non_bool_result)
@@ -2096,7 +2098,7 @@ namespace cppdatalib
 
                             if (two->is_string() && two->get_subtype() == core::symbol)
                             {
-                                two = test.member_ptr(two->get_string_unchecked());
+                                two = test.member_ptr(static_cast<core::string_t>(two->get_string_unchecked()));
                                 if (operator_ == as)
                                 {
                                     if (two)
@@ -2691,7 +2693,7 @@ namespace cppdatalib
                     stream() >> c;
 
                     if (!stream())
-                        throw core::error("SQL - invalid statement");
+                        return;
 
                     if (tolower(c) == 'w')
                     {
@@ -3299,6 +3301,9 @@ namespace cppdatalib
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
+                if (current_container() != core::array)
+                    return;
+
                 if (select(v))
                     buffer_filter::write_buffered_value_(v, is_key);
             }
@@ -3348,9 +3353,18 @@ namespace cppdatalib
                 return "cppdatalib::core::sql_select_filter(" + output.name() + ")";
             }
 
+            const core::value &get_select() const {return select;}
+            const core::value &get_where() const {return where;}
+
         protected:
             void write_buffered_value_(const value &v, bool is_key)
             {
+                if (parent_container() != core::array)
+                {
+                    buffer_filter::write_buffered_value_(v, is_key);
+                    return;
+                }
+
                 core::value copy;
                 if (impl::sql_expression_evaluator{functions, where}(v) &&
                     impl::sql_expression_evaluator{functions, select}(v, &copy, selection_order_is_important))
@@ -3360,7 +3374,7 @@ namespace cppdatalib
             bool write_(const value &v, bool is_key)
             {
                 if (current_container() != core::array)
-                    return false;
+                    return buffer_filter::write_(v, is_key);
 
                 core::value copy;
                 if (impl::sql_expression_evaluator{functions, where}(v) &&

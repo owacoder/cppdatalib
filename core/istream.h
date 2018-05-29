@@ -531,7 +531,11 @@ namespace cppdatalib
                     errno = 0;
                     char *end;
                     if (buffer == nullptr)
+                    {
                         f = convert(str.c_str(), &end);
+                        if (errno == ERANGE || *end != 0)
+                            flags_ |= fail_bit;
+                    }
                     else
                     {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
@@ -539,9 +543,9 @@ namespace cppdatalib
 #else
                         f = instr_convert(buffer, buffer + len, &end);
 #endif
+                        if (errno == ERANGE || end == nullptr)
+                            flags_ |= fail_bit;
                     }
-                    if (errno == ERANGE || *end != 0)
-                        flags_ |= fail_bit;
 
                     if (c == EOF)
                         flags_ = eof_bit;

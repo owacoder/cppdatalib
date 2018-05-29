@@ -474,7 +474,7 @@ namespace cppdatalib
                 return -1;
         }
 
-        std::vector<uint32_t> utf8_to_ucs(const std::string &s)
+        std::vector<uint32_t> utf8_to_ucs(string_view_t s)
         {
             std::vector<uint32_t> result;
 

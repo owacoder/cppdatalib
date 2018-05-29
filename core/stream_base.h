@@ -2166,7 +2166,7 @@ namespace cppdatalib
                                     return false;
                                 }
 
-                                if (value_with_attributes.is_attribute(attribute_name)) // Cannot have duplicate attribute keys
+                                if (value_with_attributes.is_attribute(core::value(attribute_name))) // Cannot have duplicate attribute keys
                                 {
                                     last_error_ = "invalid start tag; duplicate attribute names found";
                                     return false;
@@ -2262,7 +2262,7 @@ namespace cppdatalib
                 }
 
                 // Assumes name is UTF-8 encoded, not binary
-                core::ostream &write_name(core::ostream &stream, const std::string &str)
+                core::ostream &write_name(core::ostream &stream, core::string_view_t str)
                 {
                     if (str.empty())
                         throw core::error("XML - tag or attribute name must not be empty string");
@@ -2270,16 +2270,16 @@ namespace cppdatalib
                     std::vector<uint32_t> ucs = utf8_to_ucs(str);
 
                     if (!is_name_start_char(ucs[0]))
-                        throw core::custom_error("XML - invalid tag or attribute name \"" + str + "\"");
+                        throw core::custom_error("XML - invalid tag or attribute name \"" + static_cast<std::string>(str) + "\"");
 
                     for (size_t i = 1; i < ucs.size(); ++i)
                         if (!is_name_char(ucs[i]))
-                            throw core::custom_error("XML - invalid tag or attribute name \"" + str + "\"");
+                            throw core::custom_error("XML - invalid tag or attribute name \"" + static_cast<std::string>(str) + "\"");
 
                     return stream << str;
                 }
 
-                core::ostream &write_attribute_content(core::ostream &stream, const std::string &str)
+                core::ostream &write_attribute_content(core::ostream &stream, core::string_view_t str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {
@@ -2304,7 +2304,7 @@ namespace cppdatalib
                     return stream;
                 }
 
-                core::ostream &write_element_content(core::ostream &stream, const std::string &str)
+                core::ostream &write_element_content(core::ostream &stream, core::string_view_t str)
                 {
                     for (size_t i = 0; i < str.size();)
                     {
@@ -2335,7 +2335,7 @@ namespace cppdatalib
                     return stream;
                 }
 
-                core::ostream &write_binary_element_content(core::ostream &stream, const std::string &str)
+                core::ostream &write_binary_element_content(core::ostream &stream, core::string_view_t str)
                 {
                     for (size_t i = 0; i < str.size(); ++i)
                     {

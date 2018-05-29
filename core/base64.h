@@ -33,7 +33,7 @@ namespace cppdatalib
 {
     namespace base64
     {
-        inline core::ostream &write(core::ostream &stream, const std::string &str)
+        inline core::ostream &write(core::ostream &stream, core::string_view_t str)
         {
             const char alpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
             uint32_t temp;
