@@ -126,8 +126,8 @@ namespace cppdatalib
             // Normal links are weak links, that is, they don't own the object they point to
 
             // The `comparable` types should not be used in actual data values, but are intented to be used to find a specific value in a dataset
-            domain_comparable = -3, // Domain comparables are not compared by type or subtype, but are compared by value in a specific domain (i.e. compare by numbers or compare by strings)
-            generic_subtype_comparable = -4, // Generic subtype comparables are only compared by type and value, not by subtype.
+            domain_comparable = -2, // Domain comparables are not compared by type or subtype, but are compared by value in a specific domain (i.e. compare by numbers or compare by strings)
+            generic_subtype_comparable = -3, // Generic subtype comparables are only compared by type and value, not by subtype.
 
             // Integers
             unix_timestamp = -29, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds

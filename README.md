@@ -417,13 +417,29 @@ Subtypes include (all ranges inclusive on both ends):
    - -255 to -220: undefined, reserved
    - -32768 to -256: format-specified reserved subtypes
 
+There are two special subtypes, `generic_subtype_comparable`, which compares as if its subtype is equal to whatever it is compared against,
+and `domain_comparable`, which compares as if its type *and* subtype are equal to whatever it is compared against (with a few restrictions).
+NOTE: it is *not* recommended to use these special subtypes in actual data. Their purpose is to make it easier to find specific data, whatever the type.
+
+Domains are special comparison modes, to compare similar values of different types. To compare using domains, use the special subtype
+`domain_comparable` as the test subtype. Domains are separated into the following at the moment:
+   - null
+   - boolean
+   - number (integer, uinteger, real)
+   - string (string, temporary_string)
+   - object
+   - array
+   - link
+
+This means that, for example, an object and an array will never, under any circumstances, be found equal.
+
 Generic strings have three main subtypes:
 
    - `normal` - Only use this for strings known to be UTF-8 encoded. This is the default string type.
    - `clob` - Use this for strings that have an unknown text encoding (that could possibly be UTF-8).
    - `blob` - Use this for strings that are known to be binary encoded, or if you want to remove any encoding metadata from the string.
 
-If a type is unsupported in a serialization format, the type is not converted to something recognizable by the format, but an error is thrown instead, describing the failure. However, if a subtype is not supported, the value is processed as if it had none (i.e. if a value is a `string`, with unsupported subtype `date`, the value is processed as a meaningless string and the subtype metadata is removed).
+If a type is unsupported in a serialization format, the type is not converted to something recognizable by the format. An error is thrown instead, describing the failure. However, if a subtype is not supported, the value is processed as if it had none (i.e. if a value is a `string`, with unsupported subtype `date`, the value is processed as a meaningless string and the subtype metadata is removed).
 
 If a format-defined limit is reached, such as an object key length limit, an error will be thrown.
      
