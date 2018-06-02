@@ -272,7 +272,18 @@ namespace cppdatalib
 #endif
                 bool starts_with(const_pointer s) const {return starts_with(string_view_t(s));}
 
-                // TODO: ends_with()
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                bool ends_with(string_view_t v) const noexcept {return size() >= v.size() && compare(size()-v.size(), v.size(), v) == 0;}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                bool ends_with(value_type v) const noexcept {return size() > 0 && compare(size()-1, 1, string_view_t(&v, 1)) == 0;}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                bool ends_with(const_pointer s) const {return ends_with(string_view_t(s));}
 
 #ifdef CPPDATALIB_CPP14
                 constexpr
