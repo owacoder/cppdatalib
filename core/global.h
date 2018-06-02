@@ -213,7 +213,7 @@ namespace cppdatalib
                 constexpr string_view_t substr(size_type pos = 0, size_type count = npos) const
                 {
                     return pos > size()? (throw std::out_of_range("impl::string_view_t - element access is out of bounds"), string_view_t()):
-                                         string_view_t(data_ + pos, pos + std::min(count, size() - pos));
+                                         string_view_t(data_ + pos, std::min(count, size() - pos));
                 }
 
 #ifdef CPPDATALIB_CPP14
@@ -282,7 +282,7 @@ namespace cppdatalib
                     if (v.size() > size())
                         return npos;
 
-                    for (; pos + v.size() <= size(); ++pos)
+                    for (; pos <= size() - v.size(); ++pos)
                         if (compare(pos, v.size(), v) == 0)
                             return pos;
 
@@ -301,12 +301,159 @@ namespace cppdatalib
 #endif
                 size_type find(const_pointer s, size_type pos = 0) const noexcept {return find(string_view_t(s), pos);}
 
-                // TODO: rfind()
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type rfind(string_view_t v, size_type pos = npos) const noexcept
+                {
+                    if (v.size() > size())
+                        return npos;
 
-                // TODO: find_first_of()
-                // TODO: find_last_of()
-                // TODO: find_first_not_of()
-                // TODO: find_last_not_of()
+                    for (pos = std::min(pos, size() - v.size()) + 1; pos > 0;)
+                    {
+                        --pos;
+                        if (compare(pos, v.size(), v) == 0)
+                            return pos;
+                    }
+
+                    return npos;
+                }
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type rfind(value_type v, size_type pos = npos) const noexcept {return rfind(string_view_t(&v, 1), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type rfind(const_pointer v, size_type pos, size_type count) const noexcept {return rfind(string_view_t(v, count), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type rfind(const_pointer s, size_type pos = npos) const noexcept {return rfind(string_view_t(s), pos);}
+
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_first_of(string_view_t v, size_type pos = 0) const noexcept
+                {
+                    for (; pos < size(); ++pos)
+                        for (const auto &c: v)
+                            if (c == data_[pos])
+                                return pos;
+
+                    return npos;
+                }
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_first_of(value_type v, size_type pos = 0) const noexcept {return find_first_of(string_view_t(&v, 1), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_first_of(const_pointer v, size_type pos, size_type count) const noexcept {return find_first_of(string_view_t(v, count), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_first_of(const_pointer s, size_type pos = 0) const noexcept {return find_first_of(string_view_t(s), pos);}
+
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_first_not_of(string_view_t v, size_type pos = 0) const noexcept
+                {
+                    for (; pos < size(); ++pos)
+                    {
+                        bool in_set = false;
+
+                        for (const auto &c: v)
+                            if (c == data_[pos])
+                            {
+                                in_set = true;
+                                break;
+                            }
+
+                        if (!in_set)
+                            return pos;
+                    }
+
+                    return npos;
+                }
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_first_not_of(value_type v, size_type pos = 0) const noexcept {return find_first_not_of(string_view_t(&v, 1), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_first_not_of(const_pointer v, size_type pos, size_type count) const noexcept {return find_first_not_of(string_view_t(v, count), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_first_not_of(const_pointer s, size_type pos = 0) const noexcept {return find_first_not_of(string_view_t(s), pos);}
+
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_last_of(string_view_t v, size_type pos = npos) const noexcept
+                {
+                    for (pos = std::min(pos, size() - 1) + 1; pos > 0;)
+                    {
+                        --pos;
+                        for (const auto &c: v)
+                            if (c == data_[pos])
+                                return pos;
+                    }
+
+                    return npos;
+                }
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_last_of(value_type v, size_type pos = npos) const noexcept {return find_last_of(string_view_t(&v, 1), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_last_of(const_pointer v, size_type pos, size_type count) const noexcept {return find_last_of(string_view_t(v, count), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_last_of(const_pointer s, size_type pos = npos) const noexcept {return find_last_of(string_view_t(s), pos);}
+
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_last_not_of(string_view_t v, size_type pos = npos) const noexcept
+                {
+                    for (pos = std::min(pos, size() - 1) + 1; pos > 0;)
+                    {
+                        bool in_set = false;
+                        --pos;
+
+                        for (const auto &c: v)
+                            if (c == data_[pos])
+                            {
+                                in_set = true;
+                                break;
+                            }
+
+                        if (!in_set)
+                            return pos;
+                    }
+
+                    return npos;
+                }
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_last_not_of(value_type v, size_type pos = npos) const noexcept {return find_last_not_of(string_view_t(&v, 1), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_last_not_of(const_pointer v, size_type pos, size_type count) const noexcept {return find_last_not_of(string_view_t(v, count), pos);}
+#ifdef CPPDATALIB_CPP14
+                constexpr
+#endif
+                size_type find_last_not_of(const_pointer s, size_type pos = npos) const noexcept {return find_last_not_of(string_view_t(s), pos);}
 
                 bool operator==(string_view_t b) const {return compare(b) == 0;}
                 bool operator!=(string_view_t b) const {return compare(b) != 0;}
@@ -321,6 +468,7 @@ namespace cppdatalib
             };
         }
 
+        std::string s;
         typedef impl::string_view_t<char> string_view_t;
 
     } // Namespace core
