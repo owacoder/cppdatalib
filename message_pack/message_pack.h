@@ -62,6 +62,25 @@ namespace cppdatalib
                                                   provides_prefix_string_size;}
 
         protected:
+            void read_string(core::subtype_t subtype, uint32_t size, const char *failure_message)
+            {
+                core::value string_type = core::value("", 0, subtype, true);
+                get_output()->begin_string(string_type, size);
+                while (size > 0)
+                {
+                    core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
+                    stream().read(buffer.get(), buffer_size);
+                    if (stream().fail())
+                        throw core::error(failure_message);
+                    // Set string in string_type to preserve the subtype
+                    string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                    get_output()->append_to_string(string_type);
+                    size -= static_cast<uint32_t>(buffer_size);
+                }
+                string_type = core::value("", 0, string_type.get_subtype(), true);
+                get_output()->end_string(string_type);
+            }
+
             void reset_()
             {
                 containers = decltype(containers)();
@@ -137,29 +156,17 @@ namespace cppdatalib
                     case 0xc5:
                     case 0xc6:
                     {
-                        uint32_t size = 0;
-                        core::value string_type = core::value("", 0, core::normal, true);
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, uint32_t &) = {core::read_uint8<uint32_t>,
+                                                                                 core::read_uint16_be<uint32_t>,
+                                                                                 core::read_uint32_be<uint32_t>};
 
-                        if ((chr == 0xc4 && !core::read_uint8(stream(), size)) ||
-                            (chr == 0xc5 && !core::read_uint16_be(stream(), size)) ||
-                            (chr == 0xc6 && !core::read_uint32_be(stream(), size)))
+                        uint32_t size = 0;
+
+                        if (!call[chr - 0xc4](stream(), size))
                             throw core::error("MessagePack - expected binary string length");
 
-                        string_type.set_subtype(core::blob);
-                        get_output()->begin_string(string_type, size);
-                        while (size > 0)
-                        {
-                            core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
-                            stream().read(buffer.get(), buffer_size);
-                            if (stream().fail())
-                                throw core::error("MessagePack - unexpected end of binary string");
-                            // Set string in string_type to preserve the subtype
-                            string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
-                            get_output()->append_to_string(string_type);
-                            size -= static_cast<uint32_t>(buffer_size);
-                        }
-                        string_type.set_string("");
-                        get_output()->end_string(string_type);
+                        read_string(core::blob, size, "MessagePack - unexpected end of binary string");
                         break;
                     }
                     // Extensions
@@ -194,11 +201,14 @@ namespace cppdatalib
                     case 0xce:
                     case 0xcf:
                     {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, core::uint_t &) = {core::read_uint8<core::uint_t>,
+                                                                                     core::read_uint16_be<core::uint_t>,
+                                                                                     core::read_uint32_be<core::uint_t>,
+                                                                                     core::read_uint64_be<core::uint_t>};
+
                         core::uint_t val = 0;
-                        if ((chr == 0xcc && !core::read_uint8(stream(), val)) ||
-                            (chr == 0xcd && !core::read_uint16_be(stream(), val)) ||
-                            (chr == 0xce && !core::read_uint32_be(stream(), val)) ||
-                            (chr == 0xcf && !core::read_uint64_be(stream(), val)))
+                        if (!call[chr - 0xcc](stream(), val))
                             throw core::error("MessagePack - expected 'uinteger'");
                         get_output()->write(core::value(val));
                         break;
@@ -209,11 +219,14 @@ namespace cppdatalib
                     case 0xd2:
                     case 0xd3:
                     {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, core::int_t &) = {core::read_int8<core::int_t>,
+                                                                                    core::read_int16_be<core::int_t>,
+                                                                                    core::read_int32_be<core::int_t>,
+                                                                                    core::read_int64_be<core::int_t>};
+
                         core::int_t val = 0;
-                        if ((chr == 0xd0 && !core::read_int8(stream(), val)) ||
-                            (chr == 0xd1 && !core::read_int16_be(stream(), val)) ||
-                            (chr == 0xd2 && !core::read_int32_be(stream(), val)) ||
-                            (chr == 0xd3 && !core::read_int64_be(stream(), val)))
+                        if (!call[chr - 0xd0](stream(), val))
                             throw core::error("MessagePack - expected 'integer'");
                         get_output()->write(core::value(val));
                         break;
@@ -233,38 +246,30 @@ namespace cppdatalib
                     case 0xda:
                     case 0xdb:
                     {
-                        uint32_t size = 0;
-                        core::value string_type = core::value("", 0, core::normal, true);
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, uint32_t &) = {core::read_uint8<uint32_t>,
+                                                                                 core::read_uint16_be<uint32_t>,
+                                                                                 core::read_uint32_be<uint32_t>};
 
-                        if ((chr == 0xd9 && !core::read_uint8(stream(), size)) ||
-                            (chr == 0xda && !core::read_uint16_be(stream(), size)) ||
-                            (chr == 0xdb && !core::read_uint32_be(stream(), size)))
+                        uint32_t size = 0;
+
+                        if (!call[chr - 0xd9](stream(), size))
                             throw core::error("MessagePack - expected UTF-8 string length");
 
-                        get_output()->begin_string(string_type, size);
-                        while (size > 0)
-                        {
-                            core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
-                            stream().read(buffer.get(), buffer_size);
-                            if (stream().fail())
-                                throw core::error("MessagePack - unexpected end of UTF-8 string");
-                            // Set string in string_type to preserve the subtype
-                            string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
-                            get_output()->append_to_string(string_type);
-                            size -= static_cast<uint32_t>(buffer_size);
-                        }
-                        string_type.set_string("");
-                        get_output()->end_string(string_type);
+                        read_string(core::blob, size, "MessagePack - unexpected end of UTF-8 string");
                         break;
                     }
                     // Arrays
                     case 0xdc:
                     case 0xdd:
                     {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, uint32_t &) = {core::read_uint16_be<uint32_t>,
+                                                                                 core::read_uint32_be<uint32_t>};
+
                         uint32_t size = 0;
 
-                        if ((chr == 0xdc && !core::read_uint16_be(stream(), size)) ||
-                            (chr == 0xdd && !core::read_uint32_be(stream(), size)))
+                        if (!call[chr - 0xdc](stream(), size))
                             throw core::error("MessagePack - expected 'array' length");
 
                         get_output()->begin_array(core::array_t(), size);
@@ -275,10 +280,13 @@ namespace cppdatalib
                     case 0xde:
                     case 0xdf:
                     {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, uint32_t &) = {core::read_uint16_be<uint32_t>,
+                                                                                 core::read_uint32_be<uint32_t>};
+
                         uint32_t size = 0;
 
-                        if ((chr == 0xde && !core::read_uint16_be(stream(), size)) ||
-                            (chr == 0xdf && !core::read_uint32_be(stream(), size)))
+                        if (!call[chr - 0xde](stream(), size))
                             throw core::error("MessagePack - expected 'object' length");
 
                         get_output()->begin_object(core::object_t(), size);

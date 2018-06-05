@@ -326,7 +326,7 @@ namespace cppdatalib
                     case string:
                     {
                         uint32_t size = read_size(stream());
-                        core::value string_type = core::value(core::string_t());
+                        core::value string_type = core::value("", 0, core::normal, true);
 
                         switch (element_subtype)
                         {
@@ -346,11 +346,11 @@ namespace cppdatalib
                             if (stream().fail())
                                 throw core::error("Binn - unexpected end of string");
                             // Set string in string_type to preserve the subtype
-                            string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                            string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                             get_output()->append_to_string(string_type);
                             size -= static_cast<uint32_t>(buffer_size);
                         }
-                        string_type.set_string("");
+                        string_type = core::value("", 0, string_type.get_subtype(), true);
                         get_output()->end_string(string_type);
 
                         if (stream().get() != 0) // Eat trailing NUL
@@ -361,7 +361,7 @@ namespace cppdatalib
                     case blob:
                     {
                         uint32_t size = read_size(stream());
-                        core::value string_type = core::value("");
+                        core::value string_type = core::value("", 0, core::normal, true);
 
                         switch (element_subtype)
                         {
@@ -377,11 +377,11 @@ namespace cppdatalib
                             if (stream().fail())
                                 throw core::error("Binn - unexpected end of string");
                             // Set string in string_type to preserve the subtype
-                            string_type.set_string(core::string_t(buffer.get(), static_cast<size_t>(buffer_size)));
+                            string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                             get_output()->append_to_string(string_type);
                             size -= static_cast<uint32_t>(buffer_size);
                         }
-                        string_type.set_string("");
+                        string_type = core::value("", 0, string_type.get_subtype(), true);
                         get_output()->end_string(string_type);
 
                         break;

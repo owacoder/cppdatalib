@@ -115,9 +115,17 @@ namespace cppdatalib
             streamsize last_read_;
 #endif
 
+            // Get one character, bumping position forward, and return it (return EOF if no more characters available)
             virtual int_type getc_() = 0;
+            // Unget the last character, bumping position backward. Throw an error if ungetting too far
             virtual void ungetc_() = 0;
+            // Peek at the next character, preserving position, and return it (return EOF if no more characters available)
             virtual int_type peekc_() = 0;
+            // Read `n` characters, bumping position forward, and place them in `buffer`
+            // (return true on success, false on failure, including characters that are too wide for output in a `char`)
+            // `eof` should be set to true if and only if an end-of-file was reached during reading
+            // `n` should be set to the number of characters actually read
+            virtual bool readc_(char *buffer /* out */, size_t &n /* in/out */, bool &eof /* out */) = 0;
 
         public:
             istream() : flags_(0), skip_ws(true)
@@ -270,26 +278,19 @@ namespace cppdatalib
                     return *this;
                 }
 
-                while (n-- > 0)
+                bool eof = false;
+                size_t sz = 0;
+                if (n < 0 || (uintmax_t(n) > SIZE_MAX) || !readc_(ch, (sz = size_t(n)), eof))
                 {
-                    int_type c = getc_();
-                    if (c == EOF)
-                    {
-                        flags_ = eof_bit | fail_bit;
-                        break;
-                    }
-                    else if (c > 0xff)
-                    {
-                        flags_ = fail_bit;
-                        break;
-                    }
+                    if (eof)
+                        flags_ = fail_bit | eof_bit;
                     else
-                        *ch++ = c;
+                        flags_ = fail_bit;
+                }
 
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
-                    ++last_read_;
+                last_read_ = sz;
 #endif
-                }
 
                 return *this;
             }
@@ -657,6 +658,27 @@ namespace cppdatalib
                 else
                     flags_ |= bad_bit;
             }
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                size_t remaining = string.size() - pos;
+
+                if (remaining < n)
+                {
+                    // Failure to finish buffer
+                    memcpy(buffer, string.data() + pos, remaining);
+                    pos = string.size();
+                    n = remaining;
+                    eof = true;
+                    return false;
+                }
+                else
+                {
+                    // Success
+                    memcpy(buffer, string.data() + pos, n);
+                    pos += n;
+                    return true;
+                }
+            }
         };
 
         class icstring_wrapper_stream : public istream
@@ -692,6 +714,27 @@ namespace cppdatalib
                     --pos;
                 else
                     flags_ |= bad_bit;
+            }
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                size_t remaining = len - pos;
+
+                if (remaining < n)
+                {
+                    // Failure to finish buffer
+                    memcpy(buffer, string + pos, remaining);
+                    pos = len;
+                    n = remaining;
+                    eof = true;
+                    return false;
+                }
+                else
+                {
+                    // Success
+                    memcpy(buffer, string + pos, n);
+                    pos += n;
+                    return true;
+                }
             }
         };
 
@@ -735,6 +778,27 @@ namespace cppdatalib
                 else
                     flags_ |= bad_bit;
             }
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                size_t remaining = string.size() - pos;
+
+                if (remaining < n)
+                {
+                    // Failure to finish buffer
+                    memcpy(buffer, string.data() + pos, remaining);
+                    pos = string.size();
+                    n = remaining;
+                    eof = true;
+                    return false;
+                }
+                else
+                {
+                    // Success
+                    memcpy(buffer, string.data() + pos, n);
+                    pos += n;
+                    return true;
+                }
+            }
         };
 
         class istd_streambuf_wrapper : public istream
@@ -752,7 +816,12 @@ namespace cppdatalib
             streamsize remaining_buffer() const {return -1;}
 
         protected:
-            int_type getc_() {++pos_; return stream_->sbumpc();}
+            int_type getc_()
+            {
+                int_type ch = stream_->sbumpc();
+                pos_ += ch != EOF;
+                return ch;
+            }
             int_type peekc_() {return stream_->sgetc();}
             void ungetc_()
             {
@@ -760,6 +829,21 @@ namespace cppdatalib
                     flags_ |= bad_bit;
                 else
                     --pos_;
+            }
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                uint64_t got = stream_->sgetn(buffer, n);
+
+                pos_ += got;
+
+                if (got != n)
+                {
+                    n = got;
+                    eof = true;
+                    return false;
+                }
+
+                return true;
             }
         };
 
@@ -791,6 +875,27 @@ namespace cppdatalib
                     flags_ |= bad_bit;
                 else
                     --pos_;
+            }
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                size_t remaining = size_ - pos_;
+
+                if (remaining < n)
+                {
+                    // Failure to finish buffer
+                    memcpy(buffer, mem_ + pos_, remaining);
+                    pos_ = size_;
+                    n = remaining;
+                    eof = true;
+                    return false;
+                }
+                else
+                {
+                    // Success
+                    memcpy(buffer, mem_ + pos_, n);
+                    pos_ += n;
+                    return true;
+                }
             }
         };
 
@@ -843,6 +948,16 @@ namespace cppdatalib
             int_type getc_() {return stream.get();}
             int_type peekc_() {return stream.peek();}
             void ungetc_() {stream.unget();}
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                if (!stream.read(buffer, n))
+                {
+                    eof = stream.eof();
+                    return false;
+                }
+
+                return true;
+            }
         };
 #endif
         uint32_t utf_to_ucs(core::istream &stream, encoding mode, bool *eof);
@@ -937,6 +1052,29 @@ namespace cppdatalib
 
                 use_peek_next = true;
                 return peek_ = codepoint;
+            }
+
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                for (size_t i = 0; i < n; ++i)
+                {
+                    int_type ch = getc_();
+                    if (ch == EOF)
+                    {
+                        n = i;
+                        eof = true;
+                        return false;
+                    }
+                    else if (ch > 0xff)
+                    {
+                        n = i;
+                        return false;
+                    }
+
+                    buffer[i] = ch;
+                }
+
+                return true;
             }
         };
 

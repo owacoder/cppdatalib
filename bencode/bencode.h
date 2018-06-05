@@ -105,7 +105,7 @@ namespace cppdatalib
                                 get_output()->append_to_string(string_type);
                                 size -= buffer_size;
                             }
-                            string_type.set_string("");
+                            string_type = core::value("", 0, string_type.get_subtype(), true);
                             get_output()->end_string(string_type);
                         }
                         else
