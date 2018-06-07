@@ -149,7 +149,7 @@ namespace cppdatalib
             }
 
             // begin_container() operates similarly to begin_scalar_(), but pushes a reference to the container as well
-            void begin_container(const core::value &v, core::int_t size, bool is_key)
+            void begin_container(const core::value &v, optional_size size, bool is_key)
             {
                 if (references.empty())
                 {
@@ -174,8 +174,8 @@ namespace cppdatalib
                 if (v.is_array())
                 {
                     references.back()->set_array(core::array_t(), v.get_subtype());
-                    if (size != unknown_size)
-                        references.back()->get_array_ref().data().reserve(size_t(size));
+                    if (!size.empty() && size.value() < SIZE_MAX)
+                        references.back()->get_array_ref().data().reserve(size.value());
                 }
                 else if (v.is_object())
                     references.back()->set_object(core::object_t(), v.get_subtype());
@@ -201,11 +201,11 @@ namespace cppdatalib
                     references.pop_back();
             }
 
-            void begin_string_(const core::value &v, int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void begin_string_(const core::value &v, core::optional_size size, bool is_key) {begin_container(v, size, is_key);}
             void end_string_(const core::value &, bool is_key) {end_container(is_key);}
-            void begin_array_(const core::value &v, core::int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void begin_array_(const core::value &v, core::optional_size size, bool is_key) {begin_container(v, size, is_key);}
             void end_array_(const core::value &, bool is_key) {end_container(is_key);}
-            void begin_object_(const core::value &v, core::int_t size, bool is_key) {begin_container(v, size, is_key);}
+            void begin_object_(const core::value &v, core::optional_size size, bool is_key) {begin_container(v, size, is_key);}
             void end_object_(const core::value &, bool is_key) {end_container(is_key);}
         };
 

@@ -341,14 +341,14 @@ namespace cppdatalib
                         get_output()->begin_string(string_type, size);
                         while (size > 0)
                         {
-                            core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
+                            uint32_t buffer_size = std::min(uint32_t(core::buffer_size), size);
                             stream().read(buffer.get(), buffer_size);
                             if (stream().fail())
                                 throw core::error("Binn - unexpected end of string");
                             // Set string in string_type to preserve the subtype
                             string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                             get_output()->append_to_string(string_type);
-                            size -= static_cast<uint32_t>(buffer_size);
+                            size -= buffer_size;
                         }
                         string_type = core::value("", 0, string_type.get_subtype(), true);
                         get_output()->end_string(string_type);
@@ -372,14 +372,14 @@ namespace cppdatalib
                         get_output()->begin_string(string_type, size);
                         while (size > 0)
                         {
-                            core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
+                            uint32_t buffer_size = std::min(uint32_t(core::buffer_size), size);
                             stream().read(buffer.get(), buffer_size);
                             if (stream().fail())
                                 throw core::error("Binn - unexpected end of string");
                             // Set string in string_type to preserve the subtype
                             string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                             get_output()->append_to_string(string_type);
-                            size -= static_cast<uint32_t>(buffer_size);
+                            size -= buffer_size;
                         }
                         string_type = core::value("", 0, string_type.get_subtype(), true);
                         get_output()->end_string(string_type);
@@ -792,17 +792,17 @@ namespace cppdatalib
                 }
             }
 
-            void begin_string_(const core::value &v, core::int_t size, bool is_key)
+            void begin_string_(const core::value &v, core::optional_size size, bool is_key)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("Binn - 'string' value does not have size specified");
 
                 if (is_key)
                 {
-                    if (size > 255)
+                    if (size.value() > 255)
                         throw core::error("Binn - object key is larger than limit of 255 bytes");
 
-                    stream().put(static_cast<char>(size));
+                    stream().put(static_cast<char>(size.value()));
                     return;
                 }
 
@@ -820,33 +820,33 @@ namespace cppdatalib
                         break;
                 }
 
-                write_size(stream(), size);
+                write_size(stream(), size.value());
             }
             void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
             void end_string_(const core::value &, bool is_key) {if (core::subtype_is_text_string(current_container_subtype()) && !is_key) stream().put(0);}
 
-            void begin_array_(const core::value &v, core::int_t size, bool)
+            void begin_array_(const core::value &v, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("Binn - 'array' value does not have size specified");
-                else if (v.size() != static_cast<size_t>(size))
+                else if (v.size() != size.value())
                     throw core::error("Binn - entire 'array' value must be buffered before writing");
 
                 write_type(stream(), container, v.get_subtype() >= core::user? v.get_subtype() - core::user: (core::subtype_t) list);
                 write_size(stream(), get_size(v));
-                write_size(stream(), size);
+                write_size(stream(), size.value());
             }
 
-            void begin_object_(const core::value &v, core::int_t size, bool)
+            void begin_object_(const core::value &v, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("Binn - 'object' value does not have size specified");
-                else if (v.size() != static_cast<size_t>(size))
+                else if (v.size() != size.value())
                     throw core::error("Binn - entire 'object' value must be buffered before writing");
 
                 write_type(stream(), container, v.get_subtype() == core::map? map: object);
                 write_size(stream(), get_size(v));
-                write_size(stream(), size);
+                write_size(stream(), size.value());
 
                 object_types.push(v.get_subtype());
             }

@@ -48,7 +48,7 @@ namespace cppdatalib
                 char chr;
 
                 if (was_just_reset())
-                    get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
+                    get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size());
                 else if (stream() >> chr, stream().good())
                     get_output()->write(core::value(chr & 0xff));
                 else
@@ -69,13 +69,13 @@ namespace cppdatalib
             void integer_(const core::value &v) {core::write_uint8(stream(), v.get_int_unchecked());}
             void uinteger_(const core::value &v) {core::write_uint8(stream(), v.get_uint_unchecked());}
             void real_(const core::value &) {throw core::error("Raw UINT8 - 'real' value not allowed in output");}
-            void begin_string_(const core::value &, core::int_t, bool) {throw core::error("Raw UINT8 - 'string' value not allowed in output");}
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_string_(const core::value &, core::optional_size, bool) {throw core::error("Raw UINT8 - 'string' value not allowed in output");}
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 if (nesting_depth() > 0)
                     throw core::error("Raw UINT8 - nested 'array' value not allowed in output");
             }
-            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("Raw UINT8 - 'object' value not allowed in output");}
+            void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("Raw UINT8 - 'object' value not allowed in output");}
         };
 
         inline core::value from_raw_uint8(core::istream_handle stream)

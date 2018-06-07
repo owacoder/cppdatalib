@@ -110,7 +110,7 @@ namespace cppdatalib
                         throw core::error("BSON - invalid document size specified");
 
                     containers.push_back(container(size - 4, object));
-                    get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                    get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size());
                 }
 
                 core::istream::int_type element_type = stream().get();
@@ -196,9 +196,9 @@ namespace cppdatalib
                         containers.push_back(container(size - 4, static_cast<type>(element_type)));
 
                         if (static_cast<type>(element_type) == object)
-                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size());
                         else
-                            get_output()->begin_array(core::value(core::array_t()), core::stream_handler::unknown_size);
+                            get_output()->begin_array(core::value(core::array_t()), core::stream_handler::unknown_size());
 
                         break;
                     }

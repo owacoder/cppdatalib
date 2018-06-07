@@ -59,7 +59,7 @@ namespace cppdatalib
             void integer_(const core::value &v) {stream() << "<value><int>" << v.get_int_unchecked() << "</int></value>";}
             void uinteger_(const core::value &v) {stream() << "<value><int>" << v.get_uint_unchecked() << "</int></value>";}
             void real_(const core::value &v) {stream() << "<value><double>" << v.get_real_unchecked() << "</double></value>";}
-            void begin_string_(const core::value &, core::int_t, bool is_key)
+            void begin_string_(const core::value &, core::optional_size, bool is_key)
             {
                 if (is_key)
                     stream() << "<name>";
@@ -75,10 +75,10 @@ namespace cppdatalib
                     stream() << "</string></value>";
             }
 
-            void begin_array_(const core::value &, core::int_t, bool) {stream() << "<value><array><data>";}
+            void begin_array_(const core::value &, core::optional_size, bool) {stream() << "<value><array><data>";}
             void end_array_(const core::value &, bool) {stream() << "</data></array></value>";}
 
-            void begin_object_(const core::value &, core::int_t, bool) {stream() << "<value><struct>";}
+            void begin_object_(const core::value &, core::optional_size, bool) {stream() << "<value><struct>";}
             void end_object_(const core::value &, bool)
             {
                 if (current_container_size() > 0)
@@ -171,7 +171,7 @@ namespace cppdatalib
                 stream() << "</double>\n"; output_padding(current_indent);
                 stream() << "</value>";
             }
-            void begin_string_(const core::value &, core::int_t, bool is_key)
+            void begin_string_(const core::value &, core::optional_size, bool is_key)
             {
                 if (is_key)
                     stream() << "<name>";
@@ -206,7 +206,7 @@ namespace cppdatalib
                 }
             }
 
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 stream() << "<value>\n", output_padding(current_indent + indent_width);
                 stream() << "<array>\n", output_padding(current_indent + indent_width * 2);
@@ -223,7 +223,7 @@ namespace cppdatalib
                 stream() << "</value>";
             }
 
-            void begin_object_(const core::value &, core::int_t, bool)
+            void begin_object_(const core::value &, core::optional_size, bool)
             {
                 stream() << "<value>\n", output_padding(current_indent + indent_width);
                 stream() << "<struct>\n", output_padding(current_indent + indent_width * 2);

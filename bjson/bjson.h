@@ -31,6 +31,259 @@ namespace cppdatalib
 {
     namespace bjson
     {
+        /* TODO: doesn't really support core::iencodingstream formats other than `raw` */
+        class parser : public core::stream_parser
+        {
+            struct container_data
+            {
+                container_data(core::subtype_t sub_type, uint64_t remaining_size)
+                    : sub_type(sub_type)
+                    , remaining_size(remaining_size)
+                {}
+
+                core::subtype_t sub_type;
+                uint64_t remaining_size;
+            };
+
+            std::unique_ptr<char []> buffer;
+            std::stack<container_data, std::vector<container_data>> containers;
+            bool written;
+
+        public:
+            parser(core::istream_handle input)
+                : core::stream_parser(input)
+                , buffer(new char [core::buffer_size])
+            {
+                reset();
+            }
+
+            unsigned int features() const {return provides_prefix_array_size |
+                                                  provides_prefix_object_size |
+                                                  provides_prefix_string_size;}
+
+        protected:
+            void read_string(core::subtype_t subtype, uint64_t size, const char *failure_message)
+            {
+                core::value string_type = core::value("", 0, subtype, true);
+                get_output()->begin_string(string_type, size);
+                while (size > 0)
+                {
+                    uint64_t buffer_size = std::min(uint64_t(core::buffer_size), size);
+                    stream().read(buffer.get(), buffer_size);
+                    if (stream().fail())
+                        throw core::error(failure_message);
+                    // Set string in string_type to preserve the subtype
+                    string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                    get_output()->append_to_string(string_type);
+                    size -= buffer_size;
+                }
+                string_type = core::value("", 0, string_type.get_subtype(), true);
+                get_output()->end_string(string_type);
+            }
+
+            void reset_()
+            {
+                containers = decltype(containers)();
+                written = false;
+            }
+
+            void write_one_()
+            {
+                core::istream::int_type chr;
+
+                while (containers.size() > 0 && !get_output()->container_key_was_just_parsed() && containers.top().remaining_size == 0)
+                {
+                    if (get_output()->current_container() == core::array)
+                        get_output()->end_array(core::value(core::array_t(), containers.top().sub_type));
+                    else if (get_output()->current_container() == core::object)
+                        get_output()->end_object(core::value(core::object_t(), containers.top().sub_type));
+                    containers.pop();
+                }
+
+                if (containers.size() > 0)
+                {
+                    if (containers.top().remaining_size > 0 &&
+                            (get_output()->current_container() != core::object || get_output()->container_key_was_just_parsed()))
+                        --containers.top().remaining_size;
+                }
+                else if (written)
+                {
+                    written = false;
+                    return;
+                }
+
+                chr = stream().get();
+                if (chr == EOF)
+                    throw core::error("BJSON - unexpected end of stream, expected type specifier");
+
+                switch (chr)
+                {
+                    // Null
+                    case 0: get_output()->write(core::value()); break;
+                    // Boolean false
+                    case 1:
+                    case 24:
+                        get_output()->write(core::value(false)); break;
+                    // Empty UTF-8 string
+                    case 2: get_output()->write(core::value("", 0, core::normal, true)); break;
+                    // Boolean true
+                    case 3:
+                    case 25:
+                        get_output()->write(core::value(true)); break;
+                    // Positive numbers
+                    case 4:
+                    case 5:
+                    case 6:
+                    case 7:
+                    {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, core::uint_t &) = {core::read_uint8<core::uint_t>,
+                                                                                     core::read_uint16_le<core::uint_t>,
+                                                                                     core::read_uint32_le<core::uint_t>,
+                                                                                     core::read_uint64_le<core::uint_t>};
+
+                        core::uint_t val = 0;
+                        if (!call[chr - 4](stream(), val))
+                            throw core::error("BJSON - expected 'uinteger'");
+                        get_output()->write(core::value(val));
+                        break;
+                    }
+                    // Negative numbers
+                    case 8:
+                    case 9:
+                    case 10:
+                    case 11:
+                    {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, core::uint_t &) = {core::read_uint8<core::uint_t>,
+                                                                                     core::read_uint16_le<core::uint_t>,
+                                                                                     core::read_uint32_le<core::uint_t>,
+                                                                                     core::read_uint64_le<core::uint_t>};
+
+                        core::uint_t val = 0;
+                        if (!call[chr - 8](stream(), val))
+                            throw core::error("BJSON - expected 'uinteger'");
+
+                        if (val > core::uint_t(std::numeric_limits<core::int_t>::max()))
+                            get_output()->write(core::value("-" + std::to_string(val), core::bignum));
+                        else
+                            get_output()->write(core::value(-core::int_t(val)));
+
+                        break;
+                    }
+                    // Single-precision floating-point
+                    case 12:
+                    case 14:
+                    {
+                        uint32_t flt;
+                        if (!core::read_uint32_le(stream(), flt))
+                            throw core::error("BJSON - expected 'float' value");
+                        get_output()->write(core::value(core::float_from_ieee_754(flt)));
+                        break;
+                    }
+                    // Double-precision floating-point
+                    case 13:
+                    case 15:
+                    {
+                        uint64_t flt;
+                        if (!core::read_uint64_le(stream(), flt))
+                            throw core::error("BJSON - expected 'float' value");
+                        get_output()->write(core::value(core::double_from_ieee_754(flt)));
+                        break;
+                    }
+                    // UTF-8 strings
+                    case 16:
+                    case 17:
+                    case 18:
+                    case 19:
+                    {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
+                                                                                 core::read_uint16_le<uint64_t>,
+                                                                                 core::read_uint32_le<uint64_t>,
+                                                                                 core::read_uint64_le<uint64_t>};
+
+                        uint64_t size = 0;
+
+                        if (!call[chr - 16](stream(), size))
+                            throw core::error("BJSON - expected UTF-8 string length");
+
+                        read_string(core::normal, size, "BJSON - unexpected end of UTF-8 string");
+                        break;
+                    }
+                    // Binary strings
+                    case 20:
+                    case 21:
+                    case 22:
+                    case 23:
+                    {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
+                                                                                 core::read_uint16_le<uint64_t>,
+                                                                                 core::read_uint32_le<uint64_t>,
+                                                                                 core::read_uint64_le<uint64_t>};
+
+                        uint64_t size = 0;
+
+                        if (!call[chr - 20](stream(), size))
+                            throw core::error("BJSON - expected binary string length");
+
+                        read_string(core::blob, size, "BJSON - unexpected end of binary string");
+                        break;
+                    }
+                    // Strict small integers
+                    case 26: get_output()->write(core::uint_t(0)); break;
+                    case 27: get_output()->write(core::uint_t(1)); break;
+                    // Arrays
+                    case 32:
+                    case 33:
+                    case 34:
+                    case 35:
+                    {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
+                                                                                 core::read_uint16_le<uint64_t>,
+                                                                                 core::read_uint32_le<uint64_t>,
+                                                                                 core::read_uint64_le<uint64_t>};
+
+                        uint64_t size = 0;
+
+                        if (!call[chr - 32](stream(), size))
+                            throw core::error("BJSON - expected 'array' length");
+
+                        get_output()->begin_array(core::array_t(), size);
+                        containers.push(container_data(core::normal, size));
+                        break;
+                    }
+                    // Maps
+                    case 36:
+                    case 37:
+                    case 38:
+                    case 39:
+                    {
+                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
+                                                                                 core::read_uint16_le<uint64_t>,
+                                                                                 core::read_uint32_le<uint64_t>,
+                                                                                 core::read_uint64_le<uint64_t>};
+
+                        uint64_t size = 0;
+
+                        if (!call[chr - 36](stream(), size))
+                            throw core::error("BJSON - expected 'object' length");
+
+                        get_output()->begin_object(core::object_t(), size);
+                        containers.push(container_data(core::normal, size));
+                        break;
+                    }
+                    default:
+                        throw core::error("BJSON - unknown type specifier encountered");
+                }
+
+                written = true;
+            }
+        };
+
         namespace impl
         {
             class stream_writer_base : public core::stream_handler, public core::stream_writer
@@ -41,207 +294,26 @@ namespace cppdatalib
             protected:
                 core::ostream &write_size(core::ostream &stream, int initial_type, uint64_t size)
                 {
-                    char buffer[9]; // 8 + 1 byte type specifier
-                    size_t buffer_size = 0;
-
                     if (size >= UINT32_MAX)
                     {
-                        buffer[0] = initial_type + 3;
-                        for (size_t i = 0; i < 8; ++i)
-                            buffer[i+1] = (size >> (8*i)) & 0xff;
-                        buffer_size = 9;
+                        stream.put(initial_type + 3);
+                        return core::write_uint64_le(stream, size);
                     }
                     else if (size >= UINT16_MAX)
                     {
-                        buffer[0] = initial_type + 2;
-                        for (size_t i = 0; i < 4; ++i)
-                            buffer[i+1] = (size >> (8*i)) & 0xff;
-                        buffer_size = 5;
+                        stream.put(initial_type + 2);
+                        return core::write_uint32_le(stream, size);
                     }
                     else if (size >= UINT8_MAX)
                     {
-                        buffer[0] = initial_type + 1;
-                        buffer[1] = static_cast<char>(size >> 8);
-                        buffer[2] = size & 0xff;
-                        buffer_size = 3;
+                        stream.put(initial_type + 1);
+                        return core::write_uint16_le(stream, size);
                     }
                     else
                     {
-                        buffer[0] = initial_type;
-                        buffer[1] = static_cast<char>(size);
-                        buffer_size = 2;
+                        stream.put(initial_type);
+                        return core::write_uint8(stream, size);
                     }
-
-                    return stream.write(buffer, buffer_size);
-                }
-
-                size_t get_size(const core::value &v)
-                {
-                    struct traverser
-                    {
-                    private:
-                        std::stack<size_t, std::vector<size_t>> size;
-
-                    public:
-                        traverser() {size.push(0);}
-
-                        size_t get_size() const {return size.top();}
-
-                        bool operator()(const core::value *arg, core::value::traversal_ancestry_finder, bool prefix)
-                        {
-                            switch (arg->get_type())
-                            {
-                                case core::link:
-                                    throw core::error("BJSON - links are not supported by this format");
-                                case core::null:
-                                case core::boolean:
-                                    if (prefix)
-                                        size.top() += 1;
-                                    break;
-                                case core::integer:
-                                {
-                                    if (prefix)
-                                    {
-                                        size.top() += 1; // one byte for type specifier
-
-                                        if (arg->get_int_unchecked() == 0 || arg->get_int_unchecked() == 1)
-                                            ; // do nothing
-                                        else if (arg->get_int_unchecked() >= -core::int_t(UINT8_MAX) && arg->get_int_unchecked() <= UINT8_MAX)
-                                            size.top() += 1;
-                                        else if (arg->get_int_unchecked() >= -core::int_t(UINT16_MAX) && arg->get_int_unchecked() <= UINT16_MAX)
-                                            size.top() += 2;
-                                        else if (arg->get_int_unchecked() >= -core::int_t(UINT32_MAX) && arg->get_int_unchecked() <= UINT32_MAX)
-                                            size.top() += 4;
-                                        else
-                                            size.top() += 8;
-                                    }
-
-                                    break;
-                                }
-                                case core::uinteger:
-                                {
-                                    if (prefix)
-                                    {
-                                        size.top() += 1; // one byte for type specifier
-
-                                        if (arg->get_uint_unchecked() == 0 || arg->get_uint_unchecked() == 1)
-                                            ; // do nothing
-                                        else if (arg->get_uint_unchecked() <= UINT8_MAX)
-                                            size.top() += 1;
-                                        else if (arg->get_uint_unchecked() <= UINT16_MAX)
-                                            size.top() += 2;
-                                        else if (arg->get_uint_unchecked() <= UINT32_MAX)
-                                            size.top() += 4;
-                                        else
-                                            size.top() += 8;
-                                    }
-
-                                    break;
-                                }
-                                case core::real:
-                                {
-                                    if (prefix)
-                                    {
-                                        size.top() += 5; // one byte for type specifier, minimum of four bytes for data
-
-                                        // A user-specified subtype is not available for reals
-                                        // (because when the data is read again, the IEEE-754 representation will be put into an integer instead of a real,
-                                        // since there is nothing to show that the data should be read as a floating point number)
-                                        // To prevent the loss of data, the subtype is discarded and the value stays the same
-
-                                        if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(arg->get_real_unchecked()))) != arg->get_real_unchecked() && !std::isnan(arg->get_real_unchecked()))
-                                            size.top() += 4; // requires more than 32-bit float to losslessly encode
-                                    }
-
-                                    break;
-                                }
-                                case core::string:
-#ifndef CPPDATALIB_DISABLE_TEMP_STRING
-                                case core::temporary_string:
-#endif
-                                {
-                                    if (prefix)
-                                    {
-                                        size.top() += 1; // one byte for type specifier
-
-                                        if (arg->size() >= UINT32_MAX)
-                                            size.top() += 8; // requires an eight-byte size specifier
-                                        else if (arg->size() >= UINT16_MAX)
-                                            size.top() += 4; // requires a four-byte size specifier
-                                        else if (arg->size() >= UINT8_MAX)
-                                            size.top() += 2; // requires a two-byte size specifier
-                                        else if (arg->size() > 0 && core::subtype_is_text_string(arg->get_subtype()))
-                                            size.top() += 1; // requires a one-byte size specifier
-
-                                        size.top() += arg->string_size();
-                                    }
-                                    break;
-                                }
-                                case core::array:
-                                {
-                                    if (prefix)
-                                    {
-                                        size.push(size.size() > 2); // one byte for type specifier
-                                    }
-                                    else
-                                    {
-                                        if (size.size() > 2)
-                                        {
-                                            if (size.top() >= UINT32_MAX)
-                                                size.top() += 8; // requires an eight-byte size specifier
-                                            else if (size.top() >= UINT16_MAX)
-                                                size.top() += 4; // requires a four-byte size specifier
-                                            else if (size.top() >= UINT8_MAX)
-                                                size.top() += 2; // requires a two-byte size specifier
-                                            else
-                                                size.top() += 1; // requires a one-byte size specifier
-                                        }
-
-                                        size_t temp = size.top();
-                                        size.pop();
-                                        size.top() += temp;
-                                    }
-
-                                    break;
-                                }
-                                case core::object:
-                                {
-                                    if (prefix)
-                                    {
-                                        size.push(size.size() > 2); // one byte for type specifier
-                                    }
-                                    else
-                                    {
-                                        if (size.size() > 2)
-                                        {
-                                            if (size.top() >= UINT32_MAX)
-                                                size.top() += 8; // requires an eight-byte size specifier
-                                            else if (size.top() >= UINT16_MAX)
-                                                size.top() += 4; // requires a four-byte size specifier
-                                            else if (size.top() >= UINT8_MAX)
-                                                size.top() += 2; // requires a two-byte size specifier
-                                            else
-                                                size.top() += 1; // requires a one-byte size specifier
-                                        }
-
-                                        size_t temp = size.top();
-                                        size.pop();
-                                        size.top() += temp;
-                                    }
-
-                                    break;
-                                }
-                            }
-
-                            return true;
-                        }
-                    };
-
-                    traverser t;
-
-                    v.traverse(t);
-
-                    return t.get_size();
                 }
             };
         }
@@ -294,34 +366,24 @@ namespace cppdatalib
                 if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
                 {
                     out = core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()));
-                    stream().put(14)
-                            .put(out & 0xff)
-                            .put((out >> 8) & 0xff)
-                            .put((out >> 16) & 0xff)
-                            .put(static_cast<char>(out >> 24));
+                    stream().put(14);
+                    core::write_uint32_le(stream(), out);
                 }
                 else
                 {
                     out = core::double_to_ieee_754(v.get_real_unchecked());
-                    stream().put(15)
-                            .put(out & 0xff)
-                            .put((out >> 8) & 0xff)
-                            .put((out >> 16) & 0xff)
-                            .put((out >> 24) & 0xff)
-                            .put((out >> 32) & 0xff)
-                            .put((out >> 40) & 0xff)
-                            .put((out >> 48) & 0xff)
-                            .put(out >> 56);
+                    stream().put(15);
+                    core::write_uint64_le(stream(), out);
                 }
             }
 
-            void begin_string_(const core::value &v, core::int_t size, bool)
+            void begin_string_(const core::value &v, core::optional_size size, bool)
             {
                 int initial_type = 16;
 
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("BJSON - 'string' value does not have size specified");
-                else if (size == 0 && core::subtype_is_text_string(v.get_subtype()))
+                else if (size.value() == 0 && core::subtype_is_text_string(v.get_subtype()))
                 {
                     stream().put(2); // Empty string type
                     return;
@@ -330,28 +392,24 @@ namespace cppdatalib
                 if (!core::subtype_is_text_string(v.get_subtype()))
                     initial_type += 4;
 
-                write_size(stream(), initial_type, size);
+                write_size(stream(), initial_type, size.value());
             }
             void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
 
-            void begin_array_(const core::value &v, core::int_t size, bool)
+            void begin_array_(const core::value &, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("BJSON - 'array' value does not have size specified");
-                else if (v.size() != static_cast<size_t>(size))
-                    throw core::error("BJSON - entire 'array' value must be buffered before writing");
 
-                write_size(stream(), 32, get_size(v));
+                write_size(stream(), 32, size.value());
             }
 
-            void begin_object_(const core::value &v, core::int_t size, bool)
+            void begin_object_(const core::value &, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("BJSON - 'object' value does not have size specified");
-                else if (v.size() != static_cast<size_t>(size))
-                    throw core::error("BJSON - entire 'object' value must be buffered before writing");
 
-                write_size(stream(), 36, get_size(v));
+                write_size(stream(), 36, size.value());
             }
         };
 

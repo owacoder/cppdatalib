@@ -44,7 +44,7 @@ namespace cppdatalib
                 int c;
                 char *write = buffer.get();
 
-                writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+                writer.begin_string(core::string_t(), core::stream_handler::unknown_size());
                 while (c = stream().get(), c != '"' && c != EOF)
                 {
                     if (c == '\\')
@@ -174,7 +174,7 @@ namespace cppdatalib
                             if (chr != '*')
                             {
                                 const core::value value_type(core::string_t(), core::blob);
-                                get_output()->begin_string(value_type, core::stream_handler::unknown_size);
+                                get_output()->begin_string(value_type, core::stream_handler::unknown_size());
 
                                 unsigned int t = 0;
                                 bool have_first_nibble = false;
@@ -233,7 +233,7 @@ namespace cppdatalib
                             {
                                 int c;
                                 const core::value value_type(core::string_t(), core::datetime);
-                                get_output()->begin_string(value_type, core::stream_handler::unknown_size);
+                                get_output()->begin_string(value_type, core::stream_handler::unknown_size());
                                 while (c = stream().get(), c != '>')
                                 {
                                     if (c == EOF) throw core::error("Plain Text Property List - expected '>' after value");
@@ -265,7 +265,7 @@ namespace cppdatalib
                             delimiter_required = false;
                             break;
                         case '(':
-                            get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
+                            get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size());
                             delimiter_required = false;
                             break;
                         case ')':
@@ -273,7 +273,7 @@ namespace cppdatalib
                             delimiter_required = true;
                             break;
                         case '{':
-                            get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size);
+                            get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size());
                             delimiter_required = false;
                             break;
                         case '}':
@@ -412,7 +412,7 @@ finish:
                               << v.get_real_unchecked();
                 stream().put('>');
             }
-            void begin_string_(const core::value &v, core::int_t, bool)
+            void begin_string_(const core::value &v, core::optional_size, bool)
             {
                 switch (v.get_subtype())
                 {
@@ -454,10 +454,10 @@ finish:
                 }
             }
 
-            void begin_array_(const core::value &, core::int_t, bool) {stream().put('(');}
+            void begin_array_(const core::value &, core::optional_size, bool) {stream().put('(');}
             void end_array_(const core::value &, bool) {stream().put(')');}
 
-            void begin_object_(const core::value &, core::int_t, bool) {stream().put('{');}
+            void begin_object_(const core::value &, core::optional_size, bool) {stream().put('{');}
             void end_object_(const core::value &, bool) {stream().put('}');}
         };
 
@@ -541,7 +541,7 @@ finish:
                               << v.get_real_unchecked();
                 stream().put('>');
             }
-            void begin_string_(const core::value &v, core::int_t, bool)
+            void begin_string_(const core::value &v, core::optional_size, bool)
             {
                 switch (v.get_subtype())
                 {
@@ -583,7 +583,7 @@ finish:
                 }
             }
 
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 stream().put('(');
                 current_indent += indent_width;
@@ -598,7 +598,7 @@ finish:
                 stream().put(')');
             }
 
-            void begin_object_(const core::value &, core::int_t, bool)
+            void begin_object_(const core::value &, core::optional_size, bool)
             {
                 stream().put('{');
                 current_indent += indent_width;

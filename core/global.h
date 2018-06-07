@@ -128,6 +128,41 @@ namespace cppdatalib
         typedef std::string string_t;
 #endif
 
+        template<typename T>
+        struct optional
+        {
+            optional() : val_{}, used_(false) {}
+            optional(T v) : val_(v), used_(true) {}
+            template<typename U, typename std::enable_if<!std::is_same<T, U>::value>::type = 0>
+            optional(U v) : val_(v), used_(true) {}
+
+            optional &operator=(T v) {val_ = v; used_ = true; return *this;}
+
+            template<typename U>
+            bool operator==(const optional<U> &other)
+            {
+                if (used_ != other.used_)
+                    return false;
+                else if (!used_ && !other.used_)
+                    return true;
+
+                return val_ == other.val_;
+            }
+            template<typename U>
+            bool operator!=(const optional<U> &other) {return !(*this == other);}
+
+            T value() const {return val_;}
+
+            bool empty() const {return !used_;}
+            void clear() {val_ = {}; used_ = false;}
+
+        private:
+            T val_;
+            bool used_;
+        };
+
+        typedef optional<uint64_t> optional_size;
+
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
 #ifdef CPPDATALIB_STRING_VIEW_T
         typedef CPPDATALIB_STRING_VIEW_T string_view_t;

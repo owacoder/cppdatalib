@@ -104,16 +104,16 @@ namespace cppdatalib
             void integer_(const core::value &v) {stream() << "0," << v.get_int_unchecked() << "\nV\n";}
             void uinteger_(const core::value &v) {stream() << "0," << v.get_uint_unchecked() << "\nV\n";}
             void real_(const core::value &v) {stream() << "0," << v.get_real_unchecked() << "\nV\n";}
-            void begin_string_(const core::value &, core::int_t, bool) {stream().write("1,0\n\"", 5);}
+            void begin_string_(const core::value &, core::optional_size, bool) {stream().write("1,0\n\"", 5);}
             void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
             void end_string_(const core::value &, bool) {stream().write("\"\n", 2);}
 
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 if (nesting_depth() == 2)
                     throw core::error("DIF - 'array' value not allowed in row output");
             }
-            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("DIF - 'object' value not allowed in output");}
+            void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("DIF - 'object' value not allowed in output");}
         };
 
         inline std::string to_dif_table(const core::value &v, const core::string_t &worksheet_name, core::int_t columns, core::int_t rows)

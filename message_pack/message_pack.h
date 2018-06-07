@@ -68,14 +68,14 @@ namespace cppdatalib
                 get_output()->begin_string(string_type, size);
                 while (size > 0)
                 {
-                    core::int_t buffer_size = std::min(core::int_t(core::buffer_size), core::int_t(size));
+                    uint32_t buffer_size = std::min(uint32_t(core::buffer_size), size);
                     stream().read(buffer.get(), buffer_size);
                     if (stream().fail())
                         throw core::error(failure_message);
                     // Set string in string_type to preserve the subtype
                     string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                     get_output()->append_to_string(string_type);
-                    size -= static_cast<uint32_t>(buffer_size);
+                    size -= buffer_size;
                 }
                 string_type = core::value("", 0, string_type.get_subtype(), true);
                 get_output()->end_string(string_type);
@@ -488,49 +488,49 @@ namespace cppdatalib
             void integer_(const core::value &v) {write_int(stream(), v.get_int_unchecked());}
             void uinteger_(const core::value &v) {write_int(stream(), v.get_uint_unchecked());}
             void real_(const core::value &v) {write_float(stream(), v.get_real_unchecked());}
-            void begin_string_(const core::value &v, core::int_t size, bool)
+            void begin_string_(const core::value &v, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("MessagePack - 'string' value does not have size specified");
-				else if (size > UINT32_MAX)
+                else if (size.value() > UINT32_MAX)
 					throw core::error("MessagePack - 'string' value is too large");
 
-                write_string_size(stream(), static_cast<size_t>(size), v.get_subtype());
+                write_string_size(stream(), size.value(), v.get_subtype());
             }
             void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
 
-            void begin_array_(const core::value &, core::int_t size, bool)
+            void begin_array_(const core::value &, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("MessagePack - 'array' value does not have size specified");
-                else if (size <= 15)
-                    stream().put(static_cast<char>(0x90 + size));
-                else if (size <= UINT16_MAX)
-                    stream().put(static_cast<unsigned char>(0xdc)).put(static_cast<char>(size >> 8)).put(size & 0xff);
-                else if (size <= UINT32_MAX)
+                else if (size.value() <= 15)
+                    stream().put(static_cast<char>(0x90 + size.value()));
+                else if (size.value() <= UINT16_MAX)
+                    stream().put(static_cast<unsigned char>(0xdc)).put(static_cast<char>(size.value() >> 8)).put(size.value() & 0xff);
+                else if (size.value() <= UINT32_MAX)
                     stream().put(static_cast<unsigned char>(0xdd))
-                            .put(static_cast<char>(size >> 24))
-                            .put((size >> 16) & 0xff)
-                            .put((size >> 8) & 0xff)
-                            .put(size & 0xff);
+                            .put(static_cast<char>(size.value() >> 24))
+                            .put((size.value() >> 16) & 0xff)
+                            .put((size.value() >> 8) & 0xff)
+                            .put(size.value() & 0xff);
                 else
                     throw core::error("MessagePack - 'array' value is too long");
             }
 
-            void begin_object_(const core::value &, core::int_t size, bool)
+            void begin_object_(const core::value &, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("MessagePack - 'object' value does not have size specified");
-                else if (size <= 15)
-                    stream().put(static_cast<char>(0x80 + size));
-                else if (size <= UINT16_MAX)
-                    stream().put(static_cast<unsigned char>(0xde)).put(static_cast<char>(size >> 8)).put(size & 0xff);
-                else if (size <= UINT32_MAX)
+                else if (size.value() <= 15)
+                    stream().put(static_cast<char>(0x80 + size.value()));
+                else if (size.value() <= UINT16_MAX)
+                    stream().put(static_cast<unsigned char>(0xde)).put(static_cast<char>(size.value() >> 8)).put(size.value() & 0xff);
+                else if (size.value() <= UINT32_MAX)
                     stream().put(static_cast<unsigned char>(0xdf))
-                            .put(static_cast<char>(size >> 24))
-                            .put((size >> 16) & 0xff)
-                            .put((size >> 8) & 0xff)
-                            .put(size & 0xff);
+                            .put(static_cast<char>(size.value() >> 24))
+                            .put((size.value() >> 16) & 0xff)
+                            .put((size.value() >> 8) & 0xff)
+                            .put(size.value() & 0xff);
                 else
                     throw core::error("MessagePack - 'object' value is too long");
             }

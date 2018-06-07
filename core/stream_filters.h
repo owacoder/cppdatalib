@@ -77,7 +77,7 @@ namespace cppdatalib
                     return true;
                 }
 
-                void begin_array_(const value &v, int_t size, bool)
+                void begin_array_(const value &v, optional_size size, bool)
                 {
                     output.begin_array(v, size);
                 }
@@ -86,7 +86,7 @@ namespace cppdatalib
                     output.end_array(v);
                 }
 
-                void begin_object_(const value &v, int_t size, bool)
+                void begin_object_(const value &v, optional_size size, bool)
                 {
                     output.begin_object(v, size);
                 }
@@ -95,7 +95,7 @@ namespace cppdatalib
                     output.end_object(v);
                 }
 
-                void begin_string_(const value &v, int_t size, bool)
+                void begin_string_(const value &v, optional_size size, bool)
                 {
                     output.begin_string(v, size);
                 }
@@ -322,6 +322,14 @@ namespace cppdatalib
             // The default implementation is just a pass-through to the output, as you can see.
             virtual void write_buffered_value_(const value &v, bool is_key) {(void) is_key; output.write(v);}
 
+            void write_already_buffered_value(const value &v, bool is_key)
+            {
+                if (cache.active())
+                    cache.write(v);
+                else
+                    write_buffered_value_(v, is_key);
+            }
+
             void begin_()
             {
                 output.begin();
@@ -345,16 +353,16 @@ namespace cppdatalib
                     return output.write(v);
             }
 
-            void begin_array_(const value &v, int_t size, bool is_key)
+            void begin_array_(const value &v, optional_size size, bool is_key)
             {
                 if (ignore_nesting)
                     ++ignore_nesting;
                 else if (cache.active() || (flags & buffer_arrays && nesting_level <= nesting_depth()))
                 {
-                    if (size != unknown_size && uintmax_t(size) == v.size())
+                    if (size == optional_size(v.size()))
                     {
                         ++ignore_nesting;
-                        write_buffered_value_(v, is_key);
+                        write_already_buffered_value(v, is_key);
                         return;
                     }
 
@@ -364,7 +372,7 @@ namespace cppdatalib
                     cache.begin_array(v, size);
                 }
                 else
-                    output.begin_array(v, flags & buffer_ignore_reported_sizes? core::int_t(core::stream_handler::unknown_size): size);
+                    output.begin_array(v, flags & buffer_ignore_reported_sizes? core::stream_handler::unknown_size(): size);
             }
             void end_array_(const value &v, bool is_key)
             {
@@ -385,16 +393,16 @@ namespace cppdatalib
                     output.end_array(v);
             }
 
-            void begin_object_(const value &v, int_t size, bool is_key)
+            void begin_object_(const value &v, optional_size size, bool is_key)
             {
                 if (ignore_nesting)
                     ++ignore_nesting;
                 else if (cache.active() || (flags & buffer_objects && nesting_level <= nesting_depth()))
                 {
-                    if (size != unknown_size && uintmax_t(size) == v.size())
+                    if (size == optional_size(v.size()))
                     {
                         ++ignore_nesting;
-                        write_buffered_value_(v, is_key);
+                        write_already_buffered_value(v, is_key);
                         return;
                     }
 
@@ -404,7 +412,7 @@ namespace cppdatalib
                     cache.begin_object(v, size);
                 }
                 else
-                    output.begin_object(v, flags & buffer_ignore_reported_sizes? core::int_t(core::stream_handler::unknown_size): size);
+                    output.begin_object(v, flags & buffer_ignore_reported_sizes? core::stream_handler::unknown_size(): size);
             }
             void end_object_(const value &v, bool is_key)
             {
@@ -425,16 +433,16 @@ namespace cppdatalib
                     output.end_object(v);
             }
 
-            void begin_string_(const value &v, int_t size, bool is_key)
+            void begin_string_(const value &v, optional_size size, bool is_key)
             {
                 if (ignore_nesting)
                     ++ignore_nesting;
                 else if (cache.active() || (flags & buffer_strings && nesting_level <= nesting_depth()))
                 {
-                    if (size != unknown_size && uintmax_t(size) == v.size())
+                    if (size == optional_size(v.size()))
                     {
                         ++ignore_nesting;
-                        write_buffered_value_(v, is_key);
+                        write_already_buffered_value(v, is_key);
                         return;
                     }
 
@@ -444,7 +452,7 @@ namespace cppdatalib
                     cache.begin_string(v, size);
                 }
                 else
-                    output.begin_string(v, flags & buffer_ignore_reported_sizes? core::int_t(core::stream_handler::unknown_size): size);
+                    output.begin_string(v, flags & buffer_ignore_reported_sizes? core::stream_handler::unknown_size(): size);
             }
             void string_data_(const value &v, bool)
             {
@@ -522,7 +530,7 @@ namespace cppdatalib
                 return true;
             }
 
-            void begin_array_(const value &v, int_t size, bool)
+            void begin_array_(const value &v, optional_size size, bool)
             {
                 output.begin_array(v, size);
                 output2.begin_array(v, size);
@@ -533,7 +541,7 @@ namespace cppdatalib
                 output2.end_array(v);
             }
 
-            void begin_object_(const value &v, int_t size, bool)
+            void begin_object_(const value &v, optional_size size, bool)
             {
                 output.begin_object(v, size);
                 output2.begin_object(v, size);
@@ -544,7 +552,7 @@ namespace cppdatalib
                 output2.end_object(v);
             }
 
-            void begin_string_(const value &v, int_t size, bool)
+            void begin_string_(const value &v, optional_size size, bool)
             {
                 output.begin_string(v, size);
                 output2.begin_string(v, size);
@@ -620,7 +628,7 @@ namespace cppdatalib
         protected:
             void begin_() {
                 impl::stream_filter_base::begin_();
-                output.begin_array(core::array_t(), core::stream_handler::unknown_size);
+                output.begin_array(core::array_t(), core::stream_handler::unknown_size());
                 m_is_key = 0;
                 m_ignore_key = 0;
                 in_object = false;
@@ -638,7 +646,7 @@ namespace cppdatalib
                 return false;
             }
 
-            void begin_array_(const value &v, int_t size, bool is_key)
+            void begin_array_(const value &v, optional_size size, bool is_key)
             {
                 if (!m_ignore_key && (m_is_key || is_key))
                 {
@@ -655,7 +663,7 @@ namespace cppdatalib
                 }
             }
 
-            void begin_object_(const value &v, int_t size, bool is_key)
+            void begin_object_(const value &v, optional_size size, bool is_key)
             {
                 if (!in_object) // If not handling an object, start one
                 {
@@ -689,7 +697,7 @@ namespace cppdatalib
                     --m_ignore_key;
             }
 
-            void begin_string_(const value &v, int_t size, bool is_key)
+            void begin_string_(const value &v, optional_size size, bool is_key)
             {
                 if (!m_ignore_key && (m_is_key || is_key))
                     output.begin_string(v, size);
@@ -1236,7 +1244,7 @@ namespace cppdatalib
                         i->key_builder.write(v);
             }
 
-            void begin_array_(const value &v, int_t size, bool)
+            void begin_array_(const value &v, optional_size size, bool)
             {
                 output.begin_array(v, size);
                 for (auto i = layers.begin(); i != layers.end(); ++i)
@@ -1251,7 +1259,7 @@ namespace cppdatalib
                         i->key_builder.end_array(v);
             }
 
-            void begin_object_(const value &v, int_t size, bool)
+            void begin_object_(const value &v, optional_size size, bool)
             {
                 output.begin_object(v, size);
                 for (auto i = layers.begin(); i != layers.end(); ++i)
@@ -1268,7 +1276,7 @@ namespace cppdatalib
                         i->key_builder.end_object(v);
             }
 
-            void begin_string_(const value &v, int_t size, bool)
+            void begin_string_(const value &v, optional_size size, bool)
             {
                 output.begin_string(v, size);
                 for (auto i = layers.begin(); i != layers.end(); ++i)
@@ -2681,7 +2689,7 @@ namespace cppdatalib
 
                     if (state == select_element)
                     {
-                        get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                        get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size());
                         get_output()->write(core::value("select"));
                         get_output()->write(select = parse_select_expression());
                         get_output()->end_object(core::value(core::object_t()));
@@ -2703,7 +2711,7 @@ namespace cppdatalib
 
                         if (state == where_element)
                         {
-                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size());
                             get_output()->write(core::value("where"));
                             get_output()->write(where = parse_expression());
                             get_output()->end_object(core::value(core::object_t()));

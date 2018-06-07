@@ -72,7 +72,7 @@ namespace cppdatalib
             {
                 if (nesting_depth() > 0 && get_output()->current_container() != core::array)
                     // We have to start an array for mixed content
-                    get_output()->begin_array(core::value(core::array_t()), core::stream_handler::unknown_size);
+                    get_output()->begin_array(core::value(core::array_t()), core::stream_handler::unknown_size());
 
                 if (content.empty())
                     return;
@@ -140,7 +140,7 @@ namespace cppdatalib
                                 break;
                             case start_tag_was_read:
                                 begin_tag();
-                                get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                                get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size());
                                 get_output()->write(value);
                                 break;
                             case end_tag_was_read:
@@ -148,7 +148,7 @@ namespace cppdatalib
                                 break;
                             case complete_tag_was_read:
                                 begin_tag();
-                                get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                                get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size());
                                 get_output()->write(core::value(value));
                                 get_output()->write(core::value());
                                 end_tag();
@@ -368,7 +368,7 @@ namespace cppdatalib
                     write_name(stream(), current_keys.back());
             }
 
-            void begin_object_(const core::value &, core::int_t, bool)
+            void begin_object_(const core::value &, core::optional_size, bool)
             {
                 current_indent += indent_width;
             }

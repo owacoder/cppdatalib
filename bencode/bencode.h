@@ -77,10 +77,10 @@ namespace cppdatalib
                         }
                         break;
                     case 'l':
-                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
+                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size());
                         break;
                     case 'd':
-                        get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size);
+                        get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size());
                         break;
                     default:
                         if (chr < 0x80 && isdigit(chr))
@@ -146,19 +146,19 @@ namespace cppdatalib
                 stream().put('e');
             }
             void real_(const core::value &) {throw core::error("Bencode - 'real' value not allowed in output");}
-            void begin_string_(const core::value &, core::int_t size, bool)
+            void begin_string_(const core::value &, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("Bencode - 'string' value does not have size specified");
-                stream() << size;
+                stream() << size.value();
                 stream().put(':');
             }
             void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
 
-            void begin_array_(const core::value &, core::int_t, bool) {stream().put('l');}
+            void begin_array_(const core::value &, core::optional_size, bool) {stream().put('l');}
             void end_array_(const core::value &, bool) {stream().put('e');}
 
-            void begin_object_(const core::value &, core::int_t, bool) {stream().put('d');}
+            void begin_object_(const core::value &, core::optional_size, bool) {stream().put('d');}
             void end_object_(const core::value &, bool) {stream().put('e');}
         };
 

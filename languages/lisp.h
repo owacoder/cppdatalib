@@ -71,14 +71,14 @@ namespace cppdatalib
                 }
 
                 // TODO: Strings should be escaped (if it's even possible) for Lisp
-                void begin_string_(const core::value &, core::int_t, bool) {stream().put('"');}
+                void begin_string_(const core::value &, core::optional_size, bool) {stream().put('"');}
                 void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
                 void end_string_(const core::value &, bool) {stream().put('"');}
 
-                void begin_array_(const core::value &, core::int_t, bool) {stream().write("(list ", 6);}
+                void begin_array_(const core::value &, core::optional_size, bool) {stream().write("(list ", 6);}
                 void end_array_(const core::value &, bool) {stream().put(')');}
 
-                void begin_object_(const core::value &, core::int_t, bool) {stream().write("(list ", 6);}
+                void begin_object_(const core::value &, core::optional_size, bool) {stream().write("(list ", 6);}
                 void end_object_(const core::value &, bool) {stream().put(')');}
             };
 

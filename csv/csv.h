@@ -124,7 +124,7 @@ namespace cppdatalib
 
                 if (parse_as_strings)
                 {
-                    writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+                    writer.begin_string(core::string_t(), core::stream_handler::unknown_size());
 
                     // buffer is used to temporarily store whitespace for reading strings
                     while (chr = stream().get(), chr != EOF && chr != separator && chr != '\n')
@@ -173,7 +173,7 @@ namespace cppdatalib
 
                 if (parse_as_strings)
                 {
-                    writer.begin_string(core::string_t(), core::stream_handler::unknown_size);
+                    writer.begin_string(core::string_t(), core::stream_handler::unknown_size());
 
                     // buffer is used to temporarily store whitespace for reading strings
                     while (chr = stream().get(), chr != EOF)
@@ -254,13 +254,13 @@ namespace cppdatalib
                 int chr;
 
                 if (was_just_reset())
-                    get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
+                    get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size());
 
                 if (chr = stream().get(), chr != EOF)
                 {
                     if (newline_just_parsed)
                     {
-                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
+                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size());
                         newline_just_parsed = false;
                     }
 
@@ -370,12 +370,12 @@ namespace cppdatalib
             void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v) {stream() << v.get_real_unchecked();}
-            void begin_string_(const core::value &, core::int_t, bool) {stream().put('"');}
+            void begin_string_(const core::value &, core::optional_size, bool) {stream().put('"');}
             void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
             void end_string_(const core::value &, bool) {stream().put('"');}
 
-            void begin_array_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'array' value not allowed in row output");}
-            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
+            void begin_array_(const core::value &, core::optional_size, bool) {throw core::error("CSV - 'array' value not allowed in row output");}
+            void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("CSV - 'object' value not allowed in output");}
         };
 
         class stream_writer : public impl::stream_writer_base
@@ -405,16 +405,16 @@ namespace cppdatalib
             void integer_(const core::value &v) {stream() << v.get_int_unchecked();}
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v) {stream() << v.get_real_unchecked();}
-            void begin_string_(const core::value &, core::int_t, bool) {stream().put('"');}
+            void begin_string_(const core::value &, core::optional_size, bool) {stream().put('"');}
             void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
             void end_string_(const core::value &, bool) {stream().put('"');}
 
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 if (nesting_depth() == 2)
                     throw core::error("CSV - 'array' value not allowed in row output");
             }
-            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("CSV - 'object' value not allowed in output");}
+            void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("CSV - 'object' value not allowed in output");}
         };
 
         inline core::value from_csv_table(core::istream_handle stream, char separator = ',', parser::options opts = parser::convert_fields_by_deduction)

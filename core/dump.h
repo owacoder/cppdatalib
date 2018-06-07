@@ -197,14 +197,14 @@ namespace cppdatalib
                         else
                             stream() << v.get_real_unchecked();
                     }
-                    void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
+                    void begin_string_(const core::value &v, core::optional_size, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
                     void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
                     void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
 
-                    void begin_array_(const core::value &, core::int_t, bool) {stream().put('[');}
+                    void begin_array_(const core::value &, core::optional_size, bool) {stream().put('[');}
                     void end_array_(const core::value &, bool) {stream().put(']');}
 
-                    void begin_object_(const core::value &, core::int_t, bool) {stream().put('{');}
+                    void begin_object_(const core::value &, core::optional_size, bool) {stream().put('{');}
                     void end_object_(const core::value &, bool) {stream().put('}');}
                 };
             }
@@ -348,11 +348,11 @@ namespace cppdatalib
                     else
                         stream() << v.get_real_unchecked();
                 }
-                void begin_string_(const core::value &v, core::int_t, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
+                void begin_string_(const core::value &v, core::optional_size, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
                 void string_data_(const core::value &v, bool) {write_string(stream(), v.get_string_unchecked());}
                 void end_string_(const core::value &v, bool is_key) {if (v.get_subtype() != core::bignum || is_key) stream().put('"');}
 
-                void begin_array_(const core::value &, core::int_t, bool)
+                void begin_array_(const core::value &, core::optional_size, bool)
                 {
                     stream().put('[');
                     current_indent += indent_width;
@@ -370,7 +370,7 @@ namespace cppdatalib
                     stream().put(']');
                 }
 
-                void begin_object_(const core::value &, core::int_t, bool)
+                void begin_object_(const core::value &, core::optional_size, bool)
                 {
                     stream().put('{');
                     current_indent += indent_width;

@@ -188,22 +188,22 @@ namespace cppdatalib
                 stream().put(',');
             }
 
-            void begin_string_(const core::value &, core::int_t size, bool)
+            void begin_string_(const core::value &, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("Netstrings - 'string' value does not have size specified");
 
-                stream() << size;
+                stream() << size.value();
                 stream().put(':');
             }
             void string_data_(const core::value &v, bool) {stream() << v.get_string_unchecked();}
             void end_string_(const core::value &, bool) {stream().put(',');}
 
-            void begin_array_(const core::value &v, core::int_t size, bool)
+            void begin_array_(const core::value &v, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("Netstrings - 'array' value does not have size specified");
-                else if (v.size() != static_cast<size_t>(size))
+                else if (v.size() != size.value())
                     throw core::error("Netstrings - entire 'array' value must be buffered before writing");
 
                 stream() << get_size(v);
@@ -211,11 +211,11 @@ namespace cppdatalib
             }
             void end_array_(const core::value &, bool) {stream().put(',');}
 
-            void begin_object_(const core::value &v, core::int_t size, bool)
+            void begin_object_(const core::value &v, core::optional_size size, bool)
             {
-                if (size == unknown_size)
+                if (size.empty())
                     throw core::error("Netstrings - 'object' value does not have size specified");
-                else if (v.size() != static_cast<size_t>(size))
+                else if (v.size() != size.value())
                     throw core::error("Netstrings - entire 'object' value must be buffered before writing");
 
                 stream() << get_size(v);

@@ -739,7 +739,7 @@ void test_attributes()
         cppdatalib::json::stream_writer writer(std::cout);
 
         writer.begin();
-        writer.begin_array(cppdatalib::core::array_t(), 11 /*cppdatalib::core::stream_handler::unknown_size*/);
+        writer.begin_array(cppdatalib::core::array_t(), 11 /*cppdatalib::core::stream_handler::unknown_size()*/);
         //writer.write_out_of_order(1000000, 100);
         writer.write_out_of_order(9, 10);
         writer.write_out_of_order(6, 6);
@@ -1113,6 +1113,7 @@ int main(int argc, char **argv)
         }
 
         if (in_extension == "benc") input.reset(new cppdatalib::bencode::parser(*infile.get()));
+        else if (in_extension == "bjson") input.reset(new cppdatalib::bjson::parser(*infile.get()));
         else if (in_extension == "binn") input.reset(new cppdatalib::binn::parser(*infile.get()));
         else if (in_extension == "bson") input.reset(new cppdatalib::bson::parser(*infile.get()));
         else if (in_extension == "csv") input.reset(new cppdatalib::csv::parser(*infile.get()));
@@ -1184,12 +1185,10 @@ int main(int argc, char **argv)
         input.get()->end();
 #else
         cppdatalib::core::automatic_buffer_filter buffer(*output.get());
-        cppdatalib::json::pretty_stream_writer json(std::cout, 2);
-        cppdatalib::core::sql_select_filter sql(json, "select name, phone");
 
         clock_t start = clock();
 
-        *input.get() >> sql;
+        *input.get() >> buffer;
 
 		double dur = double(clock() - start) / CLOCKS_PER_SEC;
 		std::cout << std::setprecision(16);

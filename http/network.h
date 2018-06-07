@@ -149,7 +149,7 @@ namespace cppdatalib
                         string_type.add_attribute_at_end(core::value(header.first.toStdString()), core::value(header.second.toStdString()));
 #endif
 
-                    get_output()->begin_string(string_type, core::stream_handler::unknown_size);
+                    get_output()->begin_string(string_type, core::stream_handler::unknown_size());
                 }
 
                 if (reply->isFinished())
@@ -343,7 +343,7 @@ namespace cppdatalib
 #endif
                     }
 
-                    get_output()->begin_string(string_type, core::stream_handler::unknown_size);
+                    get_output()->begin_string(string_type, core::stream_handler::unknown_size());
                     while (true)
                     {
                         in->read(buffer.get(), core::buffer_size);
@@ -564,7 +564,7 @@ namespace cppdatalib
 #endif
                     }
 
-                    get_output()->begin_string(string_type, core::stream_handler::unknown_size);
+                    get_output()->begin_string(string_type, core::stream_handler::unknown_size());
                     while (true)
                     {
                         in->read(buffer.get(), core::buffer_size);

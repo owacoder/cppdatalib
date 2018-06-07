@@ -30,7 +30,7 @@ Supported formats include
 
    - [Bencode](https://en.wikipedia.org/wiki/Bencode)
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
-   - [BJSON](http://bjson.org/) (write-only)
+   - [BJSON](http://bjson.org/)
    - [BSON](http://bsonspec.org/spec.html) (read-only)
    - [CSV](https://tools.ietf.org/html/rfc4180) (allows user-defined delimiter)
    - [DIF](https://en.wikipedia.org/wiki/Data_Interchange_Format) (write-only, requires table dimensions prior to writing to create well-formed output)
@@ -183,7 +183,7 @@ int main()
     try {
         json::parser(std::cin) >> json::stream_writer(std::cout);        // Write core::value out to STDOUT as JSON
     } catch (const core::error &e) {
-        std::cerr << e.what() << std::endl; // Catch any errors that might have occured (syntax or logical)
+        std::cerr << e.what() << std::endl; // Catch ainnny errors that might have occured (syntax or logical)
     }
 
     return 0;
@@ -314,12 +314,12 @@ To create a new output format, follow the following guidelines:
       - `void integer_(const core::value &v);` - Called when a scalar `integer` is written. The default implementation does nothing.
       - `void uinteger_(const core::value &v);` - Called when a scalar `uinteger` is written. The default implementation does nothing.
       - `void real_(const core::value &v);` - Called when a scalar `real` is written. The default implementation does nothing.
-      - `void begin_string_(const core::value &v, core::int_t size, bool is_key);` - Called when starting to parse a string. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size`. If `v.size()` is equal to `size`, the entire string is available for analysis. `is_key` is true if the string is an object key. The default implementation does nothing.
+      - `void begin_string_(const core::value &v, core::optional_size size, bool is_key);` - Called when starting to parse a string. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size()`. If `v.size()` is equal to `size`, the entire string is available for analysis. `is_key` is true if the string is an object key. The default implementation does nothing.
       - `void string_data_(const core::value &v, bool is_key);` - Called when data is available to append to a string. The string is contained in `v`. `is_key` is true if the string currently being parsed is an object key. The default implementation does nothing.
       - `void end_string_(const core::value &v, bool is_key);` - Called when ending parsing of a string. `is_key` is true if the string is an object key. The default implementation does nothing.
-      - `void begin_array_(const core::value &v, core::int_t size, bool is_key);` - Called when starting to parse an array. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size`. If `v.size()` is equal to `size`, the entire array is available for analysis. `is_key` is true if the array is an object key. The default implementation does nothing.
+      - `void begin_array_(const core::value &v, core::optional_size size, bool is_key);` - Called when starting to parse an array. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size()`. If `v.size()` is equal to `size`, the entire array is available for analysis. `is_key` is true if the array is an object key. The default implementation does nothing.
       - `void end_array_(const core::value &v, bool is_key);` - Called when ending parsing of an array. `is_key` is true if the array is an object key. The default implementation does nothing.
-      - `void begin_object_(const core::value &v, core::int_t size, bool is_key);` - Called when starting to parse an object. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size`. If `v.size()` is equal to `size`, the entire object is available for analysis. `is_key` is true if the object is an object key. The default implementation does nothing.
+      - `void begin_object_(const core::value &v, core::optional_size size, bool is_key);` - Called when starting to parse an object. The size, if known, is passed in `size`. If the size is unknown, `size` is equal to `stream_handler::unknown_size()`. If `v.size()` is equal to `size`, the entire object is available for analysis. `is_key` is true if the object is an object key. The default implementation does nothing.
       - `void end_object_(const core::value &v, bool is_key);` - Called when ending parsing of an object. `is_key` is true if the object is an object key. The default implementation does nothing.
    3. All data should be written via the member function `core::ostream &output_stream();`
    4. Required buffering features should be provided by member function `unsigned int required_features() const;` The available features are `const` members of the `core::stream_handler` class. The default implementation returns `stream_handler::requires_none`.
@@ -464,6 +464,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
      Notes:
        - `string` subtypes `blob` and `clob` are supported.
        - The BJSON `string` type is used to identify UTF-8 strings, and the BJSON `binary` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
+       - Negative values too large for the internal type are converted to `bignum` internally.
        - Numerical metadata is lost when converting to and from BJSON.
 
    - BSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>

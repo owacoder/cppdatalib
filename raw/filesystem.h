@@ -141,7 +141,7 @@ namespace cppdatalib
                     if (was_just_reset())
                     {
                         if (fs::is_directory(root_path))
-                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size());
                         else
                         {
                             if ((file_options & skip_file_reading) == 0)
@@ -275,7 +275,7 @@ namespace cppdatalib
 #endif
 
                             get_output()->write(v);
-                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size);
+                            get_output()->begin_object(core::value(core::object_t()), core::stream_handler::unknown_size());
                             break;
                         case fs::file_type::regular:
                         case fs::file_type::unknown: // Exists, but unknown type. Attempt to read it
@@ -416,7 +416,7 @@ namespace cppdatalib
                 else
                     stream << v.get_real_unchecked();
             }
-            void begin_string_(const core::value &v, core::int_t, bool is_key)
+            void begin_string_(const core::value &v, core::optional_size, bool is_key)
             {
                 if (is_key)
                 {
@@ -432,7 +432,7 @@ namespace cppdatalib
                     stream << v.get_string_unchecked();
             }
 
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 if (nesting_depth() > 0)
                 {
@@ -472,7 +472,7 @@ namespace cppdatalib
                 }
             }
 
-            void begin_object_(const core::value &, core::int_t, bool)
+            void begin_object_(const core::value &, core::optional_size, bool)
             {
                 if (nesting_depth() > 0)
                 {

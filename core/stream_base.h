@@ -73,9 +73,9 @@ namespace cppdatalib
                     , subtype_(normal)
                     , parsed_key_(false)
                     , items_(0)
-                    , reported_size_(-1)
+                    , reported_size_()
                 {}
-                scope_data(type t, subtype_t s, core::int_t reported_size, bool parsed_key = false)
+                scope_data(type t, subtype_t s, optional_size reported_size, bool parsed_key = false)
                     : type_(t)
                     , subtype_(s)
                     , parsed_key_(parsed_key)
@@ -87,13 +87,13 @@ namespace cppdatalib
                 subtype_t get_subtype() const {return subtype_;}
                 uintmax_t items_parsed() const {return items_;}
                 bool key_was_parsed() const {return parsed_key_;}
-                int_t reported_size() const {return reported_size_;}
+                optional_size reported_size() const {return reported_size_;}
 
                 type type_; // The type of container that is being parsed
                 subtype_t subtype_; // The subtype of container that is being parsed
                 bool parsed_key_; // false if the object key needs to be or is being parsed, true if it has already been parsed but the value associated with it has not
                 uintmax_t items_; // The number of items parsed into this container
-                int_t reported_size_; // The number of items reported to be in this container
+                optional_size reported_size_; // The number of items reported to be in this container
             };
 
             bool active_;
@@ -127,13 +127,11 @@ namespace cppdatalib
             // an element to be written in a single write() call
             static const unsigned int requires_single_write = 0x7f;
 
-            enum {
-                unknown_size = -1 // No other negative value besides unknown_size should be used for the `size` parameters of handlers
-            };
+            static optional_size unknown_size() {return {};}
 
             stream_handler() : active_(false), is_key_(false)
             {
-                nested_scopes.push_back(scope_data(null, normal, unknown_size));
+                nested_scopes.push_back(scope_data(null, normal, unknown_size()));
             }
             virtual ~stream_handler() {}
 
@@ -156,7 +154,7 @@ namespace cppdatalib
 
                 active_ = true;
                 nested_scopes = decltype(nested_scopes)();
-                nested_scopes.push_back(scope_data(null, normal, unknown_size));
+                nested_scopes.push_back(scope_data(null, normal, unknown_size()));
                 out_of_order_buffer.clear();
                 is_key_ = false;
                 begin_();
@@ -199,8 +197,8 @@ namespace cppdatalib
             // (begins at 0 with no elements, the first element is handled, then it increments to 1)
             uintmax_t current_container_size() const {return nested_scopes.back().items_parsed();}
 
-            // Reported container size (if known, the exact reported size is returned, otherwise `unknown_size`)
-            int_t current_container_reported_size() const {return nested_scopes.back().reported_size();}
+            // Reported container size (if known, the exact reported size is returned, otherwise `unknown_size()`)
+            optional_size current_container_reported_size() const {return nested_scopes.back().reported_size();}
 
             // Returns true if this is an object and a value of a key/value pair is expected
             bool container_key_was_just_parsed() const {return nested_scopes.back().key_was_parsed();}
@@ -263,7 +261,7 @@ namespace cppdatalib
                             case temporary_string:
 #endif
                                 begin_string_(v, v.string_size(), is_key);
-                                nested_scopes.push_back({v.get_type(), v.get_subtype(), core::int_t(v.string_size())});
+                                nested_scopes.push_back({v.get_type(), v.get_subtype(), v.string_size()});
                                 remove_scope = true;
                                 string_data_(v, is_key);
                                 end_string_(v, is_key);
@@ -366,8 +364,8 @@ namespace cppdatalib
 
                 if (current_container() != array)
                     throw error("cppdatalib::core::stream_handler - An out-of-order write can only be performed while writing an array");
-                else if (current_container_reported_size() != unknown_size &&
-                         uintmax_t(current_container_reported_size()) <= idx)
+                else if (!current_container_reported_size().empty() &&
+                         current_container_reported_size().value() <= idx)
                     throw error("cppdatalib::core::stream_handler - An out-of-order write was attempted beyond reported array bounds");
 
                 if (write_out_of_order_(idx, v, false))
@@ -443,7 +441,7 @@ namespace cppdatalib
             // Note that the provided string may be a temporary_string, which MUST be converted to a real string!
             // Note that if begin_string_() is provided the entire string (size equal to specified size) it may be assumed there will be no more input.
             // Note that string_data_() and end_string_() require that `v` be of the same subtype as the original string passed to begin_string_()
-            virtual void begin_string_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
+            virtual void begin_string_(const core::value &v, optional_size size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void string_data_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
             virtual void string_data_(core::value &&v, bool is_key) {string_data_(v, is_key);}
             virtual void end_string_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
@@ -459,10 +457,10 @@ namespace cppdatalib
             //
             // If the length of v is equal to size, the entire string is provided
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
-            void begin_string(string_view_t v, core::int_t size) {begin_string(value(v), size);}
+            void begin_string(string_view_t v, optional_size size) {begin_string(value(v), size);}
 #endif
-            void begin_string(const string_t &v, core::int_t size) {begin_string(value(v), size);}
-            void begin_string(const core::value &v, core::int_t size)
+            void begin_string(const string_t &v, optional_size size) {begin_string(value(v), size);}
+            void begin_string(const core::value &v, optional_size size)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
@@ -545,8 +543,8 @@ namespace cppdatalib
                     throw error("cppdatalib::core::stream_handler - attempted to end string with non-string value");
 #endif
 
-                if (current_container_reported_size() != unknown_size &&
-                        uintmax_t(current_container_reported_size()) != current_container_size())
+                if (!current_container_reported_size().empty() &&
+                    current_container_reported_size().value() != current_container_size())
                     throw error("cppdatalib::core::stream_handler - reported string size and actual string size do not match");
 
                 if (is_key_)
@@ -573,8 +571,8 @@ namespace cppdatalib
             // An API must call these when an array is parsed. The number of elements is passed in size, if possible
             // size == -1 means unknown size
             // If the number of elements of v is equal to size, the entire array is provided
-            void begin_array(const core::array_t &v, core::int_t size) {begin_array(value(v), size);}
-            void begin_array(const core::value &v, core::int_t size)
+            void begin_array(const core::array_t &v, optional_size size) {begin_array(value(v), size);}
+            void begin_array(const core::value &v, optional_size size)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
@@ -625,13 +623,13 @@ namespace cppdatalib
 
                     // If unknown size, assume the highest index written to is the end of the array
                     // Otherwise, fill to the reported size
-                    if (current_container_reported_size() != unknown_size)
-                        while (current_container_size() < uintmax_t(current_container_reported_size()))
+                    if (!current_container_reported_size().empty())
+                        while (current_container_size() < current_container_reported_size().value())
                             write(core::value());
                 }
 
-                if (current_container_reported_size() != unknown_size &&
-                        uintmax_t(current_container_reported_size()) != current_container_size())
+                if (!current_container_reported_size().empty() &&
+                        current_container_reported_size().value() != current_container_size())
                     throw error("cppdatalib::core::stream_handler - reported array size and actual array size do not match");
 
                 if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
@@ -659,8 +657,8 @@ namespace cppdatalib
             // An API must call these when an object is parsed. The number of key/value pairs is passed in size, if possible
             // size == -1 means unknown size
             // If the number of elements of v is equal to size, the entire object is provided
-            void begin_object(const core::object_t &v, core::int_t size) {begin_object(value(v), size);}
-            void begin_object(const core::value &v, core::int_t size)
+            void begin_object(const core::object_t &v, optional_size size) {begin_object(value(v), size);}
+            void begin_object(const core::value &v, optional_size size)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
 
@@ -697,8 +695,8 @@ namespace cppdatalib
                     throw error("cppdatalib::core::stream_handler - attempted to end object with non-object value");
 #endif
 
-                if (current_container_reported_size() != unknown_size &&
-                        uintmax_t(current_container_reported_size()) != current_container_size())
+                if (!current_container_reported_size().empty() &&
+                        current_container_reported_size().value() != current_container_size())
                     throw error("cppdatalib::core::stream_handler - reported object size and actual object size do not match");
 
                 if (nested_scopes[nested_scopes.size() - 2].get_type() == object &&
@@ -728,14 +726,14 @@ namespace cppdatalib
             // If the size of v is equal to `size`, the entire array is provided
             // Note that if begin_array_() is provided the entire array (size equal to specified size) it may be assumed there will be no more input for this array.
             // Note that end_array_() requires that `v` be of the same subtype as the original array passed to begin_array_()
-            virtual void begin_array_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
+            virtual void begin_array_(const core::value &v, optional_size size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void end_array_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
             // Overloads to detect beginnings and ends of objects
             // If the size of v is equal to `size`, the entire object is provided
             // Note that if begin_object_() is provided the entire object (size equal to specified size) it may be assumed there will be no more input for this object.
             // Note that end_object_() requires that `v` be of the same subtype as the original object passed to begin_object_()
-            virtual void begin_object_(const core::value &v, core::int_t size, bool is_key) {(void) v; (void) size; (void) is_key;}
+            virtual void begin_object_(const core::value &v, optional_size size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void end_object_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
             core::cache_vector_n<scope_data, core::cache_size> nested_scopes; // Used as a stack, but not a stack so we can peek below the top

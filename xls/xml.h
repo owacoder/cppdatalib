@@ -95,12 +95,12 @@ namespace cppdatalib
             void real_(const core::value &v) {stream() << v.get_real_unchecked();}
             void string_data_(const core::value &v, bool) {write_element_content(stream(), v.get_string_unchecked());}
 
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 if (nesting_depth() == 2)
                     throw core::error("XML XLS - 'array' value not allowed in row output");
             }
-            void begin_object_(const core::value &, core::int_t, bool) {throw core::error("XML XLS - 'object' value not allowed in output");}
+            void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("XML XLS - 'object' value not allowed in output");}
         };
 
         class worksheet_writer : public table_writer

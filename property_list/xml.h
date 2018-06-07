@@ -54,7 +54,7 @@ namespace cppdatalib
             void integer_(const core::value &v) {stream() << "<integer>" << v.get_int_unchecked() << "</integer>";}
             void uinteger_(const core::value &v) {stream() << "<integer>" << v.get_uint_unchecked() << "</integer>";}
             void real_(const core::value &v) {stream() << "<real>" << v.get_real_unchecked() << "</real>";}
-            void begin_string_(const core::value &v, core::int_t, bool is_key)
+            void begin_string_(const core::value &v, core::optional_size, bool is_key)
             {
                 if (is_key)
                     stream() << "<key>";
@@ -99,10 +99,10 @@ namespace cppdatalib
                     }
             }
 
-            void begin_array_(const core::value &, core::int_t, bool) {stream() << "<array>";}
+            void begin_array_(const core::value &, core::optional_size, bool) {stream() << "<array>";}
             void end_array_(const core::value &, bool) {stream() << "</array>";}
 
-            void begin_object_(const core::value &, core::int_t, bool) {stream() << "<dict>";}
+            void begin_object_(const core::value &, core::optional_size, bool) {stream() << "<dict>";}
             void end_object_(const core::value &, bool) {stream() << "</dict>";}
         };
 
@@ -172,7 +172,7 @@ namespace cppdatalib
                 stream() << v.get_real_unchecked() << '\n'; output_padding(current_indent);
                 stream() << "</real>";
             }
-            void begin_string_(const core::value &v, core::int_t, bool is_key)
+            void begin_string_(const core::value &v, core::optional_size, bool is_key)
             {
                 if (is_key)
                     stream() << "<key>";
@@ -223,7 +223,7 @@ namespace cppdatalib
                     }
             }
 
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 stream() << "<array>";
                 current_indent += indent_width;
@@ -238,7 +238,7 @@ namespace cppdatalib
                 stream() << "</array>";
             }
 
-            void begin_object_(const core::value &, core::int_t, bool)
+            void begin_object_(const core::value &, core::optional_size, bool)
             {
                 stream() << "<dict>";
                 current_indent += indent_width;

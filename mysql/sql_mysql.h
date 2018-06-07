@@ -290,7 +290,7 @@ namespace cppdatalib
 
                         columns = mysql_num_fields(result);
 
-                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size);
+                        get_output()->begin_array(core::array_t(), core::stream_handler::unknown_size());
                     }
 
                     if ((row = mysql_fetch_row(result)) != NULL)
@@ -485,7 +485,7 @@ namespace cppdatalib
                         mysql_free_result(result);
                         result = NULL;
 
-                        get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size);
+                        get_output()->begin_object(core::object_t(), core::stream_handler::unknown_size());
                     }
 
                     if (tbl_parser.busy())
@@ -669,11 +669,11 @@ namespace cppdatalib
                 stream << v.get_uint();
                 insert_query += impl::escape(mysql, stream.str());
             }
-            void begin_string_(const core::value &, core::int_t, bool) {buffer_string.clear();}
+            void begin_string_(const core::value &, core::optional_size, bool) {buffer_string.clear();}
             void string_data_(const core::value &v, bool) {buffer_string += v.get_string();}
             void end_string_(const core::value &, bool) {insert_query += '"' + impl::escape(mysql, buffer_string) + '"';}
 
-            void begin_array_(const core::value &, core::int_t, bool)
+            void begin_array_(const core::value &, core::optional_size, bool)
             {
                 if (nesting_depth() > 0)
                     insert_query = "INSERT INTO " + table + " " + column_names + " VALUES (";
@@ -694,7 +694,7 @@ namespace cppdatalib
                 insert_query.clear();
             }
 
-            void begin_object_(const core::value &, core::int_t, bool)
+            void begin_object_(const core::value &, core::optional_size, bool)
             {
                 throw core::error("MySQL - 'object' values not allowed in output");
             }
