@@ -40,6 +40,7 @@ Supported formats include
    - MySQL (database/table retrieval and writing)
    - [Netstrings](https://en.wikipedia.org/wiki/Netstring) (write-only)
    - [plain text property lists](http://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSPropertyList.html)
+   - [PSON](https://github.com/dcodeIO/PSON)
    - [TSV](https://en.wikipedia.org/wiki/Tab-separated_values) (allows user-defined delimiter)
    - [UBJSON](http://ubjson.org/)
    - Raw [XML](https://www.w3.org/TR/xml/) (write-only)
@@ -465,7 +466,7 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - `string` subtypes `blob` and `clob` are supported.
        - The BJSON `string` type is used to identify UTF-8 strings, and the BJSON `binary` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
        - Negative values too large for the internal type are converted to `bignum` internally.
-       - Numerical metadata is lost when converting to and from BJSON.
+       - Numerical metadata of integers is lost when converting to and from BJSON.
 
    - BSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
      Notes:
@@ -524,6 +525,13 @@ If a format-defined limit is reached, such as an object key length limit, an err
        - integers are limited to two's complement 64-bit integers when reading.
        - `string` subtypes `date`, `time`, and `datetime` are supported.
        - Numerical metadata is lost when converting to and from plain text property lists.
+
+   - PSON supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `blob` and `clob` are supported.
+       - The PSON `string` type is used to identify UTF-8 strings, and the PSON `binary` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
+       - integers are limited to two's complement 64-bit integers when reading and writing.
+       - Numerical metadata of integers is lost when converting to and from PSON.
 
    - TSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:

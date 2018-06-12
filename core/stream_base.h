@@ -364,7 +364,7 @@ namespace cppdatalib
 
                 if (current_container() != array)
                     throw error("cppdatalib::core::stream_handler - An out-of-order write can only be performed while writing an array");
-                else if (!current_container_reported_size().empty() &&
+                else if (current_container_reported_size().has_value() &&
                          current_container_reported_size().value() <= idx)
                     throw error("cppdatalib::core::stream_handler - An out-of-order write was attempted beyond reported array bounds");
 
@@ -543,7 +543,7 @@ namespace cppdatalib
                     throw error("cppdatalib::core::stream_handler - attempted to end string with non-string value");
 #endif
 
-                if (!current_container_reported_size().empty() &&
+                if (current_container_reported_size().has_value() &&
                     current_container_reported_size().value() != current_container_size())
                     throw error("cppdatalib::core::stream_handler - reported string size and actual string size do not match");
 
@@ -623,12 +623,12 @@ namespace cppdatalib
 
                     // If unknown size, assume the highest index written to is the end of the array
                     // Otherwise, fill to the reported size
-                    if (!current_container_reported_size().empty())
+                    if (current_container_reported_size().has_value())
                         while (current_container_size() < current_container_reported_size().value())
                             write(core::value());
                 }
 
-                if (!current_container_reported_size().empty() &&
+                if (current_container_reported_size().has_value() &&
                         current_container_reported_size().value() != current_container_size())
                     throw error("cppdatalib::core::stream_handler - reported array size and actual array size do not match");
 
@@ -695,7 +695,7 @@ namespace cppdatalib
                     throw error("cppdatalib::core::stream_handler - attempted to end object with non-object value");
 #endif
 
-                if (!current_container_reported_size().empty() &&
+                if (current_container_reported_size().has_value() &&
                         current_container_reported_size().value() != current_container_size())
                     throw error("cppdatalib::core::stream_handler - reported object size and actual object size do not match");
 

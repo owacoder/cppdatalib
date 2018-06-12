@@ -796,6 +796,10 @@ namespace cppdatalib
                         case array:
                         case object: swap(ptr_, other.ptr_); break;
                     }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    swap(attr_, other.attr_);
+#endif
                 }
                 else
                 {

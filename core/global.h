@@ -39,8 +39,10 @@
 #if defined(__x86_64) || defined(__x86_64__) || defined(__amd64) || defined(__amd64__) || defined(_M_X64) || defined(_M_AMD64)
 #define CPPDATALIB_X86_64
 #define CPPDATALIB_X86
+#define CPPDATALIB_LITTLE_ENDIAN
 #elif defined(i386) || defined(__i386) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__) || defined(__IA32__) || defined(_M_I86) || defined(_M_IX86) || defined(__X86__) || defined(_X86_) || defined(__I86__) || defined(__THW_INTEL__) || defined(__INTEL__) || defined(__386)
 #define CPPDATALIB_X86
+#define CPPDATALIB_LITTLE_ENDIAN
 #endif
 
 #if __cplusplus >= 201703L
@@ -133,8 +135,6 @@ namespace cppdatalib
         {
             optional() : val_{}, used_(false) {}
             optional(T v) : val_(v), used_(true) {}
-            template<typename U, typename std::enable_if<!std::is_same<T, U>::value>::type = 0>
-            optional(U v) : val_(v), used_(true) {}
 
             optional &operator=(T v) {val_ = v; used_ = true; return *this;}
 
@@ -152,9 +152,12 @@ namespace cppdatalib
             bool operator!=(const optional<U> &other) {return !(*this == other);}
 
             T value() const {return val_;}
+            const T *operator->() const {return &val_;}
+            T operator*() const {return val_;}
 
-            bool empty() const {return !used_;}
-            void clear() {val_ = {}; used_ = false;}
+            explicit operator bool() const {return has_value();}
+            bool has_value() const {return used_;}
+            void reset() {val_ = {}; used_ = false;}
 
         private:
             T val_;

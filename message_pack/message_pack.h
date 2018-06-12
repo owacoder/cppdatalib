@@ -490,7 +490,7 @@ namespace cppdatalib
             void real_(const core::value &v) {write_float(stream(), v.get_real_unchecked());}
             void begin_string_(const core::value &v, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("MessagePack - 'string' value does not have size specified");
                 else if (size.value() > UINT32_MAX)
 					throw core::error("MessagePack - 'string' value is too large");
@@ -501,7 +501,7 @@ namespace cppdatalib
 
             void begin_array_(const core::value &, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("MessagePack - 'array' value does not have size specified");
                 else if (size.value() <= 15)
                     stream().put(static_cast<char>(0x90 + size.value()));
@@ -519,7 +519,7 @@ namespace cppdatalib
 
             void begin_object_(const core::value &, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("MessagePack - 'object' value does not have size specified");
                 else if (size.value() <= 15)
                     stream().put(static_cast<char>(0x80 + size.value()));

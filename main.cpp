@@ -1120,6 +1120,7 @@ int main(int argc, char **argv)
         else if (in_extension == "tsv") input.reset(new cppdatalib::tsv::parser(*infile.get()));
         else if (in_extension == "json") input.reset(new cppdatalib::json::parser(*infile.get()));
         else if (in_extension == "mpk") input.reset(new cppdatalib::message_pack::parser(*infile.get()));
+        else if (in_extension == "pson") input.reset(new cppdatalib::pson::parser(*infile.get()));
         else if (in_extension == "ubjson") input.reset(new cppdatalib::ubjson::parser(*infile.get()));
 #ifdef CPPDATALIB_ENABLE_XML
         else if (in_extension == "xml") input.reset(new cppdatalib::xml::parser(*infile.get(), false));
@@ -1162,6 +1163,7 @@ int main(int argc, char **argv)
         else if (out_extension == "json") output.reset(new cppdatalib::json::stream_writer(*outfile.get()));
         else if (out_extension == "mpk") output.reset(new cppdatalib::message_pack::stream_writer(*outfile.get()));
         else if (out_extension == "netstrings") output.reset(new cppdatalib::netstrings::stream_writer(*outfile.get()));
+        else if (out_extension == "pson") output.reset(new cppdatalib::pson::stream_writer(*outfile.get()));
         else if (out_extension == "ubjson") output.reset(new cppdatalib::ubjson::stream_writer(*outfile.get()));
 #ifdef CPPDATALIB_ENABLE_XML
         else if (out_extension == "xlsx") output.reset(new cppdatalib::xml_xls::document_writer(*outfile.get(), "Worksheet 1"));
@@ -1192,9 +1194,9 @@ int main(int argc, char **argv)
 
 		double dur = double(clock() - start) / CLOCKS_PER_SEC;
 		std::cout << std::setprecision(16);
-        std::cout << "Total Input: " << cppdatalib::core::used_buffer(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream()) << " bytes in " << dur << " seconds (" << uint64_t(cppdatalib::core::used_buffer(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream()) / dur) << " Bytes/S)\n";
+        std::cout << "Total Input: " << cppdatalib::core::used_buffer(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream()) << " bytes in " << dur << " seconds (" << uint64_t(cppdatalib::core::used_buffer(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream()) / dur) << " Bytes/S, or " << uint64_t(cppdatalib::core::used_buffer(dynamic_cast<cppdatalib::core::stream_parser*>(input.get())->stream()) / dur)*8/double(1000000) << " Mbits/S)\n";
 		if (outfile.get())
-			std::cout << "Total Output: " << uint64_t(outfile.get()->tellp()) << " bytes in " << dur << " seconds (" << uint64_t(outfile.get()->tellp() / dur) << " Bytes/S)\n";
+            std::cout << "Total Output: " << uint64_t(outfile.get()->tellp()) << " bytes in " << dur << " seconds (" << uint64_t(outfile.get()->tellp() / dur) << " Bytes/S, or " << uint64_t(outfile.get()->tellp() / dur)*8/double(1000000) << " Mbits/S)\n";
 #endif
     }
     catch (const std::exception &e) {

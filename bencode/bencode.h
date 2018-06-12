@@ -148,7 +148,7 @@ namespace cppdatalib
             void real_(const core::value &) {throw core::error("Bencode - 'real' value not allowed in output");}
             void begin_string_(const core::value &, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("Bencode - 'string' value does not have size specified");
                 stream() << size.value();
                 stream().put(':');

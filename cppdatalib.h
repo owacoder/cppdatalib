@@ -42,6 +42,7 @@
 #include "netstrings/netstrings.h"
 #include "property_list/plain_text.h"
 #include "property_list/xml.h"
+#include "pson/pson.h"
 #include "raw/uint8.h"
 #include "rpc/xml.h"
 #include "ubjson/ubjson.h"

@@ -47,17 +47,21 @@ namespace cppdatalib
             // WARNING: Underlying container type of `keys` MUST be able to maintain element positions
             // so their addresses don't change (i.e. NOT VECTOR)
             std::stack<core::value, std::list<core::value>> keys;
+            core::value top_key;
+            bool top_key_used;
             core::cache_vector_n<core::value *, core::cache_size> references;
 
         public:
             value_builder(core::value &bind) : v(bind) {}
             value_builder(const value_builder &builder)
                 : v(builder.v)
+                , top_key_used(false)
             {
                 assert(("cppdatalib::core::value_builder(const value_builder &) - attempted to copy a value_builder while active" && !builder.active()));
             }
             value_builder(value_builder &&builder)
                 : v(builder.v)
+                , top_key_used(false)
             {
                 assert(("cppdatalib::core::value_builder(value_builder &&) - attempted to move a value_builder while active" && !builder.active()));
             }
@@ -75,11 +79,35 @@ namespace cppdatalib
             }
 
         protected:
+            core::value *push_key()
+            {
+                if (top_key_used)
+                {
+                    keys.push(core::value());
+                    return &keys.top();
+                }
+
+                top_key_used = true;
+                return &top_key;
+            }
+            void pop_key()
+            {
+                if (keys.size())
+                {
+                    top_key.swap(keys.top());
+                    keys.pop();
+                }
+                else
+                    top_key_used = false;
+            }
+
             // begin_() clears the bound value to null and pushes a reference to it
             void begin_()
             {
                 keys = decltype(keys)();
                 references = decltype(references)();
+
+                top_key_used = false;
 
                 v.set_null();
                 references.push_back(&this->v);
@@ -88,8 +116,7 @@ namespace cppdatalib
             // begin_key_() just queues a new object key in the stack
             void begin_key_(const core::value &)
             {
-                keys.push(core::value());
-                references.push_back(&keys.top());
+                references.push_back(push_key());
             }
             void end_key_(const core::value &)
             {
@@ -116,8 +143,8 @@ namespace cppdatalib
                     references.back()->push_back(v);
                 else if (!is_key && current_container() == object)
                 {
-                    references.back()->add_member(std::move(keys.top()), v);
-                    keys.pop();
+                    references.back()->add_member(std::move(top_key), v);
+                    pop_key();
                 }
                 else
                     *references.back() = v;
@@ -164,8 +191,8 @@ namespace cppdatalib
                 }
                 else if (!is_key && current_container() == object)
                 {
-                    references.push_back(&references.back()->add_member(std::move(keys.top())));
-                    keys.pop();
+                    references.push_back(&references.back()->add_member(std::move(top_key)));
+                    pop_key();
                 }
 
                 // WARNING: If one tries to perform the following assignment `*references.back() = v` here,
@@ -174,7 +201,7 @@ namespace cppdatalib
                 if (v.is_array())
                 {
                     references.back()->set_array(core::array_t(), v.get_subtype());
-                    if (!size.empty() && size.value() < SIZE_MAX)
+                    if (size.has_value() && size.value() < SIZE_MAX)
                         references.back()->get_array_ref().data().reserve(size.value());
                 }
                 else if (v.is_object())

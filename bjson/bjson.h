@@ -381,7 +381,7 @@ namespace cppdatalib
             {
                 int initial_type = 16;
 
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("BJSON - 'string' value does not have size specified");
                 else if (size.value() == 0 && core::subtype_is_text_string(v.get_subtype()))
                 {
@@ -398,7 +398,7 @@ namespace cppdatalib
 
             void begin_array_(const core::value &, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("BJSON - 'array' value does not have size specified");
 
                 write_size(stream(), 32, size.value());
@@ -406,7 +406,7 @@ namespace cppdatalib
 
             void begin_object_(const core::value &, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("BJSON - 'object' value does not have size specified");
 
                 write_size(stream(), 36, size.value());

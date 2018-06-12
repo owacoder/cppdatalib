@@ -482,7 +482,7 @@ namespace cppdatalib
             void real_(const core::value &v) {write_float(stream(), v.get_real_unchecked(), true);}
             void begin_string_(const core::value &v, core::optional_size size, bool is_key)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("UBJSON - 'string' value does not have size specified");
                 else if (!core::subtype_is_text_string(v.get_subtype()))
                     throw core::error("UBJSON - 'string' value must be in UTF-8 format");

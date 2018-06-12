@@ -190,7 +190,7 @@ namespace cppdatalib
 
             void begin_string_(const core::value &, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("Netstrings - 'string' value does not have size specified");
 
                 stream() << size.value();
@@ -201,7 +201,7 @@ namespace cppdatalib
 
             void begin_array_(const core::value &v, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("Netstrings - 'array' value does not have size specified");
                 else if (v.size() != size.value())
                     throw core::error("Netstrings - entire 'array' value must be buffered before writing");
@@ -213,7 +213,7 @@ namespace cppdatalib
 
             void begin_object_(const core::value &v, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("Netstrings - 'object' value does not have size specified");
                 else if (v.size() != size.value())
                     throw core::error("Netstrings - entire 'object' value must be buffered before writing");

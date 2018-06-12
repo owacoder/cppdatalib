@@ -794,7 +794,7 @@ namespace cppdatalib
 
             void begin_string_(const core::value &v, core::optional_size size, bool is_key)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("Binn - 'string' value does not have size specified");
 
                 if (is_key)
@@ -827,7 +827,7 @@ namespace cppdatalib
 
             void begin_array_(const core::value &v, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("Binn - 'array' value does not have size specified");
                 else if (v.size() != size.value())
                     throw core::error("Binn - entire 'array' value must be buffered before writing");
@@ -839,7 +839,7 @@ namespace cppdatalib
 
             void begin_object_(const core::value &v, core::optional_size size, bool)
             {
-                if (size.empty())
+                if (!size.has_value())
                     throw core::error("Binn - 'object' value does not have size specified");
                 else if (v.size() != size.value())
                     throw core::error("Binn - entire 'object' value must be buffered before writing");
