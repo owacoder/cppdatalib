@@ -29,6 +29,7 @@
 #include "binn/binn.h"
 #include "bjson/bjson.h"
 #include "bson/bson.h"
+#include "cbor/cbor.h"
 #include "core/core.h"
 #include "csv/csv.h"
 #include "csv/tsv.h"

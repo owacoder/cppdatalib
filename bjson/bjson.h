@@ -294,17 +294,17 @@ namespace cppdatalib
             protected:
                 core::ostream &write_size(core::ostream &stream, int initial_type, uint64_t size)
                 {
-                    if (size >= UINT32_MAX)
+                    if (size > UINT32_MAX)
                     {
                         stream.put(initial_type + 3);
                         return core::write_uint64_le(stream, size);
                     }
-                    else if (size >= UINT16_MAX)
+                    else if (size > UINT16_MAX)
                     {
                         stream.put(initial_type + 2);
                         return core::write_uint32_le(stream, size);
                     }
-                    else if (size >= UINT8_MAX)
+                    else if (size > UINT8_MAX)
                     {
                         stream.put(initial_type + 1);
                         return core::write_uint16_le(stream, size);

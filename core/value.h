@@ -118,7 +118,8 @@ namespace cppdatalib
         //     -209 to -200: subtypes applicable to arrays
         //     -219 to -200: subtypes applicable to objects
         //     -229 to -220: subtypes applicable to links
-        //     -255 to -230: undefined, reserved
+        //     -239 to -230: subtypes applicable to nulls
+        //     -255 to -240: undefined, reserved
         //     minimum to -256: format-specified reserved subtypes
         enum subtype
         {
@@ -154,7 +155,8 @@ namespace cppdatalib
             binary_date, // A date structure, with unspecified binary format
             binary_time, // A time structure, with unspecified binary format
             binary_regexp, // A generic regexp structure, with unspecified binary format
-            binary_bignum, // A high-precision, binary-encoded, number (unknown binary encoding)
+            binary_pos_bignum, // A high-precision, binary-encoded, positive number (unknown binary encoding)
+            binary_neg_bignum, // A high-precision, binary-encoded, negative number (unknown binary encoding)
             binary_uuid, // A generic binary UUID value
             binary_function, // A generic binary function value (unknown language or target)
             binary_object_id, // A 12-byte binary Object ID (used especially for BSON)
@@ -167,16 +169,19 @@ namespace cppdatalib
             hash, // A hash lookup (not supported as such in the value class, but can be used as a tag for external variant classes)
 
             // Links
-            strong_link = -229,
-            parent_link,
+            strong_link = -229, // A strong (owning) link to another value instance
+            parent_link, // A weak (non-owning) link to the parent instance, usually used as an attribute value that points to the instance's parent.
 
-            // Other reserved values (32,513 options)
-            reserved = INT16_MIN,
+            // Nulls
+            undefined = -239, // An undefined value that can be used as normal null if necessary
+
+            // Other reserved values (-2,147,483,392 options)
+            reserved = INT32_MIN,
             reserved_max = -256,
 
-            // User-defined values (32,768 options)
+            // User-defined values (2,147,483,648 options)
             user = 0,
-            user_max = INT16_MAX
+            user_max = INT32_MAX
         };
 
         class value_builder;
@@ -192,7 +197,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_SUBTYPE_T
         typedef CPPDATALIB_SUBTYPE_T subtype_t;
 #else
-        typedef int16_t subtype_t;
+        typedef int32_t subtype_t;
 #endif
 
         struct null_t {};
@@ -260,18 +265,21 @@ namespace cppdatalib
                 case binary_date: return "binary date";
                 case binary_time: return "binary time";
                 case binary_regexp: return "binary regular expression";
-                case binary_bignum: return "binary bignum";
+                case binary_pos_bignum: return "binary positive bignum";
+                case binary_neg_bignum: return "binary negative bignum";
                 case binary_uuid: return "binary UUID";
                 case binary_function: return "binary function";
                 case binary_object_id: return "binary ObjectID";
 
-                case sexp: return "s-expression";
+                case sexp: return "S-expression";
 
                 case map: return "map";
                 case hash: return "hash";
 
                 case strong_link: return "strong link";
                 case parent_link: return "parent link";
+
+                case undefined: return "undefined";
 
                 default:
                     if (subtype <= reserved_max)

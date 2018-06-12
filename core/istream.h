@@ -400,14 +400,14 @@ namespace cppdatalib
                         {
                             if (negative)
                             {
-                                if (std::numeric_limits<T>::min() / 10 + (c - '0') > i)
+                                if (std::numeric_limits<T>::min() / 10 > i || std::numeric_limits<T>::min() + (c - '0') > i * 10)
                                     out_of_range = true, i = std::numeric_limits<T>::min(), flags_ |= fail_bit;
                                 else
                                     i = (i * 10) - (c - '0');
                             }
                             else
                             {
-                                if (std::numeric_limits<T>::max() / 10 - (c - '0') < i)
+                                if (std::numeric_limits<T>::max() / 10 < i || std::numeric_limits<T>::max() - (c - '0') < i * 10)
                                     out_of_range = true, i = std::numeric_limits<T>::max(), flags_ |= fail_bit;
                                 else
                                     i = (i * 10) + (c - '0');
@@ -469,7 +469,7 @@ namespace cppdatalib
 #endif
                         if (!out_of_range)
                         {
-                            if (std::numeric_limits<T>::max() / 10 - (c - '0') < i)
+                            if (std::numeric_limits<T>::max() / 10 < i || std::numeric_limits<T>::max() - (c - '0') < i * 10)
                                 out_of_range = true, i = std::numeric_limits<T>::max(), flags_ |= fail_bit;
                             else
                                 i = (i * 10) + (c - '0');
@@ -519,6 +519,8 @@ namespace cppdatalib
                 else
                 {
                     const char *buffer = current_buffer_begin();
+                    if (buffer)
+                        --buffer; // The sentry stole one of our buffer characters!
 
                     while (c != EOF && c < 0x80 && (isdigit(c) || strchr(".eE+-", c)))
                     {

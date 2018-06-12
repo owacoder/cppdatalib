@@ -1088,7 +1088,9 @@ int main(int argc, char **argv)
         if (out.substr(out_colon, 3) == "://")
             out_scheme = out.substr(0, out_colon);
 
-    if (in_scheme.empty() || in_scheme == "file")
+    if (in == "-")
+        input.reset(new cppdatalib::json::parser(std::cin));
+    else if (in_scheme.empty() || in_scheme == "file")
     {
         // Get input file extension
         size_t in_filetype = in.rfind('.');
@@ -1116,6 +1118,7 @@ int main(int argc, char **argv)
         else if (in_extension == "bjson") input.reset(new cppdatalib::bjson::parser(*infile.get()));
         else if (in_extension == "binn") input.reset(new cppdatalib::binn::parser(*infile.get()));
         else if (in_extension == "bson") input.reset(new cppdatalib::bson::parser(*infile.get()));
+        else if (in_extension == "cbor") input.reset(new cppdatalib::cbor::parser(*infile.get()));
         else if (in_extension == "csv") input.reset(new cppdatalib::csv::parser(*infile.get()));
         else if (in_extension == "tsv") input.reset(new cppdatalib::tsv::parser(*infile.get()));
         else if (in_extension == "json") input.reset(new cppdatalib::json::parser(*infile.get()));
@@ -1133,9 +1136,9 @@ int main(int argc, char **argv)
     }
 
     if (out == "internal")
-    {
         output.reset(new cppdatalib::core::value_builder(outvalue));
-    }
+    else if (out == "dump")
+        output.reset(new cppdatalib::core::dump::stream_writer(std::cout, 2));
     else if ((out_scheme.empty() || out_scheme == "file") && out != "null")
     {
         // Get output file extension
@@ -1158,6 +1161,7 @@ int main(int argc, char **argv)
         if (out_extension == "benc") output.reset(new cppdatalib::bencode::stream_writer(*outfile.get()));
         else if (out_extension == "binn") output.reset(new cppdatalib::binn::stream_writer(*outfile.get()));
         else if (out_extension == "bjson") output.reset(new cppdatalib::bjson::stream_writer(*outfile.get()));
+        else if (out_extension == "cbor") output.reset(new cppdatalib::cbor::stream_writer(*outfile.get()));
         else if (out_extension == "csv") output.reset(new cppdatalib::csv::stream_writer(*outfile.get()));
         else if (out_extension == "tsv") output.reset(new cppdatalib::tsv::stream_writer(*outfile.get()));
         else if (out_extension == "json") output.reset(new cppdatalib::json::stream_writer(*outfile.get()));
