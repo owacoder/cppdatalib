@@ -225,8 +225,8 @@ namespace cppdatalib
                             case 22: get_output()->write(core::value()); break;
                             case 23: get_output()->write(core::value(core::null_t(), core::undefined)); break;
                             case 24: break; // Not used
-                            case 25: get_output()->write(core::value(core::float_from_ieee_754_half(payload))); break;
-                            case 26: get_output()->write(core::value(core::float_from_ieee_754(payload))); break;
+                            case 25: get_output()->write(core::value(core::float_from_ieee_754_half(uint16_t(payload)))); break;
+                            case 26: get_output()->write(core::value(core::float_from_ieee_754(uint32_t(payload)))); break;
                             case 27: get_output()->write(core::value(core::double_from_ieee_754(payload))); break;
                             case 31:
                                 if (get_output()->current_container() == core::array)
@@ -277,7 +277,7 @@ namespace cppdatalib
                         return core::write_uint8(stream, integer);
                     }
                     else
-                        return stream.put((major_type << 5) | integer);
+                        return stream.put((major_type << 5) | uint8_t(integer));
                 }
             };
         }
@@ -318,19 +318,19 @@ namespace cppdatalib
                 if (core::float_from_ieee_754_half(core::float_to_ieee_754_half(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
                 {
                     out = core::float_to_ieee_754_half(static_cast<float>(v.get_real_unchecked()));
-                    stream().put(0xf9);
+                    stream().put(static_cast<unsigned char>(0xf9));
                     core::write_uint16_be(stream(), out);
                 }
                 else if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked())
                 {
                     out = core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()));
-                    stream().put(0xfa);
+                    stream().put(static_cast<unsigned char>(0xfa));
                     core::write_uint32_be(stream(), out);
                 }
                 else
                 {
                     out = core::double_to_ieee_754(v.get_real_unchecked());
-                    stream().put(0xfb);
+                    stream().put(static_cast<unsigned char>(0xfb));
                     core::write_uint64_be(stream(), out);
                 }
             }
@@ -356,7 +356,7 @@ namespace cppdatalib
             void end_string_(const core::value &, bool)
             {
                 if (!current_container_reported_size().has_value()) // No size specified for string, output `break` code
-                    stream().put(0xff);
+                    stream().put(static_cast<unsigned char>(0xff));
             }
 
             void begin_array_(const core::value &, core::optional_size size, bool)
@@ -364,12 +364,12 @@ namespace cppdatalib
                 if (size.has_value()) // Size specified in advance
                     write_int(stream(), 4, size.value());
                 else
-                    stream().put(0x9f);
+                    stream().put(static_cast<unsigned char>(0x9f));
             }
             void end_array_(const core::value &, bool)
             {
                 if (!current_container_reported_size().has_value()) // No size specified for array, output `break` code
-                    stream().put(0xff);
+                    stream().put(static_cast<unsigned char>(0xff));
             }
 
             void begin_object_(const core::value &, core::optional_size size, bool)
@@ -377,12 +377,12 @@ namespace cppdatalib
                 if (size.has_value()) // Size specified in advance
                     write_int(stream(), 5, size.value());
                 else
-                    stream().put(0xbf);
+                    stream().put(static_cast<unsigned char>(0xbf));
             }
             void end_object_(const core::value &, bool)
             {
                 if (!current_container_reported_size().has_value()) // No size specified for object, output `break` code
-                    stream().put(0xff);
+                    stream().put(static_cast<unsigned char>(0xff));
             }
         };
 

@@ -1101,9 +1101,9 @@ namespace cppdatalib
                                         else if (arg->get_type() == uinteger && arg2->get_type() == uinteger)
                                             compare = arg->get_uint_unchecked() < arg2->get_uint_unchecked();
                                         else if (arg->get_type() == integer && arg2->get_type() == uinteger)
-                                            compare = arg2->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? 1: arg->get_int_unchecked() < core::int_t(arg2->get_uint_unchecked());
+                                            compare = arg2->get_uint_unchecked() > core::uint_t(std::numeric_limits<core::int_t>::max())? 1: arg->get_int_unchecked() < core::int_t(arg2->get_uint_unchecked());
                                         else if (arg->get_type() == uinteger && arg2->get_type() == integer)
-                                            compare = arg->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? -1: core::int_t(arg->get_uint_unchecked()) < arg2->get_int_unchecked();
+                                            compare = arg->get_uint_unchecked() > core::uint_t(std::numeric_limits<core::int_t>::max())? -1: core::int_t(arg->get_uint_unchecked()) < arg2->get_int_unchecked();
                                         else
                                             compare = arg->as_real() < arg2->as_real();
                                         break;
@@ -1225,9 +1225,9 @@ namespace cppdatalib
                                         else if (arg->get_type() == uinteger && arg2->get_type() == uinteger)
                                             compare = (arg->get_uint_unchecked() > arg2->get_uint_unchecked()) - (arg->get_uint_unchecked() > arg2->get_uint_unchecked());
                                         else if (arg->get_type() == integer && arg2->get_type() == uinteger)
-                                            compare = arg2->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? -1: (arg->get_int_unchecked() > core::int_t(arg2->get_uint_unchecked())) - (arg->get_int_unchecked() < core::int_t(arg2->get_uint_unchecked()));
+                                            compare = arg2->get_uint_unchecked() > core::uint_t(std::numeric_limits<core::int_t>::max())? -1: (arg->get_int_unchecked() > core::int_t(arg2->get_uint_unchecked())) - (arg->get_int_unchecked() < core::int_t(arg2->get_uint_unchecked()));
                                         else if (arg->get_type() == uinteger && arg2->get_type() == integer)
-                                            compare = arg->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? 1: (core::int_t(arg->get_uint_unchecked()) > arg2->get_int_unchecked()) - (core::int_t(arg->get_uint_unchecked()) < arg2->get_int_unchecked());
+                                            compare = arg->get_uint_unchecked() > core::uint_t(std::numeric_limits<core::int_t>::max())? 1: (core::int_t(arg->get_uint_unchecked()) > arg2->get_int_unchecked()) - (core::int_t(arg->get_uint_unchecked()) < arg2->get_int_unchecked());
                                         else
                                         {
                                             core::real_t x = arg->as_real(), y = arg2->as_real();
@@ -1342,9 +1342,9 @@ namespace cppdatalib
                                         else if (arg->get_type() == uinteger && arg2->get_type() == uinteger)
                                             equal = arg->get_uint_unchecked() == arg2->get_uint_unchecked();
                                         else if (arg->get_type() == integer && arg2->get_type() == uinteger)
-                                            equal = arg2->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? false: arg->get_int_unchecked() == core::int_t(arg2->get_uint_unchecked());
+                                            equal = arg2->get_uint_unchecked() > core::uint_t(std::numeric_limits<core::int_t>::max())? false: arg->get_int_unchecked() == core::int_t(arg2->get_uint_unchecked());
                                         else if (arg->get_type() == uinteger && arg2->get_type() == integer)
-                                            equal = arg->get_uint_unchecked() > std::numeric_limits<core::int_t>::max()? false: core::int_t(arg->get_uint_unchecked()) == arg2->get_int_unchecked();
+                                            equal = arg->get_uint_unchecked() > core::uint_t(std::numeric_limits<core::int_t>::max())? false: core::int_t(arg->get_uint_unchecked()) == arg2->get_int_unchecked();
                                         else
                                             equal = arg->as_real() == arg2->as_real();
                                         break;

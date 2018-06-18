@@ -67,7 +67,7 @@ namespace cppdatalib
         protected:
             void read_string(core::subtype_t subtype, uint64_t size, bool add_to_dict, const char *failure_message)
             {
-                core::string_t *dict_entry = add_to_dict? std::addressof(string_dict.insert({string_dict.size(), {}}).first->second): nullptr;
+                core::string_t *dict_entry = add_to_dict? std::addressof(string_dict.insert({uint32_t(string_dict.size()), {}}).first->second): nullptr;
 
                 core::value string_type = core::value("", 0, subtype, true);
                 get_output()->begin_string(string_type, size);
@@ -377,7 +377,7 @@ namespace cppdatalib
             std::string name() const {return "cppdatalib::pson::stream_writer";}
 
         protected:
-            void null_(const core::value &) {stream().put(0xf0);}
+            void null_(const core::value &) {stream().put(static_cast<unsigned char>(0xf0));}
             void bool_(const core::value &v) {stream().put(0xf2 - v.get_bool_unchecked());}
 
             void integer_(const core::value &v)
@@ -388,12 +388,12 @@ namespace cppdatalib
                         stream().put((-(v.get_int_unchecked() + 1) << 1) | 1);
                     else if (v.get_int_unchecked() >= INT32_MIN)
                     {
-                        stream().put(0xf8);
+                        stream().put(static_cast<unsigned char>(0xf8));
                         write_int(stream(), int32_t(v.get_int_unchecked()));
                     }
                     else if (v.get_int_unchecked() >= INT64_MIN)
                     {
-                        stream().put(0xf9);
+                        stream().put(static_cast<unsigned char>(0xf9));
                         write_int(stream(), int64_t(v.get_int_unchecked()));
                     }
                     else
@@ -405,12 +405,12 @@ namespace cppdatalib
                         stream().put(v.get_int_unchecked() << 1);
                     else if (v.get_int_unchecked() <= INT32_MAX)
                     {
-                        stream().put(0xf8);
+                        stream().put(static_cast<unsigned char>(0xf8));
                         write_int(stream(), int32_t(v.get_int_unchecked()));
                     }
                     else if (v.get_int_unchecked() <= INT64_MAX)
                     {
-                        stream().put(0xf9);
+                        stream().put(static_cast<unsigned char>(0xf9));
                         write_int(stream(), int64_t(v.get_int_unchecked()));
                     }
                     else
@@ -424,12 +424,12 @@ namespace cppdatalib
                     stream().put(v.get_uint_unchecked() << 1);
                 else if (v.get_uint_unchecked() <= INT32_MAX)
                 {
-                    stream().put(0xf8);
+                    stream().put(static_cast<unsigned char>(0xf8));
                     write_int(stream(), int32_t(v.get_uint_unchecked()));
                 }
                 else if (v.get_uint_unchecked() <= INT64_MAX)
                 {
-                    stream().put(0xf9);
+                    stream().put(static_cast<unsigned char>(0xf9));
                     write_int(stream(), int64_t(v.get_uint_unchecked()));
                 }
                 else
@@ -443,13 +443,13 @@ namespace cppdatalib
                 if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
                 {
                     out = core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()));
-                    stream().put(0xfa);
+                    stream().put(static_cast<unsigned char>(0xfa));
                     core::write_uint32_le(stream(), out);
                 }
                 else
                 {
                     out = core::double_to_ieee_754(v.get_real_unchecked());
-                    stream().put(0xfb);
+                    stream().put(static_cast<unsigned char>(0xfb));
                     core::write_uint64_le(stream(), out);
                 }
             }
@@ -460,14 +460,14 @@ namespace cppdatalib
                     throw core::error("PSON - 'string' value does not have size specified");
                 else if (size.value() == 0 && core::subtype_is_text_string(v.get_subtype()))
                 {
-                    stream().put(0xf5); // Empty string type
+                    stream().put(static_cast<unsigned char>(0xf5)); // Empty string type
                     return;
                 }
 
                 if (!core::subtype_is_text_string(v.get_subtype()))
-                    stream().put(0xff);
+                    stream().put(static_cast<unsigned char>(0xff));
                 else
-                    stream().put(0xfc); // TODO: no support for dictionary writing currently
+                    stream().put(static_cast<unsigned char>(0xfc)); // TODO: no support for dictionary writing currently
 
                 write_int(stream(), uint32_t(size.value()));
             }
@@ -481,10 +481,10 @@ namespace cppdatalib
                     throw core::error("PSON - 'array' size is too large");
 
                 if (size.value() == 0)
-                    stream().put(0xf4);
+                    stream().put(static_cast<unsigned char>(0xf4));
                 else
                 {
-                    stream().put(0xf7);
+                    stream().put(static_cast<unsigned char>(0xf7));
                     write_int(stream(), uint32_t(size.value()));
                 }
             }
@@ -497,10 +497,10 @@ namespace cppdatalib
                     throw core::error("PSON - 'object' size is too large");
 
                 if (size.value() == 0)
-                    stream().put(0xf3);
+                    stream().put(static_cast<unsigned char>(0xf3));
                 else
                 {
-                    stream().put(0xf6);
+                    stream().put(static_cast<unsigned char>(0xf6));
                     write_int(stream(), uint32_t(size.value()));
                 }
             }

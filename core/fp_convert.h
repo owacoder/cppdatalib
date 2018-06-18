@@ -111,7 +111,7 @@ namespace cppdatalib
 
             // Parse initial integral value
             for (; isdigit(*begin); ++begin)
-                value = (value * 10.0) + Float(*begin - '0');
+                value = Float(value * 10.0) + Float(*begin - '0');
 
             // Parse fractional value
             if (*begin == '.')
@@ -125,11 +125,11 @@ namespace cppdatalib
 
                 for (; isdigit(*begin); ++begin)
                 {
-                    fraction = (fraction * 10.0) + Float(*begin - '0');
+                    fraction = Float(fraction * 10.0) + Float(*begin - '0');
                     ++places;
                 }
 
-                value += fraction / pow(10.0, Float(places));
+                value += fraction / pow<Float>(10.0, Float(places));
             }
 
             // Parse exponent value
@@ -149,12 +149,12 @@ namespace cppdatalib
                     goto cleanup;
 
                 for (; isdigit(*begin); ++begin)
-                    exponent = (exponent * 10.0) + Float(*begin - '0');
+                    exponent = Float(exponent * 10.0) + Float(*begin - '0');
 
                 if (negative_exp)
-                    value /= pow(10.0, exponent);
+                    value /= pow<Float>(10.0, exponent);
                 else
-                    value *= pow(10.0, exponent);
+                    value *= pow<Float>(10.0, exponent);
             }
 
             if (after != nullptr)
@@ -163,7 +163,7 @@ namespace cppdatalib
             if (isinf(value) || isnan(value))
             {
                 errno = ERANGE;
-                return negative? -HUGE_VAL: HUGE_VAL;
+                return Float(negative? -HUGE_VAL: HUGE_VAL);
             }
 
             return negative? -value: value;
@@ -203,7 +203,7 @@ namespace cppdatalib
 
             // Parse initial integral value
             for (; begin != end && isdigit(*begin); ++begin)
-                value = (value * 10.0) + Float(*begin - '0');
+                value = Float(value * 10.0) + Float(*begin - '0');
 
             // Parse fractional value
             if (begin != end && *begin == '.')
@@ -217,7 +217,7 @@ namespace cppdatalib
 
                 for (; begin != end && isdigit(*begin); ++begin)
                 {
-                    fraction = (fraction * 10.0) + Float(*begin - '0');
+                    fraction = Float(fraction * 10.0) + Float(*begin - '0');
                     places *= 10.0;
                 }
 
@@ -241,12 +241,12 @@ namespace cppdatalib
                     goto cleanup;
 
                 for (; begin != end && isdigit(*begin); ++begin)
-                    exponent = (exponent * 10.0) + Float(*begin - '0');
+                    exponent = Float(exponent * 10.0) + Float(*begin - '0');
 
                 if (negative_exp)
-                    value /= pow(10.0, exponent);
+                    value /= pow<Float>(10.0, exponent);
                 else
-                    value *= pow(10.0, exponent);
+                    value *= pow<Float>(10.0, exponent);
             }
 
             if (after != nullptr)
@@ -255,7 +255,7 @@ namespace cppdatalib
             if (isinf(value) || isnan(value))
             {
                 errno = ERANGE;
-                return negative? -HUGE_VAL: HUGE_VAL;
+                return Float(negative? -HUGE_VAL: HUGE_VAL);
             }
 
             return negative? -value: value;
