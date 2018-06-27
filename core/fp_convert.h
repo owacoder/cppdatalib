@@ -28,6 +28,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include "global.h"
 
 namespace cppdatalib
