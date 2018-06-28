@@ -32,6 +32,64 @@ namespace cppdatalib
 {
     namespace core
     {
+        // Removes leading space characters from beginning of string
+        void ascii_ltrim(std::string &str)
+        {
+            for (size_t i = 0; i < str.size(); ++i)
+            {
+                unsigned char c = str[i];
+                if (!isspace(c))
+                {
+                    if (i > 0)
+                        str.erase(0, i);
+                    return;
+                }
+            }
+        }
+
+        // Returns string with space characters trimmed off the beginning
+        std::string ascii_ltrim_copy(std::string str)
+        {
+            ascii_ltrim(str);
+            return str;
+        }
+
+        // Removes trailing space characters from end of string
+        void ascii_rtrim(std::string &str)
+        {
+            for (size_t i = str.size(); i > 0; --i)
+            {
+                unsigned char c = str[i-1];
+                if (!isspace(c))
+                {
+                    if (i < str.size())
+                        str.erase(i, str.size()-i);
+                    return;
+                }
+            }
+        }
+
+        // Returns string with space characters trimmed off the end
+        std::string ascii_rtrim_copy(std::string str)
+        {
+            ascii_rtrim(str);
+            return str;
+        }
+
+        // Removes leading and trailing space characters from string
+        void ascii_trim(std::string &str)
+        {
+            ascii_rtrim(str);
+            ascii_ltrim(str);
+        }
+
+        // Returns string with space characters trimmed off both ends
+        std::string ascii_trim_copy(std::string str)
+        {
+            ascii_trim(str);
+            return str;
+        }
+
         // Converts ASCII characters in string to lowercase
         void ascii_lowercase(std::string &str)
         {

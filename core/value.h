@@ -2717,12 +2717,12 @@ namespace cppdatalib
         inline void value::set_array(const array_t &v, subtype_t subtype) {clear(array); arr_ref_() = v; subtype_ = subtype;}
         inline void value::set_object(const object_t &v, subtype_t subtype) {clear(object); obj_ref_() = v; subtype_ = subtype;}
 
-        inline value value::operator[](cstring_t key) const {return member(value(key));}
-        inline value &value::operator[](cstring_t key) {return member(value(key));}
-        inline value value::operator[](string_view_t key) const {return member(value(static_cast<string_t>(key)));}
-        inline value &value::operator[](string_view_t key) {return member(value(static_cast<string_t>(key)));}
-        inline value value::const_member(cstring_t key) const {return const_member(value(key));}
-        inline value value::const_member(string_view_t key) const {return const_member(value(static_cast<string_t>(key)));}
+        inline value value::operator[](cstring_t key) const {return member(value(key, domain_comparable));}
+        inline value &value::operator[](cstring_t key) {return member(value(key, domain_comparable));}
+        inline value value::operator[](string_view_t key) const {return member(value(key, domain_comparable));}
+        inline value &value::operator[](string_view_t key) {return member(value(key, domain_comparable));}
+        inline value value::const_member(cstring_t key) const {return const_member(value(key, domain_comparable));}
+        inline value value::const_member(string_view_t key) const {return const_member(value(key, domain_comparable));}
         inline value value::const_member(const value &key) const
         {
             if (is_nonnull_object())
@@ -2736,8 +2736,8 @@ namespace cppdatalib
         inline value value::member(cstring_t key) const {return const_member(key);}
         inline value value::member(string_view_t key) const {return const_member(key);}
         inline value value::member(const value &key) const {return const_member(key);}
-        inline value &value::member(cstring_t key) {return member(value(key));}
-        inline value &value::member(string_view_t key) {return member(value(static_cast<string_t>(key)));}
+        inline value &value::member(cstring_t key) {return member(value(key, domain_comparable));}
+        inline value &value::member(string_view_t key) {return member(value(key, domain_comparable));}
         inline value &value::member(const value &key)
         {
             clear(object);
@@ -2757,14 +2757,14 @@ namespace cppdatalib
             }
             return NULL;
         }
-        inline bool_t value::is_member(cstring_t key) const {return is_nonnull_object() && obj_ref_().data().find(value(key)) != obj_ref_().end();}
-        inline bool_t value::is_member(string_view_t key) const {return is_nonnull_object() && obj_ref_().data().find(value(static_cast<string_t>(key))) != obj_ref_().end();}
+        inline bool_t value::is_member(cstring_t key) const {return is_nonnull_object() && obj_ref_().data().find(value(key, domain_comparable)) != obj_ref_().end();}
+        inline bool_t value::is_member(string_view_t key) const {return is_nonnull_object() && obj_ref_().data().find(value(key, domain_comparable)) != obj_ref_().end();}
         inline bool_t value::is_member(const value &key) const {return is_nonnull_object() && obj_ref_().data().find(key) != obj_ref_().end();}
-        inline size_t value::member_count(cstring_t key) const {return is_nonnull_object()? obj_ref_().data().count(value(key)): 0;}
-        inline size_t value::member_count(string_view_t key) const {return is_nonnull_object()? obj_ref_().data().count(value(static_cast<string_t>(key))): 0;}
+        inline size_t value::member_count(cstring_t key) const {return is_nonnull_object()? obj_ref_().data().count(value(key, domain_comparable)): 0;}
+        inline size_t value::member_count(string_view_t key) const {return is_nonnull_object()? obj_ref_().data().count(value(key, domain_comparable)): 0;}
         inline size_t value::member_count(const value &key) const {return is_nonnull_object()? obj_ref_().data().count(key): 0;}
-        inline void value::erase_member(cstring_t key) {if (is_nonnull_object()) obj_ref_().data().erase(value(key));}
-        inline void value::erase_member(string_view_t key) {if (is_nonnull_object()) obj_ref_().data().erase(value(static_cast<string_t>(key)));}
+        inline void value::erase_member(cstring_t key) {if (is_nonnull_object()) obj_ref_().data().erase(value(key, domain_comparable));}
+        inline void value::erase_member(string_view_t key) {if (is_nonnull_object()) obj_ref_().data().erase(value(key, domain_comparable));}
         inline void value::erase_member(const value &key) {if (is_nonnull_object()) obj_ref_().data().erase(key);}
 
         inline value &value::add_member(const value &key)

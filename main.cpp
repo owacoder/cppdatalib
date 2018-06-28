@@ -742,6 +742,13 @@ int main(int argc, char **argv)
     make_testbed<std::string>("MessagePack", std::cout, message_pack_tests, [](const std::string &item) {return cppdatalib::message_pack::to_message_pack(cppdatalib::message_pack::from_message_pack(cppdatalib::core::istream_handle(item)));})();
     make_range_testbed<uintmax_t>("identity", std::cout, 12000000000, [](uintmax_t v) {return v;}, [](uintmax_t v) {return v;})();*/
 
+    cppdatalib::http::http_initialize();
+
+    std::cout << cppdatalib::http::parser("http://google.com/", cppdatalib::core::poco_network_library);
+
+    cppdatalib::http::http_deinitialize();
+    return 0;
+
     std::unique_ptr<std::ifstream> infile;
     std::unique_ptr<std::ofstream> outfile;
     std::unique_ptr<cppdatalib::core::stream_input> input;
@@ -763,11 +770,11 @@ int main(int argc, char **argv)
     core::value lk(&value);
     core::value lk2(new core::value(value), core::strong_link);
     lk = lk2;
-    /*lk2.set_weak_link(&lk);
+    lk2.set_weak_link(&lk);
     lk.set_weak_link(&lk2);
     lk.set_strong_link(new core::value(value));
     lk.set_global_link_name(core::object_t{{"global link name", true}});
-    lk.set_local_link_name("local link name");*/
+    lk.set_local_link_name("local link name");
 
 #if 0
     std::cout << lk;

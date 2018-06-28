@@ -144,12 +144,33 @@ namespace cppdatalib
 
                 if (get_output()->current_container() != core::string)
                 {
-#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    core::value response_headers;
+
                     for (const auto &header: reply->rawHeaderPairs())
-                        string_type.add_attribute_at_end(core::value(header.first.toStdString()), core::value(header.second.toStdString()));
+                        response_headers.add_member_at_end(core::value(core::ascii_lowercase_copy(header.first.toStdString())), core::value(core::ascii_trim_copy(header.second.toStdString())));
+
+                    core::optional_size contentLength;
+
+                    // Attempt to obtain content length
+                    if (core::ascii_lowercase_copy(verb) != "head" &&
+                            response_headers.is_member("content-length") &&
+                            response_headers.const_member("transfer-encoding").get_string("identity") == "identity")
+                        contentLength = core::optional_size(response_headers.const_member("content-length").as_uint());
+
+                    // Attempt to obtain content type to adjust output string's type
+                    if (response_headers.is_member("content-type"))
+                    {
+                        std::string contentType = response_headers.const_member("content-type").as_string();
+
+                        if (contentType.substr(0, 5) == "text/")
+                            string_type.set_subtype(contentType.find("charset=utf-8") != contentType.npos? core::normal: core::clob);
+                    }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    string_type.set_attributes(std::move(response_headers.get_object_ref()));
 #endif
 
-                    get_output()->begin_string(string_type, core::stream_handler::unknown_size());
+                    get_output()->begin_string(string_type, contentLength);
                 }
 
                 if (reply->isFinished())
@@ -218,7 +239,7 @@ namespace cppdatalib
             bool busy() const {return stream_input::busy() || redirects;}
 
         protected:
-            void init_to_url(const std::string &new_url)
+            void init_to_url(std::string new_url)
             {
                 try
                 {
@@ -229,6 +250,7 @@ namespace cppdatalib
 
                     request.setMethod(verb);
                     request.setURI(path_part.empty()? "/": path_part);
+                    request.setHost(uri.getHost());
                     request.setVersion(Poco::Net::HTTPMessage::HTTP_1_1);
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
@@ -253,15 +275,15 @@ namespace cppdatalib
                             (uri.getPort() != https->getPort() && uri.getPort() != 0))
                         {
                             https->reset();
+                            https->setProxy(proxy_settings.const_member("host").as_string(),
+                                            proxy_settings.const_member("port").as_uint(Poco::Net::HTTPSession::HTTP_PORT));
+                            https->setProxyCredentials(proxy_settings.const_member("username").as_string(),
+                                                       proxy_settings.const_member("password").as_string());
+
                             https->setHost(uri.getHost());
                             https->setPort(uri.getPort());
                             https->setKeepAlive(true);
                         }
-
-                        https->setProxy(proxy_settings.const_member("host").get_string(),
-                                        proxy_settings.const_member("port").as_uint(Poco::Net::HTTPSession::HTTP_PORT));
-                        https->setProxyCredentials(proxy_settings.const_member("username").get_string(),
-                                                   proxy_settings.const_member("password").get_string());
                     }
                     else if (uri.getScheme() == "http")
                     {
@@ -276,15 +298,15 @@ namespace cppdatalib
                             (uri.getPort() != http->getPort() && uri.getPort() != 0))
                         {
                             http->reset();
+                            http->setProxy(proxy_settings.const_member("host").as_string(),
+                                           proxy_settings.const_member("port").as_uint(Poco::Net::HTTPSession::HTTP_PORT));
+                            http->setProxyCredentials(proxy_settings.const_member("username").as_string(),
+                                                      proxy_settings.const_member("password").as_string());
+
                             http->setHost(uri.getHost());
                             http->setPort(uri.getPort());
                             http->setKeepAlive(true);
                         }
-
-                        http->setProxy(proxy_settings.const_member("host").get_string(),
-                                       proxy_settings.const_member("port").as_uint(Poco::Net::HTTPSession::HTTP_PORT));
-                        http->setProxyCredentials(proxy_settings.const_member("username").get_string(),
-                                                  proxy_settings.const_member("password").get_string());
                     }
                     else
                         throw core::custom_error("HTTP - invalid scheme \"" + uri.getScheme() + "\" requested in URL");
@@ -305,6 +327,7 @@ namespace cppdatalib
             {
                 try
                 {
+                    core::optional_size contentLength;
                     core::value string_type(core::string_t(), core::blob);
                     std::istream *in;
 
@@ -332,18 +355,43 @@ namespace cppdatalib
                             throw core::custom_error("HTTP - redirection from \"" + working_url.as_string() + "\" has no destination location");
 
                         init_to_url(response.get("location"));
+
                         return;
                     }
                     else
                     {
+                        core::value response_headers;
+
                         redirects = 0;
-#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                         for (const auto &header: response)
-                            string_type.add_attribute_at_end(core::value(header.first), core::value(header.second));
+                        {
+                            std::string lcase = core::ascii_lowercase_copy(header.first);
+                            std::string trimmed = core::ascii_trim_copy(header.second);
+
+                            response_headers.member(core::value(lcase)) = core::value(trimmed);
+                        }
+
+                        // Attempt to obtain content length
+                        if (core::ascii_lowercase_copy(verb) != "head" &&
+                                response_headers.is_member("content-length") &&
+                                response_headers.const_member("transfer-encoding").get_string("identity") == "identity")
+                            contentLength = core::optional_size(response_headers.const_member("content-length").as_uint());
+
+                        // Attempt to obtain content type to adjust output string's type
+                        if (response_headers.is_member("content-type"))
+                        {
+                            std::string contentType = response_headers.const_member("content-type").as_string();
+
+                            if (contentType.substr(0, 5) == "text/")
+                                string_type.set_subtype(contentType.find("charset=utf-8") != contentType.npos? core::normal: core::clob);
+                        }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                        string_type->set_attributes(std::move(response_headers.get_object_ref()));
 #endif
                     }
 
-                    get_output()->begin_string(string_type, core::stream_handler::unknown_size());
+                    get_output()->begin_string(string_type, contentLength);
                     while (true)
                     {
                         in->read(buffer.get(), core::buffer_size);
@@ -379,7 +427,12 @@ namespace cppdatalib
             core::value proxy_settings;
             CURL *easy;
             CURLM *curl;
+            curl_slist *curl_headers;
             bool owns_easy, owns_curl;
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            core::value response_headers;
+#endif
 
         public:
             curl_parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
@@ -398,6 +451,7 @@ namespace cppdatalib
                 , proxy_settings(proxy_settings)
                 , easy(connection)
                 , curl(session)
+                , curl_headers(nullptr)
                 , owns_easy(false)
                 , owns_curl(false)
             {
@@ -407,13 +461,74 @@ namespace cppdatalib
             {
                 if (owns_easy)
                     curl_easy_cleanup(easy);
+                else
+                    curl_easy_setopt(easy, CURLOPT_HTTPHEADER, NULL);
+
                 if (owns_curl)
                     curl_multi_cleanup(curl);
+                if (curl_headers)
+                    curl_slist_free_all(curl_headers);
             }
 
             bool busy() const {return stream_input::busy() || redirects;}
 
         protected:
+            static size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
+            {
+                curl_parser *p = static_cast<curl_parser *>(userdata);
+
+                if (p->get_output()->current_container() != core::string) // String not started yet, handle obtaining Content-Length and Content-Type
+                {
+                    core::value string("", 0, core::blob, true);
+
+                    // Attempt to obtain content length
+                    core::optional_size contentLength;
+
+                    if (core::ascii_lowercase_copy(p->verb) != "head" &&
+                            p->response_headers.is_member("content-length") &&
+                            p->response_headers.const_member("transfer-encoding").get_string("identity") == "identity")
+                        contentLength = core::optional_size(p->response_headers.const_member("content-length").as_uint());
+
+                    // Attempt to obtain content type to adjust output string's type
+                    if (p->response_headers.is_member("content-type"))
+                    {
+                        std::string contentType = p->response_headers.const_member("content-type").as_string();
+
+                        if (contentType.substr(0, 5) == "text/")
+                            string.set_subtype(contentType.find("charset=utf-8") != contentType.npos? core::normal: core::clob);
+                    }
+
+                    // Attach headers we got for writing to the string if possible
+                    // NOTE: this will never include trailer headers, as a limitation of how
+                    // attribute information is passed on to the output format
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    string.set_attributes(p->response_headers.get_object_ref());
+#endif
+
+                    p->get_output()->begin_string(string, contentLength);
+                }
+
+                p->get_output()->append_to_string(core::value(ptr, size*nmemb, core::normal, true));
+                return size*nmemb;
+            }
+
+            static size_t header_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
+            {
+                std::string header(ptr, size*nmemb);
+                size_t off = header.find(':');
+
+                if (off != header.npos) // Do we really have a valid header?
+                {
+                    std::string first = header.substr(0, off);
+                    std::string second = header.substr(off+1);
+
+                    curl_parser *p = static_cast<curl_parser *>(userdata);
+                    p->response_headers.add_member_at_end(core::value(core::ascii_lowercase_copy(first)), core::value(core::ascii_trim_copy(second)));
+                }
+
+                return size*nmemb;
+            }
+
             void init_to_url(const std::string &new_url)
             {
                 try
@@ -435,80 +550,85 @@ namespace cppdatalib
                     }
 
                     curl_easy_reset(easy);
+
+                    // Set up URL
                     curl_easy_setopt(easy, CURLOPT_URL, working_url.as_string().c_str());
+
+                    // Set up output writer
+                    curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, write_callback);
+                    curl_easy_setopt(easy, CURLOPT_WRITEDATA, this);
+
+                    // Set up header writer
+                    curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, header_callback);
+                    curl_easy_setopt(easy, CURLOPT_HEADERDATA, this);
+                    response_headers.set_null();
+
+                    // Set up verb
+                    // TODO: setting verb needs work?
+                    auto lowerverb = core::ascii_lowercase_copy(verb);
+                    if (lowerverb == "get")
+                        curl_easy_setopt(easy, CURLOPT_HTTPGET, 1L);
+                    else if (lowerverb == "head")
+                    {
+                        curl_easy_setopt(easy, CURLOPT_HTTPGET, 1L);
+                        curl_easy_setopt(easy, CURLOPT_NOBODY, 1L);
+                    }
+                    else if (lowerverb == "post")
+                        curl_easy_setopt(easy, CURLOPT_POST, 1L);
+                    else if (lowerverb == "put")
+                        curl_easy_setopt(easy, CURLOPT_PUT, 1L);
+                    else
+                    {
+                        curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, verb.c_str());
+                        curl_easy_setopt(easy, CURLOPT_NOBODY, 0L);
+                    }
+
+                    // Set up redirections
+                    // TODO: setting up redirects and following them needs work?
+                    curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, (long) (maximum_redirects > 0));
+                    curl_easy_setopt(easy, CURLOPT_MAXREDIRS, (long) maximum_redirects);
+
+                    // Set up proxy
                     if (proxy_settings.object_size())
                     {
                         curl_easy_setopt(easy, CURLOPT_PROXYTYPE, working_url.as_string().substr(0, 5) == "https"? CURLPROXY_HTTPS: CURLPROXY_HTTP);
-                        curl_easy_setopt(easy, CURLOPT_PROXY, proxy_settings.const_member("host").get_cstring());
+                        curl_easy_setopt(easy, CURLOPT_PROXY, proxy_settings.const_member("host").as_string().c_str());
                         curl_easy_setopt(easy, CURLOPT_PROXYPORT, proxy_settings.const_member("port").as_uint(80));
-                        curl_easy_setopt(easy, CURLOPT_PROXYUSERNAME, proxy_settings.const_member("username").get_cstring());
-                        curl_easy_setopt(easy, CURLOPT_PROXYPASSWORD, proxy_settings.const_member("password").get_cstring());
+                        curl_easy_setopt(easy, CURLOPT_PROXYUSERNAME, proxy_settings.const_member("username").as_string().c_str());
+                        curl_easy_setopt(easy, CURLOPT_PROXYPASSWORD, proxy_settings.const_member("password").as_string().c_str());
                     }
 
-                    working_url.set_string(new_url);
+                    // Set up request headers
+                    if (curl_headers)
+                    {
+                        curl_slist_free_all(curl_headers);
+                        curl_headers = nullptr;
+                    }
 
-#if 0
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                     for (const auto &header: working_url.get_attributes())
-                        request.add(header.first.as_string(),
-                                    header.second.as_string());
+                    {
+                        curl_headers = curl_slist_append(curl_headers, (header.first.as_string() + ": " + header.second.as_string()).c_str());
+                        if (!curl_headers)
+                            throw core::error("internal libcurl error");
+                    }
 #endif
+
                     for (const auto &header: headers)
-                        request.add(header.first.as_string(),
-                                    header.second.as_string());
-
-
-
-                    if (uri.getScheme() == "https")
                     {
-                        is_https = true;
-                        if (https == nullptr)
-                        {
-                            https = new Poco::Net::HTTPSClientSession(uri.getHost(), uri.getPort()? uri.getPort(): unsigned(Poco::Net::HTTPSClientSession::HTTPS_PORT));
-                            owns_https_session = true;
-                        }
-
-                        if (uri.getHost() != https->getHost() ||
-                            (uri.getPort() != https->getPort() && uri.getPort() != 0))
-                        {
-                            https->reset();
-                            https->setHost(uri.getHost());
-                            https->setPort(uri.getPort());
-                            https->setKeepAlive(true);
-                        }
-
-                        https->setProxy(proxy_settings.const_member("host").get_string(),
-                                        proxy_settings.const_member("port").as_uint(Poco::Net::HTTPSession::HTTP_PORT));
-                        https->setProxyCredentials(proxy_settings.const_member("username").get_string(),
-                                                   proxy_settings.const_member("password").get_string());
+                        curl_headers = curl_slist_append(curl_headers, (header.first.as_string() + ": " + header.second.as_string()).c_str());
+                        if (!curl_headers)
+                            throw core::error("internal libcurl error");
                     }
-                    else if (uri.getScheme() == "http")
-                    {
-                        is_https = false;
-                        if (http == nullptr)
-                        {
-                            http = new Poco::Net::HTTPClientSession(uri.getHost(), uri.getPort()? uri.getPort(): unsigned(Poco::Net::HTTPClientSession::HTTP_PORT));
-                            owns_http_session = true;
-                        }
+                    curl_easy_setopt(easy, CURLOPT_HTTPHEADER, curl_headers);
 
-                        if (uri.getHost() != http->getHost() ||
-                            (uri.getPort() != http->getPort() && uri.getPort() != 0))
-                        {
-                            http->reset();
-                            http->setHost(uri.getHost());
-                            http->setPort(uri.getPort());
-                            http->setKeepAlive(true);
-                        }
+                    // Set keepalive flag for connection
+                    curl_easy_setopt(easy, CURLOPT_TCP_KEEPALIVE, 1L);
+                    curl_easy_setopt(easy, CURLOPT_TCP_KEEPIDLE, 120L);
+                    curl_easy_setopt(easy, CURLOPT_TCP_KEEPINTVL, 60L);
 
-                        http->setProxy(proxy_settings.const_member("host").get_string(),
-                                       proxy_settings.const_member("port").as_uint(Poco::Net::HTTPSession::HTTP_PORT));
-                        http->setProxyCredentials(proxy_settings.const_member("username").get_string(),
-                                                  proxy_settings.const_member("password").get_string());
-                    }
-                    else
-                        throw core::custom_error("HTTP - invalid scheme \"" + uri.getScheme() + "\" requested in URL");
-#endif
-                } catch (const Poco::Exception &e) {
+                    working_url.set_string(new_url);
+                } catch (const std::exception &e) {
                     throw core::custom_error("HTTP - " + std::string(e.what()));
                 }
             }
@@ -523,79 +643,34 @@ namespace cppdatalib
 
             void write_one_()
             {
-#if 0
                 try
                 {
-                    core::value string_type(core::string_t(), core::blob);
-                    std::istream *in;
+                    CURLcode result = curl_easy_perform(easy);
 
-                    if (is_https)
+                    if (result == CURLE_OK)
                     {
-                        https->sendRequest(request);
-
-                        in = &https->receiveResponse(response);
+                        // End string, since our curl callbacks header_callback and write_callback don't do that
+                        get_output()->end_string(core::value("", 0, get_output()->current_container_subtype(), true));
                     }
-                    else
-                    {
-                        http->sendRequest(request);
-
-                        in = &http->receiveResponse(response);
-                    }
-
-                    if (response.getStatus() / 100 >= 4)
-                        throw core::custom_error("HTTP - error \"" + response.getReason() + "\" while retrieving \"" + working_url.as_string() + "\"");
-                    else if (response.getStatus() / 100 == 3)
-                    {
-                        if (++redirects > maximum_redirects && maximum_redirects >= 0)
-                            throw core::custom_error("HTTP - request to \"" + url.as_string() + "\" failed with too many redirects");
-
-                        if (!response.has("location"))
-                            throw core::custom_error("HTTP - redirection from \"" + working_url.as_string() + "\" has no destination location");
-
-                        init_to_url(response.get("location"));
-                        return;
-                    }
-                    else
-                    {
-                        redirects = 0;
-#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-                        for (const auto &header: response)
-                            string_type.add_attribute_at_end(core::value(header.first), core::value(header.second));
-#endif
-                    }
-
-                    get_output()->begin_string(string_type, core::stream_handler::unknown_size());
-                    while (true)
-                    {
-                        in->read(buffer.get(), core::buffer_size);
-
-                        if (*in)
-                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), core::buffer_size)));
-                        else if (in->eof())
-                        {
-                            get_output()->append_to_string(core::value(core::string_t(buffer.get(), in->gcount())));
-                            get_output()->end_string(string_type);
-                            break;
-                        }
-                        else
-                            throw core::custom_error("HTTP - an error occured while retrieving \"" + working_url.as_string() + "\"");
-                    }
-                } catch (const Poco::Exception &e) {
+                } catch (const std::exception &e) {
                     throw core::custom_error("HTTP - " + std::string(e.what()));
                 }
-#endif
             }
         };
 #endif
 
         inline void http_initialize()
         {
-
+#ifdef CPPDATALIB_ENABLE_CURL_NETWORK
+            curl_global_init(CURL_GLOBAL_DEFAULT);
+#endif
         }
 
         inline void http_deinitialize()
         {
-
+#ifdef CPPDATALIB_ENABLE_CURL_NETWORK
+            curl_global_cleanup();
+#endif
         }
 
         class parser : public core::stream_input
@@ -680,6 +755,15 @@ namespace cppdatalib
                             interface_stream = new poco_parser(url, verb, headers, maximum_redirects, proxy_settings,
                                                                static_cast<Poco::Net::HTTPClientSession *>(context),
                                                                static_cast<Poco::Net::HTTPSClientSession *>(s_context));
+                            if (get_output())
+                                interface_stream->set_output(*get_output());
+                            break;
+#endif
+#ifdef CPPDATALIB_ENABLE_POCO_NETWORK
+                        case core::curl_network_library:
+                            interface_stream = new curl_parser(url, verb, headers, maximum_redirects, proxy_settings,
+                                                               static_cast<CURL *>(context),
+                                                               static_cast<CURLM *>(s_context));
                             if (get_output())
                                 interface_stream->set_output(*get_output());
                             break;

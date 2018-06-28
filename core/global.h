@@ -79,6 +79,9 @@ namespace cppdatalib
         enum network_library
         {
             unknown_network_library = -1
+#ifdef CPPDATALIB_ENABLE_CURL_NETWORK
+            , curl_network_library
+#endif
 #ifdef CPPDATALIB_ENABLE_QT_NETWORK
             , qt_network_library
 #endif
