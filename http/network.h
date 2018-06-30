@@ -160,7 +160,7 @@ namespace cppdatalib
                     // Attempt to obtain content type to adjust output string's type
                     if (response_headers.is_member("content-type"))
                     {
-                        std::string contentType = response_headers.const_member("content-type").as_string();
+                        std::string contentType = core::ascii_lowercase_copy(response_headers.const_member("content-type").as_string());
 
                         if (contentType.substr(0, 5) == "text/")
                             string_type.set_subtype(contentType.find("charset=utf-8") != contentType.npos? core::normal: core::clob);
@@ -380,7 +380,7 @@ namespace cppdatalib
                         // Attempt to obtain content type to adjust output string's type
                         if (response_headers.is_member("content-type"))
                         {
-                            std::string contentType = response_headers.const_member("content-type").as_string();
+                            std::string contentType = core::ascii_lowercase_copy(response_headers.const_member("content-type").as_string());
 
                             if (contentType.substr(0, 5) == "text/")
                                 string_type.set_subtype(contentType.find("charset=utf-8") != contentType.npos? core::normal: core::clob);
@@ -492,7 +492,7 @@ namespace cppdatalib
                     // Attempt to obtain content type to adjust output string's type
                     if (p->response_headers.is_member("content-type"))
                     {
-                        std::string contentType = p->response_headers.const_member("content-type").as_string();
+                        std::string contentType = core::ascii_lowercase_copy(p->response_headers.const_member("content-type").as_string());
 
                         if (contentType.substr(0, 5) == "text/")
                             string.set_subtype(contentType.find("charset=utf-8") != contentType.npos? core::normal: core::clob);

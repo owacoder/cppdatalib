@@ -232,8 +232,8 @@ namespace cppdatalib
                         break;
                     }
                     // Strict small integers
-                    case 26: get_output()->write(core::uint_t(0)); break;
-                    case 27: get_output()->write(core::uint_t(1)); break;
+                    case 26: get_output()->write(core::value(core::uint_t(0))); break;
+                    case 27: get_output()->write(core::value(core::uint_t(1))); break;
                     // Arrays
                     case 32:
                     case 33:

@@ -1893,7 +1893,7 @@ namespace cppdatalib
                     if (query.is_null())
                     {
                         if (non_bool_result)
-                            *non_bool_result = true;
+                            *non_bool_result = core::value(true);
                         return true;
                     }
 

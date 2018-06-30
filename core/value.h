@@ -1058,6 +1058,8 @@ namespace cppdatalib
             value &member(cstring_t key);
             value &member(string_view_t key);
             value &member(const value &key);
+            const value *member_ptr(cstring_t key) const;
+            const value *member_ptr(string_view_t key) const;
             const value *member_ptr(const value &key) const;
             bool_t is_member(cstring_t key) const;
             bool_t is_member(string_view_t key) const;
@@ -1371,24 +1373,24 @@ namespace cppdatalib
             array_t as_array() const;
             object_t as_object() const;
 #else
-            bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, default_).bool_;}
-            value *as_link(value *default_ = nullptr) const {return reinterpret_cast<value *>(value(*this).convert_to(link, default_).ptr_);}
-            int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, default_).int_;}
-            uint_t as_uint(uint_t default_ = 0) const {return value(*this).convert_to(uinteger, default_).uint_;}
-            real_t as_real(real_t default_ = 0.0) const {return value(*this).convert_to(real, default_).real_;}
-            string_t as_string(const string_t &default_ = string_t()) const {return value(*this).convert_to(string, default_).str_ref_();}
+            bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, core::value(default_)).bool_;}
+            value *as_link(value *default_ = nullptr) const {return reinterpret_cast<value *>(value(*this).convert_to(link, core::value(default_)).ptr_);}
+            int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, core::value(default_)).int_;}
+            uint_t as_uint(uint_t default_ = 0) const {return value(*this).convert_to(uinteger, core::value(default_)).uint_;}
+            real_t as_real(real_t default_ = 0.0) const {return value(*this).convert_to(real, core::value(default_)).real_;}
+            string_t as_string(const string_t &default_ = string_t()) const {return value(*this).convert_to(string, core::value(default_)).str_ref_();}
             array_t as_array(const array_t &default_) const;
             object_t as_object(const object_t &default_) const;
             array_t as_array() const;
             object_t as_object() const;
 
-            bool_t &convert_to_bool(bool_t default_ = false) {return convert_to(boolean, default_).bool_;}
-            int_t &convert_to_int(int_t default_ = 0) {return convert_to(integer, default_).int_;}
-            uint_t &convert_to_uint(uint_t default_ = 0) {return convert_to(uinteger, default_).uint_;}
-            real_t &convert_to_real(real_t default_ = 0.0) {return convert_to(real, default_).real_;}
-            string_t &convert_to_string(const string_t &default_ = string_t()) {return convert_to(string, default_).str_ref_();}
-            array_t &convert_to_array(const array_t &default_) {return convert_to(array, default_).arr_ref_();}
-            object_t &convert_to_object(const object_t &default_) {return convert_to(object, default_).obj_ref_();}
+            bool_t &convert_to_bool(bool_t default_ = false) {return convert_to(boolean, core::value(default_)).bool_;}
+            int_t &convert_to_int(int_t default_ = 0) {return convert_to(integer, core::value(default_)).int_;}
+            uint_t &convert_to_uint(uint_t default_ = 0) {return convert_to(uinteger, core::value(default_)).uint_;}
+            real_t &convert_to_real(real_t default_ = 0.0) {return convert_to(real, core::value(default_)).real_;}
+            string_t &convert_to_string(const string_t &default_ = string_t()) {return convert_to(string, core::value(default_)).str_ref_();}
+            array_t &convert_to_array(const array_t &default_) {return convert_to(array, core::value(default_)).arr_ref_();}
+            object_t &convert_to_object(const object_t &default_) {return convert_to(object, core::value(default_)).obj_ref_();}
             array_t &convert_to_array();
             object_t &convert_to_object();
 #endif
@@ -2747,6 +2749,8 @@ namespace cppdatalib
             it = obj_ref_().data().insert(it, {key, null_t()});
             return it->second;
         }
+        inline const value *value::member_ptr(cstring_t key) const {return member_ptr(value(key, domain_comparable));}
+        inline const value *value::member_ptr(string_view_t key) const {return member_ptr(value(key, domain_comparable));}
         inline const value *value::member_ptr(const value &key) const
         {
             if (is_nonnull_object())
@@ -2982,13 +2986,13 @@ namespace cppdatalib
         inline array_t value::as_array() const {return get_array();}
         inline object_t value::as_object() const {return get_object();}
 #else
-        inline array_t value::as_array(const array_t &default_) const {return value(*this).convert_to(array, default_).arr_ref_();}
-        inline object_t value::as_object(const object_t &default_) const {return value(*this).convert_to(object, default_).obj_ref_();}
-        inline array_t value::as_array() const {return value(*this).convert_to(array, array_t()).arr_ref_();}
-        inline object_t value::as_object() const {return value(*this).convert_to(object, object_t()).obj_ref_();}
+        inline array_t value::as_array(const array_t &default_) const {return value(*this).convert_to(array, core::value(default_)).arr_ref_();}
+        inline object_t value::as_object(const object_t &default_) const {return value(*this).convert_to(object, core::value(default_)).obj_ref_();}
+        inline array_t value::as_array() const {return value(*this).convert_to(array, core::value(array_t())).arr_ref_();}
+        inline object_t value::as_object() const {return value(*this).convert_to(object, core::value(object_t())).obj_ref_();}
 
-        inline array_t &value::convert_to_array() {return convert_to(array, array_t()).arr_ref_();}
-        inline object_t &value::convert_to_object() {return convert_to(object, object_t()).obj_ref_();}
+        inline array_t &value::convert_to_array() {return convert_to(array, core::value(array_t())).arr_ref_();}
+        inline object_t &value::convert_to_object() {return convert_to(object, core::value(object_t())).obj_ref_();}
 #endif
 
         inline void value::mutable_clear() const

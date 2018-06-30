@@ -17,7 +17,7 @@
 #define CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
-#define CPPDATALIB_THROW_IF_WRONG_TYPE
+//#define CPPDATALIB_THROW_IF_WRONG_TYPE
 #undef CPPDATALIB_ENABLE_MYSQL
 
 #include "cppdatalib.h"
@@ -465,6 +465,7 @@ void test_attributes()
         writer.begin();
         writer.begin_array(cppdatalib::core::array_t(), 11 /*cppdatalib::core::stream_handler::unknown_size()*/);
         //writer.write_out_of_order(1000000, 100);
+        /*
         writer.write_out_of_order(9, 10);
         writer.write_out_of_order(6, 6);
         writer.write_out_of_order(1, 1);
@@ -475,7 +476,7 @@ void test_attributes()
         //writer.write_out_of_order(7, 7);
         writer.write_out_of_order(5, 5);
         writer.write_out_of_order(8, 8);
-        writer.write_out_of_order(10, 9);
+        writer.write_out_of_order(10, 9);*/
         writer.end_array(cppdatalib::core::array_t());
         writer.end();
 
@@ -744,7 +745,7 @@ int main(int argc, char **argv)
 
     cppdatalib::http::http_initialize();
 
-    std::cout << cppdatalib::http::parser("http://google.com/", cppdatalib::core::poco_network_library);
+    std::cout << cppdatalib::http::parser("http://google.com/", cppdatalib::core::poco_network_library, "GET", cppdatalib::core::object_t(), 0);
 
     cppdatalib::http::http_deinitialize();
     return 0;
