@@ -83,6 +83,13 @@ namespace cppdatalib
             return result.output;
         }
 
+        template<typename Float>
+        Float pow(Float b, Float p) {return std::pow(b, p);}
+        template<>
+        float pow(float b, float p) {return std::powf(b, p);}
+        template<>
+        long double pow(long double b, long double p) {return std::powl(b, p);}
+
         // If `**after == 0` on returning from this function, success!
         // If `*after == nullptr` on returning from this function, failure.
         template<typename Float>

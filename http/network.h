@@ -154,7 +154,7 @@ namespace cppdatalib
                     core::optional_size contentLength;
 
                     // Attempt to obtain HTTP response code
-                    response_headers.member(core::value("")) = core::value(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toULongLong());
+                    response_headers.member(core::value("")) = core::value(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toLongLong());
 
                     // Attempt to obtain content length
                     if (core::ascii_lowercase_copy(verb) != "head" &&
@@ -810,7 +810,7 @@ namespace cppdatalib
                                 interface_stream->set_output(*get_output());
                             break;
 #endif
-#ifdef CPPDATALIB_ENABLE_POCO_NETWORK
+#ifdef CPPDATALIB_ENABLE_CURL_NETWORK
                         case core::curl_network_library:
                             interface_stream = new curl_parser(url, verb, headers, maximum_redirects, proxy_settings,
                                                                static_cast<CURL *>(context),

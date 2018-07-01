@@ -746,7 +746,7 @@ int main(int argc, char **argv)
 
     cppdatalib::http::http_initialize();
 
-    std::cout << cppdatalib::http::parser("http://owacoder.com/p", cppdatalib::core::poco_network_library, "GET", cppdatalib::core::object_t(), 3);
+    std::cout << cppdatalib::http::parser("http://owacoder.com/", cppdatalib::core::curl_network_library, "GET", cppdatalib::core::object_t(), 3);
 
     cppdatalib::http::http_deinitialize();
     return 0;
