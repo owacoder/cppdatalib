@@ -139,8 +139,10 @@ namespace cppdatalib
                     return;
                 }
 
+#ifndef CPPDATALIB_ENABLE_ATTRIBUTES
                 if (reply->error() != QNetworkReply::NoError)
                     throw core::custom_error("HTTP - " + reply->errorString().toStdString());
+#endif
 
                 if (get_output()->current_container() != core::string)
                 {
@@ -150,6 +152,9 @@ namespace cppdatalib
                         response_headers.add_member_at_end(core::value(core::ascii_lowercase_copy(header.first.toStdString())), core::value(core::ascii_trim_copy(header.second.toStdString())));
 
                     core::optional_size contentLength;
+
+                    // Attempt to obtain HTTP response code
+                    response_headers.member(core::value("")) = core::value(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toULongLong());
 
                     // Attempt to obtain content length
                     if (core::ascii_lowercase_copy(verb) != "head" &&
@@ -344,9 +349,12 @@ namespace cppdatalib
                         in = &http->receiveResponse(response);
                     }
 
+#ifndef CPPDATALIB_ENABLE_ATTRIBUTES
                     if (response.getStatus() / 100 >= 4)
-                        throw core::custom_error("HTTP - error \"" + response.getReason() + "\" while retrieving \"" + working_url.as_string() + "\"");
-                    else if (response.getStatus() / 100 == 3)
+                        throw core::custom_error("HTTP - " + response.getReason());
+                    else
+#endif
+                    if (response.getStatus() / 100 == 3)
                     {
                         if (++redirects > maximum_redirects && maximum_redirects >= 0)
                             throw core::custom_error("HTTP - request to \"" + url.as_string() + "\" failed with too many redirects");
@@ -370,6 +378,9 @@ namespace cppdatalib
 
                             response_headers.member(core::value(lcase)) = core::value(trimmed);
                         }
+
+                        // Attempt to obtain HTTP response code
+                        response_headers.member(core::value("")) = core::value(static_cast<int>(response.getStatus()));
 
                         // Attempt to obtain content length
                         if (core::ascii_lowercase_copy(verb) != "head" &&
@@ -430,9 +441,7 @@ namespace cppdatalib
             curl_slist *curl_headers;
             bool owns_easy, owns_curl;
 
-#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             core::value response_headers;
-#endif
 
         public:
             curl_parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
@@ -480,6 +489,17 @@ namespace cppdatalib
                 if (p->get_output()->current_container() != core::string) // String not started yet, handle obtaining Content-Length and Content-Type
                 {
                     core::value string("", 0, core::blob, true);
+
+                    // Attempt to obtain HTTP response code
+                    long responseCode;
+                    curl_easy_getinfo(p->easy, CURLINFO_RESPONSE_CODE, &responseCode);
+
+#ifndef CPPDATALIB_ENABLE_ATTRIBUTES
+                    if (responseCode >= 400)
+                        throw core::custom_error("request failed with error " + std::to_string(responseCode));
+#endif
+
+                    p->response_headers.member(core::value("")) = core::value(responseCode);
 
                     // Attempt to obtain content length
                     core::optional_size contentLength;
@@ -585,7 +605,7 @@ namespace cppdatalib
 
                     // Set up redirections
                     // TODO: setting up redirects and following them needs work?
-                    curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, (long) (maximum_redirects > 0));
+                    curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, (long) (maximum_redirects >= 0));
                     curl_easy_setopt(easy, CURLOPT_MAXREDIRS, (long) maximum_redirects);
 
                     // Set up proxy
@@ -645,6 +665,10 @@ namespace cppdatalib
             {
                 try
                 {
+                    char err[CURL_ERROR_SIZE];
+
+                    curl_easy_setopt(easy, CURLOPT_ERRORBUFFER, err);
+
                     CURLcode result = curl_easy_perform(easy);
 
                     if (result == CURLE_OK)
@@ -652,6 +676,8 @@ namespace cppdatalib
                         // End string, since our curl callbacks header_callback and write_callback don't do that
                         get_output()->end_string(core::value("", 0, get_output()->current_container_subtype(), true));
                     }
+                    else
+                        throw core::custom_error(err);
                 } catch (const std::exception &e) {
                     throw core::custom_error("HTTP - " + std::string(e.what()));
                 }
@@ -673,6 +699,28 @@ namespace cppdatalib
 #endif
         }
 
+        /*
+         * parser - generic parsing class for HTTP(S) requests, using various backends.
+         *
+         * Error messages between backends will differ, but the basic request structure and options should remain the same.
+         *
+         * If attributes are disabled:
+         *     - This class throws exceptions on HTTP responses >= 400
+         *     - The output is a single string or temporary_string with the body of the request, with no headers included
+         *     - The exact HTTP response code is not accessible programmatically
+         *
+         * If attributes are enabled:
+         *     - This class does not throw exceptions on HTTP responses >= 400
+         *     - The output is a single string or temporary_string with the body of the request,
+         *           with headers included as attributes (i.e. header name = attribute key, header value = attribute value)
+         *     - The special attribute included in the request with the key "" (i.e. the empty string) contains the HTTP response code
+         *
+         * The constructor attributes `context` and `s_context` (standing for "secondary context") have different meanings for different backends:
+         *
+         *     - Qt: `context` is a handle to an existing `QNetworkAccessManager` instance. `s_context` is not used.
+         *     - POCO: `context` is a handle to an existing `HTTPClientSession` instance. `s_context` is a handle to an existing `HTTPSClientSession` instance.
+         *     - CURL: `context` is a handle to an existing CURL easy instance. `s_context` is a handle to an existing CURL multi instance (not currently used).
+         */
         class parser : public core::stream_input
         {
             core::value url;
@@ -689,6 +737,9 @@ namespace cppdatalib
                    core::network_library interface = core::default_network_library,
                    const std::string &verb = "GET",
                    const core::object_t &headers = core::object_t(),
+                   /*
+                    * -1 if no limit, 0 disallows redirects of any sort, 1 is single redirect allowed, etc.
+                    */
                    int max_redirects = 20,
                    /*
                     *  proxy_settings:

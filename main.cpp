@@ -18,6 +18,7 @@
 //#define CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
 //#define CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
 //#define CPPDATALIB_THROW_IF_WRONG_TYPE
+//#undef CPPDATALIB_ENABLE_ATTRIBUTES
 #undef CPPDATALIB_ENABLE_MYSQL
 
 #include "cppdatalib.h"
@@ -745,7 +746,7 @@ int main(int argc, char **argv)
 
     cppdatalib::http::http_initialize();
 
-    std::cout << cppdatalib::http::parser("http://google.com/", cppdatalib::core::poco_network_library, "GET", cppdatalib::core::object_t(), 0);
+    std::cout << cppdatalib::http::parser("http://owacoder.com/p", cppdatalib::core::poco_network_library, "GET", cppdatalib::core::object_t(), 3);
 
     cppdatalib::http::http_deinitialize();
     return 0;
@@ -774,8 +775,8 @@ int main(int argc, char **argv)
     lk2.set_weak_link(&lk);
     lk.set_weak_link(&lk2);
     lk.set_strong_link(new core::value(value));
-    lk.set_global_link_name(core::object_t{{"global link name", true}});
-    lk.set_local_link_name("local link name");
+    //lk.set_global_link_name(core::object_t{{"global link name", true}});
+    //lk.set_local_link_name("local link name");
 
 #if 0
     std::cout << lk;
