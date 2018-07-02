@@ -745,6 +745,17 @@ int main(int argc, char **argv)
     make_testbed<std::string>("MessagePack", std::cout, message_pack_tests, [](const std::string &item) {return cppdatalib::message_pack::to_message_pack(cppdatalib::message_pack::from_message_pack(cppdatalib::core::istream_handle(item)));})();
     make_range_testbed<uintmax_t>("identity", std::cout, 12000000000, [](uintmax_t v) {return v;}, [](uintmax_t v) {return v;})();*/
 
+    cppdatalib::core::value rvalue = cppdatalib::core::value("yes//no", cppdatalib::core::regexp);
+    rvalue.add_attribute("options", "yksz");
+    auto obj = cppdatalib::core::object_t{{"key", "value"}, {"key2", "the second value"}, {"key3", cppdatalib::core::array_t{-1, 33, 7, 7.53, cppdatalib::core::object_t{{"bite", rvalue}}}}};
+    cppdatalib::hex::debug_write(cppdatalib::core::ostream_handle(std::cout), cppdatalib::bson::to_bson(obj)) << std::endl;
+    int diff = uintmax_t(cppdatalib::bson::to_bson(obj)[0]) - cppdatalib::bson::to_bson(obj).length();
+    if (diff)
+        std::cout << "improper length for top-level object: " << diff << "\n";
+    std::cout << cppdatalib::bson::from_bson(cppdatalib::core::istream_handle(cppdatalib::bson::to_bson(obj)));
+
+    return 0;
+
     cppdatalib::http::http_initialize();
 
     cppdatalib::core::ostringstream stream;

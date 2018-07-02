@@ -2040,7 +2040,7 @@ namespace cppdatalib
             const core::value *get_array_element() const {return is_array()? std::addressof(*array): NULL;}
 
             bool is_object() const {return p && p->is_object() && object != object_const_iterator_t() && object != p->get_object_unchecked().end();}
-            bool is_object_key() const {return is_object() && !traversed_key_already;}
+            bool is_object_key() const {return is_object() && traversed_key_already;}
             const core::value *get_object_key() const {return is_object()? std::addressof(object->first): NULL;}
             const core::value *get_object_value() const {return is_object()? std::addressof(object->second): NULL;}
 

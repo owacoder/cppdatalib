@@ -68,6 +68,8 @@ namespace cppdatalib
             user = 0x80
         };
 
+        // TODO: dbpointers, javascript code with scope, decimal128, and min and max keys are not supported for writing
+        // TODO: timestamps are read as normal integers
         class parser : public core::stream_parser
         {
             struct container
@@ -220,8 +222,8 @@ namespace cppdatalib
                         switch (subtype)
                         {
                             case generic_binary: string_type.set_subtype(core::blob); break;
-                            case function: string_type.set_subtype(core::function); break;
-                            case uuid: string_type.set_subtype(core::uuid); break;
+                            case function: string_type.set_subtype(core::binary_function); break;
+                            case uuid: string_type.set_subtype(core::binary_uuid); break;
                             default:
                                 if (subtype > 0xff)
                                     throw core::error("BSON - invalid input encoding");
@@ -434,6 +436,370 @@ namespace cppdatalib
             }
         };
 
+        namespace impl
+        {
+            class stream_writer_base : public core::stream_handler, public core::stream_writer
+            {
+            public:
+                stream_writer_base(core::ostream_handle &output) : core::stream_writer(output) {}
+
+            protected:
+                size_t get_size(const core::value &v)
+                {
+                    struct traverser
+                    {
+                    private:
+                        std::stack<size_t, core::cache_vector_n<size_t, core::cache_size>> size;
+
+                    public:
+                        traverser() {size.push(0);}
+
+                        size_t get_size() const {return size.top();}
+
+                        bool operator()(const core::value *arg, core::value::traversal_ancestry_finder finder, bool prefix)
+                        {
+                            switch (arg->get_type())
+                            {
+                                case core::link:
+                                    throw core::error("BSON - links are not supported by this format");
+                                case core::null: // No data added for a null value
+                                    break;
+                                case core::boolean: // Add one for actual payload
+                                    if (prefix)
+                                        size.top() += 1;
+                                    break;
+                                case core::integer: // Add 4 or 8 for actual payload
+                                {
+                                    if (prefix)
+                                    {
+                                        if (arg->get_int_unchecked() >= INT32_MIN && arg->get_int_unchecked() <= INT32_MAX)
+                                            size.top() += 4;
+                                        else
+                                            size.top() += 8;
+                                    }
+                                    break;
+                                }
+                                case core::uinteger: // Add 4 or 8 for actual payload
+                                {
+                                    if (prefix)
+                                    {
+                                        // TODO: handle values above INT64_MAX
+                                        if (arg->get_uint_unchecked() <= INT32_MAX)
+                                            size.top() += 4;
+                                        else
+                                            size.top() += 8;
+                                    }
+                                    break;
+                                }
+                                case core::real: // Add 8 for actual payload
+                                {
+                                    if (prefix)
+                                        size.top() += 8;
+                                    break;
+                                }
+                                case core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                                case core::temporary_string:
+#endif
+                                {
+                                    if (prefix)
+                                    {
+                                        auto ancestry = finder.get_ancestry();
+
+                                        if (!ancestry.empty() && ancestry[0].is_object_key())
+                                            size.top() += 1 + arg->string_size(); // If key, add actual payload size plus nul-terminator
+                                        else if (arg->get_subtype() == core::regexp)
+                                        {
+                                            size.top() += 2 + arg->string_size(); // If regexp, add actual payload size plus two nul-terminators
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                                            size.top() += arg->attribute(core::value((const char *) "options", core::domain_comparable, true)).as_string().size();
+#endif
+                                        }
+                                        else if (arg->get_subtype() == core::binary_object_id)
+                                            size.top() += 12; // If ObjectID, add 12 for payload
+                                        else
+                                            size.top() += 5 + arg->string_size(); // If regular string, add 4 for size specifier, payload size, and 1 for nul-terminator or subtype specifier (binary)
+                                    }
+                                    break;
+                                }
+                                case core::array:
+                                {
+                                    if (prefix)
+                                    {
+                                        size.top() += 5 + arg->array_size() * 2; // Add 4 for size specifier, 1 for nul-terminator, and length of all keys and element types
+                                        size_t limit = arg->array_size();
+
+                                        // Add in the length of string representations of array indexes
+                                        if (limit > 1000000000)
+                                            size.top() += (limit - 1000000000) * 10 + 8888888890;
+                                        else if (limit > 100000000)
+                                            size.top() += (limit - 100000000) * 9 + 788888890;
+                                        else if (limit > 10000000)
+                                            size.top() += (limit - 10000000) * 8 + 68888890;
+                                        else if (limit > 1000000)
+                                            size.top() += (limit - 1000000) * 7 + 5888890;
+                                        else if (limit > 100000)
+                                            size.top() += (limit - 100000) * 6 + 488890;
+                                        else if (limit > 10000)
+                                            size.top() += (limit - 10000) * 5 + 38890;
+                                        else if (limit > 1000)
+                                            size.top() += (limit - 1000) * 4 + 2890;
+                                        else if (limit > 100)
+                                            size.top() += (limit - 100) * 3 + 190;
+                                        else if (limit > 10)
+                                            size.top() += (limit - 10) * 2 + 10;
+                                        else
+                                            size.top() += limit;
+                                    }
+
+                                    break;
+                                }
+                                case core::object:
+                                {
+                                    if (prefix)
+                                        size.top() += 5 + arg->object_size(); // Add 4 for size specifier, 1 for nul-terminator, and length of all element types
+
+                                    break;
+                                }
+                            }
+
+                            return true;
+                        }
+                    };
+
+                    traverser t;
+
+                    v.traverse(t);
+
+                    return t.get_size();
+                }
+            };
+        }
+
+        // TODO: dbpointers, javascript code with scope, UTC datetimes, timestamps, decimal128, and min and max keys are not supported for writing
+        class stream_writer : public impl::stream_writer_base
+        {
+            std::string key_name;
+
+        public:
+            stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
+
+            unsigned int required_features() const {return requires_single_write;}
+
+            std::string name() const {return "cppdatalib::bson::stream_writer";}
+
+        protected:
+            void write_key_name()
+            {
+                if (key_name.find('\0') != key_name.npos)
+                    throw core::error("BSON - key names must not contain NUL");
+                stream() << key_name << '\0';
+            }
+
+            void begin_key_(const core::value &v)
+            {
+                key_name.clear();
+                if (!v.is_string())
+                    throw core::error("BSON - object keys must be strings");
+            }
+
+            void begin_item_(const core::value &)
+            {
+                if (current_container() == core::array)
+                    key_name = std::to_string(current_container_size());
+            }
+
+            void null_(const core::value &v)
+            {
+                if (current_container() == core::null)
+                    throw core::error("BSON - 'null' value must be part of an object or array");
+
+                if (v.get_subtype() == core::undefined)
+                    stream().put(0x06);
+                else
+                    stream().put(0x0a);
+                write_key_name();
+            }
+
+            void bool_(const core::value &v)
+            {
+                if (current_container() == core::null)
+                    throw core::error("BSON - 'boolean' value must be part of an object or array");
+
+                stream().put(0x08);
+                write_key_name();
+                stream().put(v.get_bool_unchecked());
+            }
+
+            void link_(const core::value &) {throw core::error("BSON - links are not supported by this format");}
+
+            void integer_(const core::value &v)
+            {
+                if (current_container() == core::null)
+                    throw core::error("BSON - 'integer' value must be part of an object or array");
+
+                if (v.get_int_unchecked() >= INT32_MIN && v.get_int_unchecked() <= INT32_MAX)
+                {
+                    stream().put(0x10);
+                    write_key_name();
+                    core::write_uint32_le(stream(), uint32_t(v.get_int_unchecked()));
+                }
+                else
+                {
+                    stream().put(0x12);
+                    write_key_name();
+                    core::write_uint64_le(stream(), uint64_t(v.get_int_unchecked()));
+                }
+            }
+
+            void uinteger_(const core::value &v)
+            {
+                if (current_container() == core::null)
+                    throw core::error("BSON - 'uinteger' value must be part of an object or array");
+
+                if (v.get_uint_unchecked() <= INT32_MAX)
+                {
+                    stream().put(0x10);
+                    write_key_name();
+                    core::write_uint32_le(stream(), v.get_uint_unchecked());
+                }
+                else // TODO: handle values above INT64_MAX
+                {
+                    stream().put(0x12);
+                    write_key_name();
+                    core::write_uint64_le(stream(), v.get_uint_unchecked());
+                }
+            }
+
+            void real_(const core::value &v)
+            {
+                if (current_container() == core::null)
+                    throw core::error("BSON - 'real' value must be part of an object or array");
+
+                stream().put(0x01);
+                write_key_name();
+                core::write_uint64_le(stream(), core::double_to_ieee_754(v.get_real_unchecked()));
+            }
+
+            void begin_string_(const core::value &v, core::optional_size size, bool is_key)
+            {
+                if (is_key)
+                    return;
+
+                if (current_container() == core::null)
+                    throw core::error("BSON - 'string' value must be part of an object or array");
+                else if (!size.has_value())
+                    throw core::error("BSON - 'string' value does not have size specified");
+                else if (v.size() != size.value())
+                    throw core::error("BSON - entire 'string' value must be buffered before writing");
+
+                if (v.get_subtype() == core::binary_object_id)
+                {
+                    if (size.value() != 12)
+                        throw core::error("BSON - ObjectID is not 12 bytes");
+
+                    stream().put(0x07);
+                    write_key_name();
+                }
+                else if (!core::subtype_is_text_string(v.get_subtype()))
+                {
+                    stream().put(0x05);
+                    write_key_name();
+                    core::write_uint32_le(stream(), size.value()+1);
+                    switch (v.get_subtype())
+                    {
+                        case core::binary_uuid: stream().put(0x04); break;
+                        case core::binary_function: stream().put(0x01); break;
+                        default:
+                            if (v.get_subtype() >= core::reserved && v.get_subtype() <= core::reserved_max)
+                                stream().put(v.get_subtype() - core::reserved);
+                            else if (v.get_subtype() >= core::user && v.get_subtype() <= core::user_max)
+                                stream().put(v.get_subtype() - core::user + 0x80);
+                            else
+                                stream().put(0x00);
+                            break;
+                    }
+                }
+                else // text string
+                {
+                    switch (v.get_subtype())
+                    {
+                        case core::javascript: stream().put(0x0d); break;
+                        case core::symbol: stream().put(0x0e); break;
+                        case core::regexp:
+                            stream().put(0x0b);
+                            break;
+                        default:
+                            stream().put(0x02);
+                            break;
+                    }
+                    write_key_name();
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                    // Reuse key_name to contain regexp options if available
+                    if (v.get_subtype() == core::regexp)
+                        key_name = v.attribute(core::value((const char *) "options", core::domain_comparable, true)).as_string();
+                    else
+#else
+                    // No options available for regexp
+                    if (v.get_subtype() == core::regexp)
+                        key_name.clear();
+                    else
+#endif
+                        core::write_uint32_le(stream(), size.value()+1);
+                }
+            }
+            void string_data_(const core::value &v, bool is_key)
+            {
+                if (is_key)
+                    key_name += v.get_string_unchecked();
+                else
+                    stream() << v.get_string_unchecked();
+            }
+            void end_string_(const core::value &, bool is_key)
+            {
+                if (is_key)
+                    return;
+
+                if (core::subtype_is_text_string(current_container_subtype()))
+                    stream().put(0);
+
+                if (current_container_subtype() == core::regexp)
+                    write_key_name(); // Write regexp options
+            }
+
+            void begin_array_(const core::value &v, core::optional_size size, bool)
+            {
+                if (current_container() == core::null)
+                    throw core::error("BSON - 'array' value must be part of an object or array");
+                else if (!size.has_value())
+                    throw core::error("BSON - 'array' value does not have size specified");
+                else if (v.size() != size.value())
+                    throw core::error("BSON - entire 'array' value must be buffered before writing");
+
+                stream().put(0x04);
+                write_key_name();
+                core::write_uint32_le(stream(), get_size(v));
+            }
+            void end_array_(const core::value &, bool) {stream().put(0);}
+
+            void begin_object_(const core::value &v, core::optional_size size, bool)
+            {
+                if (!size.has_value())
+                    throw core::error("BSON - 'object' value does not have size specified");
+                else if (v.size() != size.value())
+                    throw core::error("BSON - entire 'object' value must be buffered before writing");
+
+                if (current_container() != core::null)
+                {
+                    stream().put(0x03);
+                    write_key_name();
+                }
+
+                core::write_uint32_le(stream(), get_size(v));
+            }
+            void end_object_(const core::value &, bool) {stream().put(0);}
+        };
+
         inline core::value from_bson(core::istream_handle stream)
         {
             parser p(stream);
@@ -446,6 +812,14 @@ namespace cppdatalib
         {
             core::istringstream wrap(std::string(stream, size));
             return from_bson(wrap);
+        }
+
+        inline std::string to_bson(const core::value &v)
+        {
+            core::ostringstream stream;
+            stream_writer w(stream);
+            w << v;
+            return stream.str();
         }
     }
 }

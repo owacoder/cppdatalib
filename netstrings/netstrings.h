@@ -46,7 +46,7 @@ namespace cppdatalib
                     struct traverser
                     {
                     private:
-                        std::stack<size_t, std::vector<size_t>> size;
+                        std::stack<size_t, core::cache_vector_n<size_t, core::cache_size>> size;
 
                     public:
                         traverser() {size.push(0);}
