@@ -83,13 +83,6 @@ namespace cppdatalib
             return result.output;
         }
 
-        template<typename Float>
-        Float pow(Float b, Float p) {return std::pow(b, p);}
-        template<>
-        float pow(float b, float p) {return std::powf(b, p);}
-        template<>
-        long double pow(long double b, long double p) {return std::powl(b, p);}
-
         // If `**after == 0` on returning from this function, success!
         // If `*after == nullptr` on returning from this function, failure.
         template<typename Float>
@@ -137,7 +130,7 @@ namespace cppdatalib
                     ++places;
                 }
 
-                value += fraction / pow<Float>(10.0, Float(places));
+                value += fraction / pow(Float(10.0), Float(places));
             }
 
             // Parse exponent value
@@ -160,9 +153,9 @@ namespace cppdatalib
                     exponent = Float(exponent * 10.0) + Float(*begin - '0');
 
                 if (negative_exp)
-                    value /= pow<Float>(10.0, exponent);
+                    value /= pow(Float(10.0), exponent);
                 else
-                    value *= pow<Float>(10.0, exponent);
+                    value *= pow(Float(10.0), exponent);
             }
 
             if (after != nullptr)
@@ -252,9 +245,9 @@ namespace cppdatalib
                     exponent = Float(exponent * 10.0) + Float(*begin - '0');
 
                 if (negative_exp)
-                    value /= pow<Float>(10.0, exponent);
+                    value /= pow(Float(10.0), exponent);
                 else
-                    value *= pow<Float>(10.0, exponent);
+                    value *= pow(Float(10.0), exponent);
             }
 
             if (after != nullptr)

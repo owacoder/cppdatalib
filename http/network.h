@@ -53,6 +53,17 @@ namespace cppdatalib
 {
     namespace http
     {
+        class http_error : public core::custom_error
+        {
+        public:
+            http_error(int code, std::string error) : custom_error(error), code_(code) {}
+
+            int response_code() const {return code_;}
+
+        private:
+            int code_;
+        };
+
 #ifdef CPPDATALIB_ENABLE_QT_NETWORK
         class qt_parser : public core::stream_input
         {
@@ -141,7 +152,7 @@ namespace cppdatalib
 
 #ifndef CPPDATALIB_ENABLE_ATTRIBUTES
                 if (reply->error() != QNetworkReply::NoError)
-                    throw core::custom_error("HTTP - " + reply->errorString().toStdString());
+                    throw http_error(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute), "HTTP - " + reply->errorString().toStdString());
 #endif
 
                 if (get_output()->current_container() != core::string)
@@ -351,7 +362,7 @@ namespace cppdatalib
 
 #ifndef CPPDATALIB_ENABLE_ATTRIBUTES
                     if (response.getStatus() / 100 >= 4)
-                        throw core::custom_error("HTTP - " + response.getReason());
+                        throw http_error(static_cast<int>(response.getStatus()), "HTTP - " + response.getReason());
                     else
 #endif
                     if (response.getStatus() / 100 == 3)
@@ -496,7 +507,7 @@ namespace cppdatalib
 
 #ifndef CPPDATALIB_ENABLE_ATTRIBUTES
                     if (responseCode >= 400)
-                        throw core::custom_error("request failed with error " + std::to_string(responseCode));
+                        throw http_error(responseCode, "request failed with error " + std::to_string(responseCode));
 #endif
 
                     p->response_headers.member(core::value("")) = core::value(responseCode);
@@ -705,7 +716,7 @@ namespace cppdatalib
          * Error messages between backends will differ, but the basic request structure and options should remain the same.
          *
          * If attributes are disabled:
-         *     - This class throws exceptions on HTTP responses >= 400
+         *     - This class throws http_error exceptions on HTTP responses >= 400
          *     - The output is a single string or temporary_string with the body of the request, with no headers included
          *     - The exact HTTP response code is not accessible programmatically
          *

@@ -123,7 +123,7 @@ namespace cppdatalib
             static const unsigned int requires_buffered_objects = 0x10;
             static const unsigned int requires_buffered_strings = 0x20;
 
-            // The following value must be set (in `required_features()`) if the output format requires
+            // The following value should be set (in `required_features()`) if the output format requires
             // an element to be written in a single write() call
             static const unsigned int requires_single_write = 0x7f;
 
