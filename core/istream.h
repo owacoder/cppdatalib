@@ -126,6 +126,9 @@ namespace cppdatalib
             // `eof` should be set to true if and only if an end-of-file was reached during reading
             // `n` should be set to the number of characters actually read
             virtual bool readc_(char *buffer /* out */, size_t &n /* in/out */, bool &eof /* out */) = 0;
+            // Attempt to seek to absolute position `p`
+            // Return true on success, false on failure
+            virtual bool seekc_(streamsize) = 0;
 
         public:
             istream() : flags_(0), skip_ws(true)
@@ -291,6 +294,19 @@ namespace cppdatalib
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                 last_read_ = sz;
 #endif
+
+                return *this;
+            }
+
+            istream &seekg(streamsize p)
+            {
+                sentry s(*this);
+                if (!s)
+                    flags_ |= fail_bit;
+
+                flags_ &= ~eof_bit;
+                if (!seekc_(p))
+                    flags_ |= fail_bit;
 
                 return *this;
             }
@@ -651,6 +667,15 @@ namespace cppdatalib
             const std::string &str() const {return string;}
 
         protected:
+            bool seekc_(streamsize p)
+            {
+                if (uintmax_t(p) < string.size())
+                {
+                    pos = size_t(p);
+                    return true;
+                }
+                return false;
+            }
             int_type getc_() {return pos < string.size()? string[pos++] & 0xff: EOF;}
             int_type peekc_() {return pos < string.size()? string[pos] & 0xff: EOF;}
             void ungetc_()
@@ -708,6 +733,15 @@ namespace cppdatalib
             std::string str() const {return std::string(string, len);}
 
         protected:
+            bool seekc_(streamsize p)
+            {
+                if (uintmax_t(p) < len)
+                {
+                    pos = size_t(p);
+                    return true;
+                }
+                return false;
+            }
             int_type getc_() {return pos < len? string[pos++] & 0xff: EOF;}
             int_type peekc_() {return pos < len? string[pos] & 0xff: EOF;}
             void ungetc_()
@@ -771,6 +805,15 @@ namespace cppdatalib
             void str(std::string s) {string = std::move(s); pos = 0; flags_ = 0;}
 
         protected:
+            bool seekc_(streamsize p)
+            {
+                if (uintmax_t(p) < string.size())
+                {
+                    pos = size_t(p);
+                    return true;
+                }
+                return false;
+            }
             int_type getc_() {return pos < string.size()? string[pos++] & 0xff: EOF;}
             int_type peekc_() {return pos < string.size()? string[pos] & 0xff: EOF;}
             void ungetc_()
@@ -818,6 +861,7 @@ namespace cppdatalib
             streamsize remaining_buffer() const {return -1;}
 
         protected:
+            bool seekc_(streamsize p) {return stream_->pubseekpos(p, std::ios_base::in) >= 0;}
             int_type getc_()
             {
                 int_type ch = stream_->sbumpc();
@@ -869,6 +913,15 @@ namespace cppdatalib
             size_t buffer_size() const {return size_;}
 
         protected:
+            bool seekc_(streamsize p)
+            {
+                if (uintmax_t(p) < size_)
+                {
+                    pos_ = size_t(p);
+                    return true;
+                }
+                return false;
+            }
             int_type getc_() {return pos_ == size_? EOF: mem_[pos_++] & 0xff;}
             int_type peekc_() {return pos_ == size_? EOF: mem_[pos_] & 0xff;}
             void ungetc_()
@@ -947,6 +1000,7 @@ namespace cppdatalib
             size_t buffer_size() const {return stream.buffer_size();}
 
         protected:
+            bool seekc_(streamsize p) {return stream.seekg(p);}
             int_type getc_() {return stream.get();}
             int_type peekc_() {return stream.peek();}
             void ungetc_() {stream.unget();}
@@ -995,6 +1049,7 @@ namespace cppdatalib
             void set_encoding(encoding encoding_type) {current_encoding_ = encoding_type;}
 
         protected:
+            bool seekc_(streamsize) {return false;} // Not seekable
             int_type getc_()
             {
                 if (use_buffer_next)
@@ -1089,6 +1144,7 @@ namespace cppdatalib
             istream *p_; // Same as either d_ or predef_, whichever is used
 
         public:
+            istream_handle() : std_(NULL), d_(NULL), predef_(NULL), p_(NULL) {}
             istream_handle(core::istream &stream) : std_(NULL), d_(NULL), predef_(&stream), p_(predef_) {}
             istream_handle(std::istream &stream) : std_(&stream), d_(NULL), predef_(NULL)
             {
@@ -1110,6 +1166,8 @@ namespace cppdatalib
                 d_ = std::make_shared<icstring_wrapper_stream>(string.data(), string.size());
                 p_ = d_.get();
             }
+
+            bool valid() const {return std_ || p_;}
 
             operator core::istream &() {return *p_;}
             core::istream &stream() {return *p_;}
@@ -1145,6 +1203,8 @@ namespace cppdatalib
             {
                 d_ = std::make_shared<istringstream>(static_cast<std::string>(string));
             }
+
+            bool valid() const {return std_ || d_;}
 
             operator core::istream &() {return std_? *std_: *d_;}
             core::istream &stream() {return std_? *std_: *d_;}

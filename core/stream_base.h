@@ -950,7 +950,13 @@ namespace cppdatalib
             stream_parser(core::istream_handle &input) : handle(input) {}
             virtual ~stream_parser() {}
 
-            core::istream &stream() {return handle;}
+            core::istream &stream()
+            {
+                if (!handle.valid())
+                    throw core::error("cppdatalib::core::stream_parser - invalid core::istream_handle provided as argument to stream_parser");
+
+                return handle;
+            }
             // May return NULL! See core::istream_handle::std_stream() for details.
             std::istream *std_stream() {return handle.std_stream();}
         };

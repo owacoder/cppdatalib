@@ -78,9 +78,13 @@ namespace cppdatalib
             QNetworkRequest request;
             QNetworkReply *reply;
 
+            core::istream_handle input_handle;
+            QBuffer input_buffer;
+
         public:
             qt_parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
                       const std::string &verb = "GET",
+                      core::istream_handle input = core::istream_handle(),
                       const core::object_t &headers = core::object_t(),
                       int max_redirects = 20,
                       const core::object_t &proxy_settings = core::object_t(),
@@ -93,6 +97,7 @@ namespace cppdatalib
                 , manager(manager? manager: new QNetworkAccessManager())
                 , owns_manager(manager == nullptr)
                 , reply(nullptr)
+                , input_handle(input)
             {
                 reset();
             }
@@ -118,6 +123,11 @@ namespace cppdatalib
                 for (const auto &header: headers)
                     request.setRawHeader(QByteArray::fromStdString(header.first.as_string()),
                                          QByteArray::fromStdString(header.second.as_string()));
+
+                // Transfer as chunked, since we don't know precisely how long the input is
+                if (input_handle.valid())
+                    request.setRawHeader("Transfer-Encoding", "chunked");
+
                 request.setMaximumRedirectsAllowed(maximum_redirects);
                 request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, (maximum_redirects >= 0));
 
@@ -146,7 +156,22 @@ namespace cppdatalib
 
                 if (was_just_reset())
                 {
-                    reply = manager->sendCustomRequest(request, QByteArray::fromStdString(verb));
+                    if (input_handle.valid())
+                    {
+                        QByteArray data;
+                        core::istream::int_type c;
+
+                        while ((c = input_handle.stream().get(), c != EOF))
+                            data += QByteArray::fromStdString(core::ucs_to_utf8(c));
+
+                        input_buffer.close();
+                        input_buffer.setData(data);
+                        input_buffer.open(QIODevice::ReadOnly);
+                        reply = manager->sendCustomRequest(request, QByteArray::fromStdString(verb), &input_buffer);
+                    }
+                    else
+                        reply = manager->sendCustomRequest(request, QByteArray::fromStdString(verb));
+
                     return;
                 }
 
@@ -221,9 +246,12 @@ namespace cppdatalib
             Poco::Net::HTTPRequest request;
             Poco::Net::HTTPResponse response;
 
+            core::istream_handle input_stream;
+
         public:
             poco_parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
                         const std::string &verb = "GET",
+                        core::istream_handle input = core::istream_handle(),
                         const core::object_t &headers = core::object_t(),
                         int max_redirects = 20,
                         const core::object_t &proxy_settings = core::object_t(),
@@ -241,6 +269,7 @@ namespace cppdatalib
                 , owns_http_session(false)
                 , owns_https_session(false)
                 , is_https(false)
+                , input_stream(input)
             {
                 reset();
             }
@@ -264,10 +293,13 @@ namespace cppdatalib
                     Poco::URI uri(working_url.as_string());
                     std::string path_part(uri.getPathAndQuery());
 
+                    request.clear();
                     request.setMethod(verb);
                     request.setURI(path_part.empty()? "/": path_part);
                     request.setHost(uri.getHost());
                     request.setVersion(Poco::Net::HTTPMessage::HTTP_1_1);
+                    if (!uri.getUserInfo().empty())
+                        request.setCredentials("Basic", base64::encode(uri.getUserInfo()));
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                     for (const auto &header: working_url.get_attributes())
@@ -277,6 +309,10 @@ namespace cppdatalib
                     for (const auto &header: headers)
                         request.add(header.first.as_string(),
                                     header.second.as_string());
+
+                    // Transfer as chunked, since we don't know precisely how long the input is
+                    if (input_stream.valid())
+                        request.add("Transfer-Encoding", "chunked");
 
                     if (uri.getScheme() == "https")
                     {
@@ -349,13 +385,29 @@ namespace cppdatalib
 
                     if (is_https)
                     {
-                        https->sendRequest(request);
+                        std::ostream &out = https->sendRequest(request);
+
+                        if (input_stream.valid())
+                        {
+                            core::istream::int_type c;
+
+                            while ((c = input_stream.stream().get(), c != EOF))
+                                out << core::ucs_to_utf8(c);
+                        }
 
                         in = &https->receiveResponse(response);
                     }
                     else
                     {
-                        http->sendRequest(request);
+                        std::ostream &out = http->sendRequest(request);
+
+                        if (input_stream.valid())
+                        {
+                            core::istream::int_type c;
+
+                            while ((c = input_stream.stream().get(), c != EOF))
+                                out << core::ucs_to_utf8(c);
+                        }
 
                         in = &http->receiveResponse(response);
                     }
@@ -454,9 +506,12 @@ namespace cppdatalib
 
             core::value response_headers;
 
+            core::istream_handle input_handle;
+
         public:
             curl_parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
                         const std::string &verb = "GET",
+                        core::istream_handle input = core::istream_handle(),
                         const core::object_t &headers = core::object_t(),
                         int max_redirects = 20,
                         const core::object_t &proxy_settings = core::object_t(),
@@ -474,6 +529,7 @@ namespace cppdatalib
                 , curl_headers(nullptr)
                 , owns_easy(false)
                 , owns_curl(false)
+                , input_handle(input)
             {
                 reset();
             }
@@ -493,6 +549,41 @@ namespace cppdatalib
             bool busy() const {return stream_input::busy() || redirects;}
 
         protected:
+            static int seek_callback(void *userdata, curl_off_t offset, int origin)
+            {
+                if (origin != SEEK_SET)
+                    return CURL_SEEKFUNC_FAIL;
+
+                curl_parser *p = static_cast<curl_parser *>(userdata);
+
+                if (!p->input_handle.valid())
+                    return CURL_SEEKFUNC_CANTSEEK;
+
+                return p->input_handle.stream().seekg(offset)? CURL_SEEKFUNC_OK: CURL_SEEKFUNC_CANTSEEK;
+            }
+
+            static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
+            {
+                curl_parser *p = static_cast<curl_parser *>(userdata);
+
+                if (!p->input_handle.valid())
+                    return 0;
+
+                for (size_t i = 0; i < size*nmemb; ++i)
+                {
+                    core::istream::int_type c = p->input_handle.stream().get();
+
+                    if (c > 0xff)
+                        throw core::error("HTTP - invalid encoding used for input to request");
+                    else if (c == EOF)
+                        return i;
+
+                    ptr[i] = c;
+                }
+
+                return size*nmemb;
+            }
+
             static size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
             {
                 curl_parser *p = static_cast<curl_parser *>(userdata);
@@ -585,6 +676,14 @@ namespace cppdatalib
                     // Set up URL
                     curl_easy_setopt(easy, CURLOPT_URL, working_url.as_string().c_str());
 
+                    // Set up input reader
+                    curl_easy_setopt(easy, CURLOPT_READFUNCTION, read_callback);
+                    curl_easy_setopt(easy, CURLOPT_READDATA, this);
+
+                    // Set up seek functions
+                    curl_easy_setopt(easy, CURLOPT_SEEKFUNCTION, seek_callback);
+                    curl_easy_setopt(easy, CURLOPT_SEEKDATA, this);
+
                     // Set up output writer
                     curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, write_callback);
                     curl_easy_setopt(easy, CURLOPT_WRITEDATA, this);
@@ -651,6 +750,10 @@ namespace cppdatalib
                         if (!curl_headers)
                             throw core::error("internal libcurl error");
                     }
+
+                    // Transfer as chunked, since we don't know precisely how long the input is
+                    if (input_handle.valid())
+                        curl_headers = curl_slist_append(curl_headers, "Transfer-Encoding: chunked");
                     curl_easy_setopt(easy, CURLOPT_HTTPHEADER, curl_headers);
 
                     // Set keepalive flag for connection
@@ -715,6 +818,13 @@ namespace cppdatalib
          *
          * Error messages between backends will differ, but the basic request structure and options should remain the same.
          *
+         * To push data (for example, in a POST request) you should do the following:
+         *
+         *     cppdatalib::http::parser p(args...);
+         *     cppdatalib::json::stream_writer writer(p.input_stream()); // Or any stream writer
+         *     p.set_input(writer);
+         *     p >> std::cout; // Or any output
+         *
          * If attributes are disabled:
          *     - This class throws http_error exceptions on HTTP responses >= 400
          *     - The output is a single string or temporary_string with the body of the request, with no headers included
@@ -743,10 +853,13 @@ namespace cppdatalib
             core::stream_input *interface_stream;
             void *context, *s_context;
 
+            core::istream_handle input_handle;
+
         public:
             parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
                    core::network_library interface = core::default_network_library,
                    const std::string &verb = "GET",
+                   core::istream_handle input = core::istream_handle(),
                    const core::object_t &headers = core::object_t(),
                    /*
                     * -1 if no limit, 0 disallows redirects of any sort, 1 is single redirect allowed, etc.
@@ -773,6 +886,7 @@ namespace cppdatalib
                 , interface_stream(nullptr)
                 , context(context)
                 , s_context(s_context)
+                , input_handle(input)
             {
                 set_interface(interface);
                 reset();
@@ -806,7 +920,7 @@ namespace cppdatalib
                             break;
 #ifdef CPPDATALIB_ENABLE_QT_NETWORK
                         case core::qt_network_library:
-                            interface_stream = new qt_parser(url, verb, headers, maximum_redirects, proxy_settings,
+                            interface_stream = new qt_parser(url, verb, input_handle, headers, maximum_redirects, proxy_settings,
                                                              static_cast<QNetworkAccessManager *>(context));
                             if (get_output())
                                 interface_stream->set_output(*get_output());
@@ -814,7 +928,7 @@ namespace cppdatalib
 #endif
 #ifdef CPPDATALIB_ENABLE_POCO_NETWORK
                         case core::poco_network_library:
-                            interface_stream = new poco_parser(url, verb, headers, maximum_redirects, proxy_settings,
+                            interface_stream = new poco_parser(url, verb, input_handle, headers, maximum_redirects, proxy_settings,
                                                                static_cast<Poco::Net::HTTPClientSession *>(context),
                                                                static_cast<Poco::Net::HTTPSClientSession *>(s_context));
                             if (get_output())
@@ -823,7 +937,7 @@ namespace cppdatalib
 #endif
 #ifdef CPPDATALIB_ENABLE_CURL_NETWORK
                         case core::curl_network_library:
-                            interface_stream = new curl_parser(url, verb, headers, maximum_redirects, proxy_settings,
+                            interface_stream = new curl_parser(url, verb, input_handle, headers, maximum_redirects, proxy_settings,
                                                                static_cast<CURL *>(context),
                                                                static_cast<CURLM *>(s_context));
                             if (get_output())

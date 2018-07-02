@@ -9,7 +9,7 @@
 #ifndef CPPDATALIB_ENABLE_XML
 #define CPPDATALIB_ENABLE_XML
 #endif*/
-#define CPPDATALIB_ENABLE_FAST_IO
+//#define CPPDATALIB_ENABLE_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
 #define CPPDATALIB_OPTIMIZE_FOR_NUMERIC_SPACE
@@ -486,6 +486,7 @@ void test_attributes()
         cppdatalib::http::parser(cppdatalib::core::value("http://owacoder.com"),
                                  cppdatalib::core::default_network_library,
                                  "GET",
+                                 cppdatalib::core::istream_handle(),
                                  cppdatalib::core::object_t(),
                                  1,
                                  cppdatalib::core::object_t{{"host", "localhost"},
@@ -746,7 +747,13 @@ int main(int argc, char **argv)
 
     cppdatalib::http::http_initialize();
 
-    std::cout << cppdatalib::http::parser("http://owacoder.com/", cppdatalib::core::curl_network_library, "GET", cppdatalib::core::object_t(), 3);
+    cppdatalib::core::ostringstream stream;
+    cppdatalib::json::stream_writer(stream) << cppdatalib::core::object_t{{"new object type", "not true"}, {"graduated sequence", 4412887}};
+    std::cout << cppdatalib::http::parser("http://admin:admin@localhost:5986/test_db",
+                                          cppdatalib::core::curl_network_library,
+                                          "POST",
+                                          cppdatalib::core::istream_handle(stream.str()),
+                                          cppdatalib::core::object_t{{"content-type", "application/json"}}, 3);
 
     cppdatalib::http::http_deinitialize();
     return 0;
