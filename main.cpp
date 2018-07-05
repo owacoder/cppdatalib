@@ -747,7 +747,9 @@ int main(int argc, char **argv)
 
     cppdatalib::core::value rvalue = cppdatalib::core::value("yes//no", cppdatalib::core::regexp);
     rvalue.add_attribute("options", "yksz");
-    auto obj = cppdatalib::core::object_t{{"key", "value"}, {"key2", "the second value"}, {"key3", cppdatalib::core::array_t{-1, 33, 7, 7.53, cppdatalib::core::object_t{{"bite", rvalue}}}}};
+    auto obj = cppdatalib::core::object_t{{"key", "value"},
+    {"mongo", cppdatalib::core::value(10000333420000, cppdatalib::core::utc_timestamp)},
+    {"", {}}};//{"key3", cppdatalib::core::array_t{-1, 33, 7, 7.53, cppdatalib::core::object_t{{"bite", rvalue}}}}};
     cppdatalib::hex::debug_write(cppdatalib::core::ostream_handle(std::cout), cppdatalib::bson::to_bson(obj)) << std::endl;
     int diff = uintmax_t(cppdatalib::bson::to_bson(obj)[0]) - cppdatalib::bson::to_bson(obj).length();
     if (diff)

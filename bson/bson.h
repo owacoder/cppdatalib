@@ -69,7 +69,6 @@ namespace cppdatalib
         };
 
         // TODO: dbpointers, javascript code with scope, decimal128, and min and max keys are not supported for writing
-        // TODO: timestamps are read as normal integers
         class parser : public core::stream_parser
         {
             struct container
@@ -298,7 +297,8 @@ namespace cppdatalib
                         if (!core::read_int64_le(stream(), time))
                             throw core::error("BSON - expected UTC timestamp");
 
-                        get_output()->write(core::value(time, core::utc_timestamp));
+                        decrement_counter(9);
+                        get_output()->write(core::value(time, core::utc_timestamp_ms));
                         break;
                     }
                     case regex:
@@ -351,7 +351,7 @@ namespace cppdatalib
                             throw core::error("BSON - expected timestamp");
 
                         decrement_counter(9);
-                        get_output()->write(core::value(i));
+                        get_output()->write(core::value(i, core::mongodb_timestamp));
                         break;
                     }
                     case int64:
@@ -368,7 +368,7 @@ namespace cppdatalib
                         break;
                     }
                     case decimal128:
-                        throw core::error("BSON - 128-bit decimal floating-point values not supported");
+                        throw core::error("BSON - 128-bit decimal floating-point values are not supported");
                     case min_key:
                         throw core::error("BSON - minimum keys are not supported");
                     case max_key:
@@ -472,7 +472,10 @@ namespace cppdatalib
                                 {
                                     if (prefix)
                                     {
-                                        if (arg->get_int_unchecked() >= INT32_MIN && arg->get_int_unchecked() <= INT32_MAX)
+                                        if (arg->get_subtype() != core::mongodb_timestamp &&
+                                                arg->get_subtype() != core::utc_timestamp &&
+                                                arg->get_subtype() != core::utc_timestamp_ms &&
+                                                arg->get_int_unchecked() >= INT32_MIN && arg->get_int_unchecked() <= INT32_MAX)
                                             size.top() += 4;
                                         else
                                             size.top() += 8;
@@ -484,7 +487,10 @@ namespace cppdatalib
                                     if (prefix)
                                     {
                                         // TODO: handle values above INT64_MAX
-                                        if (arg->get_uint_unchecked() <= INT32_MAX)
+                                        if (arg->get_subtype() != core::mongodb_timestamp &&
+                                                arg->get_subtype() != core::utc_timestamp &&
+                                                arg->get_subtype() != core::utc_timestamp_ms &&
+                                                arg->get_uint_unchecked() <= INT32_MAX)
                                             size.top() += 4;
                                         else
                                             size.top() += 8;
@@ -576,7 +582,7 @@ namespace cppdatalib
             };
         }
 
-        // TODO: dbpointers, javascript code with scope, UTC datetimes, timestamps, decimal128, and min and max keys are not supported for writing
+        // TODO: dbpointers, javascript code with scope, decimal128, and min and max keys are not supported for writing
         class stream_writer : public impl::stream_writer_base
         {
             std::string key_name;
@@ -638,7 +644,20 @@ namespace cppdatalib
                 if (current_container() == core::null)
                     throw core::error("BSON - 'integer' value must be part of an object or array");
 
-                if (v.get_int_unchecked() >= INT32_MIN && v.get_int_unchecked() <= INT32_MAX)
+                if (v.get_subtype() == core::mongodb_timestamp)
+                {
+                    stream().put(0x11);
+                    write_key_name();
+                    core::write_uint64_le(stream(), uint64_t(v.get_int_unchecked()));
+                }
+                else if (v.get_subtype() == core::utc_timestamp ||
+                         v.get_subtype() == core::utc_timestamp_ms)
+                {
+                    stream().put(0x09);
+                    write_key_name();
+                    core::write_uint64_le(stream(), uint64_t(v.get_int_unchecked() * (v.get_subtype() == core::utc_timestamp? 1000: 1)));
+                }
+                else if (v.get_int_unchecked() >= INT32_MIN && v.get_int_unchecked() <= INT32_MAX)
                 {
                     stream().put(0x10);
                     write_key_name();
@@ -657,7 +676,20 @@ namespace cppdatalib
                 if (current_container() == core::null)
                     throw core::error("BSON - 'uinteger' value must be part of an object or array");
 
-                if (v.get_uint_unchecked() <= INT32_MAX)
+                if (v.get_subtype() == core::mongodb_timestamp)
+                {
+                    stream().put(0x11);
+                    write_key_name();
+                    core::write_uint64_le(stream(), v.get_uint_unchecked());
+                }
+                else if (v.get_subtype() == core::utc_timestamp ||
+                         v.get_subtype() == core::utc_timestamp_ms)
+                {
+                    stream().put(0x09);
+                    write_key_name();
+                    core::write_uint64_le(stream(), v.get_uint_unchecked() * (v.get_subtype() == core::utc_timestamp? 1000: 1));
+                }
+                else if (v.get_uint_unchecked() <= INT32_MAX)
                 {
                     stream().put(0x10);
                     write_key_name();

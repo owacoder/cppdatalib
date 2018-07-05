@@ -31,7 +31,7 @@ Supported formats include
    - [Bencode](https://en.wikipedia.org/wiki/Bencode)
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
    - [BJSON](http://bjson.org/)
-   - [BSON](http://bsonspec.org/spec.html) (read-only)
+   - [BSON](http://bsonspec.org/spec.html)
    - [CSV](https://tools.ietf.org/html/rfc4180) (allows user-defined delimiter)
    - [DIF](https://en.wikipedia.org/wiki/Data_Interchange_Format) (write-only, requires table dimensions prior to writing to create well-formed output)
    - [Filesystem I/O](http://en.cppreference.com/w/cpp/filesystem) (`std::experimental::filesystem` or `std::filesystem`)

@@ -132,7 +132,10 @@ namespace cppdatalib
 
             // Integers
             unix_timestamp = -29, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds
+            unix_timestamp_ms, // Number of milliseconds since the epoch, Jan 1, 1970, without leap seconds
             utc_timestamp, // Number of seconds since the epoch, Jan 1, 1970, with leap seconds
+            utc_timestamp_ms, // Number of milliseconds since the epoch, Jan 1, 1970, with leap seconds
+            mongodb_timestamp, // MongoDB timestamp
 
             // Text strings
             clob = -129, // A chunk of text (unknown encoding, can include random bytes > 0x7f)
@@ -243,8 +246,11 @@ namespace cppdatalib
                 case domain_comparable: return "<domain-comparable>";
                 case generic_subtype_comparable: return "<no subtype>";
 
-                case unix_timestamp: return "UNIX timestamp";
-                case utc_timestamp: return "UTC timestamp";
+                case unix_timestamp: return "UNIX timestamp (seconds)";
+                case unix_timestamp_ms: return "UNIX timestamp (milliseconds)";
+                case utc_timestamp: return "UTC timestamp (seconds)";
+                case utc_timestamp_ms: return "UTC timestamp (milliseconds)";
+                case mongodb_timestamp: return "MongoDB timestamp";
 
                 case clob: return "text (unknown encoding)";
                 case symbol: return "symbol";
