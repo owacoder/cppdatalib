@@ -340,6 +340,7 @@ namespace cppdatalib
             static value &assign(value &dst, value &&src);
 
         public:
+            // TODO: traversal references seem to have problems due to uninitialized iterators (debug builds with MSVC). Fix?
             struct traversal_ancestry_finder
             {
                 typedef std::stack<traversal_reference, core::cache_vector_n<traversal_reference, core::cache_size>> container;
@@ -2033,19 +2034,41 @@ namespace cppdatalib
                 , frozen(false)
             {}
 
-            traversal_reference(const value *p, array_const_iterator_t a, object_const_iterator_t o, bool traversed_key, bool frozen = false)
+            traversal_reference(const value *p, bool frozen = false)
+                : p(p)
+                , array()
+                , object()
+                , has_array_iterator(false)
+                , has_object_iterator(false)
+                , traversed_key_already(false)
+                , frozen(frozen)
+            {}
+
+            traversal_reference(const value *p, array_const_iterator_t a, bool frozen = false)
                 : p(p)
                 , array(a)
+                , object()
+                , has_array_iterator(true)
+                , has_object_iterator(false)
+                , traversed_key_already(false)
+                , frozen(frozen)
+            {}
+
+            traversal_reference(const value *p, object_const_iterator_t o, bool traversed_key, bool frozen = false)
+                : p(p)
+                , array()
                 , object(o)
+                , has_array_iterator(false)
+                , has_object_iterator(true)
                 , traversed_key_already(traversed_key)
                 , frozen(frozen)
             {}
 
-            bool is_array() const {return p && p->is_array() && array != array_const_iterator_t() && array != p->get_array_unchecked().end();}
+            bool is_array() const {return p && p->is_array() && has_array_iterator && array != p->get_array_unchecked().end();}
             size_t get_array_index() const {return is_array()? array.data() - p->get_array_unchecked().begin().data(): 0;}
             const core::value *get_array_element() const {return is_array()? std::addressof(*array): NULL;}
 
-            bool is_object() const {return p && p->is_object() && object != object_const_iterator_t() && object != p->get_object_unchecked().end();}
+            bool is_object() const {return p && p->is_object() && has_object_iterator && object != p->get_object_unchecked().end();}
             bool is_object_key() const {return is_object() && traversed_key_already;}
             const core::value *get_object_key() const {return is_object()? std::addressof(object->first): NULL;}
             const core::value *get_object_value() const {return is_object()? std::addressof(object->second): NULL;}
@@ -2057,6 +2080,8 @@ namespace cppdatalib
             const value *p;
             array_const_iterator_t array;
             object_const_iterator_t object;
+            bool has_array_iterator;
+            bool has_object_iterator;
             bool traversed_key_already;
             bool frozen;
         };
@@ -2189,21 +2214,21 @@ namespace cppdatalib
                     switch (p->get_type())
                     {
                         case array:
-                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin()));
                             if (!p->get_array_unchecked().empty())
                                 p = std::addressof(*references.top().array++);
                             else
                                 p = NULL;
                             break;
                         case object:
-                            references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                            references.push(traversal_reference(p, p->get_object_unchecked().begin(), true));
                             if (!p->get_object_unchecked().empty())
                                 p = std::addressof(references.top().object->first);
                             else
                                 p = NULL;
                             break;
                         default:
-                            references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                            references.push(traversal_reference(p));
                             p = NULL;
                             break;
                     }
@@ -2253,7 +2278,7 @@ namespace cppdatalib
 
                     if (p->is_array())
                     {
-                        references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                        references.push(traversal_reference(p, p->get_array_unchecked().begin()));
                         if (!p->get_array_unchecked().empty())
                             p = std::addressof(*references.top().array++);
                         else
@@ -2261,7 +2286,7 @@ namespace cppdatalib
                     }
                     else if (p->is_object())
                     {
-                        references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                        references.push(traversal_reference(p, p->get_object_unchecked().begin(), true));
                         if (!p->get_object_unchecked().empty())
                             p = std::addressof(references.top().object->first);
                         else
@@ -2269,7 +2294,7 @@ namespace cppdatalib
                     }
                     else
                     {
-                        references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                        references.push(traversal_reference(p));
                         p = NULL;
                     }
                 }
@@ -2315,7 +2340,7 @@ namespace cppdatalib
 
                     if (p->is_array())
                     {
-                        references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                        references.push(traversal_reference(p, p->get_array_unchecked().begin()));
                         if (!p->get_array_unchecked().empty())
                             p = std::addressof(*references.top().array++);
                         else
@@ -2323,7 +2348,7 @@ namespace cppdatalib
                     }
                     else if (p->is_object())
                     {
-                        references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                        references.push(traversal_reference(p, p->get_object_unchecked().begin(), true));
                         if (!p->get_object_unchecked().empty())
                             p = std::addressof((references.top().object++)->second);
                         else
@@ -2331,7 +2356,7 @@ namespace cppdatalib
                     }
                     else
                     {
-                        references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                        references.push(traversal_reference(p));
                         p = NULL;
                     }
                 }
@@ -2371,7 +2396,7 @@ namespace cppdatalib
 
                     if (p->is_array())
                     {
-                        references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                        references.push(traversal_reference(p, p->get_array_unchecked().begin()));
                         if (!p->get_array_unchecked().empty())
                             p = std::addressof(*references.top().array++);
                         else
@@ -2379,7 +2404,7 @@ namespace cppdatalib
                     }
                     else if (p->is_object())
                     {
-                        references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                        references.push(traversal_reference(p, p->get_object_unchecked().begin(), true));
                         if (!p->get_object_unchecked().empty())
                             p = std::addressof((references.top().object++)->second);
                         else
@@ -2387,7 +2412,7 @@ namespace cppdatalib
                     }
                     else
                     {
-                        references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                        references.push(traversal_reference(p));
                         p = NULL;
                     }
                 }
@@ -2439,7 +2464,7 @@ namespace cppdatalib
                     {
                         if (p->is_array())
                         {
-                            references.push(traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                            references.push(traversal_reference(p, p->get_array_unchecked().begin()));
                             if (!p->get_array_unchecked().empty())
                                 p = std::addressof(*references.top().array++);
                             else
@@ -2447,7 +2472,7 @@ namespace cppdatalib
                         }
                         else if (p->is_object())
                         {
-                            references.push(traversal_reference(p, array_const_iterator_t(), p->get_object_unchecked().begin(), true));
+                            references.push(traversal_reference(p, p->get_object_unchecked().begin(), true));
                             if (!p->get_object_unchecked().empty())
                                 p = std::addressof(references.top().object->first);
                             else
@@ -2455,7 +2480,7 @@ namespace cppdatalib
                         }
                         else
                         {
-                            references.push(traversal_reference(p, array_const_iterator_t(), object_const_iterator_t(), false));
+                            references.push(traversal_reference(p));
                             p = NULL;
                         }
                     }
@@ -2464,7 +2489,7 @@ namespace cppdatalib
                     {
                         if (other_p->is_array())
                         {
-                            other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                            other_references.push(traversal_reference(other_p, other_p->get_array_unchecked().begin()));
                             if (!other_p->get_array_unchecked().empty())
                                 other_p = std::addressof(*other_references.top().array++);
                             else
@@ -2472,7 +2497,7 @@ namespace cppdatalib
                         }
                         else if (other_p->is_object())
                         {
-                            other_references.push(traversal_reference(other_p, array_const_iterator_t(), other_p->get_object_unchecked().begin(), true));
+                            other_references.push(traversal_reference(other_p, other_p->get_object_unchecked().begin(), true));
                             if (!other_p->get_object_unchecked().empty())
                                 other_p = std::addressof(other_references.top().object->first);
                             else
@@ -2480,7 +2505,7 @@ namespace cppdatalib
                         }
                         else
                         {
-                            other_references.push(traversal_reference(other_p, array_const_iterator_t(), object_const_iterator_t(), false));
+                            other_references.push(traversal_reference(other_p));
                             other_p = NULL;
                         }
                     }
@@ -3040,10 +3065,10 @@ namespace cppdatalib
             switch (new_type)
             {
                 case null: break;
-                case boolean: new (&bool_) bool_t(); break;
-                case integer: new (&int_) int_t(); break;
-                case uinteger: new (&uint_) uint_t(); break;
-                case real: new (&real_) real_t(); break;
+                case boolean: new (&bool_) bool_t{}; break;
+                case integer: new (&int_) int_t{}; break;
+                case uinteger: new (&uint_) uint_t{}; break;
+                case real: new (&real_) real_t{}; break;
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
                 case temporary_string: new (&tstr_) string_view_t(); break;
 #endif

@@ -32,6 +32,7 @@ Supported formats include
    - [Binn](https://github.com/liteserver/binn/blob/master/spec.md)
    - [BJSON](http://bjson.org/)
    - [BSON](http://bsonspec.org/spec.html)
+   - [CBOR](http://cbor.io/)
    - [CSV](https://tools.ietf.org/html/rfc4180) (allows user-defined delimiter)
    - [DIF](https://en.wikipedia.org/wiki/Data_Interchange_Format) (write-only, requires table dimensions prior to writing to create well-formed output)
    - [Filesystem I/O](http://en.cppreference.com/w/cpp/filesystem) (`std::experimental::filesystem` or `std::filesystem`)
@@ -55,7 +56,6 @@ Language formats include
 ### Planned formats
 
    - Transenc
-   - CBOR
 
 ### Unimplemented adapter features
 
@@ -472,6 +472,14 @@ If a format-defined limit is reached, such as an object key length limit, an err
      Notes:
        - `string` subtypes `blob` and `clob` are supported.
        - The BSON `string` type is used to identify UTF-8 strings, and the BSON `binary` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
+       - When writing, the entire output must be written in a single call.
+
+   - CBOR supports `null`, `bool`, `uint`, `int`, `real`, `string`, `array`, and `object`.<br/>
+     Notes:
+       - `string` subtypes `blob` and `clob` are supported.
+       - CBOR tags are not currently supported.
+       - Since the CBOR specification supports negative numbers less than -2^63, these integers are converted to decimal bignums when reading.
+       - The CBOR `string` type is used to identify UTF-8 strings, and the CBOR `binary` type identifies other strings. No strings are modified, either when reading or writing. The correctness of UTF-8 strings is not verified.
 
    - CSV supports `null`, `bool`, `uint`, `int`, `real`, `string`, and `array`.<br/>
      Notes:

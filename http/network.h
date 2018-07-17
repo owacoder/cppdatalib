@@ -180,7 +180,7 @@ namespace cppdatalib
                     throw http_error(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute), "HTTP - " + reply->errorString().toStdString());
 #endif
 
-                if (get_output()->current_container() != core::string)
+                if ((reply->bytesAvailable() || reply->isFinished()) && get_output()->current_container() != core::string)
                 {
                     core::value response_headers;
 

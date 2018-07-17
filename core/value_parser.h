@@ -68,7 +68,7 @@ namespace cppdatalib
                         {
                             get_output()->begin_array(*p, p->array_size());
 
-                            references.push(value::traversal_reference(p, p->get_array_unchecked().begin(), object_const_iterator_t(), false));
+                            references.push(value::traversal_reference(p, p->get_array_unchecked().begin()));
                             if (!p->get_array_unchecked().empty())
                                 p = std::addressof(*references.top().array++);
                             else
@@ -78,7 +78,7 @@ namespace cppdatalib
                         {
                             get_output()->begin_object(*p, p->object_size());
 
-                            references.push(value::traversal_reference(p, array_t::const_iterator(), p->get_object_unchecked().begin(), true));
+                            references.push(value::traversal_reference(p, p->get_object_unchecked().begin(), true));
                             if (!p->get_object_unchecked().empty())
                                 p = std::addressof(references.top().object->first);
                             else

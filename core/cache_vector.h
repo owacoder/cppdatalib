@@ -489,8 +489,25 @@ namespace cppdatalib
             void swapByAllocTraits(cache_vector_n &rhs)
             {
                 using std::swap;
-                for (size_type i = 0; i < N; ++i)
-                    swap(mFast[i], rhs.mFast[i]);
+                if (mSize >= N && rhs.mSize >= N)
+                {
+                    for (size_type i = 0; i < N; ++i)
+                        swap(mFast[i], rhs.mFast[i]);
+                }
+                else if (mSize < rhs.mSize)
+                {
+                    for (size_type i = 0; i < mSize; ++i)
+                        swap(mFast[i], rhs.mFast[i]);
+                    moveConstruct(mSize, rhs.mSize, rhs.mFast + mSize);
+                    rhs.destroy(mSize, rhs.mSize);
+                }
+                else if (rhs.mSize < mSize)
+                {
+                    for (size_type i = 0; i < mSize; ++i)
+                        swap(mFast[i], rhs.mFast[i]);
+                    rhs.moveConstruct(rhs.mSize, mSize, mFast + rhs.mSize);
+                    destroy(rhs.mSize, mSize);
+                }
                 swap(mSlow, rhs.mSlow);
                 swap(mSize, rhs.mSize);
                 swap(mSlowCapacity, rhs.mSlowCapacity);
@@ -501,8 +518,25 @@ namespace cppdatalib
             void swapWithoutAllocator(cache_vector_n &rhs)
             {
                 using std::swap;
-                for (size_type i = 0; i < N; ++i)
-                    swap(mFast[i], rhs.mFast[i]);
+                if (mSize >= N && rhs.mSize >= N)
+                {
+                    for (size_type i = 0; i < N; ++i)
+                        swap(mFast[i], rhs.mFast[i]);
+                }
+                else if (mSize < rhs.mSize)
+                {
+                    for (size_type i = 0; i < mSize; ++i)
+                        swap(mFast[i], rhs.mFast[i]);
+                    moveConstruct(mSize, rhs.mSize, rhs.mFast + mSize);
+                    rhs.destroy(mSize, rhs.mSize);
+                }
+                else if (rhs.mSize < mSize)
+                {
+                    for (size_type i = 0; i < mSize; ++i)
+                        swap(mFast[i], rhs.mFast[i]);
+                    rhs.moveConstruct(rhs.mSize, mSize, mFast + rhs.mSize);
+                    destroy(rhs.mSize, mSize);
+                }
                 swap(mSlow, rhs.mSlow);
                 swap(mSize, rhs.mSize);
                 swap(mSlowCapacity, rhs.mSlowCapacity);
@@ -585,10 +619,10 @@ namespace cppdatalib
                 try {
                     for (i = pos; i < std::min(N, pos); ++i, ++begin)
                         mFast[i] = std::move(*begin);
-                    for (i = std::max(N, begin); i < end; ++i, ++begin)
+                    for (i = std::max(N, pos); i < end; ++i, ++begin)
                         std::allocator_traits<allocator_type>::construct(alloc, mSlow + (i - N), std::move(*begin));
                 } catch (...) {
-                    destroy(begin, i);
+                    destroy(pos, i);
                     throw;
                 }
             }
