@@ -568,11 +568,6 @@ namespace cppdatalib
                         // Deallocate current block
                         std::allocator_traits<allocator_type>::deallocate(alloc, mSlow, mSlowCapacity);
                     }
-                    else
-                    {
-                        // Default-construct new block
-                        pConstruct(new_mSlow, new_mSlow + new_slow_size);
-                    }
 
                     mSlow = new_mSlow;
                     mSlowCapacity = required - N;

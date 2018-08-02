@@ -129,6 +129,9 @@ namespace cppdatalib
             // Attempt to seek to absolute position `p`
             // Return true on success, false on failure
             virtual bool seekc_(streamsize) = 0;
+            // Return the current absolute position
+            // Return -1 on unknown or failure
+            virtual streamsize pos_() = 0;
 
         public:
             istream() : flags_(0), skip_ws(true)
@@ -296,6 +299,15 @@ namespace cppdatalib
 #endif
 
                 return *this;
+            }
+
+            streamsize tellg()
+            {
+                sentry s(*this);
+                if (!s)
+                    return -1;
+
+                return pos_();
             }
 
             istream &seekg(streamsize p)
@@ -667,6 +679,7 @@ namespace cppdatalib
             const std::string &str() const {return string;}
 
         protected:
+            streamsize pos_() {return pos;}
             bool seekc_(streamsize p)
             {
                 if (uintmax_t(p) < string.size())
@@ -733,6 +746,7 @@ namespace cppdatalib
             std::string str() const {return std::string(string, len);}
 
         protected:
+            streamsize pos_() {return pos;}
             bool seekc_(streamsize p)
             {
                 if (uintmax_t(p) < len)
@@ -805,6 +819,7 @@ namespace cppdatalib
             void str(std::string s) {string = std::move(s); pos = 0; flags_ = 0;}
 
         protected:
+            streamsize pos_() {return pos;}
             bool seekc_(streamsize p)
             {
                 if (uintmax_t(p) < string.size())
@@ -848,24 +863,25 @@ namespace cppdatalib
 
         class istd_streambuf_wrapper : public istream
         {
-            size_t pos_;
+            size_t pos;
             std::streambuf *stream_;
 
         public:
             istd_streambuf_wrapper(std::streambuf *stream)
-                : pos_(0)
+                : pos(0)
                 , stream_(stream)
             {}
 
-            streamsize used_buffer() const {return pos_;}
+            streamsize used_buffer() const {return pos;}
             streamsize remaining_buffer() const {return -1;}
 
         protected:
+            streamsize pos_() {return pos;}
             bool seekc_(streamsize p) {return stream_->pubseekpos(p, std::ios_base::in) >= 0;}
             int_type getc_()
             {
                 int_type ch = stream_->sbumpc();
-                pos_ += ch != EOF;
+                pos += ch != EOF;
                 return ch;
             }
             int_type peekc_() {return stream_->sgetc();}
@@ -874,13 +890,13 @@ namespace cppdatalib
                 if (stream_->sungetc() == EOF)
                     flags_ |= bad_bit;
                 else
-                    --pos_;
+                    --pos;
             }
             bool readc_(char *buffer, size_t &n, bool &eof)
             {
                 uint64_t got = stream_->sgetn(buffer, n);
 
-                pos_ += got;
+                pos += got;
 
                 if (got != n)
                 {
@@ -896,50 +912,51 @@ namespace cppdatalib
         class ibufferstream : public istream
         {
             const char *mem_;
-            size_t size_, pos_;
+            size_t size_, pos;
 
         public:
             ibufferstream(const char *buffer, size_t buffer_size)
                 : mem_(buffer)
                 , size_(buffer_size)
-                , pos_(0)
+                , pos(0)
             {}
 
-            const char *current_buffer_begin() const {return mem_ + pos_;}
-            streamsize used_buffer() const {return pos_;}
-            streamsize remaining_buffer() const {return size_ - pos_;}
+            const char *current_buffer_begin() const {return mem_ + pos;}
+            streamsize used_buffer() const {return pos;}
+            streamsize remaining_buffer() const {return size_ - pos;}
 
             const char *buffer() const {return mem_;}
             size_t buffer_size() const {return size_;}
 
         protected:
+            streamsize pos_() {return pos;}
             bool seekc_(streamsize p)
             {
                 if (uintmax_t(p) < size_)
                 {
-                    pos_ = size_t(p);
+                    pos = size_t(p);
                     return true;
                 }
                 return false;
             }
-            int_type getc_() {return pos_ == size_? EOF: mem_[pos_++] & 0xff;}
-            int_type peekc_() {return pos_ == size_? EOF: mem_[pos_] & 0xff;}
+            int_type getc_() {return pos == size_? EOF: mem_[pos++] & 0xff;}
+            int_type peekc_() {return pos == size_? EOF: mem_[pos] & 0xff;}
             void ungetc_()
             {
-                if (pos_ == 0)
+                if (pos == 0)
                     flags_ |= bad_bit;
                 else
-                    --pos_;
+                    --pos;
             }
             bool readc_(char *buffer, size_t &n, bool &eof)
             {
-                size_t remaining = size_ - pos_;
+                size_t remaining = size_ - pos;
 
                 if (remaining < n)
                 {
                     // Failure to finish buffer
-                    memcpy(buffer, mem_ + pos_, remaining);
-                    pos_ = size_;
+                    memcpy(buffer, mem_ + pos, remaining);
+                    pos = size_;
                     n = remaining;
                     eof = true;
                     return false;
@@ -947,8 +964,8 @@ namespace cppdatalib
                 else
                 {
                     // Success
-                    memcpy(buffer, mem_ + pos_, n);
-                    pos_ += n;
+                    memcpy(buffer, mem_ + pos, n);
+                    pos += n;
                     return true;
                 }
             }
@@ -1000,6 +1017,7 @@ namespace cppdatalib
             size_t buffer_size() const {return stream.buffer_size();}
 
         protected:
+            streamsize pos_() {return stream.tellg();}
             bool seekc_(streamsize p) {return stream.seekg(p);}
             int_type getc_() {return stream.get();}
             int_type peekc_() {return stream.peek();}
@@ -1028,7 +1046,7 @@ namespace cppdatalib
             int_type peek_;
             bool use_peek_next;
             encoding current_encoding_;
-            size_t pos_;
+            size_t pos;
 
         public:
             iencodingstream(core::istream &stream, encoding encoding_type = unknown)
@@ -1038,10 +1056,10 @@ namespace cppdatalib
                 , peek_(0)
                 , use_peek_next(false)
                 , current_encoding_(encoding_type)
-                , pos_(0)
+                , pos(0)
             {}
 
-            streamsize used_buffer() const {return pos_;}
+            streamsize used_buffer() const {return pos;}
             streamsize remaining_buffer() const {return -1;}
 
             encoding get_encoding() const {return current_encoding_;}
@@ -1049,18 +1067,19 @@ namespace cppdatalib
             void set_encoding(encoding encoding_type) {current_encoding_ = encoding_type;}
 
         protected:
+            streamsize pos_() {return -1;}
             bool seekc_(streamsize) {return false;} // Not seekable
             int_type getc_()
             {
                 if (use_buffer_next)
                 {
-                    ++pos_;
+                    ++pos;
                     use_buffer_next = false;
                     return last_;
                 }
                 else if (use_peek_next)
                 {
-                    ++pos_;
+                    ++pos;
                     use_peek_next = false;
                     return peek_;
                 }
@@ -1068,7 +1087,7 @@ namespace cppdatalib
                 bool eof;
                 uint32_t codepoint = utf_to_ucs(*underlying_stream_, current_encoding_, &eof);
 
-                pos_ += !eof;
+                pos += !eof;
 
                 if (eof)
                     return EOF;
@@ -1085,7 +1104,7 @@ namespace cppdatalib
                 else
                 {
                     use_buffer_next = true;
-                    --pos_;
+                    --pos;
                 }
             }
 

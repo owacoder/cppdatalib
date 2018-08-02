@@ -1202,6 +1202,33 @@ namespace cppdatalib
                 return *p;
             }
 
+            long link_depth() const
+            {
+                size_t cnt = 0;
+                const value *p = this;
+                while (p->is_nonnull_link())
+                {
+                    ++cnt;
+                    p = &p->deref();
+                }
+                return cnt;
+            }
+
+            const value &deref_to_depth(long depth) const
+            {
+                const value *p = this;
+                while (p->is_nonnull_link() && depth-- > 0)
+                    p = &p->deref();
+                return *p;
+            }
+            value &deref_to_depth(long depth)
+            {
+                value *p = this;
+                while (p->is_nonnull_link() && depth-- > 0)
+                    p = &p->deref();
+                return *p;
+            }
+
             const value &deref_all_links() const
             {
                 const value *p = this;
