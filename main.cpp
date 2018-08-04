@@ -5,10 +5,11 @@
 /*
 #ifndef CPPDATALIB_ENABLE_ATTRIBUTES
 #define CPPDATALIB_ENABLE_ATTRIBUTES
-#endif
+#endif*/
 #ifndef CPPDATALIB_ENABLE_XML
 #define CPPDATALIB_ENABLE_XML
-#endif*/
+#endif
+#define CPPDATALIB_ENABLE_FILESYSTEM
 //#define CPPDATALIB_ENABLE_FAST_IO
 //#define CPPDATALIB_DISABLE_WRITE_CHECKS
 #define CPPDATALIB_DISABLE_FAST_IO_GCOUNT
@@ -738,6 +739,713 @@ int rmain(int argc, char **argv)
     return 0;
 }
 
+#include <qtapp.h>
+
+void test_http()
+{
+    cppdatalib::http::http_initialize();
+
+    cppdatalib::core::ostringstream stream;
+    cppdatalib::json::stream_writer(stream) << cppdatalib::core::object_t{{"new object type", "not true"}, {"graduated sequence", 4412887}};
+    std::cout << cppdatalib::http::parser("http://google.com");
+
+    cppdatalib::http::http_deinitialize();
+}
+
+class JSBytecodeInterpreter
+{
+    typedef void (*ErrorCallback)(const std::string &);
+    ErrorCallback err;
+
+    // Arguments are pushed on the stack in the order they are encountered (first argument is deepest on the stack)
+    // The return value should be left on the top of the stack, even if it is unused (it should be set to undefined then)
+    typedef void (*ExternalFunction)(cppdatalib::core::value &stack,
+                                     cppdatalib::core::value &callStack);
+
+    static void Object_prototype_valueOf(cppdatalib::core::value &stack, cppdatalib::core::value &callStack)
+    {
+
+    }
+
+    cppdatalib::core::value createObjectPrototype()
+    {
+        return cppdatalib::core::object_t{};
+    }
+
+    cppdatalib::core::value createObject()
+    {
+        auto prototype = newHeapReference(createObjectPrototype());
+        return cppdatalib::core::object_t{
+            {{}, prototype},
+            {"prototype", prototype}
+        };
+    }
+
+    cppdatalib::core::value createFunctionPrototype()
+    {
+        auto prototype = newHeapReference(createObject());
+        return cppdatalib::core::object_t{
+            {{}, prototype},
+            {"prototype", prototype}
+        };
+    }
+
+    cppdatalib::core::value createFunction(ExternalFunction func, const cppdatalib::core::array_t &args)
+    {
+        auto prototype = newHeapReference(createFunctionPrototype());
+        return cppdatalib::core::object_t{
+            {{}, prototype},
+            {"prototype", prototype},
+            {"originalBody", {}},
+            {"body", {}},
+            {"arguments", args},
+            {"external", reinterpret_cast<uint64_t>(func)}
+        };
+    }
+
+    cppdatalib::core::value createFunction(std::string body, std::string originalBody, const cppdatalib::core::array_t &args)
+    {
+        auto prototype = newHeapReference(createFunctionPrototype());
+        return cppdatalib::core::object_t{
+            {{}, prototype},
+            {"prototype", prototype},
+            {"originalBody", originalBody},
+            {"body", body},
+            {"arguments", args},
+            {"external", 0u}
+        };
+    }
+
+    std::string bytecode;
+
+public:
+    JSBytecodeInterpreter(const std::string &bytecode = "", ErrorCallback err = nullptr) : err(err), bytecode(bytecode)
+    {
+        initialize();
+    }
+
+    void setBytecode(const std::string &bytecode)
+    {
+        this->bytecode = bytecode;
+        stream.str(bytecode);
+        stream.seekg(0);
+        while (callStack.array_size() > 1)
+            callStack.erase_element(callStack.array_size() - 1);
+    }
+
+    cppdatalib::core::value run()
+    {
+        char c;
+
+        stream.seekg(0);
+        while (c = stream.get(), stream)
+        {
+            switch (c)
+            {
+                case 0x20: // ' ', print contents of stack
+                {
+                    auto stack = this->stack;
+
+                    while (stack.size())
+                    {
+                        std::cout << stack.size() << ": " << stack.element(stack.size()-1) << "\n";
+                        stack.erase_element(stack.size() - 1);
+                    }
+                    break;
+                }
+                case 'c': // 'c', print contents of call stack
+                {
+                    std::cout << callStack << std::endl;
+                    break;
+                }
+                case '!': // '!', place following JSON value on stack
+                {
+                    cppdatalib::core::value value;
+                    value << cppdatalib::json::parser(stream);
+                    push(newHeapReference(std::move(value)));
+                    break;
+                }
+                case 0x2A: // '*', multiply top two numbers on stack
+                {
+                    if (stack.size() < 2)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid arguments to '*' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    auto &first = stackFromTop(1).deref_all_links();
+                    auto &second = stackFromTop(0).deref_all_links();
+                    auto result = as_real(first) * as_real(second);
+                    pop();
+                    pop();
+                    push(newHeapReference({result}));
+
+                    break;
+                }
+                case 0x2B: // '+', add top two numbers on stack or concatenate top two strings
+                {
+                    if (stack.size() < 2)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid arguments to '+' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    auto &first = stackFromTop(1).deref_all_links();
+                    auto &second = stackFromTop(0).deref_all_links();
+                    if (first.get_type() == cppdatalib::core::string ||
+                            second.get_type() == cppdatalib::core::string)
+                    {
+                        auto result = as_string(first) + as_string(second);
+                        pop();
+                        pop();
+                        push(newHeapReference({result}));
+                    }
+                    else
+                    {
+                        auto result = first.get_real_unchecked() + second.get_real_unchecked();
+                        pop();
+                        pop();
+                        push(newHeapReference({result}));
+                    }
+
+                    break;
+                }
+                case 0x2D: // '-', subtract top two numbers on stack
+                {
+                    if (stack.size() < 2)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid arguments to '-' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    auto &first = stackFromTop(1).deref_all_links();
+                    auto &second = stackFromTop(0).deref_all_links();
+                    auto result = as_real(first) + as_real(second);
+                    pop();
+                    pop();
+                    push(newHeapReference({result}));
+
+                    break;
+                }
+                case 0x2E: // '.', lookup member of object (second item on stack) with name (held at top of stack) and place reference on top of stack (pops name and object from stack)
+                {
+                    if (stack.size() < 2)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid arguments to 'member' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    auto &obj = stackFromTop(1).deref_all_links();
+                    auto &name = stackFromTop(0).deref_all_links();
+
+                    auto ref = findMember(obj, name);
+                    if (ref.is_null())
+                        ref = cppdatalib::core::value(&(obj.member(name) = newHeapReference(cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined)))); // Make own member in object (TODO: disregards getters and setters of prototypes at the moment)
+
+                    if (stackFromTop(1).is_link() && !stackFromTop(1).is_strong_link()) // If we still will have access to the object...
+                    {
+                        pop();
+                        pop();
+                        push(std::move(ref)); // Push the member reference to the stack
+                    }
+                    else
+                    {
+                        if (err)
+                            err("JavaScript: Invalid arguments to 'member' operator; the object has gone out of scope");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+                    break;
+                }
+                case 0x2F: // '/', divide top two numbers on stack
+                {
+                    if (stack.size() < 2)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid arguments to '/' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    auto &first = stackFromTop(1).deref_all_links();
+                    auto &second = stackFromTop(0).deref_all_links();
+                    auto result = as_real(first) / as_real(second);
+                    pop();
+                    pop();
+                    push(newHeapReference({result}));
+
+                    break;
+                }
+                case 0x3D: // '=', assign top value on stack to second value on stack and pop second value from stack
+                {
+                    if (stack.size() < 2)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid arguments to '=' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    auto &first = stackFromTop(1).deref_all_links();
+                    auto &second = stackFromTop(0).deref_to_depth(stackFromTop(0).link_depth()-1);
+
+                    first = second;
+                    pop();
+
+                    break;
+                }
+                case 0x64: // 'd', define function (stack contains "...args, body, originalBody, numberOfArgs" with "numberOfArgs" on top) and pop all relevant values, pushing the resulting function object reference onto the stack
+                {
+                    if (stack.size() < 3)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid argument to 'define' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    auto numberOfArgs = stackFromTop(0).deref_all_links().as_uint();
+                    auto originalBody = stackFromTop(1).deref_all_links().get_string();
+                    auto body = stackFromTop(2).deref_all_links().get_string();
+
+                    pop();
+                    pop();
+                    pop();
+
+                    cppdatalib::core::array_t args;
+                    while (numberOfArgs--)
+                    {
+                        args.data().insert(args.data().begin(), stackFromTop(0).deref_all_links());
+                        pop();
+                    }
+
+                    push(newHeapReference(createFunction(static_cast<std::string>(body), static_cast<std::string>(originalBody), args)));
+                    break;
+                }
+                case 0x67: // 'g', lookup variable (with name held at top of stack) and place reference on top of stack (pops name from stack)
+                {
+                    if (stack.size() < 1)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid argument to 'lookup' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    auto ref = findVariable(stackFromTop(0));
+                    pop();
+                    push(std::move(ref));
+                    break;
+                }
+                case 0x6C: // 'l', declare variable (with name held at top of stack) in current local scope (pops name from stack)
+                {
+                    if (stack.size() < 1)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid argument to 'let' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    cppdatalib::core::value ref = newHeapReference(cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined));
+                    currentScope()->member("variables").member(stackFromTop(0).deref_all_links()) = ref;
+                    pop();
+                    push(std::move(ref));
+                    break;
+                }
+                case 0x6E: // 'n', push null onto stack
+                {
+                    push(newHeapReference({}));
+                    break;
+                }
+                case 0x70: // 'p', pop from stack
+                {
+                    if (stack.size() < 1)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid argument to 'pop' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    pop();
+                    break;
+                }
+                case 0x72: // 'r', return value from function (undefined value must be on stack already if needed)
+                {
+                    if (stack.size() < 1)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid argument to 'return' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    cppdatalib::core::value v = stackFromTop(0);
+                    auto scope = currentFunctionScope();
+                    if (scope->const_member("type") == cppdatalib::core::value("global", cppdatalib::core::domain_comparable))
+                        return v.deref_all_links();
+                    moveToScope(parentScopeOf(currentFunctionScope()));
+                    push(newHeapReference(std::move(v)));
+                    break;
+                }
+                case 0x75: // 'u', push undefined onto stack
+                {
+                    push(newHeapReference(cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined)));
+                    break;
+                }
+                case 0x76: // 'v', declare variable (with name held at top of stack) in current function scope (pops name from stack)
+                {
+                    if (stack.size() < 1)
+                    {
+                        if (err)
+                            err("JavaScript: Invalid argument to 'var' operator");
+                        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+                    }
+
+                    cppdatalib::core::value ref = newHeapReference(cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined));
+                    currentFunctionScope()->member("variables").member(stackFromTop(0).deref_all_links()) = ref;
+                    pop();
+                    push(std::move(ref));
+                    break;
+                }
+            }
+        }
+
+        return cppdatalib::core::value(cppdatalib::core::null_t(), cppdatalib::core::undefined);
+    }
+
+private:
+    void initialize()
+    {
+        stack.set_null();
+        callStack.set_null();
+        heap.clear();
+        stream.str(bytecode);
+
+        addScope(cppdatalib::core::object_t{
+                     {"body", bytecode},
+                     {"variables",
+                      cppdatalib::core::object_t{
+                       {"Object", newHeapReference(cppdatalib::core::object_t{
+                        {"valueOf", newHeapReference(createFunction(Object_prototype_valueOf, {}))},
+                       })}
+                      }
+                     },
+                     {"type", "global"}
+                 });
+
+        garbageCollect();
+    }
+
+    void finalize()
+    {
+        garbageCollect();
+    }
+
+    void garbageCollect()
+    {
+
+    }
+
+    cppdatalib::core::value &stackFromTop(size_t offset) {return stack.element(stack.array_size() - 1 - offset);}
+    cppdatalib::core::value &push(cppdatalib::core::value &&v) {stack.push_back(std::move(v)); return stack.element(stack.array_size()-1);}
+    cppdatalib::core::value &pushNew() {stack.push_back({}); return stack.element(stack.array_size()-1);}
+    void pop() {stack.erase_element(stack.array_size() - 1);}
+
+    double as_real(const cppdatalib::core::value &value)
+    {
+        auto &ref = value.deref_all_links();
+
+        switch (ref.get_type())
+        {
+            case cppdatalib::core::null: return ref.get_subtype() != cppdatalib::core::undefined? 0: NAN;
+            case cppdatalib::core::boolean: return ref.get_bool_unchecked();
+            case cppdatalib::core::integer: return ref.get_int_unchecked();
+            case cppdatalib::core::uinteger: return ref.get_uint_unchecked();
+            case cppdatalib::core::real: return ref.get_real_unchecked();
+            case cppdatalib::core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            case cppdatalib::core::temporary_string:
+#endif
+            {
+                size_t pos = ref.get_string_unchecked().find_first_not_of(" \t\n\r");
+
+                if (ref.get_string_unchecked().empty())
+                    return 0;
+                else if (pos == std::string::npos || !isdigit(ref.get_string_unchecked()[pos]) ||
+                         ref.get_string_unchecked().find_first_not_of("0123456789eE.+-") != std::string::npos)
+                    return NAN;
+                else
+                {
+                    char *after;
+                    double val = cppdatalib::core::fp_from_in_string<double>(ref.get_string_unchecked().begin(), ref.get_string_unchecked().end(), &after);
+
+                    if (after != ref.get_string_unchecked().end())
+                        return NAN;
+                    return val;
+                }
+            }
+            case cppdatalib::core::array:
+                if (ref.get_array_unchecked().empty())
+                    return 0;
+                else if (ref.get_array_unchecked()[0].get_type() == cppdatalib::core::real)
+                    return ref.get_array_unchecked()[0].get_real_unchecked();
+                else
+                    return NAN;
+            case cppdatalib::core::object:
+                return NAN;
+        }
+
+        return NAN;
+    }
+
+    std::string as_string(const cppdatalib::core::value &value)
+    {
+        auto &ref = value.deref_all_links();
+
+        switch (ref.get_type())
+        {
+            case cppdatalib::core::null: return ref.get_subtype() != cppdatalib::core::undefined? "null": "undefined";
+            case cppdatalib::core::boolean: return ref.get_bool_unchecked()? "true": "false";
+            case cppdatalib::core::integer:
+            case cppdatalib::core::uinteger: return ref.as_string();
+            case cppdatalib::core::real: return std::isnan(ref.get_real_unchecked())? "NaN": std::isinf(ref.get_real_unchecked())? ref.get_real_unchecked() < 0? "-Infinity": "Infinity": ref.as_string();
+            case cppdatalib::core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            case cppdatalib::core::temporary_string:
+#endif
+                return static_cast<std::string>(ref.get_string_unchecked());
+            case cppdatalib::core::array:
+            {
+                std::string result;
+                uint64_t ctr = 0;
+                for (const auto &ref: ref.get_array_unchecked())
+                {
+                    if (ctr++)
+                        result.push_back(',');
+                    result += as_string(ref);
+                }
+                return result;
+            }
+            case cppdatalib::core::object:
+                return "[object Object]";
+        }
+
+        return "";
+    }
+
+    bool as_bool(const cppdatalib::core::value &value)
+    {
+        auto &ref = value.deref_all_links();
+
+        switch (ref.get_type())
+        {
+            case cppdatalib::core::null: return false;
+            case cppdatalib::core::boolean: return ref.get_bool_unchecked();
+            case cppdatalib::core::integer: return ref.get_int_unchecked() != 0;
+            case cppdatalib::core::uinteger: return ref.get_uint_unchecked() != 0;
+            case cppdatalib::core::real: return std::isnan(ref.get_real_unchecked())? false: ref.get_real_unchecked() != 0;
+            case cppdatalib::core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+            case cppdatalib::core::temporary_string:
+#endif
+                return ref.get_string_unchecked().size();
+            case cppdatalib::core::array: return true;
+            case cppdatalib::core::object: return true;
+        }
+
+        return false;
+    }
+
+    /*
+     * Memory management (TODO: newHeapReference needs some work!??!)
+     */
+    cppdatalib::core::value newHeapReference(cppdatalib::core::value &&value)
+    {
+        heap.push_back(std::move(value)); // Create value on heap
+        return cppdatalib::core::value(&heap.back()); // Return weak link to it
+    }
+
+    // Returns a reference to the current non-block scope (could be the global scope)
+    cppdatalib::core::value currentNonBlockScope()
+    {
+        for (size_t i = callStack.array_size(); i > 0; --i)
+            if (callStack[i-1].const_member("type") != cppdatalib::core::value("block", cppdatalib::core::domain_comparable))
+                return cppdatalib::core::value(&callStack.element(i-1));
+
+        // Never reached (callStack must always have at least one entry)
+        return {};
+    }
+
+    // Returns a reference to the current function scope, or global scope if not currently in a function
+    cppdatalib::core::value currentFunctionScope()
+    {
+        for (size_t i = callStack.array_size(); i > 0; --i)
+            if (callStack[i-1].const_member("type") == cppdatalib::core::value("function", cppdatalib::core::domain_comparable))
+                return cppdatalib::core::value(&callStack.element(i-1));
+
+        return cppdatalib::core::value(&callStack.element(0));
+    }
+
+    cppdatalib::core::value parentScopeOf(const cppdatalib::core::value &scope)
+    {
+        auto &ref = scope.deref_all_links();
+
+        size_t idx = ref.const_member("callStackHeightAtEntry").as_uint();
+
+        if (idx == 0)
+            return scope;
+        else
+            return cppdatalib::core::value(&callStack.element(idx-1));
+    }
+
+    // Returns a reference to the current scope
+    cppdatalib::core::value currentScope()
+    {
+        return cppdatalib::core::value(&callStack.element(callStack.array_size()-1));
+    }
+
+    // Enables the provided scope as the current scope
+    void moveToScope(const cppdatalib::core::value &scope)
+    {
+        auto &ref = scope.deref_all_links();
+
+        size_t callstackHeight = ref.const_member("callStackHeightAtEntry").as_uint() + 1;
+        while (callStack.array_size() > callstackHeight)
+            callStack.erase_element(callStack.array_size() - 1);
+
+        size_t stackHeight = ref.const_member("stackHeight").as_uint();
+        while (stack.array_size() > stackHeight)
+            stack.erase_element(stack.array_size() - 1);
+
+        // TODO: does this error-check properly?
+        if (stack.array_size() < stackHeight) // Something strange happened in the function call
+        {
+            if (err)
+                err("JavaScript - Too many stack entries popped off in call scope, undefined behavior may result");
+        }
+
+        stream.str(static_cast<std::string>(ref.const_member("body").get_string()));
+        stream.seekg(ref.const_member("streamPosition").as_int());
+    }
+
+    // Add scope to the call stack
+    void addScope(const cppdatalib::core::value &newScope,
+                  const cppdatalib::core::value &thisRef = {},
+                  const cppdatalib::core::array_t &args = {})
+    {
+        auto &ref = newScope.deref_all_links();
+
+        if (callStack.array_size())
+        {
+            auto &current = currentScope().deref_all_links();
+
+            current["stackHeight"] = stack.array_size();
+            current["streamPosition"] = stream.tellg();
+        }
+
+        callStack.push_back(cppdatalib::core::object_t{
+                                {"type", ref["type"]},
+                                {"variables", ref["variables"]},
+                                {"callStackHeightAtEntry", callStack.array_size()},
+                                {"stackHeightAtEntry", stack.array_size()},
+                                {"stackHeight", stack.array_size()},
+                                {"streamPosition", 0},
+                                {"body", ref["body"]},
+                                {"this", thisRef},
+                                {"arguments", args}
+                            });
+    }
+
+    // Find variable name in any scope (returns reference on success, null on failure)
+    static cppdatalib::core::value findMember(cppdatalib::core::value &obj,
+                                              const cppdatalib::core::value &name)
+    {
+        auto &obj_deref = obj.deref_all_links();
+        auto &name_deref = name.deref_all_links();
+
+        auto *prototype = &obj_deref;
+        while (prototype)
+        {
+            if (prototype->is_member(name_deref))
+                return cppdatalib::core::value(&prototype->member(name_deref));
+
+            if (!prototype->is_member(cppdatalib::core::null_t{}))
+                return {};
+
+            prototype = &prototype->member(cppdatalib::core::null_t{});
+        }
+
+        return {};
+    }
+
+    // Find variable name in any scope (returns reference on success, null on failure)
+    cppdatalib::core::value findVariable(const cppdatalib::core::value &name)
+    {
+        auto &name_deref = name.deref_all_links();
+
+        for (size_t i = callStack.size(); i > 0; --i)
+        {
+            auto &ref = callStack[i-1]["variables"];
+            if (ref.is_member(name_deref))
+                return ref.member(name_deref);
+        }
+
+        return {};
+    }
+
+    cppdatalib::core::istringstream stream;
+
+    /* All objects contain a value with the key cppdatalib::core::null_t that refers to the prototype,
+     * and normal objects have the cppdatalib::core::normal subtype:
+     *
+     *    {
+     *        cppdatalib::core::null_t(): OBJECT_PROTOTYPE,
+     *        ...
+     *        NORMAL_PROPERTIES
+     *    }
+     *
+     * Functions contain the following:
+     *
+     *    {
+     *        cppdatalib::core::null_t(): OBJECT_PROTOTYPE,
+     *        cppdatalib::core::object_t():
+     *            {
+     *                "originalBody": SOURCE_CODE as string, or cppdatalib::core::null_t() if no source code available
+     *                "body": INTERNAL_CODE as string, or cppdatalib::core::null_t() if no source code available
+     *                "argumentNames": LIST_OF_ARGUMENT_NAMES as array (a real array, not a JS array)
+     *                "external": UINTEGER, interpreted as a `void (*fp)(cppdatalib::core::value &stack, cppdatalib::core::value &callStack)` (the return value should be left on the top of the stack), or 0 if not an external function
+     *            }
+     *        ...
+     *        NORMAL_PROPERTIES
+     *
+     */
+
+    /* callStack:
+     *
+     * Each level of callStack represents an instance of the following object:
+     *
+     * {
+     *     "type": ONE OF "global/function/block"
+     *     "variables": VARIABLE_MAP (maps variable names to values, including functions)
+     *     "callStackHeightAtEntry": UINTEGER (equal to the index of this scope in `callStack`)
+     *     "stackHeightAtEntry": UINTEGER
+     *     "stackHeight": UINTEGER
+     *     "streamPosition": UINTEGER
+     *     "body": INTERNAL_CODE as string
+     *     "this": OBJECT_REFERENCE, or null if not a "function" scope
+     *     "arguments": LIST_OF_ARGUMENTS as array (a real array, not a JS array), or null if not a "function" scope
+     * }
+     *
+     */
+
+    cppdatalib::core::value callStack;
+    cppdatalib::core::value stack;
+    std::list<cppdatalib::core::value> heap;
+};
+
+void err(const std::string &err)
+{
+    std::cerr << "ERROR: " << err << std::endl;
+}
+
 int main(int argc, char **argv)
 {
     /*make_testbed<std::string>("Bencode", std::cout, bencode_tests, [](const std::string &item) {return cppdatalib::bencode::to_bencode(cppdatalib::bencode::from_bencode(cppdatalib::core::istream_handle(item)));})();
@@ -745,31 +1453,41 @@ int main(int argc, char **argv)
     make_testbed<std::string>("MessagePack", std::cout, message_pack_tests, [](const std::string &item) {return cppdatalib::message_pack::to_message_pack(cppdatalib::message_pack::from_message_pack(cppdatalib::core::istream_handle(item)));})();
     make_range_testbed<uintmax_t>("identity", std::cout, 12000000000, [](uintmax_t v) {return v;}, [](uintmax_t v) {return v;})();*/
 
-    cppdatalib::core::value rvalue = cppdatalib::core::value("yes//no", cppdatalib::core::regexp);
-    rvalue.add_attribute("options", "yksz");
-    auto obj = cppdatalib::core::object_t{{"key", "value"},
-    {"mongo", cppdatalib::core::value(10000333420000, cppdatalib::core::utc_timestamp)},
-    {"", {}}};//{"key3", cppdatalib::core::array_t{-1, 33, 7, 7.53, cppdatalib::core::object_t{{"bite", rvalue}}}}};
-    cppdatalib::hex::debug_write(cppdatalib::core::ostream_handle(std::cout), cppdatalib::bson::to_bson(obj)) << std::endl;
-    int diff = uintmax_t(cppdatalib::bson::to_bson(obj)[0]) - cppdatalib::bson::to_bson(obj).length();
-    if (diff)
-        std::cout << "improper length for top-level object: " << diff << "\n";
-    std::cout << cppdatalib::bson::from_bson(cppdatalib::core::istream_handle(cppdatalib::bson::to_bson(obj)));
+#if 0
+    if (argc > 1)
+    {
+        std::cout << JSBytecodeInterpreter((const char *) argv[1], err).run() << std::endl;
+    }
+    else
+    {
+        JSBytecodeInterpreter interpreter("", err);
 
+        std::string line;
+        while (std::getline(std::cin, line) && line.size())
+        {
+            interpreter.setBytecode(line);
+            std::cout << interpreter.run() << std::endl;
+        }
+    }
     return 0;
 
+    return qtapp_main(argc, argv, test_http);
+#endif
+
+#if 0
     cppdatalib::http::http_initialize();
 
     cppdatalib::core::ostringstream stream;
     cppdatalib::json::stream_writer(stream) << cppdatalib::core::object_t{{"new object type", "not true"}, {"graduated sequence", 4412887}};
     std::cout << cppdatalib::http::parser("http://admin:admin@localhost:5986/test_db",
-                                          cppdatalib::core::curl_network_library,
+                                          cppdatalib::core::default_network_library,
                                           "POST",
                                           cppdatalib::core::istream_handle(stream.str()),
                                           cppdatalib::core::object_t{{"content-type", "application/json"}}, 3);
 
     cppdatalib::http::http_deinitialize();
     return 0;
+#endif
 
     std::unique_ptr<std::ifstream> infile;
     std::unique_ptr<std::ofstream> outfile;
@@ -874,10 +1592,12 @@ int main(int argc, char **argv)
         else if (in_extension == "bson") input.reset(new cppdatalib::bson::parser(*infile.get()));
         else if (in_extension == "cbor") input.reset(new cppdatalib::cbor::parser(*infile.get()));
         else if (in_extension == "csv") input.reset(new cppdatalib::csv::parser(*infile.get()));
-        else if (in_extension == "tsv") input.reset(new cppdatalib::tsv::parser(*infile.get()));
         else if (in_extension == "json") input.reset(new cppdatalib::json::parser(*infile.get()));
+        else if (in_extension == "line") input.reset(new cppdatalib::raw::line_parser(*infile.get()));
         else if (in_extension == "mpk") input.reset(new cppdatalib::message_pack::parser(*infile.get()));
         else if (in_extension == "pson") input.reset(new cppdatalib::pson::parser(*infile.get()));
+        else if (in_extension == "raw") input.reset(new cppdatalib::raw::uint8_parser(*infile.get()));
+        else if (in_extension == "tsv") input.reset(new cppdatalib::tsv::parser(*infile.get()));
         else if (in_extension == "ubjson") input.reset(new cppdatalib::ubjson::parser(*infile.get()));
 #ifdef CPPDATALIB_ENABLE_XML
         else if (in_extension == "xml") input.reset(new cppdatalib::xml::parser(*infile.get(), false));
@@ -915,13 +1635,16 @@ int main(int argc, char **argv)
         if (out_extension == "benc") output.reset(new cppdatalib::bencode::stream_writer(*outfile.get()));
         else if (out_extension == "binn") output.reset(new cppdatalib::binn::stream_writer(*outfile.get()));
         else if (out_extension == "bjson") output.reset(new cppdatalib::bjson::stream_writer(*outfile.get()));
+        else if (out_extension == "bson") output.reset(new cppdatalib::bson::stream_writer(*outfile.get()));
         else if (out_extension == "cbor") output.reset(new cppdatalib::cbor::stream_writer(*outfile.get()));
         else if (out_extension == "csv") output.reset(new cppdatalib::csv::stream_writer(*outfile.get()));
-        else if (out_extension == "tsv") output.reset(new cppdatalib::tsv::stream_writer(*outfile.get()));
         else if (out_extension == "json") output.reset(new cppdatalib::json::stream_writer(*outfile.get()));
+        else if (out_extension == "line") output.reset(new cppdatalib::raw::line_stream_writer(*outfile.get()));
         else if (out_extension == "mpk") output.reset(new cppdatalib::message_pack::stream_writer(*outfile.get()));
         else if (out_extension == "netstrings") output.reset(new cppdatalib::netstrings::stream_writer(*outfile.get()));
         else if (out_extension == "pson") output.reset(new cppdatalib::pson::stream_writer(*outfile.get()));
+        else if (out_extension == "raw") output.reset(new cppdatalib::raw::uint8_stream_writer(*outfile.get()));
+        else if (out_extension == "tsv") output.reset(new cppdatalib::tsv::stream_writer(*outfile.get()));
         else if (out_extension == "ubjson") output.reset(new cppdatalib::ubjson::stream_writer(*outfile.get()));
 #ifdef CPPDATALIB_ENABLE_XML
         else if (out_extension == "xlsx") output.reset(new cppdatalib::xml_xls::document_writer(*outfile.get(), "Worksheet 1"));

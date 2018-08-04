@@ -401,22 +401,25 @@ Top-level types include:
    - string
    - array
    - object
+   - link
 
 Subtypes include (all ranges inclusive on both ends):
 
-   - 0 to 32767: format- or user-specified subtypes
+   - 0 to 2^32-1: format- or user-specified subtypes
    - -9 to -1: generic subtypes applicable to all types
    - -19 to -10: subtypes applicable to booleans
    - -29 to -20: subtypes applicable to integers, either signed or unsigned
    - -39 to -30: subtypes applicable only to signed integers
    - -49 to -40: subtypes applicable only to unsigned integers
    - -59 to -50: subtypes applicable to floating-point values
-   - -129 to -60: subtypes applicable to strings, encoded as some form of text
-   - -199 to -130: subtypes applicable to strings, encoded as some form of binary value
+   - -129 to -60: subtypes applicable to strings or temporary strings, encoded as some form of text
+   - -199 to -130: subtypes applicable to strings or temporary strings, encoded as some form of binary value
    - -209 to -200: subtypes applicable to arrays
    - -219 to -200: subtypes applicable to objects
-   - -255 to -220: undefined, reserved
-   - -32768 to -256: format-specified reserved subtypes
+   - -229 to -220: subtypes applicable to links
+   - -239 to -230: subtypes applicable to nulls
+   - -255 to -240: undefined, reserved
+   - -2^32 to -256: format-specified reserved subtypes
 
 There are two special subtypes, `generic_subtype_comparable`, which compares as if its subtype is equal to whatever it is compared against,
 and `domain_comparable`, which compares as if its type *and* subtype are equal to whatever it is compared against (with a few restrictions).

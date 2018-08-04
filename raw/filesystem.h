@@ -344,12 +344,12 @@ namespace cppdatalib
             }
             void end_key_(const core::value &)
             {
-                if (key.get_string_unchecked().empty() ||
-                    key.get_string_unchecked() == "." ||
-                    key.get_string_unchecked() == ".." ||
-                    key.get_string_unchecked().find('/') != key.get_string_unchecked().npos ||
-                    key.get_string_unchecked().find(fs::path::preferred_separator) != key.get_string_unchecked().npos)
-                    throw core::custom_error("filesystem - invalid filename, cannot open \"" + (path() / key.get_string_unchecked()).native() + "\" for writing");
+                if (key.get_owned_string_unchecked().empty() ||
+                    key.get_owned_string_unchecked() == "." ||
+                    key.get_owned_string_unchecked() == ".." ||
+                    key.get_owned_string_unchecked().find('/') != key.get_owned_string_unchecked().npos ||
+                    key.get_owned_string_unchecked().find(fs::path::preferred_separator) != key.get_owned_string_unchecked().npos)
+                    throw core::custom_error("filesystem - invalid filename, cannot open \"" + (path() / key.get_owned_string_unchecked()).native() + "\" for writing");
                 scalar_is_key = false;
             }
 
@@ -361,7 +361,7 @@ namespace cppdatalib
 
                 if (!v.is_array() && !v.is_object())
                 {
-                    fs::path p = path() / key.get_string_unchecked();
+                    fs::path p = path() / key.get_owned_string_unchecked();
 
                     if (safe_write && fs::exists(p))
                         throw core::custom_error("filesystem - file \"" + p.native() + "\" already exists");
@@ -378,7 +378,7 @@ namespace cppdatalib
                     stream.close();
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-                    fs::path p = path() / key.get_string_unchecked();
+                    fs::path p = path() / key.get_owned_string_unchecked();
 
                     core::value permissions = key.const_attribute(core::value("permissions"));
                     if (permissions.is_uint())
@@ -421,22 +421,22 @@ namespace cppdatalib
                 if (is_key)
                 {
                     key = v; // Copy attributes, if any
-                    key.get_string_ref().clear();
+                    key.get_owned_string_ref().clear();
                 }
             }
             void string_data_(const core::value &v, bool is_key)
             {
                 if (is_key)
-                    key.get_string_ref() += v.get_string_unchecked();
+                    key.get_owned_string_ref() += v.get_owned_string_unchecked();
                 else
-                    stream << v.get_string_unchecked();
+                    stream << v.get_owned_string_unchecked();
             }
 
             void begin_array_(const core::value &, core::optional_size, bool)
             {
                 if (nesting_depth() > 0)
                 {
-                    fs::path p = path() / key.get_string_unchecked();
+                    fs::path p = path() / key.get_owned_string_unchecked();
 
                     if (fs::status(p).type() == fs::file_type::directory)
                     {
@@ -445,7 +445,7 @@ namespace cppdatalib
                     }
                     else
                     {
-                        if (!fs::create_directory(path() / key.get_string_unchecked()))
+                        if (!fs::create_directory(path() / key.get_owned_string_unchecked()))
                             throw core::custom_error("filesystem - unable to create directory \"" + p.native() + "\"");
                     }
 
@@ -476,7 +476,7 @@ namespace cppdatalib
             {
                 if (nesting_depth() > 0)
                 {
-                    fs::path p = path() / key.get_string_unchecked();
+                    fs::path p = path() / key.get_owned_string_unchecked();
 
                     if (fs::status(p).type() == fs::file_type::directory)
                     {
@@ -485,7 +485,7 @@ namespace cppdatalib
                     }
                     else
                     {
-                        if (!fs::create_directory(path() / key.get_string_unchecked()))
+                        if (!fs::create_directory(path() / key.get_owned_string_unchecked()))
                             throw core::custom_error("filesystem - unable to create directory \"" + p.native() + "\"");
                     }
 
