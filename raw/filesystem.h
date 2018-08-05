@@ -105,9 +105,14 @@ namespace cppdatalib
                 filepath.clear();
             }
 
-            intmax_t file_time_to_unix_time(fs::file_time_type time)
+            std::chrono::seconds file_time_to_unix_time(fs::file_time_type time)
             {
-                return std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch()).count();
+                return std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch());
+            }
+
+            std::chrono::nanoseconds file_time_to_unix_time_ns(fs::file_time_type time)
+            {
+                return std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch());
             }
 
             void begin_read_file_contents(const fs::directory_entry &entry)
@@ -119,7 +124,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 v.add_attribute(core::value(core::value("permissions")), core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
                 v.add_attribute(core::value(core::value("size")), core::value(filesize));
-                v.add_attribute(core::value(core::value("modified")), core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+                v.add_attribute(core::value(core::value("modified")), file_time_to_unix_time_ns(fs::last_write_time(entry.path())));
 #endif
                 get_output()->write(v);
 
@@ -215,7 +220,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                                 v.add_attribute(core::value("permissions"), core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
                                 v.add_attribute(core::value("size"), core::value(fs::file_size(entry.path())));
-                                v.add_attribute(core::value("modified"), core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+                                v.add_attribute(core::value("modified"), file_time_to_unix_time_ns(fs::last_write_time(entry.path())));
 #endif
                                 get_output()->write(v);
                                 get_output()->write(core::value());
@@ -230,7 +235,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                                 v.add_attribute(core::value("permissions"), core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
                                 v.add_attribute(core::value("size"), core::value(fs::file_size(entry.path())));
-                                v.add_attribute(core::value("modified"), core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+                                v.add_attribute(core::value("modified"), file_time_to_unix_time_ns(fs::last_write_time(entry.path())));
 #endif
                                 get_output()->write(v);
                                 get_output()->write(core::value());
@@ -245,7 +250,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                                 v.add_attribute(core::value("permissions"), core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
                                 v.add_attribute(core::value("size"), core::value(fs::file_size(entry.path())));
-                                v.add_attribute(core::value("modified"), core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+                                v.add_attribute(core::value("modified"), file_time_to_unix_time_ns(fs::last_write_time(entry.path())));
 #endif
                                 get_output()->write(v);
                                 get_output()->write(core::value());
@@ -260,7 +265,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                                 v.add_attribute(core::value("permissions"), core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
                                 v.add_attribute(core::value("size"), core::value(fs::file_size(entry.path())));
-                                v.add_attribute(core::value("modified"), core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+                                v.add_attribute(core::value("modified"), file_time_to_unix_time_ns(fs::last_write_time(entry.path())));
 #endif
                                 get_output()->write(v);
                                 get_output()->write(core::value());
@@ -271,7 +276,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                             v.add_attribute(core::value("permissions"), core::value(unsigned(entry.status().permissions() & fs::perms::mask)));
                             v.add_attribute(core::value("size"), core::value(0));
-                            v.add_attribute(core::value("modified"), core::value(file_time_to_unix_time(fs::last_write_time(entry.path())), core::unix_timestamp));
+                            v.add_attribute(core::value("modified"), file_time_to_unix_time_ns(fs::last_write_time(entry.path())));
 #endif
 
                             get_output()->write(v);
@@ -386,7 +391,7 @@ namespace cppdatalib
 
                     core::value write_time = key.const_attribute(core::value("modified"));
                     if (write_time.is_int())
-                        fs::last_write_time(p, fs::file_time_type(std::chrono::seconds(write_time.get_int())));
+                        fs::last_write_time(p, fs::file_time_type(std::chrono::milliseconds(write_time)));
 #endif
                 }
             }

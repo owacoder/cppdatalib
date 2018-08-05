@@ -1453,6 +1453,38 @@ int main(int argc, char **argv)
     make_testbed<std::string>("MessagePack", std::cout, message_pack_tests, [](const std::string &item) {return cppdatalib::message_pack::to_message_pack(cppdatalib::message_pack::from_message_pack(cppdatalib::core::istream_handle(item)));})();
     make_range_testbed<uintmax_t>("identity", std::cout, 12000000000, [](uintmax_t v) {return v;}, [](uintmax_t v) {return v;})();*/
 
+    std::chrono::seconds seconds(3599);
+    cppdatalib::core::value nanoseconds(37000, cppdatalib::core::unix_timestamp);
+
+    std::cout << cppdatalib::core::value(seconds) << std::endl;
+    std::cout << cppdatalib::core::value(std::chrono::milliseconds(seconds)) << std::endl;
+    std::cout << cppdatalib::core::value(std::chrono::microseconds(seconds)) << std::endl;
+    std::cout << cppdatalib::core::value(std::chrono::nanoseconds(seconds)) << std::endl;
+    std::cout << cppdatalib::core::value(std::chrono::duration_cast<std::chrono::minutes>(seconds)) << std::endl;
+    std::cout << cppdatalib::core::value(std::chrono::duration_cast<std::chrono::hours>(seconds)) << std::endl;
+
+    std::chrono::nanoseconds ns = nanoseconds;
+    std::cout << "NS: " << ns.count() << std::endl;
+
+    std::chrono::time_point<std::chrono::system_clock> sec_systemclock = std::chrono::system_clock::now();
+
+    std::cout << cppdatalib::core::value(std::chrono::system_clock::now()) << std::endl;
+    std::cout << cppdatalib::core::value(sec_systemclock) << std::endl;
+
+    sec_systemclock = cppdatalib::core::value(std::chrono::system_clock::now());
+    std::cout << "systemclock: " << std::chrono::duration_cast<std::chrono::nanoseconds>(sec_systemclock.time_since_epoch()).count() << std::endl;
+
+    std::complex<float> cmp(30, 4);
+
+    std::cout << cmp;
+
+    std::cout << cppdatalib::core::value(cmp) << std::endl;
+
+    cmp = cppdatalib::core::value(std::complex<float>(4.55, -7)).as<decltype(cmp)>();
+    std::cout << cmp << std::endl;
+
+    return 0;
+
 #if 0
     if (argc > 1)
     {

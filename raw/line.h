@@ -99,19 +99,24 @@ namespace cppdatalib
         class line_stream_writer : public core::stream_writer, public core::stream_handler
         {
             bool had_item;
+            int delimiter;
 
         public:
-            line_stream_writer(core::ostream_handle output) : core::stream_writer(output), had_item(false) {}
+            line_stream_writer(core::ostream_handle output, int delimiter = '\n')
+                : core::stream_writer(output)
+                , had_item(false)
+                , delimiter(delimiter)
+            {}
 
             std::string name() const {return "cppdatalib::raw::line_stream_writer";}
 
         protected:
-            void begin_() {had_item = false;}
+            void begin_() {had_item = false; stream().precision(CPPDATALIB_REAL_DIG);}
 
             void begin_item_(const core::value &v)
             {
                 if (had_item)
-                    stream().put('\n');
+                    stream().put(delimiter);
                 else if (!v.is_array())
                     had_item = true;
             }

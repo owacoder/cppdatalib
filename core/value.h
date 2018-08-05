@@ -109,9 +109,9 @@ namespace cppdatalib
         //     0 to maximum: format- or user-specified subtypes
         //     -9 to -1: generic subtypes applicable to all types
         //     -19 to -10: subtypes applicable to booleans
-        //     -29 to -20: subtypes applicable to integers, either signed or unsigned
-        //     -39 to -30: subtypes applicable only to signed integers
-        //     -49 to -40: subtypes applicable only to unsigned integers
+        //     -39 to -20: subtypes applicable to integers, either signed or unsigned
+        //     -44 to -40: subtypes applicable only to signed integers
+        //     -49 to -45: subtypes applicable only to unsigned integers
         //     -59 to -50: subtypes applicable to floating-point values
         //     -129 to -60: subtypes applicable to strings or temporary strings, encoded as some form of text
         //     -199 to -130: subtypes applicable to strings or temporary strings, encoded as some form of binary value
@@ -131,10 +131,15 @@ namespace cppdatalib
             generic_subtype_comparable = -3, // Generic subtype comparables are only compared by type and value, not by subtype.
 
             // Integers
-            unix_timestamp = -29, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds
+            unix_timestamp = -39, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds
             unix_timestamp_ms, // Number of milliseconds since the epoch, Jan 1, 1970, without leap seconds
+            unix_timestamp_ns, // Number of nanoseconds since the epoch, Jan 1, 1970, without leap seconds
             utc_timestamp, // Number of seconds since the epoch, Jan 1, 1970, with leap seconds
             utc_timestamp_ms, // Number of milliseconds since the epoch, Jan 1, 1970, with leap seconds
+            utc_timestamp_ns, // Number of nanoseconds since the epoch, Jan 1, 1970, with leap seconds
+            duration, // A specified number of seconds as a duration
+            duration_ms, // A specified number of milliseconds as a duration
+            duration_ns, // A specified number of nanoseconds as a duration
             mongodb_timestamp, // MongoDB timestamp
 
             // Text strings
@@ -248,8 +253,13 @@ namespace cppdatalib
 
                 case unix_timestamp: return "UNIX timestamp (seconds)";
                 case unix_timestamp_ms: return "UNIX timestamp (milliseconds)";
+                case unix_timestamp_ns: return "UNIX timestamp (nanoseconds)";
                 case utc_timestamp: return "UTC timestamp (seconds)";
                 case utc_timestamp_ms: return "UTC timestamp (milliseconds)";
+                case utc_timestamp_ns: return "UTC timestamp (nanoseconds)";
+                case duration: return "duration (seconds)";
+                case duration_ms: return "duration (milliseconds)";
+                case duration_ns: return "duration (nanoseconds)";
                 case mongodb_timestamp: return "MongoDB timestamp";
 
                 case clob: return "text (unknown encoding)";
@@ -642,7 +652,7 @@ namespace cppdatalib
 #endif
             {
                 if (v)
-                    assign(*this, cppdatalib::core::value(*v));
+                    assign(*this, cppdatalib::core::value(*v, subtype));
             }
 
             // Template constructor for pointer with supplied user data
@@ -678,7 +688,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const T &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const T &v) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
@@ -686,17 +696,32 @@ namespace cppdatalib
                 assign(*this, cast_to_cppdatalib<T>(v));
             }
 
-            // Template constructor for simple type with supplied user data
+            // Template constructor for simple type (with subtype specified)
+            template<typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(const T &v, subtype_t subtype) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
+            {
+                assign(*this, cast_to_cppdatalib<T>(v));
+                subtype_ = subtype;
+            }
+
+            // Template constructor for simple type with supplied user data (with subtype specified)
             template<typename T, typename UserData, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const T &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
+            value(const T &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
             {
                 assign(*this, cast_to_cppdatalib<T>(v, userdata));
+                subtype_ = subtype;
             }
 
             // Template constructor for template type
@@ -704,22 +729,40 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const Template<Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const Template<Ts...> &v) : type_(null), subtype_(normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
             {
                 assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v));
             }
 
-            // Template constructor for template type with supplied user data
+            // Template constructor for template type (with subtype specified)
+            template<template<typename...> class Template, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(const Template<Ts...> &v, subtype_t subtype) : type_(null), subtype_(subtype)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
+            {
+                assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v));
+                subtype_ = subtype;
+            }
+
+            // Template constructor for template type with supplied user data (with subtype specified)
             template<template<typename...> class Template, typename UserData, typename... Ts>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const Template<Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
+            value(const Template<Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
             {
                 assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v, userdata));
+                subtype_ = subtype;
             }
 
             // Template constructor for sized array template type
@@ -727,7 +770,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const Template<T, N, Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const Template<T, N, Ts...> &v) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
@@ -735,17 +778,32 @@ namespace cppdatalib
                 assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v));
             }
 
+            // Template constructor for sized array template type (with subtype specified)
+            template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(const Template<T, N, Ts...> &v, subtype_t subtype) : type_(null), subtype_(normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
+            {
+                assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v));
+                subtype_ = subtype;
+            }
+
             // Template constructor for sized array template type with supplied user data
             template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename UserData, typename... Ts>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const Template<T, N, Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
+            value(const Template<T, N, Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
             {
                 assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v, userdata));
+                subtype_ = subtype;
             }
 
             // Template constructor for sized type
@@ -753,12 +811,26 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const Template<N, Ts...> &v, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const Template<N, Ts...> &v) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
             {
                 assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v));
+            }
+
+            // Template constructor for sized type (with subtype specified)
+            template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+#ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
+            explicit
+#endif
+            value(const Template<N, Ts...> &v, subtype_t subtype) : type_(null), subtype_(normal)
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+                , attr_(nullptr)
+#endif
+            {
+                assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v));
+                subtype_ = subtype;
             }
 
             // Template constructor for sized type with supplied user data

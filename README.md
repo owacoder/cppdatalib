@@ -61,8 +61,6 @@ Language formats include
 
 The adapter for the STL is missing some features to seamlessly integrate with standard types. For example, the following libraries and technologies are not currently supported as seamless conversions out-of-the-box:
 
-   - The Chrono library
-   - The complex-number library
    - Function objects (i.e. `std::function`)
    - The Locale library
    - `std::auto_ptr` which is deprecated anyway
@@ -408,9 +406,9 @@ Subtypes include (all ranges inclusive on both ends):
    - 0 to 2^32-1: format- or user-specified subtypes
    - -9 to -1: generic subtypes applicable to all types
    - -19 to -10: subtypes applicable to booleans
-   - -29 to -20: subtypes applicable to integers, either signed or unsigned
-   - -39 to -30: subtypes applicable only to signed integers
-   - -49 to -40: subtypes applicable only to unsigned integers
+   - -39 to -20: subtypes applicable to integers, either signed or unsigned
+   - -44 to -40: subtypes applicable only to signed integers
+   - -49 to -45: subtypes applicable only to unsigned integers
    - -59 to -50: subtypes applicable to floating-point values
    - -129 to -60: subtypes applicable to strings or temporary strings, encoded as some form of text
    - -199 to -130: subtypes applicable to strings or temporary strings, encoded as some form of binary value

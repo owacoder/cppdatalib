@@ -21,6 +21,10 @@
 #include <stack>
 #include <queue>
 
+#include <chrono>
+
+#include <complex>
+
 #ifdef CPPDATALIB_CPP17
 #include <variant>
 #include <optional>
@@ -1320,6 +1324,170 @@ public:
         if (bind.is_array())
             cppdatalib::core::impl::tuple_push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind.get_array_unchecked(), result);
         return result;
+    }
+};
+
+// COMPLEX
+
+template<typename T>
+class cast_template_to_cppdatalib<std::complex, T>
+{
+    const std::complex<T> &bind;
+
+public:
+    cast_template_to_cppdatalib(const std::complex<T> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        return cppdatalib::core::value(cppdatalib::core::array_t{cppdatalib::core::value(bind.real()),
+                                                                 cppdatalib::core::value(bind.imag())});
+    }
+};
+
+template<typename T>
+class cast_template_from_cppdatalib<std::complex, T>
+{
+    const cppdatalib::core::value &bind;
+
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::complex<T>() const
+    {
+        if (bind.is_array())
+        {
+            if (bind.array_size() > 1)
+                return std::complex<T>(bind.element_ptr(0)->operator T(),
+                                       bind.element_ptr(1)->operator T());
+            else if (bind.array_size())
+                return std::complex<T>(bind.element_ptr(0)->operator T());
+        }
+
+        return {};
+    }
+};
+
+// CHRONO
+
+template<typename Clock, typename Duration>
+class cast_template_to_cppdatalib<std::chrono::time_point, Clock, Duration>
+{
+    const std::chrono::time_point<Clock, Duration> &bind;
+
+public:
+    cast_template_to_cppdatalib(const std::chrono::time_point<Clock, Duration> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        typedef typename Duration::period Period;
+
+        if (Period::num < Period::den) // Sub-second precision
+        {
+            if (Period::den <= 1000)
+                return cppdatalib::core::value(std::chrono::duration_cast<std::chrono::milliseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp_ms);
+            else
+                return cppdatalib::core::value(std::chrono::duration_cast<std::chrono::nanoseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp_ns);
+        }
+        else // Second or super-second precision
+            return cppdatalib::core::value(std::chrono::duration_cast<std::chrono::milliseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp);
+    }
+};
+
+template<typename Rep, typename Period>
+class cast_template_to_cppdatalib<std::chrono::duration, Rep, Period>
+{
+    const std::chrono::duration<Rep, Period> &bind;
+
+public:
+    cast_template_to_cppdatalib(const std::chrono::duration<Rep, Period> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        if (Period::num < Period::den) // Sub-second precision
+        {
+            if (Period::den <= 1000)
+                return cppdatalib::core::value(bind.count() * (1000 / Period::den), cppdatalib::core::duration_ms);
+            else if (Period::den <= 1000000000)
+                return cppdatalib::core::value(bind.count() * (1000000000 / Period::den), cppdatalib::core::duration_ns);
+            else // Period::den > 1000000000
+                return cppdatalib::core::value(bind.count() / (Period::den / 1000000000), cppdatalib::core::duration_ns);
+        }
+        else // Second or super-second precision
+            return cppdatalib::core::value(bind.count() * Period::num / Period::den, cppdatalib::core::duration);
+    }
+};
+
+template<typename Clock, typename Duration>
+class cast_template_from_cppdatalib<std::chrono::time_point, Clock, Duration>
+{
+    const cppdatalib::core::value &bind;
+
+    template<typename T>
+    std::chrono::time_point<Clock, Duration> from_int(T v, cppdatalib::core::subtype_t subtype) const
+    {
+        switch (subtype)
+        {
+            case cppdatalib::core::unix_timestamp:
+            case cppdatalib::core::utc_timestamp:
+            case cppdatalib::core::duration:
+                return std::chrono::time_point<Clock, Duration>(std::chrono::duration_cast<Duration>(std::chrono::seconds(v)));
+            case cppdatalib::core::unix_timestamp_ms:
+            case cppdatalib::core::utc_timestamp_ms:
+            case cppdatalib::core::duration_ms:
+                return std::chrono::time_point<Clock, Duration>(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(v)));
+            case cppdatalib::core::unix_timestamp_ns:
+            case cppdatalib::core::utc_timestamp_ns:
+            case cppdatalib::core::duration_ns:
+                return std::chrono::time_point<Clock, Duration>(std::chrono::duration_cast<Duration>(std::chrono::nanoseconds(v)));
+            default: return std::chrono::time_point<Clock, Duration>(std::chrono::duration_cast<Duration>(std::chrono::seconds(v)));
+        }
+    }
+
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::chrono::time_point<Clock, Duration>() const
+    {
+        if (bind.is_int())
+            return from_int(bind.get_int_unchecked(), bind.get_subtype());
+        else if (bind.is_uint())
+            return from_int(bind.get_uint_unchecked(), bind.get_subtype());
+        else
+            return {};
+    }
+};
+
+template<typename Rep, typename Period>
+class cast_template_from_cppdatalib<std::chrono::duration, Rep, Period>
+{
+    const cppdatalib::core::value &bind;
+
+    template<typename T>
+    std::chrono::duration<Rep, Period> from_int(T v, cppdatalib::core::subtype_t subtype) const
+    {
+        switch (subtype)
+        {
+            case cppdatalib::core::unix_timestamp:
+            case cppdatalib::core::utc_timestamp:
+            case cppdatalib::core::duration:
+                return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::seconds(v));
+            case cppdatalib::core::unix_timestamp_ms:
+            case cppdatalib::core::utc_timestamp_ms:
+            case cppdatalib::core::duration_ms:
+                return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::milliseconds(v));
+            case cppdatalib::core::unix_timestamp_ns:
+            case cppdatalib::core::utc_timestamp_ns:
+            case cppdatalib::core::duration_ns:
+                return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::nanoseconds(v));
+            default: return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(std::chrono::seconds(v));
+        }
+    }
+
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::chrono::duration<Rep, Period>() const
+    {
+        if (bind.is_int())
+            return from_int(bind.get_int_unchecked(), bind.get_subtype());
+        else if (bind.is_uint())
+            return from_int(bind.get_uint_unchecked(), bind.get_subtype());
+        else
+            return {};
     }
 };
 
