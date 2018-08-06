@@ -693,7 +693,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_to_cppdatalib<T>(v));
+                cast_to_cppdatalib<T>(v).convert(*this);
             }
 
             // Template constructor for simple type (with subtype specified)
@@ -706,7 +706,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_to_cppdatalib<T>(v));
+                cast_to_cppdatalib<T>(v).convert(*this);
                 subtype_ = subtype;
             }
 
@@ -720,7 +720,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_to_cppdatalib<T>(v, userdata));
+                cast_to_cppdatalib<T>(v, userdata).convert(*this);
                 subtype_ = subtype;
             }
 
@@ -734,7 +734,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v));
+                cast_template_to_cppdatalib<Template, Ts...>(v).convert(*this);
             }
 
             // Template constructor for template type (with subtype specified)
@@ -747,7 +747,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v));
+                cast_template_to_cppdatalib<Template, Ts...>(v).convert(*this);
                 subtype_ = subtype;
             }
 
@@ -761,7 +761,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_template_to_cppdatalib<Template, Ts...>(v, userdata));
+                cast_template_to_cppdatalib<Template, Ts...>(v, userdata).convert(*this);
                 subtype_ = subtype;
             }
 
@@ -775,7 +775,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v));
+                cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v).convert(*this);
             }
 
             // Template constructor for sized array template type (with subtype specified)
@@ -788,7 +788,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v));
+                cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v).convert(*this);
                 subtype_ = subtype;
             }
 
@@ -802,7 +802,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v, userdata));
+                cast_array_template_to_cppdatalib<Template, T, N, Ts...>(v, userdata).convert(*this);
                 subtype_ = subtype;
             }
 
@@ -816,7 +816,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v));
+                cast_sized_template_to_cppdatalib<Template, N, Ts...>(v).convert(*this);
             }
 
             // Template constructor for sized type (with subtype specified)
@@ -829,7 +829,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v));
+                cast_sized_template_to_cppdatalib<Template, N, Ts...>(v).convert(*this);
                 subtype_ = subtype;
             }
 
@@ -843,7 +843,7 @@ namespace cppdatalib
                 , attr_(nullptr)
 #endif
             {
-                assign(*this, cast_sized_template_to_cppdatalib<Template, N, Ts...>(v, userdata));
+                cast_sized_template_to_cppdatalib<Template, N, Ts...>(v, userdata).convert(*this);
             }
 
             ~value();
@@ -3304,6 +3304,7 @@ class cast_to_cppdatalib
 public:
     cast_to_cppdatalib(T) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value();}
+    void convert(cppdatalib::core::value &) const {}
 };
 
 template<template<typename...> class Template, typename... Ts>
@@ -3313,6 +3314,7 @@ struct cast_template_to_cppdatalib
 public:
     cast_template_to_cppdatalib(const Template<Ts...> &) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value();}
+    void convert(cppdatalib::core::value &) const {}
 };
 
 template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
@@ -3322,6 +3324,7 @@ struct cast_array_template_to_cppdatalib
 public:
     cast_array_template_to_cppdatalib(const Template<T, N, Ts...> &) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value();}
+    void convert(cppdatalib::core::value &) const {}
 };
 
 template<template<size_t, typename...> class Template, size_t N, typename... Ts>
@@ -3331,6 +3334,7 @@ struct cast_sized_template_to_cppdatalib
 public:
     cast_sized_template_to_cppdatalib(const Template<N, Ts...> &) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value();}
+    void convert(cppdatalib::core::value &) const {}
 };
 
 template<typename T>
@@ -3339,6 +3343,7 @@ class cast_from_cppdatalib {
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &) {}
     operator T() const {return T();}
+    void convert(T &) const {}
 };
 
 template<template<typename...> class Template, typename... Ts>
@@ -3348,6 +3353,7 @@ struct cast_template_from_cppdatalib
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &) {}
     operator Template<Ts...>() const {return Template<Ts...>();}
+    void convert(Template<Ts...> &) const {}
 };
 
 template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
@@ -3357,6 +3363,7 @@ struct cast_array_template_from_cppdatalib
 public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &) {}
     operator Template<T, N, Ts...>() const {return Template<T, N, Ts...>();}
+    void convert(Template<T, N, Ts...> &) const {}
 };
 
 template<template<size_t, typename...> class Template, size_t N, typename... Ts>
@@ -3366,6 +3373,7 @@ struct cast_sized_template_from_cppdatalib
 public:
     cast_sized_template_from_cppdatalib(const cppdatalib::core::value &) {}
     operator Template<N, Ts...>() const {return Template<N, Ts...>();}
+    void convert(Template<N, Ts...> &) const {}
 };
 
 template<>
@@ -3375,6 +3383,7 @@ class cast_to_cppdatalib<signed char>
 public:
     cast_to_cppdatalib(signed char bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::int_t>(bind);}
 };
 
 template<>
@@ -3384,6 +3393,7 @@ class cast_to_cppdatalib<unsigned char>
 public:
     cast_to_cppdatalib(unsigned char bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::uint_t>(bind);}
 };
 
 template<>
@@ -3393,6 +3403,7 @@ class cast_to_cppdatalib<char>
 public:
     cast_to_cppdatalib(char bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(1, bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::string_t(1, bind);}
 };
 
 template<>
@@ -3402,6 +3413,7 @@ class cast_to_cppdatalib<signed short>
 public:
     cast_to_cppdatalib(signed short bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::int_t>(bind);}
 };
 
 template<>
@@ -3411,6 +3423,7 @@ class cast_to_cppdatalib<unsigned short>
 public:
     cast_to_cppdatalib(unsigned short bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::uint_t>(bind);}
 };
 
 template<>
@@ -3420,6 +3433,7 @@ class cast_to_cppdatalib<signed int>
 public:
     cast_to_cppdatalib(signed int bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::int_t>(bind);}
 };
 
 template<>
@@ -3429,6 +3443,7 @@ class cast_to_cppdatalib<unsigned int>
 public:
     cast_to_cppdatalib(unsigned int bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::uint_t>(bind);}
 };
 
 template<>
@@ -3438,6 +3453,7 @@ class cast_to_cppdatalib<signed long>
 public:
     cast_to_cppdatalib(signed long bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::int_t>(bind);}
 };
 
 template<>
@@ -3447,6 +3463,7 @@ class cast_to_cppdatalib<unsigned long>
 public:
     cast_to_cppdatalib(unsigned long bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::uint_t>(bind);}
 };
 
 template<>
@@ -3456,6 +3473,7 @@ class cast_to_cppdatalib<signed long long>
 public:
     cast_to_cppdatalib(signed long long bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::int_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::int_t>(bind);}
 };
 
 template<>
@@ -3465,6 +3483,7 @@ class cast_to_cppdatalib<unsigned long long>
 public:
     cast_to_cppdatalib(unsigned long long bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::uint_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::uint_t>(bind);}
 };
 
 template<>
@@ -3474,6 +3493,7 @@ class cast_to_cppdatalib<float>
 public:
     cast_to_cppdatalib(float bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::real_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::real_t>(bind);}
 };
 
 template<>
@@ -3483,6 +3503,7 @@ class cast_to_cppdatalib<double>
 public:
     cast_to_cppdatalib(double bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::real_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::real_t>(bind);}
 };
 
 template<>
@@ -3492,6 +3513,7 @@ class cast_to_cppdatalib<long double>
 public:
     cast_to_cppdatalib(long double bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(static_cast<cppdatalib::core::real_t>(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = static_cast<cppdatalib::core::real_t>(bind);}
 };
 
 template<>
@@ -3501,6 +3523,7 @@ class cast_to_cppdatalib<char *>
 public:
     cast_to_cppdatalib(char * const &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::string_t(bind);}
 };
 
 template<>
@@ -3510,6 +3533,7 @@ class cast_to_cppdatalib<const char *>
 public:
     cast_to_cppdatalib(const char * const &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind));}
+    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::string_t(bind);}
 };
 
 template<>
@@ -3519,6 +3543,7 @@ class cast_to_cppdatalib<cppdatalib::core::string_t>
 public:
     cast_to_cppdatalib(const cppdatalib::core::string_t &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+    void convert(cppdatalib::core::value &dest) const {dest = bind;}
 };
 
 template<>
@@ -3528,6 +3553,7 @@ class cast_to_cppdatalib<cppdatalib::core::array_t>
 public:
     cast_to_cppdatalib(const cppdatalib::core::array_t &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+    void convert(cppdatalib::core::value &dest) const {dest = bind;}
 };
 
 template<>
@@ -3537,6 +3563,7 @@ class cast_to_cppdatalib<cppdatalib::core::object_t>
 public:
     cast_to_cppdatalib(const cppdatalib::core::object_t &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+    void convert(cppdatalib::core::value &dest) const {dest = bind;}
 };
 
 template<typename T>
@@ -3551,6 +3578,13 @@ public:
             return *bind;
         return cppdatalib::core::null_t();
     }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        if (bind)
+            dest = *bind;
+        else
+            dest.set_null();
+    }
 };
 
 template<size_t N>
@@ -3560,6 +3594,7 @@ class cast_to_cppdatalib<char[N]>
 public:
     cast_to_cppdatalib(const char (&bind)[N]) : bind(&bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::string_t(bind, N);}
+    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::string_t(bind, N);}
 };
 
 template<typename T, size_t N>
@@ -3570,10 +3605,15 @@ public:
     cast_to_cppdatalib(const T (&bind)[N]) : bind(&bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (size_t i = 0; i < N; ++i)
-            result.push_back(bind[i]);
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (size_t i = 0; i < N; ++i)
+            dest.push_back(bind[i]);
     }
 };
 
@@ -3584,6 +3624,7 @@ class cast_from_cppdatalib<bool>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator bool() const {return bind.as_bool();}
+    void convert(cppdatalib::core::value &dest) const {dest = bind.as_bool();}
 };
 
 template<>
@@ -3593,9 +3634,15 @@ class cast_from_cppdatalib<signed char>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator signed char() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed char>::min(),
-                                      bind.as_int(),
-                                      std::numeric_limits<signed char>::max());
+        signed char result;
+        convert(result);
+        return result;
+    }
+    void convert(signed char &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<signed char>::min(),
+                                                    bind.as_int(),
+                                                    std::numeric_limits<signed char>::max());
     }
 };
 
@@ -3606,9 +3653,15 @@ class cast_from_cppdatalib<unsigned char>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator unsigned char() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned char>::min(),
-                                      bind.as_uint(),
-                                      std::numeric_limits<unsigned char>::max());
+        unsigned char result;
+        convert(result);
+        return result;
+    }
+    void convert(unsigned char &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned char>::min(),
+                                                    bind.as_uint(),
+                                                    std::numeric_limits<unsigned char>::max());
     }
 };
 
@@ -3619,9 +3672,15 @@ class cast_from_cppdatalib<signed short>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator signed short() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed short>::min(),
-                                      bind.as_int(),
-                                      std::numeric_limits<signed short>::max());
+        signed short result;
+        convert(result);
+        return result;
+    }
+    void convert(signed short &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<signed short>::min(),
+                                                    bind.as_int(),
+                                                    std::numeric_limits<signed short>::max());
     }
 };
 
@@ -3632,9 +3691,15 @@ class cast_from_cppdatalib<unsigned short>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator unsigned short() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned short>::min(),
-                                      bind.as_uint(),
-                                      std::numeric_limits<unsigned short>::max());
+        unsigned short result;
+        convert(result);
+        return result;
+    }
+    void convert(unsigned short &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned short>::min(),
+                                                    bind.as_uint(),
+                                                    std::numeric_limits<unsigned short>::max());
     }
 };
 
@@ -3645,9 +3710,15 @@ class cast_from_cppdatalib<signed int>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator signed int() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed int>::min(),
-                                      bind.as_int(),
-                                      std::numeric_limits<signed int>::max());
+        signed int result;
+        convert(result);
+        return result;
+    }
+    void convert(signed int &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<signed int>::min(),
+                                                    bind.as_int(),
+                                                    std::numeric_limits<signed int>::max());
     }
 };
 
@@ -3658,9 +3729,15 @@ class cast_from_cppdatalib<unsigned int>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator unsigned int() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned int>::min(),
-                                      bind.as_uint(),
-                                      std::numeric_limits<unsigned int>::max());
+        unsigned int result;
+        convert(result);
+        return result;
+    }
+    void convert(unsigned int &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned int>::min(),
+                                                    bind.as_uint(),
+                                                    std::numeric_limits<unsigned int>::max());
     }
 };
 
@@ -3671,9 +3748,15 @@ class cast_from_cppdatalib<signed long>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator signed long() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed long>::min(),
-                                      bind.as_int(),
-                                      std::numeric_limits<signed long>::max());
+        signed long result;
+        convert(result);
+        return result;
+    }
+    void convert(signed long &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<signed long>::min(),
+                                                    bind.as_int(),
+                                                    std::numeric_limits<signed long>::max());
     }
 };
 
@@ -3684,9 +3767,15 @@ class cast_from_cppdatalib<unsigned long>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator unsigned long() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned long>::min(),
-                                      bind.as_uint(),
-                                      std::numeric_limits<unsigned long>::max());
+        unsigned long result;
+        convert(result);
+        return result;
+    }
+    void convert(unsigned long &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned long>::min(),
+                                                    bind.as_uint(),
+                                                    std::numeric_limits<unsigned long>::max());
     }
 };
 
@@ -3697,9 +3786,15 @@ class cast_from_cppdatalib<signed long long>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator signed long long() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<signed long long>::min(),
-                                      bind.as_int(),
-                                      std::numeric_limits<signed long long>::max());
+        signed long long result;
+        convert(result);
+        return result;
+    }
+    void convert(signed long long &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<signed long long>::min(),
+                                                    bind.as_int(),
+                                                    std::numeric_limits<signed long long>::max());
     }
 };
 
@@ -3710,9 +3805,15 @@ class cast_from_cppdatalib<unsigned long long>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator unsigned long long() const {
-        return cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
-                                      bind.as_uint(),
-                                      std::numeric_limits<unsigned long long>::max());
+        unsigned long long result;
+        convert(result);
+        return result;
+    }
+    void convert(unsigned long long &dest) const
+    {
+        dest = cppdatalib::core::impl::zero_convert(std::numeric_limits<unsigned long long>::min(),
+                                                    bind.as_uint(),
+                                                    std::numeric_limits<unsigned long long>::max());
     }
 };
 
@@ -3723,6 +3824,7 @@ class cast_from_cppdatalib<float>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator float() const {return static_cast<float>(bind.as_real());}
+    void convert(float &dest) const {dest = static_cast<float>(bind.as_real());}
 };
 
 template<>
@@ -3732,6 +3834,7 @@ class cast_from_cppdatalib<double>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator double() const {return bind.as_real();}
+    void convert(double &dest) const {dest = bind.as_real();}
 };
 
 template<>
@@ -3741,6 +3844,7 @@ class cast_from_cppdatalib<long double>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator long double() const {return bind.as_real();}
+    void convert(long double &dest) const {dest = bind.as_real();}
 };
 
 template<>
@@ -3750,6 +3854,7 @@ class cast_from_cppdatalib<cppdatalib::core::string_t>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator cppdatalib::core::string_t() const {return bind.as_string();}
+    void convert(cppdatalib::core::string_t &dest) const {dest = bind.as_string();}
 };
 
 template<typename... Ts>
@@ -3759,6 +3864,7 @@ class cast_template_from_cppdatalib<std::basic_string, Ts...>
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator std::basic_string<Ts...>() const {return bind.as_string();}
+    void convert(std::basic_string<Ts...> &dest) const {dest = bind.as_string();}
 };
 
 template<>
@@ -3768,6 +3874,7 @@ class cast_from_cppdatalib<cppdatalib::core::array_t>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator cppdatalib::core::array_t() const {return bind.as_array();}
+    void convert(cppdatalib::core::array_t &dest) const {dest = bind.as_array();}
 };
 
 template<>
@@ -3777,6 +3884,7 @@ class cast_from_cppdatalib<cppdatalib::core::object_t>
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator cppdatalib::core::object_t() const {return bind.as_object();}
+    void convert(cppdatalib::core::object_t &dest) const {dest = bind.as_object();}
 };
 
 #endif // CPPDATALIB_VALUE_H

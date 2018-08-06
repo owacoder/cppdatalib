@@ -41,6 +41,8 @@ public:
     cast_template_to_cppdatalib(const std::basic_string<char, Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
                                                                              cppdatalib::core::clob);}
+    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
+                                                                                      cppdatalib::core::clob);}
 };
 
 namespace cppdatalib { namespace core {
@@ -76,9 +78,16 @@ public:
     cast_template_to_cppdatalib(const std::unique_ptr<T, Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (!bind)
-            return cppdatalib::core::null_t();
-        return *bind;
+            dest.set_null();
+        else
+            dest = *bind;
     }
 };
 
@@ -121,9 +130,16 @@ public:
     cast_template_to_cppdatalib(const std::shared_ptr<T> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (!bind)
-            return cppdatalib::core::null_t();
-        return *bind;
+            dest.set_null();
+        else
+            dest = *bind;
     }
 };
 
@@ -167,9 +183,16 @@ public:
     cast_template_to_cppdatalib(const std::weak_ptr<T> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (!bind)
-            return cppdatalib::core::null_t();
-        return *bind;
+            dest.set_null();
+        else
+            dest = *bind;
     }
 };
 
@@ -213,10 +236,15 @@ public:
     cast_array_template_to_cppdatalib(const std::array<T, N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::value(cppdatalib::core::array_t());
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -228,10 +256,15 @@ public:
     cast_sized_template_to_cppdatalib(const std::bitset<N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (size_t i = 0; i < bind.size(); ++i)
-            result.push_back(bind[i]);
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (size_t i = 0; i < bind.size(); ++i)
+            dest.push_back(cppdatalib::core::value(bind[i]));
     }
 };
 
@@ -243,10 +276,15 @@ public:
     cast_template_to_cppdatalib(const std::list<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -258,10 +296,15 @@ public:
     cast_template_to_cppdatalib(const std::forward_list<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -273,10 +316,15 @@ public:
     cast_template_to_cppdatalib(const std::deque<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -288,10 +336,15 @@ public:
     cast_template_to_cppdatalib(const std::vector<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -303,10 +356,15 @@ public:
     cast_template_to_cppdatalib(const std::set<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -318,10 +376,15 @@ public:
     cast_template_to_cppdatalib(const std::unordered_set<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -333,10 +396,15 @@ public:
     cast_template_to_cppdatalib(const std::multiset<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -348,10 +416,15 @@ public:
     cast_template_to_cppdatalib(const std::unordered_multiset<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -363,10 +436,15 @@ public:
     cast_template_to_cppdatalib(const std::valarray<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (size_t i = 0; i < bind.size(); ++i)
-            result.push_back(cppdatalib::core::value(bind[i]));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (size_t i = 0; i < bind.size(); ++i)
+            dest.push_back(cppdatalib::core::value(bind[i]));
     }
 };
 
@@ -407,7 +485,8 @@ class cast_template_to_cppdatalib<std::initializer_list, Ts...>
     cppdatalib::core::array_t bind;
 public:
     cast_template_to_cppdatalib(std::initializer_list<Ts...> bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind);}
+    operator cppdatalib::core::value() {return cppdatalib::core::value(std::move(bind));}
+    void convert(cppdatalib::core::value &dest) {dest = cppdatalib::core::value(std::move(bind));}
 };
 
 template<typename... Ts>
@@ -418,15 +497,20 @@ public:
     cast_template_to_cppdatalib(std::stack<Ts...> bind) : bind(bind) {}
     operator cppdatalib::core::value()
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest)
+    {
+        dest.set_array({});
         using namespace std;
-        cppdatalib::core::value result = cppdatalib::core::value(cppdatalib::core::array_t());
         while (!bind.empty())
         {
-            result.push_back(cppdatalib::core::value(bind.top()));
+            dest.push_back(cppdatalib::core::value(bind.top()));
             bind.pop();
         }
-        reverse(result.get_array_ref().begin().data(), result.get_array_ref().end().data());
-        return result;
+        reverse(dest.get_array_ref().begin().data(), dest.get_array_ref().end().data());
     }
 };
 
@@ -438,13 +522,18 @@ public:
     cast_template_to_cppdatalib(std::queue<Ts...> bind) : bind(bind) {}
     operator cppdatalib::core::value()
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest)
+    {
+        dest.set_array({});
         while (!bind.empty())
         {
-            result.push_back(cppdatalib::core::value(bind.front()));
+            dest.push_back(cppdatalib::core::value(bind.front()));
             bind.pop();
         }
-        return result;
     }
 };
 
@@ -456,13 +545,18 @@ public:
     cast_template_to_cppdatalib(std::priority_queue<Ts...> bind) : bind(bind) {}
     operator cppdatalib::core::value()
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest)
+    {
+        dest.set_array({});
         while (!bind.empty())
         {
-            result.push_back(cppdatalib::core::value(bind.front()));
+            dest.push_back(cppdatalib::core::value(bind.front()));
             bind.pop();
         }
-        return result;
     }
 };
 
@@ -474,11 +568,16 @@ public:
     cast_template_to_cppdatalib(const std::map<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (const auto &item: bind)
-            result.add_member_at_end(cppdatalib::core::value(item.first),
-                                     cppdatalib::core::value(item.second));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({});
+        for (const auto &item: bind)
+            dest.add_member_at_end(cppdatalib::core::value(item.first),
+                                   cppdatalib::core::value(item.second));
     }
 };
 
@@ -532,11 +631,16 @@ public:
     cast_template_to_cppdatalib(const std::multimap<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::value(cppdatalib::core::object_t());
-        for (const auto &item: bind)
-            result.add_member_at_end(cppdatalib::core::value(item.first),
-                                     cppdatalib::core::value(item.second));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({});
+        for (const auto &item: bind)
+            dest.add_member_at_end(cppdatalib::core::value(item.first),
+                                   cppdatalib::core::value(item.second));
     }
 };
 
@@ -590,12 +694,17 @@ public:
     cast_template_to_cppdatalib(const std::unordered_map<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        result.set_subtype(cppdatalib::core::hash);
-        for (const auto &item: bind)
-            result.add_member(cppdatalib::core::value(item.first),
-                              cppdatalib::core::value(item.second));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({});
+        dest.set_subtype(cppdatalib::core::hash);
+        for (const auto &item: bind)
+            dest.add_member(cppdatalib::core::value(item.first),
+                            cppdatalib::core::value(item.second));
     }
 };
 
@@ -649,12 +758,17 @@ public:
     cast_template_to_cppdatalib(const std::unordered_multimap<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        result.set_subtype(cppdatalib::core::hash);
-        for (const auto &item: bind)
-            result.add_member(cppdatalib::core::value(item.first),
-                              cppdatalib::core::value(item.second));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({});
+        dest.set_subtype(cppdatalib::core::hash);
+        for (const auto &item: bind)
+            dest.add_member(cppdatalib::core::value(item.first),
+                            cppdatalib::core::value(item.second));
     }
 };
 
@@ -707,6 +821,7 @@ class cast_template_to_cppdatalib<std::pair, Ts...>
 public:
     cast_template_to_cppdatalib(const std::pair<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::array_t{cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)};}
+    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::array_t{cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)};}
 };
 
 namespace cppdatalib { namespace core {
@@ -792,9 +907,14 @@ public:
     cast_template_to_cppdatalib(const std::tuple<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::array_t result;
-        cppdatalib::core::impl::push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind, result);
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        cppdatalib::core::impl::push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind, dest.get_array_ref());
     }
 };
 
@@ -853,9 +973,16 @@ public:
     cast_template_to_cppdatalib(const std::optional<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (bind)
-            return cppdatalib::core::value(*bind);
-        return cppdatalib::core::null_t();
+            dest = *bind;
+        else
+            dest.set_null();
     }
 };
 
@@ -898,9 +1025,16 @@ public:
     cast_template_to_cppdatalib(const std::variant<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (bind.valueless_by_exception())
-            return core::null_t();
-        return cppdatalib::core::value(std::get<bind.index()>(bind));
+            dest.set_null();
+        else
+            dest = cppdatalib::core::value(std::get<bind.index()>(bind));
     }
 };
 
@@ -944,8 +1078,14 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator std::basic_string<char, Ts...>() const
     {
+        std::basic_string<char, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::basic_string<char, Ts...> &dest) const
+    {
         cppdatalib::core::string_t str = bind.as_string();
-        return std::basic_string<char, Ts...>(str.c_str(), str.size());
+        dest.assign(str.c_str(), str.size());
     }
 };
 
@@ -959,6 +1099,10 @@ public:
     {
         return std::unique_ptr<T, Ts...>(new T(bind.operator T()));
     }
+    void convert(std::unique_ptr<T, Ts...> &dest) const
+    {
+        dest.reset(new T(bind.operator T()));
+    }
 };
 
 template<typename T>
@@ -971,6 +1115,10 @@ public:
     {
         return std::shared_ptr<T>(new T(bind.operator T()));
     }
+    void convert(std::shared_ptr<T> &dest) const
+    {
+        dest = std::shared_ptr<T>(new T(bind.operator T()));
+    }
 };
 
 template<typename T, size_t N>
@@ -982,13 +1130,22 @@ public:
     operator std::array<T, N>() const
     {
         std::array<T, N> result{};
+        convert(result);
+        return result;
+    }
+    void convert(std::array<T, N> &dest) const
+    {
         if (bind.is_array())
         {
+            size_t i = 0;
             auto it = bind.get_array_unchecked().begin();
-            for (size_t i = 0; i < std::min(bind.array_size(), N); ++i)
-                result[i] = (*it++).operator T();
+            for (; i < std::min(bind.array_size(), N); ++i)
+                dest[i] = (*it++).operator T();
+            for (; i < N; ++i)
+                dest[i] = {};
         }
-        return result;
+        else
+            std::fill(dest.begin(), dest.end(), T{});
     }
 };
 
@@ -1001,13 +1158,22 @@ public:
     operator std::bitset<N>() const
     {
         std::bitset<N> result{};
+        convert(result);
+        return result;
+    }
+    void convert(std::bitset<N> &dest) const
+    {
         if (bind.is_array())
         {
+            size_t i = 0;
             auto it = bind.get_array_unchecked().begin();
-            for (size_t i = 0; i < std::min(bind.array_size(), N); ++i)
-                result[i] = *it++;
+            for (; i < std::min(bind.array_size(), N); ++i)
+                dest[i] = *it++;
+            for (; i < N; ++i)
+                dest[i] = {};
         }
-        return result;
+        else
+            std::fill(dest.begin(), dest.end(), {});
     }
 };
 
@@ -1020,10 +1186,15 @@ public:
     operator std::stack<T, Ts...>() const
     {
         std::stack<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::stack<T, Ts...> &dest) const
+    {
+        dest = {};
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push(item.operator T());
-        return result;
+                dest.push(item.operator T());
     }
 };
 
@@ -1036,10 +1207,15 @@ public:
     operator std::queue<T, Ts...>() const
     {
         std::queue<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::queue<T, Ts...> &dest) const
+    {
+        dest = {};
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push(item.operator T());
-        return result;
+                dest.push(item.operator T());
     }
 };
 
@@ -1052,10 +1228,15 @@ public:
     operator std::priority_queue<T, Ts...>() const
     {
         std::priority_queue<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::priority_queue<T, Ts...> &dest) const
+    {
+        dest = {};
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push(item.operator T());
-        return result;
+                dest.push(item.operator T());
     }
 };
 
@@ -1068,10 +1249,15 @@ public:
     operator std::list<T, Ts...>() const
     {
         std::list<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::list<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -1084,11 +1270,16 @@ public:
     operator std::forward_list<T, Ts...>() const
     {
         std::forward_list<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::forward_list<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_front(item.operator T());
-        result.reverse();
-        return result;
+                dest.push_front(item.operator T());
+        dest.reverse();
     }
 };
 
@@ -1101,10 +1292,15 @@ public:
     operator std::deque<T, Ts...>() const
     {
         std::deque<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::deque<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -1117,10 +1313,15 @@ public:
     operator std::vector<T, Ts...>() const
     {
         std::vector<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::vector<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -1133,12 +1334,16 @@ public:
     operator std::valarray<T>() const
     {
         std::valarray<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::valarray<T> &dest) const
+    {
         size_t index = 0;
-        result.resize(bind.array_size());
+        dest.resize(bind.array_size());
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result[index++] = item.operator T();
-        return result;
+                dest[index++] = item.operator T();
     }
 };
 
@@ -1151,10 +1356,15 @@ public:
     operator std::set<T, Ts...>() const
     {
         std::set<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::set<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item.operator T());
-        return result;
+                dest.insert(item.operator T());
     }
 };
 
@@ -1167,10 +1377,15 @@ public:
     operator std::multiset<T, Ts...>() const
     {
         std::multiset<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::multiset<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item.operator T());
-        return result;
+                dest.insert(item.operator T());
     }
 };
 
@@ -1183,10 +1398,15 @@ public:
     operator std::unordered_set<T, Ts...>() const
     {
         std::unordered_set<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::unordered_set<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item.operator T());
-        return result;
+                dest.insert(item.operator T());
     }
 };
 
@@ -1199,10 +1419,15 @@ public:
     operator std::unordered_multiset<T, Ts...>() const
     {
         std::unordered_multiset<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::unordered_multiset<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item.operator T());
-        return result;
+                dest.insert(item.operator T());
     }
 };
 
@@ -1215,11 +1440,16 @@ public:
     operator std::map<K, V, Ts...>() const
     {
         std::map<K, V, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::map<K, V, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert({item.first.operator K(),
-                               item.second.operator V()});
-        return result;
+                dest.insert({item.first.operator K(),
+                             item.second.operator V()});
     }
 };
 
@@ -1232,11 +1462,16 @@ public:
     operator std::multimap<K, V, Ts...>() const
     {
         std::multimap<K, V, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::multimap<K, V, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert({item.first.operator K(),
-                               item.second.operator V()});
-        return result;
+                dest.insert({item.first.operator K(),
+                             item.second.operator V()});
     }
 };
 
@@ -1249,11 +1484,16 @@ public:
     operator std::unordered_map<K, V, Ts...>() const
     {
         std::unordered_map<K, V, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::unordered_map<K, V, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert({item.first.operator K(),
-                               item.second.operator V()});
-        return result;
+                dest.insert({item.first.operator K(),
+                             item.second.operator V()});
     }
 };
 
@@ -1266,11 +1506,16 @@ public:
     operator std::unordered_multimap<K, V, Ts...>() const
     {
         std::unordered_multimap<K, V, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::unordered_multimap<K, V, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert({item.first.operator K(),
-                               item.second.operator V()});
-        return result;
+                dest.insert({item.first.operator K(),
+                             item.second.operator V()});
     }
 };
 
@@ -1280,7 +1525,8 @@ class cast_template_from_cppdatalib<std::pair, T1, T2>
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator std::pair<T1, T2>() const {return std::pair<T1, T2>{bind.element(0).operator T1(), bind.element(1).operator T2()};}
+    operator std::pair<T1, T2>() const {return {bind.element(0).operator T1(), bind.element(1).operator T2()};}
+    void convert(std::pair<T1, T2> &dest) const {dest = {bind.element(0).operator T1(), bind.element(1).operator T2()};}
 };
 
 namespace cppdatalib
@@ -1321,9 +1567,15 @@ public:
     operator std::tuple<Ts...>() const
     {
         std::tuple<Ts...> result;
-        if (bind.is_array())
-            cppdatalib::core::impl::tuple_push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind.get_array_unchecked(), result);
+        convert(result);
         return result;
+    }
+    void convert(std::tuple<Ts...> &dest) const
+    {
+        if (bind.is_array())
+            cppdatalib::core::impl::tuple_push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind.get_array_unchecked(), dest);
+        else
+            dest = {};
     }
 };
 
@@ -1341,6 +1593,10 @@ public:
         return cppdatalib::core::value(cppdatalib::core::array_t{cppdatalib::core::value(bind.real()),
                                                                  cppdatalib::core::value(bind.imag())});
     }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest = cppdatalib::core::array_t{cppdatalib::core::value(bind.real()), cppdatalib::core::value(bind.imag())};
+    }
 };
 
 template<typename T>
@@ -1352,16 +1608,16 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator std::complex<T>() const
     {
+        std::complex<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::complex<T> &dest) const
+    {
         if (bind.is_array())
-        {
-            if (bind.array_size() > 1)
-                return std::complex<T>(bind.element_ptr(0)->operator T(),
-                                       bind.element_ptr(1)->operator T());
-            else if (bind.array_size())
-                return std::complex<T>(bind.element_ptr(0)->operator T());
-        }
-
-        return {};
+            dest = {bind.element(0).operator T(), bind.element(1).operator T()};
+        else
+            dest = {};
     }
 };
 
@@ -1376,17 +1632,23 @@ public:
     cast_template_to_cppdatalib(const std::chrono::time_point<Clock, Duration> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         typedef typename Duration::period Period;
 
         if (Period::num < Period::den) // Sub-second precision
         {
             if (Period::den <= 1000)
-                return cppdatalib::core::value(std::chrono::duration_cast<std::chrono::milliseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp_ms);
+                dest = cppdatalib::core::value(std::chrono::duration_cast<std::chrono::milliseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp_ms);
             else
-                return cppdatalib::core::value(std::chrono::duration_cast<std::chrono::nanoseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp_ns);
+                dest = cppdatalib::core::value(std::chrono::duration_cast<std::chrono::nanoseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp_ns);
         }
         else // Second or super-second precision
-            return cppdatalib::core::value(std::chrono::duration_cast<std::chrono::milliseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp);
+            dest = cppdatalib::core::value(std::chrono::duration_cast<std::chrono::milliseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp);
     }
 };
 
@@ -1399,17 +1661,23 @@ public:
     cast_template_to_cppdatalib(const std::chrono::duration<Rep, Period> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (Period::num < Period::den) // Sub-second precision
         {
             if (Period::den <= 1000)
-                return cppdatalib::core::value(bind.count() * (1000 / Period::den), cppdatalib::core::duration_ms);
+                dest = cppdatalib::core::value(bind.count() * (1000 / Period::den), cppdatalib::core::duration_ms);
             else if (Period::den <= 1000000000)
-                return cppdatalib::core::value(bind.count() * (1000000000 / Period::den), cppdatalib::core::duration_ns);
+                dest = cppdatalib::core::value(bind.count() * (1000000000 / Period::den), cppdatalib::core::duration_ns);
             else // Period::den > 1000000000
-                return cppdatalib::core::value(bind.count() / (Period::den / 1000000000), cppdatalib::core::duration_ns);
+                dest = cppdatalib::core::value(bind.count() / (Period::den / 1000000000), cppdatalib::core::duration_ns);
         }
         else // Second or super-second precision
-            return cppdatalib::core::value(bind.count() * Period::num / Period::den, cppdatalib::core::duration);
+            dest = cppdatalib::core::value(bind.count() * Period::num / Period::den, cppdatalib::core::duration);
     }
 };
 
@@ -1443,12 +1711,18 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator std::chrono::time_point<Clock, Duration>() const
     {
+        std::chrono::time_point<Clock, Duration> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::chrono::time_point<Clock, Duration> &dest) const
+    {
         if (bind.is_int())
-            return from_int(bind.get_int_unchecked(), bind.get_subtype());
+            dest = from_int(bind.get_int_unchecked(), bind.get_subtype());
         else if (bind.is_uint())
-            return from_int(bind.get_uint_unchecked(), bind.get_subtype());
+            dest = from_int(bind.get_uint_unchecked(), bind.get_subtype());
         else
-            return {};
+            dest = {};
     }
 };
 
@@ -1482,12 +1756,18 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator std::chrono::duration<Rep, Period>() const
     {
+        std::chrono::duration<Rep, Period> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::chrono::duration<Rep, Period> &dest) const
+    {
         if (bind.is_int())
-            return from_int(bind.get_int_unchecked(), bind.get_subtype());
+            dest = from_int(bind.get_int_unchecked(), bind.get_subtype());
         else if (bind.is_uint())
-            return from_int(bind.get_uint_unchecked(), bind.get_subtype());
+            dest = from_int(bind.get_uint_unchecked(), bind.get_subtype());
         else
-            return {};
+            dest = {};
     }
 };
 
@@ -1502,11 +1782,17 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator std::optional<Ts...>() const
     {
-        typedef typename cppdatalib::core::impl::unpack_first<Ts...>::type contained_type;
         std::optional<Ts...> result;
-        if (!bind.is_null())
-            result = bind.operator contained_type();
+        convert(result);
         return result;
+    }
+    void convert(std::optional<Ts...> &dest) const
+    {
+        typedef typename cppdatalib::core::impl::unpack_first<Ts...>::type contained_type;
+        if (!bind.is_null())
+            dest = bind.operator contained_type();
+        else
+            dest = {};
     }
 };
 
@@ -1519,23 +1805,28 @@ public:
     operator std::any() const
     {
         std::any result;
+        convert(result);
+        return result;
+    }
+    void convert(std::any &dest) const
+    {
         switch (bind.get_type())
         {
-            case core::null: result = std::any(); break;
-            case core::boolean: result = bind.get_bool_unchecked(); break;
-            case core::integer: result = bind.get_int_unchecked(); break;
-            case core::uinteger: result = bind.get_uint_unchecked(); break;
-            case core::real: result = bind.get_real_unchecked(); break;
+            case core::null: dest = std::any(); break;
+            case core::boolean: dest = bind.get_bool_unchecked(); break;
+            case core::integer: dest = bind.get_int_unchecked(); break;
+            case core::uinteger: dest = bind.get_uint_unchecked(); break;
+            case core::real: dest = bind.get_real_unchecked(); break;
             case core::string:
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
             case cppdatalib::core::temporary_string:
 #endif
-                result = bind.get_string_unchecked();
+                dest = bind.get_string_unchecked();
                 break;
-            case core::array: result = bind.get_array_unchecked(); break;
-            case core::object: result = bind.get_object_unchecked(); break;
+            case core::link: dest = bind.get_link_unchecked(); break;
+            case core::array: dest = bind.get_array_unchecked(); break;
+            case core::object: dest = bind.get_object_unchecked(); break;
         }
-        return result;
     }
 };
 #endif

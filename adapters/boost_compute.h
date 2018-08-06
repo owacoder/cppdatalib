@@ -55,10 +55,14 @@ public:
     {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::array_t array;
-        array.data().resize(N);
-        boost::compute::copy(bind.begin(), bind.end(), array.data().begin(), queue);
-        return array;
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.get_array_ref().data().resize(N);
+        boost::compute::copy(bind.begin(), bind.end(), dest.get_array_ref().data().begin(), queue);
     }
 };
 
@@ -75,9 +79,15 @@ public:
     operator boost::compute::array<T, N>() const
     {
         boost::compute::array<T, N> result(queue.get_context());
-        if (bind.is_array())
-            boost::compute::copy_n(bind.get_array_unchecked().data().begin(), std::min(N, bind.array_size()), result.begin(), queue);
+        convert(result);
         return result;
+    }
+    void convert(boost::compute::array<T, N> &dest) const
+    {
+        if (bind.is_array())
+            boost::compute::copy_n(bind.get_array_unchecked().data().begin(), std::min(N, bind.array_size()), dest.begin(), queue);
+        else
+            boost::compute::fill(dest.begin(), dest.end(), {}, queue);
     }
 };
 
@@ -97,10 +107,14 @@ public:
     {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::array_t array;
-        array.data().resize(bind.size());
-        boost::compute::copy(bind.begin(), bind.end(), array.data().begin(), queue);
-        return array;
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.get_array_ref().data().resize(bind.size());
+        boost::compute::copy(bind.begin(), bind.end(), dest.get_array_ref().data().begin(), queue);
     }
 };
 
@@ -117,12 +131,19 @@ public:
     operator boost::compute::vector<T, Ts...>() const
     {
         boost::compute::vector<T, Ts...> result(bind.array_size(), queue.get_context());
+        convert(result);
+        return result;
+    }
+    void convert(boost::compute::vector<T, Ts...> &dest) const
+    {
         if (bind.is_array())
+        {
+            dest.resize(bind.array_size());
             boost::compute::copy(bind.get_array_unchecked().data().begin(),
                                  bind.get_array_unchecked().data().end(),
-                                 result.begin(),
+                                 dest.begin(),
                                  queue);
-        return result;
+        }
     }
 };
 

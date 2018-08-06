@@ -43,10 +43,15 @@ public:
     cast_template_to_cppdatalib(const boost::dynamic_bitset<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::value(cppdatalib::core::array_t());
-        for (size_t i = 0; i < bind.size(); ++i)
-            result.push_back(cppdatalib::core::value(bool(bind[i])));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (size_t i = 0; i < bind.size(); ++i)
+            dest.push_back(cppdatalib::core::value(bool(bind[i])));
     }
 };
 
@@ -59,12 +64,16 @@ public:
     operator boost::dynamic_bitset<Ts...>() const
     {
         boost::dynamic_bitset<Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::dynamic_bitset<Ts...> &dest) const
+    {
         size_t index = 0;
-        result.resize(bind.array_size());
+        dest.resize(bind.array_size());
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result[index++] = item.operator bool();
-        return result;
+                dest[index++] = item.operator bool();
     }
 };
 

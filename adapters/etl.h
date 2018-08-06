@@ -52,6 +52,14 @@
  *  TODO: implement conversions for maps, sets, intrusive_queue and intrusive_stack, and priority_queue
  */
 
+/***************************************************************************************
+ *
+ *
+ * TODO: EVERYTHING FROM HERE DOWN NEEDS TO HAVE convert() ADDED AS A MEMBER FUNCTION!
+ *
+ *
+ **************************************************************************************/
+
 // --------
 //  string
 // --------

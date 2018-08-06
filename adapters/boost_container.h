@@ -46,6 +46,14 @@
 
 #include "../core/value_parser.h"
 
+/***************************************************************************************
+ *
+ *
+ * TODO: EVERYTHING FROM HERE DOWN NEEDS TO HAVE convert() ADDED AS A MEMBER FUNCTION!
+ *
+ *
+ **************************************************************************************/
+
 // --------
 //  vector
 // --------
@@ -58,10 +66,15 @@ public:
     cast_template_to_cppdatalib(const boost::container::vector<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -74,10 +87,15 @@ public:
     operator boost::container::vector<T, Ts...>() const
     {
         boost::container::vector<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::vector<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -93,10 +111,15 @@ public:
     cast_template_to_cppdatalib(const boost::container::stable_vector<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -109,10 +132,15 @@ public:
     operator boost::container::stable_vector<T, Ts...>() const
     {
         boost::container::stable_vector<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::stable_vector<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -131,6 +159,12 @@ public:
     operator boost::container::static_vector<T, N>() const
     {
         boost::container::static_vector<T, N> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::static_vector<T, N> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
         {
             size_t idx = 0;
@@ -138,10 +172,9 @@ public:
             {
                 if (idx++ == N)
                     break;
-                result.push_back(item.operator T());
+                dest.push_back(item.operator T());
             }
         }
-        return result;
     }
 };
 
@@ -160,10 +193,15 @@ public:
     operator boost::container::small_vector<T, N, Ts...>() const
     {
         boost::container::small_vector<T, N, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::small_vector<T, N, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -179,10 +217,15 @@ public:
     cast_template_to_cppdatalib(const boost::container::slist<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -195,11 +238,16 @@ public:
     operator boost::container::slist<T, Ts...>() const
     {
         boost::container::slist<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::slist<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_front(item.operator T());
-        result.reverse();
-        return result;
+                dest.push_front(item.operator T());
+        dest.reverse();
     }
 };
 
@@ -215,10 +263,15 @@ public:
     cast_template_to_cppdatalib(const boost::container::list<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -231,10 +284,15 @@ public:
     operator boost::container::list<T, Ts...>() const
     {
         boost::container::list<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::list<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -250,10 +308,15 @@ public:
     cast_template_to_cppdatalib(const boost::container::deque<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -266,10 +329,15 @@ public:
     operator boost::container::deque<T, Ts...>() const
     {
         boost::container::deque<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::deque<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -286,10 +354,15 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (const auto &item: bind)
-            result.add_member_at_end(cppdatalib::core::value(item.first),
-                                     cppdatalib::core::value(item.second));
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({});
+        for (const auto &item: bind)
+            dest.add_member_at_end(cppdatalib::core::value(item.first),
+                                   cppdatalib::core::value(item.second));
     }
 };
 
@@ -302,11 +375,16 @@ public:
     operator boost::container::flat_map<K, V, Ts...>() const
     {
         boost::container::flat_map<K, V, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::flat_map<K, V, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first.operator K(),
-                              item.second.operator V());
-        return result;
+                dest.insert(item.first.operator K(),
+                            item.second.operator V());
     }
 };
 
@@ -364,10 +442,15 @@ public:
     cast_template_to_cppdatalib(const boost::container::flat_set<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -380,10 +463,15 @@ public:
     operator boost::container::flat_set<T, Ts...>() const
     {
         boost::container::flat_set<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::flat_set<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item.operator T());
-        return result;
+                dest.insert(item.operator T());
     }
 };
 
@@ -399,11 +487,16 @@ public:
     cast_template_to_cppdatalib(const boost::container::map<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (const auto &item: bind)
-            result.add_member_at_end(cppdatalib::core::value(item.first),
-                                     cppdatalib::core::value(item.second));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({});
+        for (const auto &item: bind)
+            dest.add_member_at_end(cppdatalib::core::value(item.first),
+                                   cppdatalib::core::value(item.second));
     }
 };
 
@@ -416,11 +509,16 @@ public:
     operator boost::container::map<K, V, Ts...>() const
     {
         boost::container::map<K, V, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::map<K, V, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first.operator K(),
-                              item.second.operator V());
-        return result;
+                dest.insert(item.first.operator K(),
+                            item.second.operator V());
     }
 };
 
@@ -478,10 +576,15 @@ public:
     cast_template_to_cppdatalib(const boost::container::set<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({});
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -494,10 +597,15 @@ public:
     operator boost::container::set<T, Ts...>() const
     {
         boost::container::set<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(boost::container::set<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item.operator T());
-        return result;
+                dest.insert(item.operator T());
     }
 };
 
@@ -513,6 +621,8 @@ public:
     cast_template_to_cppdatalib(const boost::container::basic_string<char, Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
                                                                              cppdatalib::core::clob);}
+    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
+                                                                                      cppdatalib::core::clob);}
 };
 
 template<typename... Ts>
@@ -525,6 +635,11 @@ public:
     {
         cppdatalib::core::string_t str = bind.as_string();
         return boost::container::basic_string<char, Ts...>(str.c_str(), str.size());
+    }
+    void convert(boost::container::basic_string<char, Ts...> &dest) const
+    {
+        cppdatalib::core::string_t str = bind.as_string();
+        dest.assign(str.c_str(), str.size());
     }
 };
 
