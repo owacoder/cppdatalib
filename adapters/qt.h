@@ -53,14 +53,6 @@
 
 #include "../core/value_parser.h"
 
-/***************************************************************************************
- *
- *
- * TODO: EVERYTHING FROM HERE DOWN NEEDS TO HAVE convert() ADDED AS A MEMBER FUNCTION!
- *
- *
- **************************************************************************************/
-
 // -------
 //  QPair
 // -------
@@ -71,7 +63,16 @@ class cast_template_to_cppdatalib<QPair, Ts...>
     const QPair<Ts...> &bind;
 public:
     cast_template_to_cppdatalib(const QPair<Ts...> &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::array_t{cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)};}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)}, cppdatalib::core::normal);
+    }
 };
 
 template<typename T1, typename T2>
@@ -80,7 +81,16 @@ class cast_template_from_cppdatalib<QPair, T1, T2>
     const cppdatalib::core::value &bind;
 public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QPair<T1, T2>() const {return QPair<T1, T2>{bind.element(0).operator T1(), bind.element(1).operator T2()};}
+    operator QPair<T1, T2>() const
+    {
+        QPair<T1, T2> result;
+        convert(result);
+        return result;
+    }
+    void convert(QPair<T1, T2> &dest) const
+    {
+        dest = {bind.element(0).operator T1(), bind.element(1).operator T2()};
+    }
 };
 
 namespace cppdatalib { namespace core {
@@ -127,7 +137,16 @@ class cast_to_cppdatalib<QByteArray>
     const QByteArray &bind;
 public:
     cast_to_cppdatalib(const QByteArray &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toStdString(), cppdatalib::core::blob);}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_string(bind.toStdString(), cppdatalib::core::blob);
+    }
 };
 
 template<>
@@ -136,7 +155,16 @@ class cast_from_cppdatalib<QByteArray>
     const cppdatalib::core::value &bind;
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QByteArray() const {return QByteArray::fromStdString(bind.as_string());}
+    operator QByteArray() const
+    {
+        QByteArray result;
+        convert(result);
+        return result;
+    }
+    void convert(QByteArray &dest)
+    {
+        dest = QByteArray::fromStdString(bind.as_string());
+    }
 };
 
 // ---------------
@@ -149,7 +177,16 @@ class cast_to_cppdatalib<QLatin1String>
     const QLatin1String &bind;
 public:
     cast_to_cppdatalib(const QLatin1String &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.data(), bind.size()), cppdatalib::core::clob);}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest)
+    {
+        dest = cppdatalib::core::value(bind.data(), bind.size(), cppdatalib::core::clob, true);
+    }
 };
 
 // -------
@@ -162,7 +199,16 @@ class cast_to_cppdatalib<QChar>
     const QChar &bind;
 public:
     cast_to_cppdatalib(const QChar &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return QString(bind).toStdString();}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_string(QString(bind).toStdString(), cppdatalib::core::normal);
+    }
 };
 
 // ---------
@@ -175,7 +221,16 @@ class cast_to_cppdatalib<QString>
     const QString &bind;
 public:
     cast_to_cppdatalib(const QString &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toStdString());}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_string(bind.toStdString(), cppdatalib::core::normal);
+    }
 };
 
 template<>
@@ -184,7 +239,16 @@ class cast_from_cppdatalib<QString>
     const cppdatalib::core::value &bind;
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QString() const {return QString::fromStdString(bind.as_string());}
+    operator QString() const
+    {
+        QString result;
+        convert(result);
+        return result;
+    }
+    void convert(QString &dest) const
+    {
+        dest = QString::fromStdString(bind.as_string());
+    }
 };
 
 // -------
@@ -197,7 +261,16 @@ class cast_to_cppdatalib<QDate>
     const QDate &bind;
 public:
     cast_to_cppdatalib(const QDate &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toString().toStdString(), cppdatalib::core::date);}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_string(bind.toString().toStdString(), cppdatalib::core::date);
+    }
 };
 
 template<>
@@ -206,7 +279,16 @@ class cast_from_cppdatalib<QDate>
     const cppdatalib::core::value &bind;
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QDate() const {return QDate::fromString(QString::fromStdString(bind.as_string()));}
+    operator QDate() const
+    {
+        QDate result;
+        convert(result);
+        return result;
+    }
+    void convert(QDate &dest) const
+    {
+        dest = QDate::fromString(QString::fromStdString(bind.as_string()));
+    }
 };
 
 // -------
@@ -219,7 +301,16 @@ class cast_to_cppdatalib<QTime>
     const QTime &bind;
 public:
     cast_to_cppdatalib(const QTime &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toString().toStdString(), cppdatalib::core::time);}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_string(bind.toString().toStdString(), cppdatalib::core::time);
+    }
 };
 
 template<>
@@ -228,7 +319,16 @@ class cast_from_cppdatalib<QTime>
     const cppdatalib::core::value &bind;
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QTime() const {return QTime::fromString(QString::fromStdString(bind.as_string()));}
+    operator QTime() const
+    {
+        QTime result;
+        convert(result);
+        return result;
+    }
+    void convert(QTime &dest) const
+    {
+        dest = QTime::fromString(QString::fromStdString(bind.as_string()));
+    }
 };
 
 // -----------
@@ -241,7 +341,16 @@ class cast_to_cppdatalib<QDateTime>
     const QDateTime &bind;
 public:
     cast_to_cppdatalib(const QDateTime &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toString().toStdString(), cppdatalib::core::datetime);}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_string(bind.toString().toStdString(), cppdatalib::core::datetime);
+    }
 };
 
 template<>
@@ -250,7 +359,16 @@ class cast_from_cppdatalib<QDateTime>
     const cppdatalib::core::value &bind;
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QDateTime() const {return QDateTime::fromString(QString::fromStdString(bind.as_string()));}
+    operator QDateTime() const
+    {
+        QDateTime result;
+        convert(result);
+        return result;
+    }
+    void convert(QDateTime &dest) const
+    {
+        dest = QDateTime::fromString(QString::fromStdString(bind.as_string()));
+    }
 };
 
 // -------
@@ -263,7 +381,16 @@ class cast_to_cppdatalib<QUuid>
     const QUuid &bind;
 public:
     cast_to_cppdatalib(const QUuid &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(bind.toString().toStdString(), cppdatalib::core::uuid);}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_string(bind.toString().toStdString(), cppdatalib::core::uuid);
+    }
 };
 
 template<>
@@ -272,7 +399,16 @@ class cast_from_cppdatalib<QUuid>
     const cppdatalib::core::value &bind;
 public:
     cast_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
-    operator QUuid() const {return QUuid(QString::fromStdString(bind.as_string()));}
+    operator QUuid() const
+    {
+        QUuid result;
+        convert(result);
+        return result;
+    }
+    void convert(QUuid &dest) const
+    {
+        dest = QUuid(QString::fromStdString(bind.as_string()));
+    }
 };
 
 // -------------
@@ -287,10 +423,15 @@ public:
     cast_to_cppdatalib(const QStringList &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -303,10 +444,15 @@ public:
     operator QStringList() const
     {
         QStringList result;
+        convert(result);
+        return result;
+    }
+    void convert(QStringList &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator QString());
-        return result;
+                dest.push_back(item.operator QString());
     }
 };
 
@@ -322,10 +468,15 @@ public:
     cast_template_to_cppdatalib(const QVector<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -338,10 +489,15 @@ public:
     operator QVector<T>() const
     {
         QVector<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(QVector<T> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -357,10 +513,15 @@ public:
     cast_template_to_cppdatalib(const QList<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -373,10 +534,15 @@ public:
     operator QList<T>() const
     {
         QList<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(QList<T> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -392,10 +558,15 @@ public:
     cast_template_to_cppdatalib(const QLinkedList<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -407,11 +578,16 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator QLinkedList<T>() const
     {
-        QLinkedList<T> result;
+        QLinkedList result;
+        convert(result);
+        return result;
+    }
+    void convert(QLinkedList<T> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -427,10 +603,15 @@ public:
     cast_template_to_cppdatalib(const QStack<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -443,10 +624,15 @@ public:
     operator QStack<T>() const
     {
         QStack<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(QStack<T> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -462,10 +648,15 @@ public:
     cast_template_to_cppdatalib(const QQueue<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -478,10 +669,15 @@ public:
     operator QQueue<T>() const
     {
         QQueue<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(QQueue<T> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -497,10 +693,15 @@ public:
     cast_template_to_cppdatalib(const QSet<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -513,10 +714,15 @@ public:
     operator QSet<T>() const
     {
         QSet<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(QSet<T> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item.operator T());
-        return result;
+                dest.insert(item.operator T());
     }
 };
 
@@ -532,11 +738,16 @@ public:
     cast_template_to_cppdatalib(const QMap<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (auto it = bind.begin(); it != bind.end(); ++it)
-            result.add_member_at_end(cppdatalib::core::value(it.key()),
-                                     cppdatalib::core::value(it.value()));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({}, cppdatalib::core::normal);
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            dest.add_member_at_end(cppdatalib::core::value(it.key()),
+                                   cppdatalib::core::value(it.value()));
     }
 };
 
@@ -549,10 +760,15 @@ public:
     operator QMap<K, V>() const
     {
         QMap<K, V> result;
+        convert(result);
+        return result;
+    }
+    void convert(QMap<K, V> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first.operator K(), item.second.operator V());
-        return result;
+                dest.insert(item.first.operator K(), item.second.operator V());
     }
 };
 
@@ -610,11 +826,16 @@ public:
     cast_template_to_cppdatalib(const QMultiMap<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (auto it = bind.begin(); it != bind.end(); ++it)
-            result.add_member_at_end(cppdatalib::core::value(it.key()),
-                                     cppdatalib::core::value(it.value()));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({}, cppdatalib::core::normal);
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            dest.add_member_at_end(cppdatalib::core::value(it.key()),
+                                   cppdatalib::core::value(it.value()));
     }
 };
 
@@ -627,10 +848,15 @@ public:
     operator QMultiMap<K, V>() const
     {
         QMultiMap<K, V> result;
+        convert(result);
+        return result;
+    }
+    void convert(QMultiMap<K, V> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first.operator K(), item.second.operator V());
-        return result;
+                dest.insert(item.first.operator K(), item.second.operator V());
     }
 };
 
@@ -688,12 +914,16 @@ public:
     cast_template_to_cppdatalib(const QHash<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        result.set_subtype(cppdatalib::core::hash);
-        for (auto it = bind.begin(); it != bind.end(); ++it)
-            result.add_member(cppdatalib::core::value(it.key()),
-                              cppdatalib::core::value(it.value()));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({}, cppdatalib::core::hash);
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            dest.add_member(cppdatalib::core::value(it.key()),
+                            cppdatalib::core::value(it.value()));
     }
 };
 
@@ -706,10 +936,15 @@ public:
     operator QHash<K, V>() const
     {
         QHash<K, V> result;
+        convert(result);
+        return result;
+    }
+    void convert(QHash<K, V> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first.operator K(), item.second.operator V());
-        return result;
+                dest.insert(item.first.operator K(), item.second.operator V());
     }
 };
 
@@ -767,12 +1002,16 @@ public:
     cast_template_to_cppdatalib(const QMultiHash<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        result.set_subtype(cppdatalib::core::hash);
-        for (auto it = bind.begin(); it != bind.end(); ++it)
-            result.add_member(cppdatalib::core::value(it.key()),
-                              cppdatalib::core::value(it.value()));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({}, cppdatalib::core::hash);
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            dest.add_member(cppdatalib::core::value(it.key()),
+                            cppdatalib::core::value(it.value()));
     }
 };
 
@@ -785,10 +1024,15 @@ public:
     operator QMultiHash<K, V>() const
     {
         QMultiHash<K, V> result;
+        convert(result);
+        return result;
+    }
+    void convert(QMultiHash<K, V> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first.operator K(), item.second.operator V());
-        return result;
+                dest.insert(item.first.operator K(), item.second.operator V());
     }
 };
 
@@ -849,29 +1093,33 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest)
+    {
         switch (bind.type())
         {
             default:
-            case QVariant::Invalid: result.set_null(); break;
-            case QVariant::Bool: result = bind.toBool(); break;
-            case QVariant::ByteArray: result = bind.toByteArray(); break;
-            case QVariant::Char: result = bind.toChar(); break;
-            case QVariant::Date: result = bind.toDate(); break;
-            case QVariant::DateTime: result = bind.toDateTime(); break;
-            case QVariant::Double: result = bind.toDouble(); break;
-            case QVariant::Hash: result = bind.toHash(); break;
-            case QVariant::Int: result = bind.toInt(); break;
-            case QVariant::List: result = bind.toList(); break;
-            case QVariant::LongLong: result = bind.toLongLong(); break;
-            case QVariant::Map: result = bind.toMap(); break;
-            case QVariant::String: result = bind.toString(); break;
-            case QVariant::StringList: result = bind.toStringList(); break;
-            case QVariant::Time: result = bind.toTime(); break;
-            case QVariant::UInt: result = bind.toUInt(); break;
-            case QVariant::ULongLong: result = bind.toULongLong(); break;
-            case QVariant::Uuid: result = bind.toUuid(); break;
+            case QVariant::Invalid: dest.set_null(cppdatalib::core::normal); break;
+            case QVariant::Bool: dest = bind.toBool(); break;
+            case QVariant::ByteArray: dest = bind.toByteArray(); break;
+            case QVariant::Char: dest = bind.toChar(); break;
+            case QVariant::Date: dest = bind.toDate(); break;
+            case QVariant::DateTime: dest = bind.toDateTime(); break;
+            case QVariant::Double: dest = bind.toDouble(); break;
+            case QVariant::Hash: dest = bind.toHash(); break;
+            case QVariant::Int: dest = bind.toInt(); break;
+            case QVariant::List: dest = bind.toList(); break;
+            case QVariant::LongLong: dest = bind.toLongLong(); break;
+            case QVariant::Map: dest = bind.toMap(); break;
+            case QVariant::String: dest = bind.toString(); break;
+            case QVariant::StringList: dest = bind.toStringList(); break;
+            case QVariant::Time: dest = bind.toTime(); break;
+            case QVariant::UInt: dest = bind.toUInt(); break;
+            case QVariant::ULongLong: dest = bind.toULongLong(); break;
+            case QVariant::Uuid: dest = bind.toUuid(); break;
         }
-        return result;
     }
 };
 
@@ -884,40 +1132,45 @@ public:
     operator QVariant() const
     {
         QVariant result;
+        convert(result);
+        return result;
+    }
+    void convert(QVariant &dest) const
+    {
         switch (bind.get_type())
         {
-            case cppdatalib::core::null: result = QVariant(); break;
-            case cppdatalib::core::boolean: result = bind.get_bool_unchecked(); break;
-            case cppdatalib::core::integer: result = qlonglong(bind.get_int_unchecked()); break;
-            case cppdatalib::core::uinteger: result = qulonglong(bind.get_uint_unchecked()); break;
-            case cppdatalib::core::real: result = bind.get_real_unchecked(); break;
+            case cppdatalib::core::link:
+            case cppdatalib::core::null: dest = QVariant(); break;
+            case cppdatalib::core::boolean: dest = bind.get_bool_unchecked(); break;
+            case cppdatalib::core::integer: dest = qlonglong(bind.get_int_unchecked()); break;
+            case cppdatalib::core::uinteger: dest = qulonglong(bind.get_uint_unchecked()); break;
+            case cppdatalib::core::real: dest = bind.get_real_unchecked(); break;
             case cppdatalib::core::string:
             {
                 switch (bind.get_subtype())
                 {
                     case cppdatalib::core::blob:
                     case cppdatalib::core::clob:
-                        result = QByteArray::fromStdString(bind.get_string_unchecked());
+                        dest = QByteArray::fromStdString(bind.get_string_unchecked());
                         break;
-                    case cppdatalib::core::date: result = QDate::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
-                    case cppdatalib::core::time: result = QTime::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
-                    case cppdatalib::core::datetime: result = QDateTime::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
-                    case cppdatalib::core::uuid: result = QUuid(QString::fromStdString(bind.get_string_unchecked())); break;
-                    default: result = QString::fromStdString(bind.get_string_unchecked()); break;
+                    case cppdatalib::core::date: dest = QDate::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
+                    case cppdatalib::core::time: dest = QTime::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
+                    case cppdatalib::core::datetime: dest = QDateTime::fromString(QString::fromStdString(bind.get_string_unchecked())); break;
+                    case cppdatalib::core::uuid: dest = QUuid(QString::fromStdString(bind.get_string_unchecked())); break;
+                    default: dest = QString::fromStdString(bind.get_string_unchecked()); break;
                 }
                 break;
             }
-            case cppdatalib::core::array: result = bind.operator QVariantList(); break;
+            case cppdatalib::core::array: dest = bind.operator QVariantList(); break;
             case cppdatalib::core::object:
             {
                 if (bind.get_subtype() == cppdatalib::core::hash)
-                    result = bind.operator QVariantHash();
+                    dest = bind.operator QVariantHash();
                 else
-                    result = bind.operator QVariantMap();
+                    dest = bind.operator QVariantMap();
                 break;
             }
         }
-        return result;
     }
 };
 

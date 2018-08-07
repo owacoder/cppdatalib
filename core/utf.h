@@ -170,7 +170,8 @@ namespace cppdatalib
 
         // Returns empty string if invalid codepoint is encountered
         // Returns UTF-8 string on valid input
-        std::string ucs_to_utf8(const uint32_t *s, size_t size)
+        template<typename CharType>
+        std::string ucs_to_utf8(const CharType *s, size_t size)
         {
             std::string result;
 
@@ -208,7 +209,8 @@ namespace cppdatalib
 
         // Returns empty string if invalid codepoint is encountered
         // Returns UTF-xx string on valid input
-        std::string ucs_to_utf(const uint32_t *s, size_t size, encoding mode)
+        template<typename CharType>
+        std::string ucs_to_utf(const CharType *s, size_t size, encoding mode)
         {
             if (mode == utf8)
                 return ucs_to_utf8(s, size);
@@ -542,6 +544,14 @@ namespace cppdatalib
             return result;
         }
 
+        template<typename T>
+        void utf8_to_ucs(string_view_t s, T &result)
+        {
+            result.clear();
+            for (size_t i = 0; i < s.size(); )
+                result.push_back(utf8_to_ucs(s, i, i));
+        }
+
         std::string ucs_to_utf8(uint32_t codepoint)
         {
             return ucs_to_utf8(&codepoint, 1);
@@ -566,7 +576,7 @@ namespace cppdatalib
 
         // Returns -1 on conversion failure, invalid codepoint, overlong encoding, or truncated input
         // Returns codepoint on success, with updated `idx` stored in `new_pos`
-        uint32_t utf_to_ucs(const std::string &s, encoding mode, size_t idx, size_t &new_pos)
+        uint32_t utf_to_ucs(string_view_t s, encoding mode, size_t idx, size_t &new_pos)
         {
             uint32_t result = 0;
 
@@ -847,7 +857,7 @@ namespace cppdatalib
             return result > 0x10ffff? uint32_t(-1): result;
         }
 
-        std::vector<uint32_t> utf_to_ucs(const std::string &s, encoding mode)
+        std::vector<uint32_t> utf_to_ucs(string_view_t s, encoding mode)
         {
             std::vector<uint32_t> result;
 
@@ -857,7 +867,15 @@ namespace cppdatalib
             return result;
         }
 
-        std::vector<uint32_t> utf_to_ucs(const std::string &s, const char *encoding_name)
+        template<typename T>
+        void utf_to_ucs(string_view_t s, encoding mode, T &result)
+        {
+            result.clear();
+            for (size_t i = 0; i < s.size(); )
+                result.push_back(utf_to_ucs(s, mode, i, i));
+        }
+
+        std::vector<uint32_t> utf_to_ucs(string_view_t s, const char *encoding_name)
         {
             return utf_to_ucs(s, encoding_from_name(encoding_name));
         }

@@ -49,7 +49,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (size_t i = 0; i < bind.size(); ++i)
             dest.push_back(cppdatalib::core::value(bool(bind[i])));
     }

@@ -2,6 +2,9 @@
 #define CPPDATALIB_STL_H
 
 #include <string>
+#include <codecvt>
+#include <locale>
+
 #include <array>
 #include <vector>
 #include <list>
@@ -25,6 +28,8 @@
 
 #include <complex>
 
+#include <atomic>
+
 #ifdef CPPDATALIB_CPP17
 #include <variant>
 #include <optional>
@@ -41,7 +46,7 @@ public:
     cast_template_to_cppdatalib(const std::basic_string<char, Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
                                                                              cppdatalib::core::clob);}
-    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
+    void convert(cppdatalib::core::value &dest) const {dest.set_string(cppdatalib::core::string_t(bind.c_str(), bind.size()),
                                                                                       cppdatalib::core::clob);}
 };
 
@@ -70,6 +75,64 @@ namespace cppdatalib { namespace core {
     };
 }}
 
+// This overload handles both 16- and 32-bit wide strings
+// It is assumed that 16-bit strings are UTF-16 encoded
+template<typename CharType, typename... Ts>
+class cast_template_to_cppdatalib<std::basic_string, CharType, Ts...>
+{
+    const std::basic_string<CharType, Ts...> &bind;
+
+    static_assert(sizeof(CharType) == sizeof(uint32_t) || sizeof(CharType) == sizeof(uint16_t), "Size of character type must be 16 or 32 bits");
+
+public:
+    cast_template_to_cppdatalib(const std::basic_string<CharType, Ts...> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        if (sizeof(CharType) == sizeof(uint32_t)) // 32 bit?
+        {
+            auto &ref = dest.get_owned_string_ref();
+            ref.clear();
+            for (CharType c: bind)
+            {
+                std::string temp = cppdatalib::core::ucs_to_utf8(c);
+                if (temp.empty()) // Conversion error
+                    throw cppdatalib::core::error("Invalid UTF-32");
+                ref += temp;
+            }
+            dest.set_subtype(cppdatalib::core::normal);
+        }
+        else if (sizeof(CharType) == sizeof(uint16_t)) // 16 bit?
+        {
+            // TODO: remove necessity of splitting UTF-16 characters into individual bytes?
+            std::string split;
+            for (CharType c: bind)
+            {
+                split.push_back((uint32_t) c >> 8);
+                split.push_back((uint32_t) c & 0xff);
+            }
+
+            auto &ref = dest.get_owned_string_ref();
+            ref.clear();
+            for (size_t i = 0; i < split.size(); )
+            {
+                uint32_t codepoint = cppdatalib::core::utf_to_ucs(split, cppdatalib::core::utf16_big_endian, i, i);
+                std::string temp = cppdatalib::core::ucs_to_utf8(codepoint);
+                if (temp.empty())
+                    throw cppdatalib::core::error("Invalid UTF-16");
+                ref += temp;
+            }
+
+            dest.set_subtype(cppdatalib::core::normal);
+        }
+    }
+};
+
 template<typename T, typename... Ts>
 class cast_template_to_cppdatalib<std::unique_ptr, T, Ts...>
 {
@@ -85,7 +148,7 @@ public:
     void convert(cppdatalib::core::value &dest) const
     {
         if (!bind)
-            dest.set_null();
+            dest.set_null(cppdatalib::core::normal);
         else
             dest = *bind;
     }
@@ -137,7 +200,7 @@ public:
     void convert(cppdatalib::core::value &dest) const
     {
         if (!bind)
-            dest.set_null();
+            dest.set_null(cppdatalib::core::normal);
         else
             dest = *bind;
     }
@@ -190,7 +253,7 @@ public:
     void convert(cppdatalib::core::value &dest) const
     {
         if (!bind)
-            dest.set_null();
+            dest.set_null(cppdatalib::core::normal);
         else
             dest = *bind;
     }
@@ -242,7 +305,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -262,7 +325,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (size_t i = 0; i < bind.size(); ++i)
             dest.push_back(cppdatalib::core::value(bind[i]));
     }
@@ -282,7 +345,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -302,7 +365,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -322,7 +385,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -342,7 +405,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -362,7 +425,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -382,7 +445,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -402,7 +465,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -422,7 +485,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -442,7 +505,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (size_t i = 0; i < bind.size(); ++i)
             dest.push_back(cppdatalib::core::value(bind[i]));
     }
@@ -503,7 +566,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest)
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         using namespace std;
         while (!bind.empty())
         {
@@ -528,7 +591,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest)
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         while (!bind.empty())
         {
             dest.push_back(cppdatalib::core::value(bind.front()));
@@ -551,7 +614,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest)
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         while (!bind.empty())
         {
             dest.push_back(cppdatalib::core::value(bind.front()));
@@ -574,7 +637,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_object({});
+        dest.set_object({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.add_member_at_end(cppdatalib::core::value(item.first),
                                    cppdatalib::core::value(item.second));
@@ -637,7 +700,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_object({});
+        dest.set_object({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.add_member_at_end(cppdatalib::core::value(item.first),
                                    cppdatalib::core::value(item.second));
@@ -700,7 +763,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_object({});
+        dest.set_object({}, cppdatalib::core::normal);
         dest.set_subtype(cppdatalib::core::hash);
         for (const auto &item: bind)
             dest.add_member(cppdatalib::core::value(item.first),
@@ -764,7 +827,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_object({});
+        dest.set_object({}, cppdatalib::core::normal);
         dest.set_subtype(cppdatalib::core::hash);
         for (const auto &item: bind)
             dest.add_member(cppdatalib::core::value(item.first),
@@ -821,7 +884,7 @@ class cast_template_to_cppdatalib<std::pair, Ts...>
 public:
     cast_template_to_cppdatalib(const std::pair<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::array_t{cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)};}
-    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::array_t{cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)};}
+    void convert(cppdatalib::core::value &dest) const {dest.set_array({cppdatalib::core::value(bind.first), cppdatalib::core::value(bind.second)}, cppdatalib::core::normal);}
 };
 
 namespace cppdatalib { namespace core {
@@ -913,7 +976,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         cppdatalib::core::impl::push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind, dest.get_array_ref());
     }
 };
@@ -982,7 +1045,7 @@ public:
         if (bind)
             dest = *bind;
         else
-            dest.set_null();
+            dest.set_null(cppdatalib::core::normal);
     }
 };
 
@@ -1032,7 +1095,7 @@ public:
     void convert(cppdatalib::core::value &dest) const
     {
         if (bind.valueless_by_exception())
-            dest.set_null();
+            dest.set_null(cppdatalib::core::normal);
         else
             dest = cppdatalib::core::value(std::get<bind.index()>(bind));
     }
@@ -1086,6 +1149,56 @@ public:
     {
         cppdatalib::core::string_t str = bind.as_string();
         dest.assign(str.c_str(), str.size());
+    }
+};
+
+// This overload handles both 16- and 32-bit wide strings
+// It is assumed that 16-bit strings are UTF-16 encoded
+template<typename CharType, typename... Ts>
+class cast_template_from_cppdatalib<std::basic_string, CharType, Ts...>
+{
+    const cppdatalib::core::value &bind;
+
+    static_assert(sizeof(CharType) == sizeof(uint32_t) || sizeof(CharType) == sizeof(uint16_t), "Size of character type must be 16 or 32 bits");
+
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    operator std::basic_string<CharType, Ts...>() const
+    {
+        std::basic_string<CharType, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(std::basic_string<CharType, Ts...> &dest) const
+    {
+        std::string s = bind.as_string();
+
+        if (sizeof(CharType) == sizeof(uint32_t)) // 32 bit?
+        {
+            dest.clear();
+            for (size_t i = 0; i < s.size(); )
+            {
+                uint32_t codepoint = cppdatalib::core::utf8_to_ucs(s, i, i);
+                if (codepoint == UINT32_MAX)
+                    throw cppdatalib::core::error("Invalid UTF-8");
+                dest.push_back(codepoint);
+            }
+        }
+        else if (sizeof(CharType) == sizeof(uint16_t)) // 16 bit?
+        {
+            dest.clear();
+            for (size_t i = 0; i < s.size(); )
+            {
+                uint32_t codepoint = cppdatalib::core::utf8_to_ucs(s, i, i);
+                if (codepoint == UINT32_MAX)
+                    throw cppdatalib::core::error("Invalid UTF-8");
+
+                // TODO: remove dependence on creating a secondary byte-granular string?
+                std::string temp = cppdatalib::core::ucs_to_utf(codepoint, cppdatalib::core::utf16_big_endian);
+                for (size_t j = 0; j < temp.size(); j += 2)
+                    dest.push_back(((temp[j] & 0xff) << 8) | uint8_t(temp[j+1]));
+            }
+        }
     }
 };
 
@@ -1576,6 +1689,40 @@ public:
             cppdatalib::core::impl::tuple_push_back<std::tuple_size<std::tuple<Ts...>>::value>(bind.get_array_unchecked(), dest);
         else
             dest = {};
+    }
+};
+
+// ATOMIC
+
+template<typename T>
+class cast_template_to_cppdatalib<std::atomic, T>
+{
+    const std::atomic<T> &bind;
+
+public:
+    cast_template_to_cppdatalib(const std::atomic<T> &bind) : bind(bind) {}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest = cppdatalib::core::value(bind.load());
+    }
+};
+
+template<typename T>
+class cast_template_from_cppdatalib<std::atomic, T>
+{
+    const cppdatalib::core::value &bind;
+
+public:
+    cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
+    void convert(std::atomic<T> &dest) const
+    {
+        dest.store(bind.operator T());
     }
 };
 

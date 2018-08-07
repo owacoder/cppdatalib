@@ -67,8 +67,6 @@ The adapter for the STL is missing some features to seamlessly integrate with st
    - The random-number generators
    - Ratio values
    - Regular expressions
-   - Atomic types
-   - Wide strings
    - I/O streams
 
 Obviously the other adapters for third-party libraries are not complete either, but are there to get you started.

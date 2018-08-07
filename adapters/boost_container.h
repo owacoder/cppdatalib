@@ -72,7 +72,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -117,7 +117,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -223,7 +223,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -269,7 +269,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -314,7 +314,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -359,7 +359,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_object({});
+        dest.set_object({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.add_member_at_end(cppdatalib::core::value(item.first),
                                    cppdatalib::core::value(item.second));
@@ -448,7 +448,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -493,7 +493,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_object({});
+        dest.set_object({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.add_member_at_end(cppdatalib::core::value(item.first),
                                    cppdatalib::core::value(item.second));
@@ -582,7 +582,7 @@ public:
     }
     void convert(cppdatalib::core::value &dest) const
     {
-        dest.set_array({});
+        dest.set_array({}, cppdatalib::core::normal);
         for (const auto &item: bind)
             dest.push_back(cppdatalib::core::value(item));
     }
@@ -621,7 +621,7 @@ public:
     cast_template_to_cppdatalib(const boost::container::basic_string<char, Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
                                                                              cppdatalib::core::clob);}
-    void convert(cppdatalib::core::value &dest) const {dest = cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
+    void convert(cppdatalib::core::value &dest) const {dest.set_string(cppdatalib::core::string_t(bind.c_str(), bind.size()),
                                                                                       cppdatalib::core::clob);}
 };
 
@@ -667,5 +667,9 @@ namespace cppdatalib { namespace core {
         }
     };
 }}
+
+// --------
+//  TODO: wstring
+// --------
 
 #endif // CPPDATALIB_BOOST_CONTAINER_H

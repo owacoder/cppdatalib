@@ -1501,18 +1501,51 @@ namespace cppdatalib
             object_t &convert_to_object();
 #endif
 
-			// Use of `this->` silences MSVC
             template<typename T>
-            typename std::remove_cv<typename std::remove_reference<T>::type>::type cast() const {return this->operator typename std::remove_cv<typename std::remove_reference<T>::type>::type();}
+            const value &cast(T &dest) const
+            {
+                cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this).convert(dest);
+                return *this;
+            }
+
+            template<typename T>
+            const value &cast(T *&dest) const
+            {
+                dest = new T{};
+                cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(*this).convert(*dest);
+                return *this;
+            }
+
+            template<template<typename...> class Template, typename... Ts>
+            const value &cast(Template<Ts...> &dest) const
+            {
+                cast_template_from_cppdatalib<Template, Ts...>(*this).convert(dest);
+                return *this;
+            }
+
+            template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+            const value &cast(Template<T, N, Ts...> &dest) const
+            {
+                cast_array_template_from_cppdatalib<Template, T, N, Ts...>(*this).convert(dest);
+                return *this;
+            }
+
+            template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+            const value &cast(Template<N, Ts...> &dest) const
+            {
+                cast_sized_template_from_cppdatalib<Template, N, Ts...>(*this).convert(dest);
+                return *this;
+            }
 
             template<typename T, typename UserData>
-            typename std::remove_cv<typename std::remove_reference<T>::type>::type cast(UserData userdata) const;
+            const value &cast(typename std::remove_cv<typename std::remove_reference<T>::type>::type &dest, UserData userdata) const;
 
+            // Use of `this->` silences MSVC
             template<typename T>
-            typename std::remove_cv<typename std::remove_reference<T>::type>::type as() const {return cast<T>();}
+            typename std::remove_cv<typename std::remove_reference<T>::type>::type as() const {return this->operator typename std::remove_cv<typename std::remove_reference<T>::type>::type();}
 
             template<typename T, typename UserData>
-            typename std::remove_cv<typename std::remove_reference<T>::type>::type as(UserData userdata) const {return cast<T>(userdata);}
+            typename std::remove_cv<typename std::remove_reference<T>::type>::type as(UserData userdata) const;
 
             template<typename T>
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
@@ -3232,6 +3265,34 @@ namespace cppdatalib
                 {}
 
                 template<typename T>
+                extended_value_cast(const value &bind, UserData userdata, T &dest)
+                    : bind(bind), userdata(userdata)
+                {
+                    cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(bind, userdata).convert(dest);
+                }
+
+                template<template<typename...> class Template, typename... Ts>
+                extended_value_cast(const value &bind, UserData userdata, Template<Ts...> &dest)
+                    : bind(bind), userdata(userdata)
+                {
+                    cast_template_from_cppdatalib<Template, Ts...>(bind, userdata).convert(dest);
+                }
+
+                template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts>
+                extended_value_cast(const value &bind, UserData userdata, Template<T, N, Ts...> &dest)
+                    : bind(bind), userdata(userdata)
+                {
+                    cast_array_template_from_cppdatalib<Template, T, N, Ts...>(bind, userdata).convert(dest);
+                }
+
+                template<template<size_t, typename...> class Template, size_t N, typename... Ts>
+                extended_value_cast(const value &bind, UserData userdata, Template<N, Ts...> &dest)
+                    : bind(bind), userdata(userdata)
+                {
+                    cast_sized_template_from_cppdatalib<Template, N, Ts...>(bind, userdata).convert(dest);
+                }
+
+                template<typename T>
                 operator T() const {return cast_from_cppdatalib<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(bind, userdata);}
 
                 template<template<typename...> class Template, typename... Ts>
@@ -3258,6 +3319,12 @@ namespace cppdatalib
         }
 
         template<typename T>
+        void cast(const cppdatalib::core::value &val, typename std::remove_cv<typename std::remove_reference<T>::type>::type &dest)
+        {
+            val.cast<T>(dest);
+        }
+
+        template<typename T>
         cppdatalib::core::value cast(T val, subtype_t subtype = normal)
         {
             return cppdatalib::core::value(val, subtype);
@@ -3269,10 +3336,22 @@ namespace cppdatalib
             return impl::extended_value_cast<UserData &>(bind, userdata);
         }
 
+        template<typename T, typename UserData>
+        void userdata_cast(const value &bind, UserData &userdata, T &dest)
+        {
+            impl::extended_value_cast<UserData &>(bind, userdata, dest);
+        }
+
         template<typename UserData>
         impl::extended_value_cast<UserData> userdata_cast(const value &bind, const UserData &userdata)
         {
             return impl::extended_value_cast<UserData>(bind, userdata);
+        }
+
+        template<typename T, typename UserData>
+        void userdata_cast(const value &bind, const UserData &userdata, T &dest)
+        {
+            impl::extended_value_cast<UserData>(bind, userdata, dest);
         }
 
         template<typename Bind, typename UserData>
@@ -3288,9 +3367,16 @@ namespace cppdatalib
         }
 
         template<typename T, typename UserData>
-        typename std::remove_cv<typename std::remove_reference<T>::type>::type value::cast(UserData userdata) const
+        typename std::remove_cv<typename std::remove_reference<T>::type>::type value::as(UserData userdata) const
         {
             return userdata_cast(*this, userdata).operator typename std::remove_cv<typename std::remove_reference<T>::type>::type();
+        }
+
+        template<typename T, typename UserData>
+        const value &value::cast(typename std::remove_cv<typename std::remove_reference<T>::type>::type &dest, UserData userdata) const
+        {
+            userdata_cast(*this, userdata, dest);
+            return *this;
         }
     }
 

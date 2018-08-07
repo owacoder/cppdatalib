@@ -66,9 +66,16 @@ public:
     cast_template_to_cppdatalib(const Poco::Optional<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (!bind.isSpecified())
-            return cppdatalib::core::null_t();
-        return cppdatalib::core::value(bind.value());
+            dest.set_null(cppdatalib::core::normal);
+        else
+            dest = cppdatalib::core::value(bind.value());
     }
 };
 
@@ -81,9 +88,15 @@ public:
     operator Poco::Optional<T>() const
     {
         Poco::Optional<T> result;
-        if (!bind.is_null())
-            result = bind.operator T();
+        convert(result);
         return result;
+    }
+    void convert(Poco::Optional<T> &dest) const
+    {
+        if (!bind.is_null())
+            dest = bind.operator T();
+        else
+            dest.clear();
     }
 };
 
@@ -101,9 +114,16 @@ public:
     cast_template_to_cppdatalib(const Poco::Nullable<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (!bind.isSpecified())
-            return cppdatalib::core::null_t();
-        return cppdatalib::core::value(bind.value());
+            dest.set_null(cppdatalib::core::normal);
+        else
+            dest = cppdatalib::core::value(bind.value());
     }
 };
 
@@ -116,9 +136,15 @@ public:
     operator Poco::Nullable<T>() const
     {
         Poco::Nullable<T> result;
-        if (!bind.is_null())
-            result = bind.operator T();
+        convert(result);
         return result;
+    }
+    void convert(Poco::Nullable<T> &dest) const
+    {
+        if (!bind.is_null())
+            dest = bind.operator T();
+        else
+            dest.clear();
     }
 };
 
@@ -136,12 +162,16 @@ public:
     cast_template_to_cppdatalib(const Poco::HashMap<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        result.set_subtype(cppdatalib::core::hash);
-        for (const auto &item: bind)
-            result.add_member(cppdatalib::core::value(item.first),
-                              cppdatalib::core::value(item.second));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({}, cppdatalib::core::hash);
+        for (const auto &item: bind)
+            dest.add_member(cppdatalib::core::value(item.first),
+                            cppdatalib::core::value(item.second));
     }
 };
 
@@ -154,11 +184,16 @@ public:
     operator Poco::HashMap<K, V, Ts...>() const
     {
         Poco::HashMap<K, V, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(Poco::HashMap<K, V, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert({item.first.operator K(),
-                               item.second.operator V()});
-        return result;
+                dest.insert({item.first.operator K(),
+                             item.second.operator V()});
     }
 };
 
@@ -176,10 +211,15 @@ public:
     cast_template_to_cppdatalib(const Poco::LinearHashTable<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -192,10 +232,15 @@ public:
     operator Poco::LinearHashTable<T, Ts...>() const
     {
         Poco::LinearHashTable<T, Ts...> result;
+        convert(result);
+        return result;
+    }
+    void convert(Poco::LinearHashTable<T, Ts...> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.insert(item.operator T());
-        return result;
+                dest.insert(item.operator T());
     }
 };
 
@@ -238,9 +283,14 @@ public:
     cast_template_to_cppdatalib(const Poco::Tuple<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::array_t result;
-        cppdatalib::poco::impl::push_back<Poco::Tuple<Ts...>::length>(bind, result);
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        cppdatalib::poco::impl::push_back<Poco::Tuple<Ts...>::length>(bind, dest.get_array_ref());
     }
 };
 
@@ -282,9 +332,15 @@ public:
     operator Poco::Tuple<Ts...>() const
     {
         Poco::Tuple<Ts...> result;
-        if (bind.is_array())
-            cppdatalib::poco::impl::tuple_push_back<Poco::Tuple<Ts...>::length>(bind.get_array_unchecked(), result);
+        convert(result);
         return result;
+    }
+    void convert(Poco::Tuple<Ts...> &dest) const
+    {
+        if (bind.is_array())
+            cppdatalib::poco::impl::tuple_push_back<Poco::Tuple<Ts...>::length>(bind.get_array_unchecked(), dest);
+        else
+            dest = {};
     }
 };
 
@@ -300,7 +356,16 @@ class cast_template_to_cppdatalib<Poco::Dynamic::Pair, Ts...>
     const Poco::Dynamic::Pair<Ts...> &bind;
 public:
     cast_template_to_cppdatalib(const Poco::Dynamic::Pair<Ts...> &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::array_t{cppdatalib::core::value(bind.first()), cppdatalib::core::value(bind.second())};}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({cppdatalib::core::value(bind.first()), cppdatalib::core::value(bind.second())}, cppdatalib::core::normal);
+    }
 };
 
 template<typename T>
@@ -311,7 +376,13 @@ public:
     cast_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator Poco::Dynamic::Pair<T>() const
     {
-        return Poco::Dynamic::Pair<T>{bind.element(0).operator T(), bind.element(1).operator Poco::Dynamic::Var()};
+        Poco::Dynamic::Pair<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(Poco::Dynamic::Pair<T> &dest) const
+    {
+        dest = {bind.element(0).operator T(), bind.element(1).operator Poco::Dynamic::Var()};
     }
 };
 
@@ -329,10 +400,15 @@ public:
     cast_to_cppdatalib(const Poco::Dynamic::List &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -345,10 +421,15 @@ public:
     operator Poco::Dynamic::List() const
     {
         Poco::Dynamic::List result;
+        convert(result);
+        return result;
+    }
+    void convert(Poco::Dynamic::List &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator Poco::Dynamic::Var());
-        return result;
+                dest.push_back(item.operator Poco::Dynamic::Var());
     }
 };
 
@@ -366,10 +447,15 @@ public:
     cast_to_cppdatalib(const Poco::Dynamic::Deque &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -382,10 +468,15 @@ public:
     operator Poco::Dynamic::Deque() const
     {
         Poco::Dynamic::Deque result;
+        convert(result);
+        return result;
+    }
+    void convert(Poco::Dynamic::Deque &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator Poco::Dynamic::Var());
-        return result;
+                dest.push_back(item.operator Poco::Dynamic::Var());
     }
 };
 
@@ -403,10 +494,15 @@ public:
     cast_to_cppdatalib(const Poco::Dynamic::Vector &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -419,10 +515,15 @@ public:
     operator Poco::Dynamic::Vector() const
     {
         Poco::Dynamic::Vector result;
+        convert(result);
+        return result;
+    }
+    void convert(Poco::Dynamic::Vector &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator Poco::Dynamic::Var());
-        return result;
+                dest.push_back(item.operator Poco::Dynamic::Var());
     }
 };
 
@@ -440,11 +541,16 @@ public:
     cast_template_to_cppdatalib(const Poco::Dynamic::Struct<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::object_t();
-        for (auto it = bind.begin(); it != bind.end(); ++it)
-            result.add_member(cppdatalib::core::value(it->first),
-                              cppdatalib::core::value(it->second));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_object({}, cppdatalib::core::normal);
+        for (auto it = bind.begin(); it != bind.end(); ++it)
+            dest.add_member(cppdatalib::core::value(it->first),
+                            cppdatalib::core::value(it->second));
     }
 };
 
@@ -457,11 +563,16 @@ public:
     operator Poco::Dynamic::Struct<T>() const
     {
         Poco::Dynamic::Struct<T> result;
+        convert(result);
+        return result;
+    }
+    void convert(Poco::Dynamic::Struct<T> &dest) const
+    {
+        dest = {};
         if (bind.is_object())
             for (const auto &item: bind.get_object_unchecked())
-                result.insert(item.first.operator T(),
-                              item.second.operator Poco::Dynamic::Var());
-        return result;
+                dest.insert(item.first.operator T(),
+                            item.second.operator Poco::Dynamic::Var());
     }
 };
 
@@ -482,7 +593,7 @@ class cast_to_cppdatalib<Poco::Dynamic::Var>
         try
         {
             const auto &struct_ref = v.extract<Poco::DynamicStruct>();
-            result = cppdatalib::core::object_t();
+            result.set_object({}, cppdatalib::core::normal);
             for (auto it = struct_ref.begin(); it != struct_ref.end(); ++it)
                 result.add_member(cppdatalib::core::value(it->first),
                                   cppdatalib::core::value(it->second));
@@ -494,7 +605,7 @@ class cast_to_cppdatalib<Poco::Dynamic::Var>
         try
         {
             const auto &struct_ref = v.extract<Poco::Dynamic::Struct<Poco::Dynamic::Var>>();
-            result = cppdatalib::core::object_t();
+            result.set_object({}, cppdatalib::core::normal);
             for (auto it = struct_ref.begin(); it != struct_ref.end(); ++it)
                 result.add_member(cppdatalib::core::value(it->first),
                                   cppdatalib::core::value(it->second));
@@ -505,7 +616,7 @@ class cast_to_cppdatalib<Poco::Dynamic::Var>
         // Otherwise, try int keys
         {
             const auto &struct_ref = v.extract<Poco::Dynamic::Struct<int>>();
-            result = cppdatalib::core::object_t();
+            result.set_object({}, cppdatalib::core::normal);
             for (auto it = struct_ref.begin(); it != struct_ref.end(); ++it)
                 result.add_member(cppdatalib::core::value(it->first),
                                   cppdatalib::core::value(it->second));
@@ -519,31 +630,33 @@ public:
     operator cppdatalib::core::value() const
     {
         cppdatalib::core::value result;
-
-        if (bind.isEmpty()) result.set_null();
-        else if (bind.isBoolean()) result = bind.convert<bool>();
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        if (bind.isEmpty()) dest.set_null(cppdatalib::core::normal);
+        else if (bind.isBoolean()) dest = bind.convert<bool>();
         else if (bind.isDeque() ||
                  bind.isArray() ||
                  bind.isList() ||
                  bind.isVector())
         {
-            result = cppdatalib::core::array_t();
+            dest.set_array({}, cppdatalib::core::normal);
             for (const auto &item: bind)
-                result.push_back(cppdatalib::core::value(item));
+                dest.push_back(cppdatalib::core::value(item));
         }
-        else if (bind.isString()) result = cppdatalib::core::value(bind.convert<std::string>(), cppdatalib::core::clob);
-        else if (bind.isStruct()) extract_struct(bind, result);
+        else if (bind.isString()) dest.set_string(bind.convert<std::string>(), cppdatalib::core::clob);
+        else if (bind.isStruct()) extract_struct(bind, dest);
         else if (bind.isInteger())
         {
             if (bind.isSigned())
-                result = bind.convert<Poco::Int64>();
+                dest = bind.convert<Poco::Int64>();
             else
-                result = bind.convert<Poco::UInt64>();
+                dest = bind.convert<Poco::UInt64>();
         }
-        else if (bind.isNumeric()) result = bind.convert<double>();
-        else result.set_null();
-
-        return result;
+        else if (bind.isNumeric()) dest = bind.convert<double>();
+        else dest.set_null(cppdatalib::core::normal);
     }
 };
 
@@ -556,23 +669,28 @@ public:
     operator Poco::Dynamic::Var() const
     {
         Poco::Dynamic::Var result;
+        convert(result);
+        return result;
+    }
+    void convert(Poco::Dynamic::Var &dest) const
+    {
         switch (bind.get_type())
         {
-            case cppdatalib::core::null: result = Poco::Dynamic::Var(); break;
-            case cppdatalib::core::boolean: result = bind.get_bool_unchecked(); break;
-            case cppdatalib::core::integer: result = Poco::Int64(bind.get_int_unchecked()); break;
-            case cppdatalib::core::uinteger: result = Poco::UInt64(bind.get_uint_unchecked()); break;
-            case cppdatalib::core::real: result = bind.get_real_unchecked(); break;
+            case cppdatalib::core::link:
+            case cppdatalib::core::null: dest = Poco::Dynamic::Var(); break;
+            case cppdatalib::core::boolean: dest = bind.get_bool_unchecked(); break;
+            case cppdatalib::core::integer: dest = Poco::Int64(bind.get_int_unchecked()); break;
+            case cppdatalib::core::uinteger: dest = Poco::UInt64(bind.get_uint_unchecked()); break;
+            case cppdatalib::core::real: dest = bind.get_real_unchecked(); break;
             case cppdatalib::core::string:
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
             case cppdatalib::core::temporary_string:
 #endif
-                result = bind.get_string_unchecked();
+                dest = static_cast<std::string>(bind.get_string_unchecked());
                 break;
-            case cppdatalib::core::array: result = bind.operator Poco::Dynamic::Vector(); break;
-            case cppdatalib::core::object: result = bind.operator Poco::Dynamic::Struct<Poco::Dynamic::Var>(); break;
+            case cppdatalib::core::array: dest = bind.operator Poco::Dynamic::Vector(); break;
+            case cppdatalib::core::object: dest = bind.operator Poco::Dynamic::Struct<Poco::Dynamic::Var>(); break;
         }
-        return result;
     }
 };
 
