@@ -36,6 +36,9 @@ Supported formats include
    - [CSV](https://tools.ietf.org/html/rfc4180) (allows user-defined delimiter)
    - [DIF](https://en.wikipedia.org/wiki/Data_Interchange_Format) (write-only, requires table dimensions prior to writing to create well-formed output)
    - [Filesystem I/O](http://en.cppreference.com/w/cpp/filesystem) (`std::experimental::filesystem` or `std::filesystem`)
+   - Raw [HTTP](https://en.wikipedia.org/wiki/Http) (client-only, as string with attributes - if they're enabled - and plain string otherwise)<br/>
+     Supports sending data from input stream (i.e. PUT with string buffer)<br/>
+     Supports Qt, Poco, or curl backends
    - [JSON](https://json.org/)
    - [MessagePack](https://msgpack.org/)
    - MySQL (database/table retrieval and writing)
