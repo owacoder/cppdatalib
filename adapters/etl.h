@@ -52,14 +52,6 @@
  *  TODO: implement conversions for maps, sets, intrusive_queue and intrusive_stack, and priority_queue
  */
 
-/***************************************************************************************
- *
- *
- * TODO: EVERYTHING FROM HERE DOWN NEEDS TO HAVE convert() ADDED AS A MEMBER FUNCTION!
- *
- *
- **************************************************************************************/
-
 // --------
 //  string
 // --------
@@ -70,8 +62,16 @@ class cast_sized_template_to_cppdatalib<etl::string, N>
     const etl::string<N> &bind;
 public:
     cast_sized_template_to_cppdatalib(const etl::string<N> &bind) : bind(bind) {}
-    operator cppdatalib::core::value() const {return cppdatalib::core::value(cppdatalib::core::string_t(bind.c_str(), bind.size()),
-                                                                             cppdatalib::core::clob);}
+    operator cppdatalib::core::value() const
+    {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_string(cppdatalib::core::string_t(bind.c_str(), bind.size()), cppdatalib::core::clob);
+    }
 };
 
 template<size_t N>
@@ -83,9 +83,13 @@ public:
     operator etl::string<N>() const
     {
         etl::string<N> result;
-        cppdatalib::core::string_t stdstr = bind.as_string();
-        result.append(stdstr.c_str(), std::min(stdstr.size(), N));
+        convert(result);
         return result;
+    }
+    void convert(etl::string<N> &dest) const
+    {
+        cppdatalib::core::string_t stdstr = bind.as_string();
+        dest.assign(stdstr.c_str(), std::min(stdstr.size(), N));
     }
 };
 
@@ -101,9 +105,15 @@ public:
     cast_template_to_cppdatalib(const etl::optional<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         if (!bind.isSpecified())
-            return cppdatalib::core::null_t();
-        return cppdatalib::core::value(bind.value());
+            dest.set_null(cppdatalib::core::normal);
+        dest = cppdatalib::core::value(bind.value());
     }
 };
 
@@ -116,9 +126,15 @@ public:
     operator etl::optional<T>() const
     {
         etl::optional<T> result;
-        if (!bind.is_null())
-            result = bind.operator T();
+        convert(result);
         return result;
+    }
+    void convert(etl::optional<T> &dest) const
+    {
+        if (!bind.is_null())
+            dest = bind.operator T();
+        else
+            dest = {};
     }
 };
 
@@ -134,10 +150,15 @@ public:
     cast_array_template_to_cppdatalib(const etl::array<T, N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -149,14 +170,23 @@ public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator etl::array<T, N>() const
     {
-        etl::array<T, N> result{};
+        etl::array<T, N> result;
+        convert(result);
+        return result;
+    }
+    void convert(etl::array<T, N> &dest) const
+    {
         if (bind.is_array())
         {
+            size_t i = 0;
             auto it = bind.get_array_unchecked().begin();
-            for (size_t i = 0; i < std::min(bind.array_size(), N); ++i)
-                result[i] = (*it++).operator T();
+            for (; i < std::min(bind.array_size(), N); ++i)
+                dest[i] = (*it++).operator T();
+            for (; i < N; ++i)
+                dest[i] = {};
         }
-        return result;
+        else
+            dest = {};
     }
 };
 
@@ -172,10 +202,15 @@ public:
     cast_sized_template_to_cppdatalib(const etl::bitset<N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -187,13 +222,23 @@ public:
     cast_sized_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator etl::bitset<N>() const
     {
-        etl::bitset<N> result{};
+        etl::bitset<N> result;
+        convert(result);
+        return result;
+    }
+    void convert(etl::bitset<N> &dest) const
+    {
         if (bind.is_array())
         {
+            size_t i = 0;
             auto it = bind.get_array_unchecked().begin();
-            for (size_t i = 0; i < std::min(bind.array_size(), N); ++i)
-                result[i] = *it++;
+            for (; i < std::min(bind.array_size(), N); ++i)
+                dest[i] = *it++;
+            for (; i < N; ++i)
+                dest[i] = {};
         }
+        else
+            dest = {};
         return result;
     }
 };
@@ -210,10 +255,15 @@ public:
     cast_array_template_to_cppdatalib(const etl::deque<T, N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -225,11 +275,16 @@ public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator etl::deque<T, N>() const
     {
-        etl::deque<T, N> result{};
+        etl::deque<T, N> result;
+        convert(result);
+        return result;
+    }
+    void convert(etl::deque<T, N> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -245,10 +300,15 @@ public:
     cast_array_template_to_cppdatalib(const etl::vector<T, N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -260,11 +320,16 @@ public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator etl::vector<T, N>() const
     {
-        etl::vector<T, N> result{};
+        etl::vector<T, N> result;
+        convert(result);
+        return result;
+    }
+    void convert(etl::vector<T, N> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -280,10 +345,15 @@ public:
     cast_array_template_to_cppdatalib(const etl::list<T, N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -295,11 +365,16 @@ public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator etl::list<T, N>() const
     {
-        etl::list<T, N> result{};
+        etl::list<T, N> result;
+        convert(result);
+        return result;
+    }
+    void convert(etl::list<T, N> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -315,10 +390,15 @@ public:
     cast_array_template_to_cppdatalib(const etl::forward_list<T, N> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -330,11 +410,16 @@ public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator etl::forward_list<T, N>() const
     {
-        etl::forward_list<T, N> result{};
+        etl::forward_list<T, N> result;
+        convert(result);
+        return result;
+    }
+    void convert(etl::forward_list<T, N> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push_back(item.operator T());
-        return result;
+                dest.push_back(item.operator T());
     }
 };
 
@@ -350,10 +435,15 @@ public:
     cast_template_to_cppdatalib(const etl::intrusive_list<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -369,10 +459,15 @@ public:
     cast_template_to_cppdatalib(const etl::intrusive_forward_list<Ts...> &bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
-        for (const auto &item: bind)
-            result.push_back(cppdatalib::core::value(item));
+        cppdatalib::core::value result;
+        convert(result);
         return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
+        for (const auto &item: bind)
+            dest.push_back(cppdatalib::core::value(item));
     }
 };
 
@@ -388,13 +483,18 @@ public:
     cast_array_template_to_cppdatalib(etl::queue<T, N> bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
-        cppdatalib::core::value result = cppdatalib::core::array_t();
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
+        dest.set_array({}, cppdatalib::core::normal);
         while (!bind.empty())
         {
-            result.push_back(cppdatalib::core::value(bind.top()));
+            dest.push_back(cppdatalib::core::value(bind.top()));
             bind.pop();
         }
-        return result;
     }
 };
 
@@ -406,11 +506,16 @@ public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator etl::queue<T, N>() const
     {
-        etl::queue<T, N> result{};
+        etl::queue<T, N> result;
+        convert(result);
+        return result;
+    }
+    void convert(etl::queue<T, N> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push(item.operator T());
-        return result;
+                dest.push(item.operator T());
     }
 };
 
@@ -426,15 +531,20 @@ public:
     cast_array_template_to_cppdatalib(etl::stack<T, N> bind) : bind(bind) {}
     operator cppdatalib::core::value() const
     {
+        cppdatalib::core::value result;
+        convert(result);
+        return result;
+    }
+    void convert(cppdatalib::core::value &dest) const
+    {
         using namespace std;
-        cppdatalib::core::value result = cppdatalib::core::array_t();
+        dest.set_array({}, cppdatalib::core::normal);
         while (!bind.empty())
         {
-            result.push_back(cppdatalib::core::value(bind.top()));
+            dest.push_back(cppdatalib::core::value(bind.top()));
             bind.pop();
         }
-        reverse(result.get_array_ref().begin(), result.get_array_ref().end());
-        return result;
+        reverse(dest.get_array_ref().begin(), dest.get_array_ref().end());
     }
 };
 
@@ -446,11 +556,16 @@ public:
     cast_array_template_from_cppdatalib(const cppdatalib::core::value &bind) : bind(bind) {}
     operator etl::stack<T, N>() const
     {
-        etl::stack<T, N> result{};
+        etl::stack<T, N> result;
+        convert(result);
+        return result;
+    }
+    void convert(etl::stack<T, N> &dest) const
+    {
+        dest.clear();
         if (bind.is_array())
             for (const auto &item: bind.get_array_unchecked())
-                result.push(item.operator T());
-        return result;
+                dest.push(item.operator T());
     }
 };
 

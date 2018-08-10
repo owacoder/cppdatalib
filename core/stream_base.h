@@ -2223,6 +2223,7 @@ namespace cppdatalib
                                 }
 
                                 doctypedecl["root"] = core::value(value);
+                                throw core::error("XML - DOCTYPE is not currently supported in XML documents");
                             }
                             else
                                 return false;
