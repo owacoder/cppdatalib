@@ -299,7 +299,13 @@ namespace cppdatalib
                     request.setHost(uri.getHost());
                     request.setVersion(Poco::Net::HTTPMessage::HTTP_1_1);
                     if (!uri.getUserInfo().empty())
-                        request.setCredentials("Basic", base64::encode(uri.getUserInfo()));
+                    {
+                        core::ostringstream out;
+                        base64::encode_accumulator base64(out);
+                        base64.accumulate(uri.getUserInfo());
+                        base64.end();
+                        request.setCredentials("Basic", out.str());
+                    }
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                     for (const auto &header: working_url.get_attributes())
@@ -845,7 +851,7 @@ namespace cppdatalib
         class parser : public core::stream_input
         {
             core::value url;
-            core::object_t headers;
+            core::value headers;
             std::string verb;
             int maximum_redirects;
             core::object_t proxy_settings;
@@ -860,7 +866,7 @@ namespace cppdatalib
                    core::network_library interface = core::default_network_library,
                    const std::string &verb = "GET",
                    core::istream_handle input = core::istream_handle(),
-                   const core::object_t &headers = core::object_t(),
+                   const core::object_t &headers = core::object_t(), /* headers must NOT contain a Range field or Transfer-Encoding field */
                    /*
                     * -1 if no limit, 0 disallows redirects of any sort, 1 is single redirect allowed, etc.
                     */
@@ -920,7 +926,7 @@ namespace cppdatalib
                             break;
 #ifdef CPPDATALIB_ENABLE_QT_NETWORK
                         case core::qt_network_library:
-                            interface_stream = new qt_parser(url, verb, input_handle, headers, maximum_redirects, proxy_settings,
+                            interface_stream = new qt_parser(url, verb, input_handle, headers.get_object_unchecked(), maximum_redirects, proxy_settings,
                                                              static_cast<QNetworkAccessManager *>(context));
                             if (get_output())
                                 interface_stream->set_output(*get_output());
@@ -928,7 +934,7 @@ namespace cppdatalib
 #endif
 #ifdef CPPDATALIB_ENABLE_POCO_NETWORK
                         case core::poco_network_library:
-                            interface_stream = new poco_parser(url, verb, input_handle, headers, maximum_redirects, proxy_settings,
+                            interface_stream = new poco_parser(url, verb, input_handle, headers.get_object_unchecked(), maximum_redirects, proxy_settings,
                                                                static_cast<Poco::Net::HTTPClientSession *>(context),
                                                                static_cast<Poco::Net::HTTPSClientSession *>(s_context));
                             if (get_output())
@@ -937,7 +943,7 @@ namespace cppdatalib
 #endif
 #ifdef CPPDATALIB_ENABLE_CURL_NETWORK
                         case core::curl_network_library:
-                            interface_stream = new curl_parser(url, verb, input_handle, headers, maximum_redirects, proxy_settings,
+                            interface_stream = new curl_parser(url, verb, input_handle, headers.get_object_unchecked(), maximum_redirects, proxy_settings,
                                                                static_cast<CURL *>(context),
                                                                static_cast<CURLM *>(s_context));
                             if (get_output())
@@ -955,6 +961,29 @@ namespace cppdatalib
             void set_max_redirects(int max) {maximum_redirects = max;}
 
             bool busy() const {return stream_input::busy() || (interface_stream && interface_stream->busy());}
+
+            // `path` is a either a single integer, which specifies where to start reading from,
+            // or an array containing two integers, which specify a range to read
+            bool seek_to(const core::value &path, bool allow_slow_seeking = false)
+            {
+                (void) allow_slow_seeking;
+
+                if (path.is_array())
+                    headers["Range"] = core::value("bytes " + stdx::to_string(path.element(0).as_uint()) + "-" + (path.array_size() > 1? stdx::to_string(path.element(1).as_uint()): ""));
+                else if (path.is_int() || path.is_uint())
+                    headers["Range"] = core::value("bytes " + stdx::to_string(path.as_uint()));
+                else
+                    return false;
+
+                reset();
+                return true;
+            }
+
+            void cancel_seek()
+            {
+                headers.erase_member("Range");
+                reset();
+            }
 
         protected:
             void test_interface()

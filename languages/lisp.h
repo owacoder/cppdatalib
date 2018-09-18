@@ -65,7 +65,9 @@ namespace cppdatalib
                 void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
                 void real_(const core::value &v)
                 {
-                    if (!std::isfinite(v.get_real_unchecked()))
+                    using namespace std;
+                    
+                    if (!isfinite(v.get_real_unchecked()))
                         throw core::error("Lisp - cannot write 'NaN' or 'Infinity' values");
                     stream() << v.get_real_unchecked();
                 }
@@ -80,13 +82,15 @@ namespace cppdatalib
 
                 void begin_object_(const core::value &, core::optional_size, bool) {stream().write("(list ", 6);}
                 void end_object_(const core::value &, bool) {stream().put(')');}
+
+                void link_(const core::value &) {throw core::error("Lisp - 'link' value not allowed in output");}
             };
 
             inline std::string to_lisp(const core::value &v)
             {
                 core::ostringstream stream;
                 stream_writer w(stream);
-                w << v;
+                core::convert(w, v);
                 return stream.str();
             }
         }

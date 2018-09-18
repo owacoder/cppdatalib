@@ -25,66 +25,87 @@
 #ifndef CPPDATALIB_HEX_H
 #define CPPDATALIB_HEX_H
 
-#include "ostream.h"
+#include "value_builder.h"
 
 namespace cppdatalib
 {
     namespace hex
     {
-        inline core::ostream &debug_write(core::ostream &stream, unsigned char c)
+        class encode_accumulator : public core::accumulator_base
         {
-            const char alpha[] = "0123456789ABCDEF";
+        public:
+            encode_accumulator() : core::accumulator_base() {}
+            encode_accumulator(core::istream_handle handle, accumulator_base *output_handle = NULL) : core::accumulator_base(handle, output_handle) {}
+            encode_accumulator(core::ostream_handle handle) : core::accumulator_base(handle) {}
+            encode_accumulator(accumulator_base *handle, bool pull_from_handle = false) : core::accumulator_base(handle, pull_from_handle) {}
+            encode_accumulator(core::stream_handler &handle, bool just_append = false) : core::accumulator_base(handle, just_append) {}
 
-            if (isprint(c))
-                stream.put(c);
-            else
+        protected:
+            const char *alphabet() {return "0123456789ABCDEF";}
+
+            void accumulate_(core::istream::int_type data)
             {
-                stream.put(alpha[(c & 0xff) >> 4]);
-                stream.put(alpha[c & 0xf]);
+                char buf[2];
+
+                buf[0] = alphabet()[(data & 0xF0) >> 4];
+                buf[1] = alphabet()[data & 0xF];
+
+                flush_out(buf, 2);
+            }
+        };
+
+        class decode_accumulator : public core::accumulator_base
+        {
+            uint8_t state;
+            int required_input_before_flush;
+
+        public:
+            decode_accumulator() : core::accumulator_base() {}
+            decode_accumulator(core::istream_handle handle, accumulator_base *output_handle = NULL) : core::accumulator_base(handle, output_handle) {}
+            decode_accumulator(core::ostream_handle handle) : core::accumulator_base(handle) {}
+            decode_accumulator(accumulator_base *handle, bool pull_from_handle = false) : core::accumulator_base(handle, pull_from_handle) {}
+            decode_accumulator(core::stream_handler &handle, bool just_append = false) : core::accumulator_base(handle, just_append) {}
+
+        protected:
+            static int value(int xdigit)
+            {
+                const char alpha[] = "abcdef";
+
+                if (isdigit(xdigit))
+                    return xdigit - '0';
+                else if (!isxdigit(xdigit))
+                    return -1;
+                else
+                    return 10 + strchr(alpha, tolower(xdigit)) - alpha;
             }
 
-            return stream.put(' ');
-        }
+            void begin_() {state = 0; required_input_before_flush = 2;}
+            void end_()
+            {
+                if (required_input_before_flush == 1)
+                {
+                    char buf = state << 4;
+                    flush_out(&buf, 1);
+                }
+            }
 
-        inline core::ostream &debug_write(core::ostream &stream, core::string_view_t str)
-        {
-            for (auto c: str)
-                debug_write(stream, c);
+            void accumulate_(core::istream::int_type data)
+            {
+                int val = value(data & 0xff);
 
-            return stream;
-        }
+                if (val < 0)
+                    return;
 
-        inline std::string debug_encode(const std::string &str)
-        {
-            core::ostringstream stream;
-            debug_write(stream, str);
-            return stream.str();
-        }
+                state = (state << 4) | val;
 
-        inline core::ostream &write(core::ostream &stream, unsigned char c)
-        {
-            const char alpha[] = "0123456789ABCDEF";
-
-            stream.put(alpha[(c & 0xff) >> 4]);
-            stream.put(alpha[c & 0xf]);
-
-            return stream;
-        }
-
-        inline core::ostream &write(core::ostream &stream, core::string_view_t str)
-        {
-            for (auto c: str)
-                write(stream, c);
-
-            return stream;
-        }
-
-        inline std::string encode(core::string_view_t str)
-        {
-            core::ostringstream stream;
-            write(stream, str);
-            return stream.str();
-        }
+                if (--required_input_before_flush == 0)
+                {
+                    char buf = state;
+                    flush_out(&buf, 1);
+                    begin_();
+                }
+            }
+        };
     }
 }
 

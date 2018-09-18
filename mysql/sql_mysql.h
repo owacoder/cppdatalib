@@ -242,7 +242,7 @@ namespace cppdatalib
                     mysql_free_result(result);
                     result = NULL;
                 }
-                catch (const core::error &)
+                catch (...)
                 {
                     if (result)
                         mysql_free_result(result);
@@ -698,6 +698,8 @@ namespace cppdatalib
             {
                 throw core::error("MySQL - 'object' values not allowed in output");
             }
+
+            void link_(const core::value &) {throw core::error("MySQL - 'link' value not allowed in output");}
         };
     }
 }

@@ -28,6 +28,11 @@
 #include <cstdlib>
 #include <iterator>
 #include <memory>
+//#include "global.h"
+
+#ifndef CPPDATALIB_CPP11
+#include <vector>
+#endif
 
 namespace cppdatalib
 {
@@ -38,6 +43,15 @@ namespace cppdatalib
          * in using cache_vector_n over std::vector for shallow (perhaps one level deep) stack-implemented-on-a-vector usage.
          */
 
+#ifndef CPPDATALIB_CPP11
+        template<typename T, size_t N>
+        class cache_vector_n : public std::vector<T>
+        {
+        public:
+            cache_vector_n() : std::vector<T>() {}
+            explicit cache_vector_n(size_t n, const T &v) : std::vector<T>(n, v) {}
+        };
+#else
         template<typename T, size_t N, typename Allocator = std::allocator<T>>
         class cache_vector_n
         {
@@ -706,6 +720,7 @@ namespace cppdatalib
             size_type mSize, mSlowCapacity;
             allocator_type alloc;
         };
+#endif // CPPDATALIB_CPP11
     }
 }
 

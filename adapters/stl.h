@@ -2,18 +2,13 @@
 #define CPPDATALIB_STL_H
 
 #include <string>
-#include <codecvt>
 #include <locale>
 
-#include <array>
 #include <vector>
 #include <list>
-#include <forward_list>
 #include <queue>
 #include <valarray>
 #include <bitset>
-#include <tuple>
-#include <ratio>
 
 #include <set>
 #include <unordered_set>
@@ -24,11 +19,19 @@
 #include <stack>
 #include <queue>
 
+#ifdef CPPDATALIB_CPP11
+#include <array>
+#include <codecvt>
+#include <forward_list>
+#include <tuple>
+#include <ratio>
+
 #include <chrono>
 
 #include <complex>
 
 #include <atomic>
+#endif
 
 #ifdef CPPDATALIB_CPP17
 #include <variant>
@@ -37,6 +40,8 @@
 #endif
 
 #include "../core/value_parser.h"
+
+#ifdef CPPDATALIB_CPP11
 
 template<typename... Ts>
 class cast_template_to_cppdatalib<std::basic_string, char, Ts...>
@@ -1179,7 +1184,7 @@ public:
             for (size_t i = 0; i < s.size(); )
             {
                 uint32_t codepoint = cppdatalib::core::utf8_to_ucs(s, i, i);
-                if (codepoint == UINT32_MAX)
+                if (codepoint == std::numeric_limits<uint32_t>::max())
                     throw cppdatalib::core::error("Invalid UTF-8");
                 dest.push_back(codepoint);
             }
@@ -1190,7 +1195,7 @@ public:
             for (size_t i = 0; i < s.size(); )
             {
                 uint32_t codepoint = cppdatalib::core::utf8_to_ucs(s, i, i);
-                if (codepoint == UINT32_MAX)
+                if (codepoint == std::numeric_limits<uint32_t>::max())
                     throw cppdatalib::core::error("Invalid UTF-8");
 
                 // TODO: remove dependence on creating a secondary byte-granular string?
@@ -1821,7 +1826,7 @@ public:
             else if (Period::den <= 1000000000)
                 dest = cppdatalib::core::value(bind.count() * (1000000000 / Period::den), cppdatalib::core::duration_ns);
             else // Period::den > 1000000000
-                dest = cppdatalib::core::value(bind.count() / (Period::den / 1000000000), cppdatalib::core::duration_ns);
+                dest = cppdatalib::core::value(bind.count() / (Period::den / 1000000000ull), cppdatalib::core::duration_ns);
         }
         else // Second or super-second precision
             dest = cppdatalib::core::value(bind.count() * Period::num / Period::den, cppdatalib::core::duration);
@@ -1976,6 +1981,8 @@ public:
         }
     }
 };
-#endif
+#endif // CPPDATALIB_CPP17
+
+#endif // CPPDATALIB_CPP11
 
 #endif // CPPDATALIB_STL_H

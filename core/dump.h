@@ -26,6 +26,7 @@
 #define CPPDATALIB_DUMP_H
 
 #include "stream_base.h"
+#include "hex.h"
 
 namespace cppdatalib
 {
@@ -64,7 +65,13 @@ namespace cppdatalib
                                             case '\n': stream.write("\\n", 2); break;
                                             case '\r': stream.write("\\r", 2); break;
                                             case '\t': stream.write("\\t", 2); break;
-                                            default: hex::write(stream.write("\\u00", 4), c); break;
+                                            default:
+                                            {
+                                                hex::encode_accumulator accumulator(stream.write("\\u00", 4));
+                                                accumulator.accumulate(c);
+                                                accumulator.end();
+                                                break;
+                                            }
                                         }
                                     }
                                     else
@@ -139,7 +146,7 @@ namespace cppdatalib
                         {
                             impl::attribute_stream_writer writer(stream());
                             stream() << "[attributes=";
-                            writer << core::value(v.get_attributes());
+                            convert(writer, core::value(v.get_attributes()));
                             stream() << "].";
                         }
 #endif
@@ -157,7 +164,7 @@ namespace cppdatalib
                         {
                             impl::attribute_stream_writer writer(stream());
                             stream() << "[attributes=";
-                            writer << core::value(v.get_attributes());
+                            convert(writer, core::value(v.get_attributes()));
                             stream() << "].";
                         }
 #endif
@@ -169,7 +176,7 @@ namespace cppdatalib
                         if (v.is_strong_link())
                         {
                             impl::attribute_stream_writer writer(stream());
-                            writer << *v;
+                            convert(writer, *v);
                         }
                         else
                         {
@@ -178,7 +185,7 @@ namespace cppdatalib
                             {
                                 stream() << "global(";
                                 impl::attribute_stream_writer writer(stream());
-                                writer << v.get_link_name();
+                                convert(writer, v.get_link_name());
                                 stream() << ").";
                             }
 #endif
@@ -190,9 +197,11 @@ namespace cppdatalib
                     void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
                     void real_(const core::value &v)
                     {
-                        if (std::isinf(v.get_real_unchecked()))
+                        using namespace std;
+                        
+                        if (isinf(v.get_real_unchecked()))
                             stream() << (v.get_real_unchecked() < 0? "-": "") << "infinity";
-                        else if (std::isnan(v.get_real_unchecked()))
+                        else if (isnan(v.get_real_unchecked()))
                             stream() << "NaN";
                         else
                             stream() << v.get_real_unchecked();
@@ -211,7 +220,7 @@ namespace cppdatalib
 
             class stream_writer : public impl::stream_writer_base
             {
-                std::unique_ptr<char []> buffer;
+                char *buffer;
                 size_t indent_width;
                 size_t current_indent;
                 bool nested;
@@ -222,9 +231,9 @@ namespace cppdatalib
                     {
                         size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                        memset(buffer.get(), ' ', size);
+                        memset(buffer, ' ', size);
 
-                        stream().write(buffer.get(), size);
+                        stream().write(buffer, size);
                         padding -= size;
                     }
                 }
@@ -245,6 +254,7 @@ namespace cppdatalib
                     , current_indent(0)
                     , nested(false)
                 {}
+                ~stream_writer() {delete[] buffer;}
 
                 size_t indent() {return indent_width;}
 
@@ -287,7 +297,7 @@ namespace cppdatalib
                     {
                         impl::attribute_stream_writer writer(stream());
                         stream() << "[attributes=";
-                        writer << core::value(v.get_attributes());
+                        convert(writer, core::value(v.get_attributes()));
                         stream() << "].";
                     }
 #endif
@@ -308,7 +318,7 @@ namespace cppdatalib
                     {
                         impl::attribute_stream_writer writer(stream());
                         stream() << "[attributes=";
-                        writer << core::value(v.get_attributes());
+                        convert(writer, core::value(v.get_attributes()));
                         stream() << "].";
                     }
 #endif
@@ -320,7 +330,7 @@ namespace cppdatalib
                     if (v.is_strong_link())
                     {
                         stream_writer writer(stream(), indent_width, current_indent);
-                        writer << *v;
+                        convert(writer, *v);
                     }
                     else
                     {
@@ -329,7 +339,7 @@ namespace cppdatalib
                         {
                             stream() << "global(";
                             impl::attribute_stream_writer writer(stream());
-                            writer << v.get_link_name();
+                            convert(writer, v.get_link_name());
                             stream() << ").";
                         }
 #endif
@@ -341,9 +351,11 @@ namespace cppdatalib
                 void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
                 void real_(const core::value &v)
                 {
-                    if (std::isinf(v.get_real_unchecked()))
+                    using namespace std;
+                    
+                    if (isinf(v.get_real_unchecked()))
                         stream() << (v.get_real_unchecked() < 0? "-": "") << "infinity";
-                    else if (std::isnan(v.get_real_unchecked()))
+                    else if (isnan(v.get_real_unchecked()))
                         stream() << "NaN";
                     else
                         stream() << v.get_real_unchecked();
@@ -390,35 +402,43 @@ namespace cppdatalib
             };
         }
 
-        inline std::ostream &operator<<(std::ostream &o, const value &v)
+        inline std::ostream &convert(std::ostream &o, const value &v)
         {
             core::ostream_handle wrap(o);
             dump::stream_writer writer(wrap, 2);
-            writer << v;
+            core::convert(writer, v);
             return o;
         }
+        inline std::ostream &operator<<(std::ostream &o, const value &v) {return convert(o, v);}
 
-        inline std::ostream &operator<<(std::ostream &o, core::stream_input &&parser)
+#ifdef CPPDATALIB_CPP11
+        inline std::ostream &convert(std::ostream &o, core::stream_input &&parser)
         {
             core::ostream_handle wrap(o);
             dump::stream_writer writer(wrap, 2);
-            writer << parser;
+            core::convert(writer, parser);
             return o;
         }
+        inline std::ostream &operator<<(std::ostream &o, core::stream_input &&parser) {return convert(o, std::move(parser));}
+#endif
 
-        inline const value &operator>>(const value &v, std::ostream &o)
+        inline const value &convert(const value &v, std::ostream &o)
         {
             core::ostream_handle wrap(o);
             dump::stream_writer writer(wrap, 2);
-            return v >> writer;
+            return convert(v, writer);
         }
+        inline const value &operator>>(const value &v, std::ostream &o) {return convert(v, o);}
 
-        inline void operator>>(core::stream_input &&parser, std::ostream &o)
+#ifdef CPPDATALIB_CPP11
+        inline void convert(core::stream_input &&parser, std::ostream &o)
         {
             core::ostream_handle wrap(o);
             dump::stream_writer writer(wrap, 2);
             parser >> writer;
         }
+        inline void operator>>(core::stream_input &&parser, std::ostream &o) {return convert(std::move(parser), o);}
+#endif
     }
 }
 

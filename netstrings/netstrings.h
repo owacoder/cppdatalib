@@ -46,7 +46,9 @@ namespace cppdatalib
                     struct traverser
                     {
                     private:
-                        std::stack<size_t, core::cache_vector_n<size_t, core::cache_size>> size;
+                        typedef std::stack< size_t, core::cache_vector_n<size_t, core::cache_size> > sizes_t;
+
+                        sizes_t size;
 
                     public:
                         traverser() {size.push(0);}
@@ -107,7 +109,7 @@ namespace cppdatalib
 #endif
                                 {
                                     if (prefix)
-                                        size.top() += 2 + arg->string_size() + std::to_string(arg->string_size()).size();
+                                        size.top() += 2 + arg->string_size() + stdx::to_string(arg->string_size()).size();
                                     break;
                                 }
                                 case core::array:
@@ -119,7 +121,7 @@ namespace cppdatalib
                                     }
                                     else
                                     {
-                                        size_t temp = size.top() + (size.size() > 2? std::to_string(size.top()).size() + 2: 0);
+                                        size_t temp = size.top() + (size.size() > 2? stdx::to_string(size.top()).size() + 2: 0);
                                         size.pop();
                                         size.top() += temp;
                                     }
@@ -228,7 +230,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             stream_writer w(stream);
-            w << v;
+            core::convert(w, v);
             return stream.str();
         }
     }

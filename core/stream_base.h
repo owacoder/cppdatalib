@@ -29,6 +29,7 @@
 #include "value.h"
 #include "istream.h"
 #include "ostream.h"
+#include <queue>
 
 namespace cppdatalib
 {
@@ -96,6 +97,9 @@ namespace cppdatalib
                 optional_size reported_size_; // The number of items reported to be in this container
             };
 
+            typedef core::cache_vector_n<scope_data, core::cache_size> nested_scopes_t; // Used as a stack, but not a stack so we can peek below the top
+            typedef std::map<uint64_t, core::value> out_of_order_buffer_t;
+
             bool active_;
             bool is_key_;
 
@@ -127,7 +131,7 @@ namespace cppdatalib
             // an element to be written in a single write() call
             static const unsigned int requires_single_write = 0x7f;
 
-            static optional_size unknown_size() {return {};}
+            static optional_size unknown_size() {return optional_size();}
 
             stream_handler() : active_(false), is_key_(false)
             {
@@ -153,7 +157,7 @@ namespace cppdatalib
                 assert("cppdatalib::core::stream_handler - begin() called on active handler" && !active());
 
                 active_ = true;
-                nested_scopes = decltype(nested_scopes)();
+                nested_scopes = nested_scopes_t();
                 nested_scopes.push_back(scope_data(null, normal, unknown_size()));
                 out_of_order_buffer.clear();
                 is_key_ = false;
@@ -203,7 +207,26 @@ namespace cppdatalib
             // Returns true if this is an object and a value of a key/value pair is expected
             bool container_key_was_just_parsed() const {return nested_scopes.back().key_was_parsed();}
 
-            // An API must call this when a scalar value is encountered,
+            // This function should be called when an output "seek" should be performed
+            //
+            // The format seeks through the entire output (not what was just seeked) for the specified item(s)
+            // Use `cancel_seek()` to cancel the seek range and use the entire output again
+            //
+            // The output after this function is called should only be to the same level as the sought-after item, or lower
+            //
+            // Returns false if the seek (which is format-defined) fails (possibly due to the format not supporting it)
+            // Returns true on success
+            //
+            // The `path` is a format-specific path type (generally a string delimited by '/', but it could be anything)
+            //
+            // If `allow_slow_seeking` is true, a format may search its entire storage for the specified path
+            // If `allow_slow_seeking` is false, a format may NOT search its entire storage for the specified path
+            // It should be able to locate the specified resource location in less than O(n) time (where n is the size of the storage)
+            virtual bool seek_to(const value &path, bool allow_slow_seeking = false) {(void) path; (void) allow_slow_seeking; return false;}
+
+            virtual void cancel_seek() {}
+
+            // This function should be called when a scalar value is encountered,
             // although it should operate correctly for any value.
             //
             // If `comments_and_directives_pass_through` is true,
@@ -261,20 +284,20 @@ namespace cppdatalib
                             case temporary_string:
 #endif
                                 begin_string_(v, v.string_size(), is_key);
-                                nested_scopes.push_back({v.get_type(), v.get_subtype(), v.string_size()});
+                                nested_scopes.push_back(scope_data(v.get_type(), v.get_subtype(), v.string_size()));
                                 remove_scope = true;
                                 string_data_(v, is_key);
                                 end_string_(v, is_key);
                                 break;
                             case array:
                                 begin_array_(v, 0, is_key);
-                                nested_scopes.push_back({array, v.get_subtype(), 0});
+                                nested_scopes.push_back(scope_data(array, v.get_subtype(), 0));
                                 remove_scope = true;
                                 end_array_(v, is_key);
                                 break;
                             case object:
                                 begin_object_(v, 0, is_key);
-                                nested_scopes.push_back({object, v.get_subtype(), 0});
+                                nested_scopes.push_back(scope_data(object, v.get_subtype(), 0));
                                 remove_scope = true;
                                 end_object_(v, is_key);
                                 break;
@@ -317,7 +340,7 @@ namespace cppdatalib
                 return true;
             }
 
-            // An API must call this when a comment is requested to be written.
+            // This function should be called when a comment is requested to be written.
             // Comments are not guaranteed to be supported by the output format.
             // The default implementation does nothing
             void write_comment(const core::value &v)
@@ -325,7 +348,7 @@ namespace cppdatalib
                 comment_(v);
             }
 
-            // An API must call this when a program directive is requested to be written.
+            // This function should be called when a program directive is requested to be written.
             // Program directives are not guaranteed to be supported by the output format.
             // The default implementation does nothing
             void write_program_directive(const core::value &v)
@@ -333,7 +356,7 @@ namespace cppdatalib
                 directive_(v);
             }
 
-            // An API must call this when an out-of-order write is requested
+            // This function should be called when an out-of-order write is requested
             // for an array write. This works for scalars or complex objects.
             //
             // Out-of-order writes can only be requested when writing arrays,
@@ -373,8 +396,8 @@ namespace cppdatalib
 
                 if (current_container_size() == idx)
                     result = write(v);
-                else if (current_container_size() > idx || !out_of_order_buffer.insert({idx, v}).second)
-                    throw custom_error("cppdatalib::core::stream_handler - An out-of-order write on index " + std::to_string(idx) + " was performed more than once");
+                else if (current_container_size() > idx || !out_of_order_buffer.insert(out_of_order_buffer_t::value_type(idx, v)).second)
+                    throw custom_error("cppdatalib::core::stream_handler - An out-of-order write on index " + stdx::to_string(idx) + " was performed more than once");
 
                 while (out_of_order_buffer.size() && out_of_order_buffer.begin()->first == current_container_size())
                 {
@@ -443,11 +466,13 @@ namespace cppdatalib
             // Note that string_data_() and end_string_() require that `v` be of the same subtype as the original string passed to begin_string_()
             virtual void begin_string_(const core::value &v, optional_size size, bool is_key) {(void) v; (void) size; (void) is_key;}
             virtual void string_data_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
+#ifdef CPPDATALIB_CPP11
             virtual void string_data_(core::value &&v, bool is_key) {string_data_(v, is_key);}
+#endif
             virtual void end_string_(const core::value &v, bool is_key) {(void) v; (void) is_key;}
 
         public:
-            // An API must call these when a long string is parsed. The number of bytes is passed in size, if possible
+            // These functions must be called when a long string is parsed. The number of bytes is passed in size, if possible
             // size == -1 means unknown size
             //
             // Comments and processing instructions will be passed as such to the resulting handler, but no special action is taken.
@@ -481,7 +506,7 @@ namespace cppdatalib
                     begin_string_(v, size, is_key_ = false);
                 }
 
-                nested_scopes.push_back({string, v.get_subtype(), size});
+                nested_scopes.push_back(scope_data(string, v.get_subtype(), size));
             }
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
             void append_to_string(string_view_t v) {append_to_string(value(v));}
@@ -505,6 +530,7 @@ namespace cppdatalib
                 string_data_(v, is_key_);
                 nested_scopes.back().items_ += v.string_size();
             }
+#ifdef CPPDATALIB_CPP11
             void append_to_string(core::value &&v)
             {
                 assert("cppdatalib::core::stream_handler - begin() must be called before handler can be used" && active());
@@ -524,6 +550,7 @@ namespace cppdatalib
                 string_data_(std::move(v), is_key_);
                 nested_scopes.back().items_ += str_size;
             }
+#endif // CPPDATALIB_CPP11
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
             void end_string(string_view_t v) {end_string(value(v));}
 #endif
@@ -568,7 +595,7 @@ namespace cppdatalib
                     ++nested_scopes.back().items_;
             }
 
-            // An API must call these when an array is parsed. The number of elements is passed in size, if possible
+            // These functions must be called when an array is parsed. The number of elements is passed in size, if possible
             // size == -1 means unknown size
             // If the number of elements of v is equal to size, the entire array is provided
             void begin_array(const core::array_t &v, optional_size size) {begin_array(value(v), size);}
@@ -593,7 +620,7 @@ namespace cppdatalib
                     begin_array_(v, size, false);
                 }
 
-                nested_scopes.push_back({array, v.get_subtype(), size});
+                nested_scopes.push_back(scope_data(array, v.get_subtype(), size));
             }
             void end_array(const core::array_t &v) {end_array(value(v));}
             void end_array(const core::value &v)
@@ -654,7 +681,7 @@ namespace cppdatalib
                     ++nested_scopes.back().items_;
             }
 
-            // An API must call these when an object is parsed. The number of key/value pairs is passed in size, if possible
+            // These functions must be called when an object is parsed. The number of key/value pairs is passed in size, if possible
             // size == -1 means unknown size
             // If the number of elements of v is equal to size, the entire object is provided
             void begin_object(const core::object_t &v, optional_size size) {begin_object(value(v), size);}
@@ -679,7 +706,7 @@ namespace cppdatalib
                     begin_object_(v, size, false);
                 }
 
-                nested_scopes.push_back({object, v.get_subtype(), size});
+                nested_scopes.push_back(scope_data(object, v.get_subtype(), size));
             }
             void end_object(const core::object_t &v) {end_object(value(v));}
             void end_object(const core::value &v)
@@ -740,7 +767,7 @@ namespace cppdatalib
             std::map<uint64_t, core::value> out_of_order_buffer; // Used for out-of-order write buffering if it is not supported by the handler
         };
 
-        /* The base class of all input formats. All input formats must inherit from this class */
+        /* The base class of all input formats that read to a structured output. All input formats must inherit from this class */
         class stream_input
         {
         private:
@@ -779,6 +806,27 @@ namespace cppdatalib
                 reset_();
                 mReset = true;
             }
+
+            // This function should be called when an input "seek" should be performed
+            //
+            // The format seeks through the entire input (not what was just seeked) for the specified item(s)
+            // Use `cancel_seek()` to cancel the seek range and use the entire input again
+            //
+            // The output after this function is called should only be from the same level as the sought-after item, or lower
+            // (i.e. the format should not seek to item at depth 4 and then output some value at depth 3, but depth 5 should be output)
+            //
+            // A reimplementation IS ALLOWED to `reset()` the parser and then seek as needed
+            // Returns false if the seek (which is format-defined) fails (possibly due to the format not supporting it)
+            // Returns true on success
+            //
+            // The `path` is a format-specific path type (generally a string delimited by '/', but it could be anything)
+            //
+            // If `allow_slow_seeking` is true, a format may search its entire storage for the specified path
+            // If `allow_slow_seeking` is false, a format may NOT search its entire storage for the specified path
+            // It should be able to locate the specified resource location in less than O(n) time (where n is the size of the storage)
+            virtual bool seek_to(const value &path, bool allow_slow_seeking = false) {(void) path; (void) allow_slow_seeking; return false;}
+
+            virtual void cancel_seek() {}
 
             // Returns whether the input is in its initial state (just reset)
             bool was_just_reset() const {return mReset;}
@@ -941,7 +989,7 @@ namespace cppdatalib
             virtual void reset_() = 0;
         };
 
-        /* The base class of all input formats that read from an input stream. All input formats that read from an input stream must inherit from this class */
+        /* The base class of all input formats that read from an input stream to a structured output. All input formats that read from an input stream must inherit from this class */
         class stream_parser : public stream_input
         {
             core::istream_handle handle;
@@ -961,6 +1009,316 @@ namespace cppdatalib
             std::istream *std_stream() {return handle.std_stream();}
         };
 
+        /* The base class of all filters that filter an input, output, or structured stream
+         *
+         * This class can be used as a pull parser on input, or as a push parser on output
+         *
+         *     Pull parser:
+         *
+         *         Provide an istream_handle or an accumulator_base pointer (with pull_parse set to true) to the constructor.
+         *         Then use the accumulator_base as a normal istream. Transformations happen automatically when data is read.
+         *
+         *     Push parser:
+         *
+         *         Provide an ostream_handle, accumulator_base (with pull_parse set to false), or a stream_handler to the constructor.
+         *
+         *         Call begin() to begin operations on the stream, although this is not strictly necessary (it's handled automatically).
+         *
+         *         Then call accumulate(void) while it returns true to accumulate from the provided input (if any), or
+         *         call accumulate(n) to accumulate from external input. The inherited class will provide output to flush_out().
+         *
+         *         Call end() to end operations on the stream.
+         *         (NECESSARY when using accumulate()! Not necessary if using the standard istream functions)
+         *
+         * Stacked accumulators can be used like the following (pseudocode):
+         *
+         *     // Notice the pull-parser theme continues
+         *     accumulator_base input_accumulator(input_stream);
+         *     accumulator_base output_accumulator(&input_accumulator, true);
+         *
+         *     // Use output accumulator as pull parser
+         *     output_accumulator.get(), etc.
+         *
+         * or:
+         *
+         *     // Notice the push-parser theme continues
+         *     accumulator_base output_accumulator(output_stream);
+         *     accumulator_base input_accumulator(&output_accumulator);
+         *
+         *     // Use input accumulator as push parser
+         *     input_accumulator.accumulate(data), etc.
+         *
+         * or:
+         *
+         *     // Notice accumulators can work as push-pull parser pairs too
+         *     accumulator_base output_accumulator(output_stream);
+         *     accumulator_base input_accumulator(input_stream, &output_accumulator);
+         *
+         *     // Use input_accumulator as push-pull parser (automatically reads and writes when accumulate(void) is called)
+         *     // Data flow is controlled between the input and output
+         *     input_accumulator.accumulate(void), etc.
+         */
+        class accumulator_base : public istream, public ostream
+        {
+            core::istream_handle ihandle;
+            core::ostream_handle ohandle;
+            core::stream_handler *shandle;
+            accumulator_base *ahandle;
+
+            bool begun, just_append;
+
+            // For buffering unget()
+            std::deque<char> read_buffer;
+            int_type last_read_;
+            size_t pos;
+
+        public:
+            typedef istream::int_type int_type;
+            typedef istream::streamsize streamsize;
+
+            // Null constructor. Any attempt to flow data through this accumulator will fail
+            accumulator_base()
+                : shandle(NULL)
+                , ahandle(NULL)
+                , begun(false)
+                , just_append(false)
+                , last_read_(EOF)
+                , pos(0)
+            {}
+            // Reads from handle as an input filter (use standard istream functions to get the output)
+            // Writes to output_handle if one is provided, otherwise assumes you're using this accumulator as a pull parser
+            accumulator_base(core::istream_handle handle, accumulator_base *output_handle = NULL)
+                : ihandle(handle)
+                , shandle(NULL)
+                , ahandle(output_handle)
+                , begun(false)
+                , just_append(false)
+                , last_read_(EOF)
+                , pos(0)
+            {}
+            // Writes to handle as an output filter (use accumulate() functions to put the output)
+            // Assumes you're using this accumulator as a push parser
+            accumulator_base(core::ostream_handle handle)
+                : ohandle(handle)
+                , shandle(NULL)
+                , ahandle(NULL)
+                , begun(false)
+                , just_append(false)
+                , last_read_(EOF)
+                , pos(0)
+            {}
+            // Writes to handle as an output filter (use accumulate() functions to put the output)
+            // Assumes you're using this accumulator as a pull parser (from handle) if pull_from_handle is true
+            // Assumes you're using this accumulator as a push parser (to handle) if pull_from_handle is false
+            accumulator_base(accumulator_base *handle, bool pull_from_handle = false)
+                : ihandle(pull_from_handle? istream_handle(*handle): istream_handle())
+                , shandle(NULL)
+                , ahandle(pull_from_handle? NULL: handle)
+                , begun(false)
+                , just_append(false)
+                , last_read_(EOF)
+                , pos(0)
+            {}
+            // If just_append is true, the handler will only append to a string, not begin and end it
+            // Assumes you're using this accumulator as a push parser
+            accumulator_base(core::stream_handler &handle, bool just_append = false)
+                : shandle(&handle)
+                , ahandle(NULL)
+                , begun(false)
+                , just_append(just_append)
+                , last_read_(EOF)
+                , pos(0)
+            {}
+            virtual ~accumulator_base() {}
+
+            void begin()
+            {
+                if (!begun)
+                {
+                    if (shandle && !just_append)
+                    {
+                        shandle->begin();
+                        shandle->begin_string(core::value("", 0, core::normal, true), core::stream_handler::unknown_size());
+                    }
+                    begun = true;
+                    begin_();
+                }
+            }
+            void accumulate(core::istream::int_type data)
+            {
+                begin();
+
+                accumulate_(data);
+            }
+            void accumulate(const char *str, size_t len)
+            {
+                begin();
+
+                for (size_t i = 0; i < len; ++i)
+                    accumulate_(str[i]);
+            }
+            void accumulate(core::string_view_t str)
+            {
+                begin();
+
+                for (size_t i = 0; i < str.size(); ++i)
+                    accumulate_(str[i]);
+            }
+            bool accumulate() // Returns true on success, false if end of input was reached. Calls end() automatically at end of input.
+            {
+                begin();
+
+                if (ihandle.valid())
+                {
+                    istream::int_type c = ihandle.stream().get();
+                    if (c == EOF)
+                    {
+                        end();
+                        return false;
+                    }
+                    accumulate(c);
+                }
+                else
+                    throw core::error("cppdatalib::core::accumulator_base - accumulate() called without input stream specified");
+
+                return true;
+            }
+            void end()
+            {
+                if (begun)
+                {
+                    end_();
+                    if (ohandle.valid())
+                        ohandle.stream().flush();
+                    else if (ahandle)
+                        ahandle->end();
+                    else if (shandle && !just_append)
+                    {
+                        shandle->end_string(core::value("", 0, core::normal, true));
+                        shandle->end();
+                    }
+                    begun = false;
+                }
+            }
+
+            streamsize used_buffer() const {return pos;}
+            streamsize remaining_buffer() const {return -1;}
+
+        protected:
+            // istream implementation
+            int_type getc_()
+            {
+                if (!fill_buffer())
+                    return EOF;
+
+                last_read_ = read_buffer.front();
+                read_buffer.pop_front();
+                ++pos;
+                return last_read_;
+            }
+            void ungetc_()
+            {
+                if (last_read_ == EOF)
+                    flags_ |= fail_bit;
+                else
+                {
+                    read_buffer.push_front(last_read_);
+                    --pos;
+                    last_read_ = EOF;
+                }
+            }
+            int_type peekc_()
+            {
+                if (!fill_buffer())
+                    return EOF;
+
+                return read_buffer.front();
+            }
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                size_t chars_read = 0;
+
+                while (n--)
+                {
+                    int_type c = getc_();
+                    if (c == EOF || c > 0xff)
+                    {
+                        n = chars_read;
+                        eof = c == EOF;
+                        return false;
+                    }
+
+                    *buffer++ = c;
+                    ++chars_read;
+                }
+
+                return true;
+            }
+            bool seekc_(streamsize) {return false;}
+            streamsize pos_() {return -1;}
+
+            // ostream implementation
+            void write_(const char *c, size_t n) {accumulate(c, n);}
+            void putc_(char c) {accumulate(c & 0xff);}
+
+            // accumulate implementation
+            bool fill_buffer()
+            {
+                if (!ihandle.valid())
+                    return false;
+
+                while (read_buffer.empty())
+                    if (!accumulate())
+                        break;
+
+                if (read_buffer.empty())
+                    end();
+
+                return !read_buffer.empty();
+            }
+
+            virtual void begin_() {}
+            virtual void accumulate_(core::istream::int_type data) {(void) data;}
+            virtual void end_() {}
+
+            void flush_out(const char *str, size_t len)
+            {
+                begin();
+
+                if (ohandle.valid())
+                    ohandle.stream().write(str, len);
+                else if (ahandle)
+                    ahandle->accumulate(str, len);
+                else if (shandle)
+                    shandle->append_to_string(core::value(str, len, core::normal, true));
+                else if (ihandle.valid())
+                {
+                    while (len--)
+                        read_buffer.push_back(*str++);
+                }
+                else
+                    throw core::error("cppdatalib::core::flush_out() - no output handler specified");
+            }
+        };
+
+        class identity_accumulator : public accumulator_base
+        {
+        public:
+            identity_accumulator() : core::accumulator_base() {}
+            identity_accumulator(core::istream_handle handle, accumulator_base *output_handle = NULL) : core::accumulator_base(handle, output_handle) {}
+            identity_accumulator(core::ostream_handle handle) : core::accumulator_base(handle) {}
+            identity_accumulator(accumulator_base *handle, bool pull_from_handle = false) : core::accumulator_base(handle, pull_from_handle) {}
+            identity_accumulator(core::stream_handler &handle, bool just_append = false) : core::accumulator_base(handle, just_append) {}
+
+        protected:
+            void accumulate_(core::istream::int_type data)
+            {
+                std::string utf8 = core::ucs_to_utf8(data);
+
+                flush_out(utf8.c_str(), utf8.size());
+            }
+        };
+
         // Convert directly from parser to serializer
         inline stream_handler &operator<<(stream_handler &output, stream_input &input)
         {
@@ -971,7 +1329,9 @@ namespace cppdatalib
 
             return output;
         }
+        inline stream_handler &convert(stream_handler &output, stream_input &input) {return output << input;}
 
+#ifdef CPPDATALIB_CPP11
         // Convert directly from parser to serializer
         inline stream_handler &operator<<(stream_handler &output, stream_input &&input)
         {
@@ -982,6 +1342,7 @@ namespace cppdatalib
 
             return output;
         }
+        inline stream_handler &convert(stream_handler &output, stream_input &&input) {return output << std::move(input);}
 
         // Convert directly from parser to serializer
         inline void operator<<(stream_handler &&output, stream_input &input)
@@ -991,6 +1352,7 @@ namespace cppdatalib
 
             input.convert(output);
         }
+        inline void convert(stream_handler &&output, stream_input &input) {std::move(output) << input;}
 
         // Convert directly from parser to rvalue serializer
         inline void operator<<(stream_handler &&output, stream_input &&input)
@@ -1000,6 +1362,8 @@ namespace cppdatalib
 
             input.convert(output);
         }
+        inline void convert(stream_handler &&output, stream_input &&input) {std::move(output) << std::move(input);}
+#endif
 
         // Convert directly from parser to serializer
         inline stream_input &operator>>(stream_input &input, stream_handler &output)
@@ -1007,25 +1371,31 @@ namespace cppdatalib
             output << input;
             return input;
         }
+        inline stream_input &convert(stream_input &input, stream_handler &output) {return input >> output;}
 
+#ifdef CPPDATALIB_CPP11
         // Convert directly from parser to serializer
         inline stream_input &operator>>(stream_input &input, stream_handler &&output)
         {
             output << input;
             return input;
         }
+        inline stream_input &convert(stream_input &input, stream_handler &&output) {return input >> std::move(output);}
 
         // Convert directly from parser to serializer
         inline void operator>>(stream_input &&input, stream_handler &output)
         {
             output << input;
         }
+        inline void convert(stream_input &&input, stream_handler &output) {std::move(input) >> output;}
 
         // Convert directly from parser to rvalue serializer
         inline void operator>>(stream_input &&input, stream_handler &&output)
         {
             output << input;
         }
+        inline void convert(stream_input &&input, stream_handler &&output) {std::move(input) >> std::move(output);}
+#endif
 
         struct value::traverse_node_prefix_serialize
         {
@@ -1429,6 +1799,11 @@ namespace cppdatalib
         };
 
 #ifdef CPPDATALIB_ENABLE_XML
+
+#ifndef CPPDATALIB_ENABLE_ATTRIBUTES
+#error The XML library requires CPPDATALIB_ENABLE_ATTRIBUTES to be defined
+#endif
+
         namespace xml_impl
         {
             class xml_base
@@ -1480,9 +1855,12 @@ namespace cppdatalib
 
                 std::string last_error_;
 
-                core::cache_vector_n<core::string_t, core::cache_size> element_stack;
-                std::map<core::string_t, entity> entities;
-                std::map<core::string_t, entity> parameter_entities;
+                typedef core::cache_vector_n<core::string_t, core::cache_size> element_stack_t;
+                typedef std::map<core::string_t, entity> entity_map_t;
+
+                element_stack_t element_stack;
+                entity_map_t entities;
+                entity_map_t parameter_entities;
 
                 // Format of doctypedecl:
                 // {
@@ -1492,7 +1870,10 @@ namespace cppdatalib
                 core::value doctypedecl;
                 bool has_root_element;
 
-                std::vector<std::pair<core::string_t, core::istringstream>> entity_buffers;
+                typedef std::pair<core::string_t, core::istringstream> entity_buffer_t;
+                typedef std::vector<entity_buffer_t> entity_buffers_t;
+
+                entity_buffers_t entity_buffers;
 
             public:
                 stream_parser(core::istream_handle input) : core::stream_parser(input) {}
@@ -1638,9 +2019,9 @@ namespace cppdatalib
                 void register_entity(const core::string_t &name, const core::string_t &value, bool parameter_entity)
                 {
                     if (parameter_entity)
-                        parameter_entities.insert({name, entity(value, parameter_entity)});
+                        parameter_entities.insert(entity_map_t::value_type(name, entity(value, parameter_entity)));
                     else
-                        entities.insert({name, entity(value, parameter_entity)});
+                        entities.insert(entity_map_t::value_type(name, entity(value, parameter_entity)));
                 }
 
                 bool add_entity_to_be_parsed(const core::string_t &entity_name, const core::string_t &entity_value)
@@ -1653,10 +2034,10 @@ namespace cppdatalib
                         }
 
                     if (entity_buffers.empty() || entity_buffers.back().second.peek() != EOF)
-                        entity_buffers.push_back({entity_name, core::istringstream(entity_value)});
+                        entity_buffers.push_back(entity_buffer_t(entity_name, core::istringstream(entity_value)));
                     else // At end of buffer, just replace it
                     {
-                        std::pair<core::string_t, core::istringstream> temp(entity_name, core::istringstream(entity_value));
+                        entity_buffer_t temp(entity_name, core::istringstream(entity_value));
                         std::swap(entity_buffers.back(), temp);
                     }
 
@@ -1757,7 +2138,7 @@ namespace cppdatalib
                         {
                             entity_should_be_parsed = false;
 
-                            auto it = parameter_entities.find(value);
+                            entity_map_t::iterator it = parameter_entities.find(value);
                             if (it == parameter_entities.end()) // Entity not found
                             {
                                 last_error_ = "parameter entity '" + value + "' is not declared";
@@ -1770,7 +2151,7 @@ namespace cppdatalib
                         {
                             entity_should_be_parsed = true;
 
-                            auto it = entities.find(value);
+                            entity_map_t::iterator it = entities.find(value);
                             if (it == entities.end()) // Entity not found
                             {
                                 if (value == "amp")
@@ -2205,8 +2586,8 @@ namespace cppdatalib
                                 }
 
                                 // Pop the two trailing ']' characters off
-                                value.pop_back();
-                                value.pop_back();
+                                value.erase(value.size()-1);
+                                value.erase(value.size()-1);
                             }
                             else if (c == 'D') // DOCTYPE
                             {
@@ -2369,27 +2750,27 @@ namespace cppdatalib
             protected:
                 void write_attributes(const core::value &v)
                 {
-                    for (auto attr: v.get_attributes())
+                    for (object_const_iterator_t attr = v.get_attributes().begin(); attr.differs(v.get_attributes().end()); ++attr)
                     {
-                        if (!attr.first.is_string())
+                        if (!attr->first.is_string())
                             throw core::error("XML - cannot write attribute with non-string key");
                         stream().put(' ');
-                        write_name(stream(), attr.first.get_string_unchecked());
+                        write_name(stream(), attr->first.get_string_unchecked());
 
                         stream().write("=\"", 2);
-                        switch (attr.second.get_type())
+                        switch (attr->second.get_type())
                         {
                             case core::null: break;
-                            case core::link: link_(attr.second); break;
-                            case core::boolean: bool_(attr.second); break;
-                            case core::integer: integer_(attr.second); break;
-                            case core::uinteger: uinteger_(attr.second); break;
-                            case core::real: real_(attr.second); break;
+                            case core::link: link_(attr->second); break;
+                            case core::boolean: bool_(attr->second); break;
+                            case core::integer: integer_(attr->second); break;
+                            case core::uinteger: uinteger_(attr->second); break;
+                            case core::real: real_(attr->second); break;
                             case core::string:
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
                             case core::temporary_string:
 #endif
-                                write_attribute_content(stream(), attr.second.get_string_unchecked()); break;
+                                write_attribute_content(stream(), attr->second.get_string_unchecked()); break;
                             case core::array:
                             case core::object: throw core::error("XML - cannot write attribute with 'array' or 'object' value");
                         }
@@ -2412,7 +2793,7 @@ namespace cppdatalib
                         if (!is_name_char(ucs[i]))
                             throw core::custom_error("XML - invalid tag or attribute name \"" + static_cast<std::string>(str) + "\"");
 
-                    return stream << str;
+                    return stream.write(str.data(), str.size());
                 }
 
                 core::ostream &write_attribute_content(core::ostream &stream, core::string_view_t str)

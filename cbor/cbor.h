@@ -37,7 +37,7 @@ namespace cppdatalib
         {
             struct container_data
             {
-                container_data(core::subtype_t sub_type, core::optional_size remaining_size)
+                container_data(core::subtype_t sub_type = core::normal, core::optional_size remaining_size = core::optional_size())
                     : sub_type(sub_type)
                     , remaining_size(remaining_size)
                 {}
@@ -46,8 +46,10 @@ namespace cppdatalib
                 core::optional_size remaining_size;
             };
 
-            std::unique_ptr<char []> buffer;
-            std::stack<container_data, std::vector<container_data>> containers;
+            char * const buffer;
+            typedef std::stack< container_data, std::vector<container_data> > containers_t;
+
+            containers_t containers;
             bool written;
 
         public:
@@ -57,6 +59,7 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
             unsigned int features() const {return provides_prefix_array_size |
                                                   provides_prefix_object_size |
@@ -75,11 +78,11 @@ namespace cppdatalib
                 while (size > 0)
                 {
                     uint64_t buffer_size = std::min(uint64_t(core::buffer_size), size);
-                    stream().read(buffer.get(), buffer_size);
+                    stream().read(buffer, buffer_size);
                     if (stream().fail())
                         throw core::error(failure_message);
                     // Set string in string_type to preserve the subtype
-                    string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                    string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                     get_output()->append_to_string(string_type);
                     size -= buffer_size;
                 }
@@ -91,9 +94,37 @@ namespace cppdatalib
 
             void reset_()
             {
-                containers = decltype(containers)();
+                containers = containers_t();
                 written = false;
             }
+
+#ifdef CPPDATALIB_WATCOM
+            bool read_int64(core::istream &strm, size_t idx, uint64_t &result)
+            {
+                switch (idx)
+                {
+                    case 0: return core::read_uint8<uint64_t>(strm, result);
+                    case 1: return core::read_uint16_be<uint64_t>(strm, result);
+                    case 2: return core::read_uint32_be<uint64_t>(strm, result);
+                    case 3: return core::read_uint64_be<uint64_t>(strm, result);
+                    default: return false;
+                }
+            }
+#else
+            bool read_int64(core::istream &strm, size_t idx, uint64_t &result)
+            {
+                // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
+                                                                         core::read_uint16_be<uint64_t>,
+                                                                         core::read_uint32_be<uint64_t>,
+                                                                         core::read_uint64_be<uint64_t>};
+
+                if (!call[idx](strm, result))
+                    return false;
+
+                return true;
+            }
+#endif
 
             void write_one_()
             {
@@ -138,13 +169,7 @@ namespace cppdatalib
                     case 26:
                     case 27:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
-                                                                                 core::read_uint16_le<uint64_t>,
-                                                                                 core::read_uint32_le<uint64_t>,
-                                                                                 core::read_uint64_le<uint64_t>};
-
-                        if (!call[sub_type - 24](stream(), payload))
+                        if (!read_int64(stream(), sub_type - 24, payload))
                             throw core::error("CBOR - expected type payload");
                         break;
                     }
@@ -166,7 +191,7 @@ namespace cppdatalib
                     case 1:
                     {
                         if (payload >= uint64_t(std::numeric_limits<core::int_t>::min()))
-                            get_output()->write(core::value("-" + std::to_string(payload), core::bignum));
+                            get_output()->write(core::value("-" + stdx::to_string(payload), core::bignum));
                         else
                             get_output()->write(core::value(-1 - core::int_t(payload)));
                         break;
@@ -256,17 +281,17 @@ namespace cppdatalib
             protected:
                 core::ostream &write_int(core::ostream &stream, unsigned int major_type, uint64_t integer)
                 {
-                    if (integer > UINT32_MAX)
+                    if (integer > std::numeric_limits<uint32_t>::max())
                     {
                         stream.put((major_type << 5) | 27);
                         return core::write_uint64_be(stream, integer);
                     }
-                    else if (integer > UINT16_MAX)
+                    else if (integer > std::numeric_limits<uint16_t>::max())
                     {
                         stream.put((major_type << 5) | 26);
                         return core::write_uint32_be(stream, integer);
                     }
-                    else if (integer > UINT8_MAX)
+                    else if (integer > std::numeric_limits<uint8_t>::max())
                     {
                         stream.put((major_type << 5) | 25);
                         return core::write_uint16_be(stream, integer);
@@ -315,7 +340,9 @@ namespace cppdatalib
             {
                 uint64_t out;
 
-                if (core::float_from_ieee_754_half(core::float_to_ieee_754_half(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
+                using namespace std;
+
+                if (core::float_from_ieee_754_half(core::float_to_ieee_754_half(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || isnan(v.get_real_unchecked()))
                 {
                     out = core::float_to_ieee_754_half(static_cast<float>(v.get_real_unchecked()));
                     stream().put(static_cast<unsigned char>(0xf9));
@@ -384,13 +411,15 @@ namespace cppdatalib
                 if (!current_container_reported_size().has_value()) // No size specified for object, output `break` code
                     stream().put(static_cast<unsigned char>(0xff));
             }
+
+            void link_(const core::value &) {throw core::error("CBOR - 'link' value not allowed in output");}
         };
 
         inline std::string to_cbor(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer w(stream);
-            w << v;
+            core::convert(w, v);
             return stream.str();
         }
     }

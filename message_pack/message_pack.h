@@ -36,7 +36,7 @@ namespace cppdatalib
         {
             struct container_data
             {
-                container_data(core::subtype_t sub_type, uint32_t remaining_size)
+                container_data(core::subtype_t sub_type = core::normal, uint32_t remaining_size = 0)
                     : sub_type(sub_type)
                     , remaining_size(remaining_size)
                 {}
@@ -45,8 +45,10 @@ namespace cppdatalib
                 uint32_t remaining_size;
             };
 
-            std::unique_ptr<char []> buffer;
-            std::stack<container_data, std::vector<container_data>> containers;
+            char * const buffer;
+            typedef std::stack< container_data, std::vector<container_data> > containers_t;
+
+            containers_t containers;
             bool written;
 
         public:
@@ -56,6 +58,7 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
             unsigned int features() const {return provides_prefix_array_size |
                                                   provides_prefix_object_size |
@@ -69,11 +72,11 @@ namespace cppdatalib
                 while (size > 0)
                 {
                     uint32_t buffer_size = std::min(uint32_t(core::buffer_size), size);
-                    stream().read(buffer.get(), buffer_size);
+                    stream().read(buffer, buffer_size);
                     if (stream().fail())
                         throw core::error(failure_message);
                     // Set string in string_type to preserve the subtype
-                    string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                    string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                     get_output()->append_to_string(string_type);
                     size -= buffer_size;
                 }
@@ -83,9 +86,39 @@ namespace cppdatalib
 
             void reset_()
             {
-                containers = decltype(containers)();
+                containers = containers_t();
                 written = false;
             }
+
+#ifdef CPPDATALIB_WATCOM
+            template<typename T>
+            bool read_int(core::istream &strm, size_t idx, T &result)
+            {
+                switch (idx)
+                {
+                    case 0: return core::read_uint8<T>(strm, result);
+                    case 1: return core::read_uint16_be<T>(strm, result);
+                    case 2: return core::read_uint32_be<T>(strm, result);
+                    case 3: return core::read_uint64_be<T>(strm, result);
+                    default: return false;
+                }
+            }
+#else
+            template<typename T>
+            bool read_int(core::istream &strm, size_t idx, T &result)
+            {
+                // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                core::istream &(*call[])(core::istream &, T &) = {core::read_uint8<T>,
+                                                                  core::read_uint16_be<T>,
+                                                                  core::read_uint32_be<T>,
+                                                                  core::read_uint64_be<T>};
+
+                if (!call[idx](strm, result))
+                    return false;
+
+                return true;
+            }
+#endif
 
             void write_one_()
             {
@@ -156,14 +189,9 @@ namespace cppdatalib
                     case 0xc5:
                     case 0xc6:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint32_t &) = {core::read_uint8<uint32_t>,
-                                                                                 core::read_uint16_be<uint32_t>,
-                                                                                 core::read_uint32_be<uint32_t>};
-
                         uint32_t size = 0;
 
-                        if (!call[chr - 0xc4](stream(), size))
+                        if (!read_int<uint32_t>(stream(), chr - 0xc4, size))
                             throw core::error("MessagePack - expected binary string length");
 
                         read_string(core::blob, size, "MessagePack - unexpected end of binary string");
@@ -201,14 +229,8 @@ namespace cppdatalib
                     case 0xce:
                     case 0xcf:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, core::uint_t &) = {core::read_uint8<core::uint_t>,
-                                                                                     core::read_uint16_be<core::uint_t>,
-                                                                                     core::read_uint32_be<core::uint_t>,
-                                                                                     core::read_uint64_be<core::uint_t>};
-
                         core::uint_t val = 0;
-                        if (!call[chr - 0xcc](stream(), val))
+                        if (!read_int<core::uint_t>(stream(), chr - 0xcc, val))
                             throw core::error("MessagePack - expected 'uinteger'");
                         get_output()->write(core::value(val));
                         break;
@@ -219,14 +241,8 @@ namespace cppdatalib
                     case 0xd2:
                     case 0xd3:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, core::int_t &) = {core::read_int8<core::int_t>,
-                                                                                    core::read_int16_be<core::int_t>,
-                                                                                    core::read_int32_be<core::int_t>,
-                                                                                    core::read_int64_be<core::int_t>};
-
                         core::int_t val = 0;
-                        if (!call[chr - 0xd0](stream(), val))
+                        if (!read_int<core::int_t>(stream(), chr - 0xd0, val))
                             throw core::error("MessagePack - expected 'integer'");
                         get_output()->write(core::value(val));
                         break;
@@ -246,14 +262,9 @@ namespace cppdatalib
                     case 0xda:
                     case 0xdb:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint32_t &) = {core::read_uint8<uint32_t>,
-                                                                                 core::read_uint16_be<uint32_t>,
-                                                                                 core::read_uint32_be<uint32_t>};
-
                         uint32_t size = 0;
 
-                        if (!call[chr - 0xd9](stream(), size))
+                        if (!read_int<uint32_t>(stream(), chr - 0xd9, size))
                             throw core::error("MessagePack - expected UTF-8 string length");
 
                         read_string(core::blob, size, "MessagePack - unexpected end of UTF-8 string");
@@ -263,13 +274,9 @@ namespace cppdatalib
                     case 0xdc:
                     case 0xdd:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint32_t &) = {core::read_uint16_be<uint32_t>,
-                                                                                 core::read_uint32_be<uint32_t>};
-
                         uint32_t size = 0;
 
-                        if (!call[chr - 0xdc](stream(), size))
+                        if (!read_int<uint32_t>(stream(), chr - 0xdc + 1, size))
                             throw core::error("MessagePack - expected 'array' length");
 
                         get_output()->begin_array(core::array_t(), size);
@@ -280,13 +287,9 @@ namespace cppdatalib
                     case 0xde:
                     case 0xdf:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint32_t &) = {core::read_uint16_be<uint32_t>,
-                                                                                 core::read_uint32_be<uint32_t>};
-
                         uint32_t size = 0;
 
-                        if (!call[chr - 0xde](stream(), size))
+                        if (!read_int<uint32_t>(stream(), chr - 0xde + 1, size))
                             throw core::error("MessagePack - expected 'object' length");
 
                         get_output()->begin_object(core::object_t(), size);
@@ -309,13 +312,13 @@ namespace cppdatalib
             protected:
                 core::ostream &write_int(core::ostream &stream, core::uint_t i)
                 {
-                    if (i <= UINT8_MAX / 2)
+                    if (i <= std::numeric_limits<uint8_t>::max() / 2)
                         return stream.put(static_cast<char>(i));
-                    else if (i <= UINT8_MAX)
+                    else if (i <= std::numeric_limits<uint8_t>::max())
                         return stream.put(static_cast<unsigned char>(0xcc)).put(static_cast<char>(i));
-                    else if (i <= UINT16_MAX)
+                    else if (i <= std::numeric_limits<uint16_t>::max())
                         return stream.put(static_cast<unsigned char>(0xcd)).put(static_cast<char>(i >> 8)).put(i & 0xff);
-                    else if (i <= UINT32_MAX)
+                    else if (i <= std::numeric_limits<uint32_t>::max())
                         return stream.put(static_cast<unsigned char>(0xce))
                                 .put(static_cast<char>(i >> 24))
                                 .put((i >> 16) & 0xff)
@@ -337,11 +340,11 @@ namespace cppdatalib
                 {
                     if (i >= 0)
                     {
-                        if (i <= UINT8_MAX)
+                        if (i <= std::numeric_limits<uint8_t>::max())
                             return stream.put(static_cast<unsigned char>(0xd0)).put(static_cast<char>(i));
-                        else if (i <= UINT16_MAX)
+                        else if (i <= std::numeric_limits<uint16_t>::max())
                             return stream.put(static_cast<unsigned char>(0xd1)).put(static_cast<char>(i >> 8)).put(i & 0xff);
-                        else if (i <= UINT32_MAX)
+                        else if (i <= std::numeric_limits<uint32_t>::max())
                             return stream.put(static_cast<unsigned char>(0xd2))
                                     .put(static_cast<char>(i >> 24))
                                     .put((i >> 16) & 0xff)
@@ -363,23 +366,23 @@ namespace cppdatalib
                         uint64_t temp;
                         if (i < -std::numeric_limits<core::int_t>::max())
                         {
-                            i = uint64_t(INT32_MAX) + 1; // this assignment ensures that the 64-bit write will occur, since the most negative
+                            i = uint64_t(std::numeric_limits<int32_t>::max()) + 1; // this assignment ensures that the 64-bit write will occur, since the most negative
                                                          // value is (in binary) 1000...0000
                             temp = 0; // The initial set bit is implied, and ORed in with `0x80 | xxx` later on
                         }
                         else
                         {
                             i = -i; // Make i positive
-                            temp = ~uint64_t(i) + 1;
+                            temp = ~(uint64_t) (i) + 1;
                         }
 
                         if (i <= 31)
                             return stream.put(0xe0 + (temp & 0x1f));
-                        else if (i <= INT8_MAX)
+                        else if (i <= std::numeric_limits<int8_t>::max())
                             return stream.put(static_cast<unsigned char>(0xd0)).put(0x80 | (temp & 0xff));
-                        else if (i <= INT16_MAX)
+                        else if (i <= std::numeric_limits<int16_t>::max())
                             return stream.put(static_cast<unsigned char>(0xd1)).put(0x80 | ((temp >> 8) & 0xff)).put(temp & 0xff);
-                        else if (i <= INT32_MAX)
+                        else if (i <= std::numeric_limits<int32_t>::max())
                             return stream.put(static_cast<unsigned char>(0xd2))
                                     .put(0x80 | ((temp >> 24) & 0xff))
                                     .put((temp >> 16) & 0xff)
@@ -400,7 +403,9 @@ namespace cppdatalib
 
                 core::ostream &write_float(core::ostream &stream, core::real_t f)
                 {
-                    if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(f))) == f || std::isnan(f))
+                    using namespace std;
+                    
+                    if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(f))) == f || isnan(f))
                     {
                         uint32_t temp = core::float_to_ieee_754(static_cast<float>(f));
 
@@ -431,13 +436,13 @@ namespace cppdatalib
                     // Binary string?
                     if (!core::subtype_is_text_string(subtype))
                     {
-                        if (str_size <= UINT8_MAX)
+                        if (str_size <= std::numeric_limits<uint8_t>::max())
                             return stream.put(static_cast<unsigned char>(0xc4)).put(static_cast<char>(str_size));
-                        else if (str_size <= UINT16_MAX)
+                        else if (str_size <= std::numeric_limits<uint16_t>::max())
                             return stream.put(static_cast<unsigned char>(0xc5))
                                     .put(static_cast<char>(str_size >> 8))
                                     .put(str_size & 0xff);
-                        else if (str_size <= UINT32_MAX)
+                        else if (str_size <= std::numeric_limits<uint32_t>::max())
                             return stream.put(static_cast<unsigned char>(0xc6))
                                     .put(static_cast<char>(str_size >> 24))
                                     .put((str_size >> 16) & 0xff)
@@ -451,13 +456,13 @@ namespace cppdatalib
                     {
                         if (str_size <= 31)
                             return stream.put(static_cast<char>(0xa0 + str_size));
-                        else if (str_size <= UINT8_MAX)
+                        else if (str_size <= std::numeric_limits<uint8_t>::max())
                             return stream.put(static_cast<unsigned char>(0xd9)).put(static_cast<char>(str_size));
-                        else if (str_size <= UINT16_MAX)
+                        else if (str_size <= std::numeric_limits<uint16_t>::max())
                             return stream.put(static_cast<unsigned char>(0xda))
                                     .put(static_cast<char>(str_size >> 8))
                                     .put(str_size & 0xff);
-                        else if (str_size <= UINT32_MAX)
+                        else if (str_size <= std::numeric_limits<uint32_t>::max())
                             return stream.put(static_cast<unsigned char>(0xdb))
                                     .put(static_cast<char>(str_size >> 24))
                                     .put((str_size >> 16) & 0xff)
@@ -492,8 +497,8 @@ namespace cppdatalib
             {
                 if (!size.has_value())
                     throw core::error("MessagePack - 'string' value does not have size specified");
-                else if (size.value() > UINT32_MAX)
-					throw core::error("MessagePack - 'string' value is too large");
+                else if (size.value() > std::numeric_limits<uint32_t>::max())
+                                        throw core::error("MessagePack - 'string' value is too large");
 
                 write_string_size(stream(), size.value(), v.get_subtype());
             }
@@ -505,9 +510,9 @@ namespace cppdatalib
                     throw core::error("MessagePack - 'array' value does not have size specified");
                 else if (size.value() <= 15)
                     stream().put(static_cast<char>(0x90 + size.value()));
-                else if (size.value() <= UINT16_MAX)
+                else if (size.value() <= std::numeric_limits<uint16_t>::max())
                     stream().put(static_cast<unsigned char>(0xdc)).put(static_cast<char>(size.value() >> 8)).put(size.value() & 0xff);
-                else if (size.value() <= UINT32_MAX)
+                else if (size.value() <= std::numeric_limits<uint32_t>::max())
                     stream().put(static_cast<unsigned char>(0xdd))
                             .put(static_cast<char>(size.value() >> 24))
                             .put((size.value() >> 16) & 0xff)
@@ -523,9 +528,9 @@ namespace cppdatalib
                     throw core::error("MessagePack - 'object' value does not have size specified");
                 else if (size.value() <= 15)
                     stream().put(static_cast<char>(0x80 + size.value()));
-                else if (size.value() <= UINT16_MAX)
+                else if (size.value() <= std::numeric_limits<uint16_t>::max())
                     stream().put(static_cast<unsigned char>(0xde)).put(static_cast<char>(size.value() >> 8)).put(size.value() & 0xff);
-                else if (size.value() <= UINT32_MAX)
+                else if (size.value() <= std::numeric_limits<uint32_t>::max())
                     stream().put(static_cast<unsigned char>(0xdf))
                             .put(static_cast<char>(size.value() >> 24))
                             .put((size.value() >> 16) & 0xff)
@@ -534,27 +539,31 @@ namespace cppdatalib
                 else
                     throw core::error("MessagePack - 'object' value is too long");
             }
+
+            void link_(const core::value &) {throw core::error("MessagePack - 'link' value not allowed in output");}
         };
 
         inline core::value from_message_pack(core::istream_handle stream)
         {
             parser p(stream);
             core::value v;
-            p >> v;
+            core::convert(p, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _msgpack(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_message_pack(wrap);
         }
+#endif
 
         inline std::string to_message_pack(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

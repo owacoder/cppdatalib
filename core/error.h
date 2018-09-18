@@ -26,6 +26,7 @@
 #define CPPDATALIB_ERROR_H
 
 #include <string>
+#include "global.h"
 
 namespace cppdatalib
 {
@@ -39,7 +40,7 @@ namespace cppdatalib
         public:
             error(const char *reason) : what_(reason) {}
 
-            virtual const char *what() const noexcept {return what_;}
+            virtual const char *what() const CPPDATALIB_NOEXCEPT {return what_;}
 
         private:
             const char *what_;
@@ -49,9 +50,11 @@ namespace cppdatalib
         {
             custom_error(const char *reason) : what_(reason) {}
             custom_error(const std::string &reason) : what_(reason) {}
+#ifdef CPPDATALIB_CPP11
             custom_error(std::string &&reason) : what_(std::move(reason)) {}
+#endif
 
-            const char *what() const noexcept {return what_.c_str();}
+            const char *what() const CPPDATALIB_NOEXCEPT {return what_.c_str();}
 
         private:
             std::string what_;

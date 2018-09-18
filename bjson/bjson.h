@@ -36,7 +36,7 @@ namespace cppdatalib
         {
             struct container_data
             {
-                container_data(core::subtype_t sub_type, uint64_t remaining_size)
+                container_data(core::subtype_t sub_type = core::normal, uint64_t remaining_size = 0)
                     : sub_type(sub_type)
                     , remaining_size(remaining_size)
                 {}
@@ -45,8 +45,11 @@ namespace cppdatalib
                 uint64_t remaining_size;
             };
 
-            std::unique_ptr<char []> buffer;
-            std::stack<container_data, std::vector<container_data>> containers;
+            char * const buffer;
+
+            typedef std::stack< container_data, std::vector<container_data> > containers_t;
+
+            containers_t containers;
             bool written;
 
         public:
@@ -56,6 +59,7 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
             unsigned int features() const {return provides_prefix_array_size |
                                                   provides_prefix_object_size |
@@ -69,11 +73,11 @@ namespace cppdatalib
                 while (size > 0)
                 {
                     uint64_t buffer_size = std::min(uint64_t(core::buffer_size), size);
-                    stream().read(buffer.get(), buffer_size);
+                    stream().read(buffer, buffer_size);
                     if (stream().fail())
                         throw core::error(failure_message);
                     // Set string in string_type to preserve the subtype
-                    string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                    string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                     get_output()->append_to_string(string_type);
                     size -= buffer_size;
                 }
@@ -83,9 +87,64 @@ namespace cppdatalib
 
             void reset_()
             {
-                containers = decltype(containers)();
+                containers = containers_t();
                 written = false;
             }
+
+            // Watcom crashes on the normal read_int() functions for some reason :/
+#ifdef CPPDATALIB_WATCOM
+            bool read_int(core::istream &strm, size_t idx, core::uint_t &result)
+            {
+                switch (idx)
+                {
+                    case 0: return core::read_uint8<core::uint_t>(strm, result);
+                    case 1: return core::read_uint16_le<core::uint_t>(strm, result);
+                    case 2: return core::read_uint32_le<core::uint_t>(strm, result);
+                    case 3: return core::read_uint64_le<core::uint_t>(strm, result);
+                    default: return false;
+                }
+            }
+
+            bool read_int64(core::istream &strm, size_t idx, uint64_t &result)
+            {
+                switch (idx)
+                {
+                    case 0: return core::read_uint8<uint64_t>(strm, result);
+                    case 1: return core::read_uint16_le<uint64_t>(strm, result);
+                    case 2: return core::read_uint32_le<uint64_t>(strm, result);
+                    case 3: return core::read_uint64_le<uint64_t>(strm, result);
+                    default: return false;
+                }
+            }
+#else
+            bool read_int(core::istream &strm, size_t idx, core::uint_t &result)
+            {
+                // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                core::istream &(*call[])(core::istream &, core::uint_t &) = {core::read_uint8<core::uint_t>,
+                                                                             core::read_uint16_le<core::uint_t>,
+                                                                             core::read_uint32_le<core::uint_t>,
+                                                                             core::read_uint64_le<core::uint_t>};
+
+                if (!call[idx](strm, result))
+                    return false;
+
+                return true;
+            }
+
+            bool read_int64(core::istream &strm, size_t idx, uint64_t &result)
+            {
+                // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
+                                                                         core::read_uint16_le<uint64_t>,
+                                                                         core::read_uint32_le<uint64_t>,
+                                                                         core::read_uint64_le<uint64_t>};
+
+                if (!call[idx](strm, result))
+                    return false;
+
+                return true;
+            }
+#endif
 
             void write_one_()
             {
@@ -136,14 +195,8 @@ namespace cppdatalib
                     case 6:
                     case 7:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, core::uint_t &) = {core::read_uint8<core::uint_t>,
-                                                                                     core::read_uint16_le<core::uint_t>,
-                                                                                     core::read_uint32_le<core::uint_t>,
-                                                                                     core::read_uint64_le<core::uint_t>};
-
                         core::uint_t val = 0;
-                        if (!call[chr - 4](stream(), val))
+                        if (!read_int(stream(), chr - 4, val))
                             throw core::error("BJSON - expected 'uinteger'");
                         get_output()->write(core::value(val));
                         break;
@@ -154,18 +207,12 @@ namespace cppdatalib
                     case 10:
                     case 11:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, core::uint_t &) = {core::read_uint8<core::uint_t>,
-                                                                                     core::read_uint16_le<core::uint_t>,
-                                                                                     core::read_uint32_le<core::uint_t>,
-                                                                                     core::read_uint64_le<core::uint_t>};
-
                         core::uint_t val = 0;
-                        if (!call[chr - 8](stream(), val))
+                        if (!read_int(stream(), chr - 8, val))
                             throw core::error("BJSON - expected 'uinteger'");
 
                         if (val > core::uint_t(std::numeric_limits<core::int_t>::max()))
-                            get_output()->write(core::value("-" + std::to_string(val), core::bignum));
+                            get_output()->write(core::value("-" + stdx::to_string(val), core::bignum));
                         else
                             get_output()->write(core::value(-core::int_t(val)));
 
@@ -197,15 +244,9 @@ namespace cppdatalib
                     case 18:
                     case 19:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
-                                                                                 core::read_uint16_le<uint64_t>,
-                                                                                 core::read_uint32_le<uint64_t>,
-                                                                                 core::read_uint64_le<uint64_t>};
-
                         uint64_t size = 0;
 
-                        if (!call[chr - 16](stream(), size))
+                        if (!read_int64(stream(), chr - 16, size))
                             throw core::error("BJSON - expected UTF-8 string length");
 
                         read_string(core::normal, size, "BJSON - unexpected end of UTF-8 string");
@@ -217,15 +258,9 @@ namespace cppdatalib
                     case 22:
                     case 23:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
-                                                                                 core::read_uint16_le<uint64_t>,
-                                                                                 core::read_uint32_le<uint64_t>,
-                                                                                 core::read_uint64_le<uint64_t>};
-
                         uint64_t size = 0;
 
-                        if (!call[chr - 20](stream(), size))
+                        if (!read_int(stream(), chr - 20, size))
                             throw core::error("BJSON - expected binary string length");
 
                         read_string(core::blob, size, "BJSON - unexpected end of binary string");
@@ -240,15 +275,9 @@ namespace cppdatalib
                     case 34:
                     case 35:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
-                                                                                 core::read_uint16_le<uint64_t>,
-                                                                                 core::read_uint32_le<uint64_t>,
-                                                                                 core::read_uint64_le<uint64_t>};
-
                         uint64_t size = 0;
 
-                        if (!call[chr - 32](stream(), size))
+                        if (!read_int64(stream(), chr - 32, size))
                             throw core::error("BJSON - expected 'array' length");
 
                         get_output()->begin_array(core::array_t(), size);
@@ -261,15 +290,9 @@ namespace cppdatalib
                     case 38:
                     case 39:
                     {
-                        // This is just a fancy jump table, basically. It calls the correct read function based on the index used
-                        core::istream &(*call[])(core::istream &, uint64_t &) = {core::read_uint8<uint64_t>,
-                                                                                 core::read_uint16_le<uint64_t>,
-                                                                                 core::read_uint32_le<uint64_t>,
-                                                                                 core::read_uint64_le<uint64_t>};
-
                         uint64_t size = 0;
 
-                        if (!call[chr - 36](stream(), size))
+                        if (!read_int64(stream(), chr - 36, size))
                             throw core::error("BJSON - expected 'object' length");
 
                         get_output()->begin_object(core::object_t(), size);
@@ -294,17 +317,17 @@ namespace cppdatalib
             protected:
                 core::ostream &write_size(core::ostream &stream, int initial_type, uint64_t size)
                 {
-                    if (size > UINT32_MAX)
+                    if (size > std::numeric_limits<uint32_t>::max())
                     {
                         stream.put(initial_type + 3);
                         return core::write_uint64_le(stream, size);
                     }
-                    else if (size > UINT16_MAX)
+                    else if (size > std::numeric_limits<uint16_t>::max())
                     {
                         stream.put(initial_type + 2);
                         return core::write_uint32_le(stream, size);
                     }
-                    else if (size > UINT8_MAX)
+                    else if (size > std::numeric_limits<uint8_t>::max())
                     {
                         stream.put(initial_type + 1);
                         return core::write_uint16_le(stream, size);
@@ -363,7 +386,9 @@ namespace cppdatalib
             {
                 uint64_t out;
 
-                if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
+                using namespace std;
+
+                if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || isnan(v.get_real_unchecked()))
                 {
                     out = core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()));
                     stream().put(14);
@@ -411,13 +436,15 @@ namespace cppdatalib
 
                 write_size(stream(), 36, size.value());
             }
+
+            void link_(const core::value &) {throw core::error("BJSON - 'link' value not allowed in output");}
         };
 
         inline std::string to_bjson(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer w(stream);
-            w << v;
+            core::convert(w, v);
             return stream.str();
         }
     }

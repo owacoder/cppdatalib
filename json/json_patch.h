@@ -46,8 +46,10 @@ namespace cppdatalib
                     {
                         std::string result;
 
-                        for (auto c: key)
+                        for (size_t i = 0; i < key.size(); ++i)
                         {
+                            const char c = key[i];
+                            
                             if (c == '~')
                                 result += "~0";
                             else if (c == '/')
@@ -62,12 +64,12 @@ namespace cppdatalib
                     std::string make_path(core::value::traversal_ancestry_finder finder)
                     {
                         std::string path;
-                        auto ancestors = finder.get_ancestry();
+                        core::value::traversal_ancestry_finder::ancestry_t ancestors = finder.get_ancestry();
                         for (size_t i = ancestors.size(); i;)
                         {
                             core::value::traversal_reference ref = ancestors[--i];
                             if (ref.is_array())
-                                path += "/" + std::to_string(ref.get_array_index());
+                                path += "/" + stdx::to_string(ref.get_array_index());
                             else if (ref.is_object())
                             {
                                 if (ref.is_object_key())

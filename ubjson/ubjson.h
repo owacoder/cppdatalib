@@ -38,7 +38,7 @@ namespace cppdatalib
         {
             struct container_data
             {
-                container_data(char content_type, core::int_t remaining_size)
+                container_data(char content_type = 0, core::int_t remaining_size = 0)
                     : content_type(content_type)
                     , remaining_size(remaining_size)
                 {}
@@ -47,24 +47,52 @@ namespace cppdatalib
                 core::int_t remaining_size;
             };
 
-            std::unique_ptr<char []> buffer;
-            std::stack<container_data, std::vector<container_data>> containers;
+            char * const buffer;
+            typedef std::stack< container_data, std::vector<container_data> > containers_t;
+
+            containers_t containers;
+
+#ifdef CPPDATALIB_WATCOM
+            template<typename T>
+            bool read_int_internal(core::istream &strm, size_t idx, T &result)
+            {
+                switch (idx)
+                {
+                    case 0: return core::read_uint8<T>(strm, result);
+                    case 1: return core::read_int8<T>(strm, result);
+                    case 2: return core::read_int16_be<T>(strm, result);
+                    case 3: return core::read_int32_be<T>(strm, result);
+                    case 4: return core::read_int64_be<T>(strm, result);
+                    default: return false;
+                }
+            }
+#else
+            template<typename T>
+            bool read_int_internal(core::istream &strm, size_t idx, T &result)
+            {
+                // This is just a fancy jump table, basically. It calls the correct read function based on the index used
+                core::istream &(*call[])(core::istream &, T &) = {core::read_uint8<T>,
+                                                                  core::read_int8<T>,
+                                                                  core::read_int16_be<T>,
+                                                                  core::read_int32_be<T>,
+                                                                  core::read_int64_be<T>};
+
+                if (!call[idx](strm, result))
+                    return false;
+
+                return true;
+            }
+#endif
 
             inline core::istream &read_int(core::int_t &i, char specifier)
             {
-                core::istream &(*call[])(core::istream &, core::int_t &) = {core::read_uint8<core::int_t>,
-                                                                            core::read_int8<core::int_t>,
-                                                                            core::read_int16_be<core::int_t>,
-                                                                            core::read_int32_be<core::int_t>,
-                                                                            core::read_int64_be<core::int_t>};
-
                 const char specifiers[] = "UiIlL";
 
                 const char *p = strchr(specifiers, specifier);
                 if (!p)
                     throw core::error("UBJSON - invalid integer specifier found in input");
 
-                if (!call[p - specifiers](stream(), i))
+                if (!read_int_internal<core::int_t>(stream(), p - specifiers, i))
                     throw core::error("UBJSON - expected integer value after type specifier");
 
                 return stream();
@@ -121,10 +149,10 @@ namespace cppdatalib
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                        stream().read(buffer.get(), buffer_size);
+                        stream().read(buffer, buffer_size);
                         if (stream().fail())
                             throw core::error("UBJSON - expected high-precision number value after type specifier");
-                        string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                        string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                         writer.append_to_string(string_type);
                         size -= buffer_size;
                     }
@@ -142,10 +170,10 @@ namespace cppdatalib
                     while (size > 0)
                     {
                         core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                        stream().read(buffer.get(), buffer_size);
+                        stream().read(buffer, buffer_size);
                         if (stream().fail())
                             throw core::error("UBJSON - expected string value after type specifier");
-                        string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                        string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                         writer.append_to_string(string_type);
                         size -= buffer_size;
                     }
@@ -164,13 +192,14 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
             unsigned int features() const {return provides_prefix_string_size;}
 
         protected:
             void reset_()
             {
-                containers = decltype(containers)();
+                containers = containers_t();
             }
 
             void write_one_()
@@ -271,7 +300,7 @@ namespace cppdatalib
                         else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
                             stream().unget();
 
-                        get_output()->begin_array(core::array_t(), size >= 0? size: core::stream_handler::unknown_size());
+                        get_output()->begin_array(core::array_t(), size >= 0? core::optional_size(size): core::stream_handler::unknown_size());
                         containers.push(container_data(type, size));
 
                         break;
@@ -315,7 +344,7 @@ namespace cppdatalib
                         else if (size < 0) // Unless a count was read, one character needs to be put back (from checking chr == '#')
                             stream().unget();
 
-                        get_output()->begin_object(core::object_t(), size >= 0? size: core::stream_handler::unknown_size());
+                        get_output()->begin_object(core::object_t(), size >= 0? core::optional_size(size): core::stream_handler::unknown_size());
                         containers.push(container_data(type, size));
 
                         break;
@@ -358,19 +387,19 @@ namespace cppdatalib
                     if (force_bits == std::string::npos)
                         force_bits = 0;
 
-                    if (force_bits == 0 && (i >= 0 && i <= UINT8_MAX))
+                    if (force_bits == 0 && (i >= 0 && i <= std::numeric_limits<uint8_t>::max()))
                     {
                         if (add_specifier)
                             stream.put('U');
                         stream.put(static_cast<char>(i));
                     }
-                    else if (force_bits <= 1 && (i >= INT8_MIN && i < 0))
+                    else if (force_bits <= 1 && (i >= std::numeric_limits<int8_t>::min() && i < 0))
                     {
                         if (add_specifier)
                             stream.put('i');
-                        stream.put(0x80 | ((~std::abs(i) & 0xff) + 1));
+                        stream.put(0x80 | ((~stdx::abs(i) & 0xff) + 1));
                     }
-                    else if (force_bits <= 2 && (i >= INT16_MIN && i <= INT16_MAX))
+                    else if (force_bits <= 2 && (i >= std::numeric_limits<int16_t>::min() && i <= std::numeric_limits<int16_t>::max()))
                     {
                         uint16_t t = static_cast<uint16_t>(i);
 
@@ -378,7 +407,7 @@ namespace cppdatalib
                             stream.put('I');
                         stream.put(t >> 8).put(t & 0xff);
                     }
-                    else if (force_bits <= 3 && (i >= INT32_MIN && i <= INT32_MAX))
+                    else if (force_bits <= 3 && (i >= std::numeric_limits<int32_t>::min() && i <= std::numeric_limits<int32_t>::max()))
                     {
                         uint32_t t = static_cast<uint32_t>(i);
 
@@ -413,10 +442,12 @@ namespace cppdatalib
                     const std::string specifiers = "dD";
                     size_t force_bits = specifiers.find(force_specifier);
 
+                    using namespace std;
+
                     if (force_bits == std::string::npos)
                         force_bits = 0;
 
-                    if (force_bits == 0 && (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(f))) == f || std::isnan(f)))
+                    if (force_bits == 0 && (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(f))) == f || isnan(f)))
                     {
                         uint32_t t = core::float_to_ieee_754(static_cast<float>(f));
 
@@ -471,7 +502,7 @@ namespace cppdatalib
             {
                 if (v.get_uint_unchecked() > static_cast<core::uint_t>(std::numeric_limits<core::int_t>::max()))
                 {
-                    std::string str = std::to_string(v.get_uint_unchecked());
+                    std::string str = stdx::to_string(v.get_uint_unchecked());
                     stream().put('H');
                     write_int(stream(), str.size(), true);
                     stream() << str;
@@ -500,27 +531,31 @@ namespace cppdatalib
 
             void begin_object_(const core::value &, core::optional_size, bool) {stream().put('{');}
             void end_object_(const core::value &, bool) {stream().put('}');}
+
+            void link_(const core::value &) {throw core::error("UBJSON - 'link' value not allowed in output");}
         };
 
         inline core::value from_ubjson(core::istream_handle stream)
         {
             parser reader(stream);
             core::value v;
-            reader >> v;
+            core::convert(reader, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _ubjson(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_ubjson(wrap);
         }
+#endif
 
         inline std::string to_ubjson(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

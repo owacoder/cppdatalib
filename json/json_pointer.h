@@ -37,7 +37,13 @@ namespace cppdatalib
             {
                 inline bool normalize_node_path(std::string &path_node)
                 {
-                    for (size_t i = 0; i < path_node.size(); ++i)
+                    if (path_node.empty())
+                        return true;
+
+                    if (path_node[0] != '/')
+                        return false;
+
+                    for (size_t i = 1; i < path_node.size(); ++i)
                     {
                         if (path_node[i] == '~')
                         {
@@ -104,9 +110,9 @@ namespace cppdatalib
                         }
                         else if (reference->is_array())
                         {
-                            for (auto c: path_node)
+                            for (size_t i = 0; i < path_node.size(); ++i)
                             {
-                                if (!isdigit(c & 0xff))
+                                if (!isdigit(path_node[i] & 0xff))
                                 {
                                     if (throw_on_errors)
                                         throw core::error("JSON Pointer - Attempted to dereference invalid array index");
@@ -115,10 +121,10 @@ namespace cppdatalib
                                 }
                             }
 
-                            core::int_t array_index;
+                            core::uint_t array_index;
                             core::istring_wrapper_stream stream(path_node);
                             stream >> array_index;
-                            if (stream.fail() || stream.get() != EOF || (path_node.front() == '0' && path_node != "0")) // Check whether there are leading zeroes
+                            if (stream.fail() || stream.get() != EOF || (path_node[0] == '0' && path_node != "0") || array_index > reference->array_size()) // Check whether there are leading zeroes
                             {
                                 if (throw_on_errors)
                                     throw core::error("JSON Pointer - Attempted to dereference invalid array index");
@@ -235,9 +241,9 @@ namespace cppdatalib
                                 return &reference->get_array_ref().data().back();
                             }
 
-                            for (auto c: path_node)
+                            for (size_t i = 0; i < path_node.size(); ++i)
                             {
-                                if (!isdigit(c & 0xff))
+                                if (!isdigit(path_node[i] & 0xff))
                                 {
                                     if (throw_on_errors)
                                         throw core::error("JSON Pointer - Attempted to dereference invalid array index");
@@ -246,10 +252,10 @@ namespace cppdatalib
                                 }
                             }
 
-                            core::int_t array_index;
+                            core::uint_t array_index;
                             core::istring_wrapper_stream stream(path_node);
                             stream >> array_index;
-                            if (stream.fail() || stream.get() != EOF || (path_node.front() == '0' && path_node != "0")) // Check whether there are leading zeroes
+                            if (stream.fail() || stream.get() != EOF || (path_node[0] == '0' && path_node != "0") || array_index >= reference->array_size()) // Check whether there are leading zeroes
                             {
                                 if (throw_on_errors)
                                     throw core::error("JSON Pointer - Attempted to dereference invalid array index");
@@ -339,6 +345,115 @@ namespace cppdatalib
             inline bool test(core::value &value, const std::string &pointer, const core::value &src)
             {
                 return deref(value, pointer) == src;
+            }
+
+            inline bool is_valid_path(std::string path)
+            {
+                return impl::normalize_node_path(path);
+            }
+
+            // Returns array with specified path
+            // Elements are unsigned integers for array indexes, null values for insertion indexes ("-" elements)
+            // and strings for object keys
+            inline core::value path_to_array(core::string_view_t path)
+            {
+                core::value result = core::value(core::array_t());
+
+                if (path.empty() || !is_valid_path(static_cast<std::string>(path)))
+                    return core::value();
+
+                size_t idx = 1, end_idx = 0;
+                end_idx = path.find('/', idx);
+                while (idx <= path.size())
+                {
+                    std::string path_node;
+
+                    // Extract the current node from pointer
+                    if (end_idx == std::string::npos)
+                        path_node = static_cast<std::string>(path.substr(idx, end_idx));
+                    else
+                        path_node = static_cast<std::string>(path.substr(idx, end_idx - idx));
+                    idx += path_node.size() + 1;
+
+                    // Escape special characters in strings
+                    impl::normalize_node_path(path_node);
+
+                    // Is it an array entry?
+                    bool all_digits = true;
+                    for (size_t i = 0; i < path_node.size(); ++i)
+                        if (!isdigit(path_node[i] & 0xff))
+                        {
+                            all_digits = false;
+                            break;
+                        }
+
+                    // Add to result
+                    if (all_digits)
+                    {
+                        core::uint_t aIndex;
+                        core::istring_wrapper_stream wrapper(path_node);
+                        wrapper >> aIndex;
+                        result.push_back(aIndex);
+                    }
+                    else if (path_node == "-")
+                        result.push_back(core::value());
+                    else
+                        result.push_back(core::value(path_node));
+
+                    // Look for the next node
+                    end_idx = path.find('/', idx);
+                }
+
+                return result;
+            }
+
+            // Returns JSON Pointer from specified array
+            // Array elements that are null are assumed to be insertion indexes ("-" elements)
+            inline std::string array_to_path(const core::value &path)
+            {
+                std::string result_path;
+
+                if (path.is_array())
+                {
+                    if (path.array_size() == 0)
+                        result_path.push_back('/');
+
+                    for (core::array_const_iterator_t item = path.get_array_unchecked().begin();
+                         item.differs(path.get_array_unchecked().end());
+                         ++item)
+                    {
+                        result_path.push_back('/');
+
+                        switch (item->get_type())
+                        {
+                            default: break;
+                            case core::null: result_path.push_back('-'); break;
+                            case core::boolean: result_path += item->get_bool_unchecked()? "true": "false"; break;
+                            case core::integer: result_path += stdx::to_string(item->get_int_unchecked()); break;
+                            case core::uinteger: result_path += stdx::to_string(item->get_uint_unchecked()); break;
+                            case core::real: result_path += stdx::to_string(item->get_real_unchecked()); break;
+                            case core::string:
+#ifndef CPPDATALIB_DISABLE_TEMP_STRING
+                            case core::temporary_string:
+#endif
+                            {
+                                core::string_t s = static_cast<core::string_t>(item->get_string());
+                                for (size_t i = 0; i < s.size(); ++i)
+                                {
+                                    switch (s[i])
+                                    {
+                                        case '~': result_path += "~0"; break;
+                                        case '/': result_path += "~1"; break;
+                                        default: result_path.push_back(s[i]); break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                return result_path;
             }
         }
     }

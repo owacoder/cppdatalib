@@ -41,7 +41,7 @@ namespace cppdatalib
             }
 
         protected:
-            void reset_() {stream() >> std::noskipws;}
+            void reset_() {stream() >> stdx::noskipws;}
 
             void write_one_()
             {
@@ -77,21 +77,23 @@ namespace cppdatalib
         {
             string_parser p(stream);
             core::value v;
-            p >> v;
+            core::convert(p, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _raw_string(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_raw_string(wrap);
         }
+#endif
 
         inline std::string to_raw_string(const core::value &v)
         {
             core::ostringstream stream;
             string_stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

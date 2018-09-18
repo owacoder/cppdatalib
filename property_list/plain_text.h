@@ -33,7 +33,7 @@ namespace cppdatalib
     {
         class parser : public core::stream_parser
         {
-            std::unique_ptr<char []> buffer;
+            char * const buffer;
             bool delimiter_required;
 
         private:
@@ -42,7 +42,7 @@ namespace cppdatalib
                 static const std::string hex = "0123456789ABCDEF";
 
                 int c;
-                char *write = buffer.get();
+                char *write = buffer;
 
                 writer.begin_string(core::string_t(), core::stream_handler::unknown_size());
                 while (c = stream().get(), c != '"' && c != EOF)
@@ -70,12 +70,7 @@ namespace cppdatalib
                                     code = (code << 4) | uint32_t(pos);
                                 }
 
-#ifdef CPPDATALIB_MSVC
-								std::wstring_convert<std::codecvt_utf8<unsigned int>, unsigned int> utf8;
-#else
-								std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-#endif
-                                std::string bytes = utf8.to_bytes(code);
+                                std::string bytes = core::ucs_to_utf8(code);
 
                                 memcpy(write, bytes.c_str(), bytes.size());
                                 write += bytes.size();
@@ -96,12 +91,7 @@ namespace cppdatalib
                                         code = (code << 3) | (c - '0');
                                     }
 
-#ifdef CPPDATALIB_MSVC
-									std::wstring_convert<std::codecvt_utf8<unsigned int>, unsigned int> utf8;
-#else
-									std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf8;
-#endif
-                                    std::string bytes = utf8.to_bytes(code);
+                                    std::string bytes = core::ucs_to_utf8(code);
 
                                     memcpy(write, bytes.c_str(), bytes.size());
                                     write += bytes.size();
@@ -116,21 +106,21 @@ namespace cppdatalib
                     else
                         *write++ = c;
 
-                    if (write - buffer.get() >= core::buffer_size)
+                    if (write - buffer >= core::buffer_size)
                     {
                         *write = 0;
-                        writer.append_to_string(core::value(core::string_t(buffer.get(), write - buffer.get())));
-                        write = buffer.get();
+                        writer.append_to_string(core::value(core::string_t(buffer, write - buffer)));
+                        write = buffer;
                     }
                 }
 
                 if (c == EOF)
                     throw core::error("Plain Text Property List - unexpected end of string");
 
-                if (write != buffer.get())
+                if (write != buffer)
                 {
                     *write = 0;
-                    writer.append_to_string(core::value(core::string_t(buffer.get(), write - buffer.get())));
+                    writer.append_to_string(core::value(core::string_t(buffer, write - buffer)));
                 }
                 writer.end_string(core::string_t());
                 return stream();
@@ -142,13 +132,14 @@ namespace cppdatalib
                 , buffer(new char [core::buffer_size + core::max_utf8_code_sequence_size + 1])
             {
                 reset();
-            }            
+            }
+            ~parser() {delete[] buffer;}
 
         protected:
             void reset_()
             {
                 delimiter_required = false;
-                stream() >> std::skipws;
+                stream() >> stdx::skipws;
             }
 
             void write_one_()
@@ -338,15 +329,27 @@ finish:
 
                                         i = j;
 
+
+#ifdef CPPDATALIB_CPP11
                                         std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf8;
                                         std::u16string wstr = utf8.from_bytes(utf8_string);
+#else
+                                        std::vector<uint32_t> utf32 = core::utf8_to_ucs(utf8_string);
+                                        std::string utf16 = core::ucs_to_utf(&utf32[0], utf32.size(), core::utf16_big_endian);
+                                        std::vector<uint16_t> wstr;
+
+                                        for (size_t p = 0; p + 1 < utf16.size(); p += 2)
+                                            wstr.push_back((uint8_t(utf16[p]) << 8) | (uint8_t(utf16[p+1])));
+#endif
 
                                         for (j = 0; j < wstr.size(); ++j)
                                         {
                                             uint16_t c = wstr[j];
 
-                                            hex::write(stream.write("\\U", 2), c >> 8);
-                                            hex::write(stream, c & 0xff);
+                                            hex::encode_accumulator accumulator(stream.write("\\U", 2));
+                                            accumulator.accumulate(c >> 8);
+                                            accumulator.accumulate(c & 0xff);
+                                            accumulator.end();
                                         }
                                     }
                                     else
@@ -363,6 +366,8 @@ finish:
 
         class stream_writer : public impl::stream_writer_base
         {
+            hex::encode_accumulator hex;
+
         public:
             stream_writer(core::ostream_handle output) : impl::stream_writer_base(output) {}
 
@@ -423,7 +428,10 @@ finish:
                         break;
                     default:
                         if (!core::subtype_is_text_string(v.get_subtype()))
+                        {
                             stream().put('<');
+                            hex = hex::encode_accumulator(stream());
+                        }
                         else
                             stream().put('"');
                         break;
@@ -432,7 +440,7 @@ finish:
             void string_data_(const core::value &v, bool)
             {
                 if (!core::subtype_is_text_string(current_container_subtype()))
-                    hex::write(stream(), v.get_string_unchecked());
+                    hex.accumulate(v.get_string_unchecked());
                 else
                     write_string(stream(), v.get_string_unchecked());
             }
@@ -447,7 +455,10 @@ finish:
                         break;
                     default:
                         if (!core::subtype_is_text_string(v.get_subtype()))
+                        {
+                            hex.end();
                             stream().put('>');
+                        }
                         else
                             stream().put('"');
                         break;
@@ -459,11 +470,15 @@ finish:
 
             void begin_object_(const core::value &, core::optional_size, bool) {stream().put('{');}
             void end_object_(const core::value &, bool) {stream().put('}');}
+
+            void link_(const core::value &) {throw core::error("Plain Text Property List - 'link' value not allowed in output");}
         };
 
         class pretty_stream_writer : public impl::stream_writer_base
         {
-            std::unique_ptr<char []> buffer;
+            hex::encode_accumulator hex;
+
+            char * const buffer;
             size_t indent_width;
             size_t current_indent;
 
@@ -473,9 +488,9 @@ finish:
                 {
                     size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                    memset(buffer.get(), ' ', size);
+                    memset(buffer, ' ', size);
 
-                    stream().write(buffer.get(), size);
+                    stream().write(buffer, size);
                     padding -= size;
                 }
             }
@@ -487,6 +502,7 @@ finish:
                 , indent_width(indent_width)
                 , current_indent(0)
             {}
+            ~pretty_stream_writer() {delete[] buffer;}
 
             size_t indent() {return indent_width;}
 
@@ -552,7 +568,10 @@ finish:
                         break;
                     default:
                         if (!core::subtype_is_text_string(v.get_subtype()))
+                        {
                             stream().put('<');
+                            hex = hex::encode_accumulator(stream());
+                        }
                         else
                             stream().put('"');
                         break;
@@ -561,7 +580,7 @@ finish:
             void string_data_(const core::value &v, bool)
             {
                 if (!core::subtype_is_text_string(current_container_subtype()))
-                    hex::write(stream(), v.get_string_unchecked());
+                    hex.accumulate(v.get_string_unchecked());
                 else
                     write_string(stream(), v.get_string_unchecked());
             }
@@ -576,7 +595,10 @@ finish:
                         break;
                     default:
                         if (!core::subtype_is_text_string(v.get_subtype()))
+                        {
+                            hex.end();
                             stream().put('>');
+                        }
                         else
                             stream().put('"');
                         break;
@@ -612,13 +634,15 @@ finish:
 
                 stream().put('}');
             }
+
+            void link_(const core::value &) {throw core::error("Plain Text Property List - 'link' value not allowed in output");}
         };
 
         inline core::value from_plain_text_property_list(core::istream_handle stream)
         {
             parser p(stream);
             core::value v;
-            p >> v;
+            core::convert(p, v);
             return v;
         }
 
@@ -626,7 +650,7 @@ finish:
         {
             core::ostringstream stream;
             stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -634,7 +658,7 @@ finish:
         {
             core::ostringstream stream;
             pretty_stream_writer writer(stream, indent_width);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

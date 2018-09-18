@@ -29,13 +29,14 @@
 # define CPPDATALIB_MSVC
 #endif
 
-#include "base64.h"
-#include "hex.h"
+#include "cpp11.h"
 #include "fp_convert.h"
+#include "utf.h"
+#include "hex.h"
 // stream_filters.h includes value_builder.h, stream_base.h, and value.h
 #include "stream_filters.h"
 #include "value_parser.h"
 #include "dump.h"
-#include "utf.h"
+#include "base64.h"
 
 #endif // CPPDATALIB_CORE_CORE_H

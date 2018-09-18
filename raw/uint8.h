@@ -41,7 +41,7 @@ namespace cppdatalib
             }
 
         protected:
-            void reset_() {stream() >> std::noskipws;}
+            void reset_() {stream() >> stdx::noskipws;}
 
             void write_one_()
             {
@@ -76,27 +76,31 @@ namespace cppdatalib
                     throw core::error("Raw UINT8 - nested 'array' value not allowed in output");
             }
             void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("Raw UINT8 - 'object' value not allowed in output");}
+
+            void link_(const core::value &) {throw core::error("Raw UINT8 - 'link' value not allowed in output");}
         };
 
         inline core::value from_raw_uint8(core::istream_handle stream)
         {
             uint8_parser p(stream);
             core::value v;
-            p >> v;
+            core::convert(p, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _raw_uint8(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_raw_uint8(wrap);
         }
+#endif
 
         inline std::string to_raw_uint8(const core::value &v)
         {
             core::ostringstream stream;
             uint8_stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

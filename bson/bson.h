@@ -80,8 +80,10 @@ namespace cppdatalib
                 type type_;
             };
 
-            core::cache_vector_n<container, core::cache_size> containers;
-            std::unique_ptr<char []> buffer;
+            typedef core::cache_vector_n<container, core::cache_size> containers_t;
+
+            containers_t containers;
+            char * const buffer;
 
         public:
             parser(core::istream_handle input)
@@ -90,13 +92,14 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
             unsigned int features() const {return provides_prefix_string_size;}
 
         protected:
             void reset_()
             {
-                containers = decltype(containers)();
+                containers = containers_t();
             }
 
             void write_one_()
@@ -163,10 +166,10 @@ namespace cppdatalib
                         while (size > 0)
                         {
                             int32_t buffer_size = std::min(int32_t(core::buffer_size), size);
-                            if (!stream().read(buffer.get(), buffer_size))
+                            if (!stream().read(buffer, buffer_size))
                                 throw core::error("BSON - unexpected end of string");
                             // Set string in string_type to preserve the subtype
-                            string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                            string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                             get_output()->append_to_string(string_type);
                             size -= buffer_size;
                         }
@@ -239,10 +242,10 @@ namespace cppdatalib
                         while (size > 0)
                         {
                             int32_t buffer_size = std::min(int32_t(core::buffer_size), size);
-                            if (!stream().read(buffer.get(), buffer_size))
+                            if (!stream().read(buffer, buffer_size))
                                 throw core::error("BSON - unexpected end of string");
                             // Set string in string_type to preserve the subtype
-                            string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                            string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                             get_output()->append_to_string(string_type);
                             size -= buffer_size;
                         }
@@ -303,7 +306,7 @@ namespace cppdatalib
                     }
                     case regex:
                     {
-                        core::value str{core::string_t(), core::regexp};
+                        core::value str = core::value(core::string_t(), core::regexp);
 
                         decrement_counter(1);
 
@@ -415,8 +418,8 @@ namespace cppdatalib
 
             void decrement_counter(size_t amount, bool allow_popping = false)
             {
-				if (amount > INT32_MAX)
-					throw core::error("BSON - invalid size prefix specified on document");
+                                if (amount > std::numeric_limits<int32_t>::max())
+                                        throw core::error("BSON - invalid size prefix specified on document");
                 containers.back().size_ -= int32_t(amount);
                 if (containers.back().size_ < 0)
                     throw core::error("BSON - invalid size prefix specified on document");
@@ -449,7 +452,9 @@ namespace cppdatalib
                     struct traverser
                     {
                     private:
-                        std::stack<size_t, core::cache_vector_n<size_t, core::cache_size>> size;
+                        typedef std::stack< size_t, core::cache_vector_n<size_t, core::cache_size> > sizes_t;
+
+                        sizes_t size;
 
                     public:
                         traverser() {size.push(0);}
@@ -475,7 +480,7 @@ namespace cppdatalib
                                         if (arg->get_subtype() != core::mongodb_timestamp &&
                                                 arg->get_subtype() != core::utc_timestamp &&
                                                 arg->get_subtype() != core::utc_timestamp_ms &&
-                                                arg->get_int_unchecked() >= INT32_MIN && arg->get_int_unchecked() <= INT32_MAX)
+                                                arg->get_int_unchecked() >= std::numeric_limits<int32_t>::min() && arg->get_int_unchecked() <= std::numeric_limits<int32_t>::max())
                                             size.top() += 4;
                                         else
                                             size.top() += 8;
@@ -486,11 +491,11 @@ namespace cppdatalib
                                 {
                                     if (prefix)
                                     {
-                                        // TODO: handle values above INT64_MAX
+                                        // TODO: handle values above std::numeric_limits<int64_t>::max()
                                         if (arg->get_subtype() != core::mongodb_timestamp &&
                                                 arg->get_subtype() != core::utc_timestamp &&
                                                 arg->get_subtype() != core::utc_timestamp_ms &&
-                                                arg->get_uint_unchecked() <= INT32_MAX)
+                                                arg->get_uint_unchecked() <= std::numeric_limits<int32_t>::max())
                                             size.top() += 4;
                                         else
                                             size.top() += 8;
@@ -510,7 +515,7 @@ namespace cppdatalib
                                 {
                                     if (prefix)
                                     {
-                                        auto ancestry = finder.get_ancestry();
+                                        core::value::traversal_ancestry_finder::ancestry_t ancestry = finder.get_ancestry();
 
                                         if (!ancestry.empty() && ancestry[0].is_object_key())
                                             size.top() += 1 + arg->string_size(); // If key, add actual payload size plus nul-terminator
@@ -612,7 +617,7 @@ namespace cppdatalib
             void begin_item_(const core::value &)
             {
                 if (current_container() == core::array)
-                    key_name = std::to_string(current_container_size());
+                    key_name = stdx::to_string(current_container_size());
             }
 
             void null_(const core::value &v)
@@ -637,7 +642,7 @@ namespace cppdatalib
                 stream().put(v.get_bool_unchecked());
             }
 
-            void link_(const core::value &) {throw core::error("BSON - links are not supported by this format");}
+            void link_(const core::value &) {throw core::error("BSON - 'link' value not allowed in output");}
 
             void integer_(const core::value &v)
             {
@@ -657,7 +662,7 @@ namespace cppdatalib
                     write_key_name();
                     core::write_uint64_le(stream(), uint64_t(v.get_int_unchecked() * (v.get_subtype() == core::utc_timestamp? 1000: 1)));
                 }
-                else if (v.get_int_unchecked() >= INT32_MIN && v.get_int_unchecked() <= INT32_MAX)
+                else if (v.get_int_unchecked() >= std::numeric_limits<int32_t>::min() && v.get_int_unchecked() <= std::numeric_limits<int32_t>::max())
                 {
                     stream().put(0x10);
                     write_key_name();
@@ -689,13 +694,13 @@ namespace cppdatalib
                     write_key_name();
                     core::write_uint64_le(stream(), v.get_uint_unchecked() * (v.get_subtype() == core::utc_timestamp? 1000: 1));
                 }
-                else if (v.get_uint_unchecked() <= INT32_MAX)
+                else if (v.get_uint_unchecked() <= std::numeric_limits<int32_t>::max())
                 {
                     stream().put(0x10);
                     write_key_name();
                     core::write_uint32_le(stream(), v.get_uint_unchecked());
                 }
-                else // TODO: handle values above INT64_MAX
+                else // TODO: handle values above std::numeric_limits<int64_t>::max()
                 {
                     stream().put(0x12);
                     write_key_name();
@@ -836,21 +841,23 @@ namespace cppdatalib
         {
             parser p(stream);
             core::value v;
-            p >> v;
+            core::convert(p, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _bson(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_bson(wrap);
         }
+#endif
 
         inline std::string to_bson(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer w(stream);
-            w << v;
+            core::convert(w, v);
             return stream.str();
         }
     }

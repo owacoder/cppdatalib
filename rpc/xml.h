@@ -89,7 +89,7 @@ namespace cppdatalib
 
         class pretty_stream_writer : public core::xml_impl::stream_writer_base
         {
-            std::unique_ptr<char []> buffer;
+            char * const buffer;
             size_t indent_width;
             size_t current_indent;
 
@@ -99,9 +99,9 @@ namespace cppdatalib
                 {
                     size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                    memset(buffer.get(), ' ', size);
+                    memset(buffer, ' ', size);
 
-                    stream().write(buffer.get(), size);
+                    stream().write(buffer, size);
                     padding -= size;
                 }
             }
@@ -112,6 +112,7 @@ namespace cppdatalib
                 , buffer(new char [core::buffer_size])
                 , indent_width(indent_width)
             {}
+            ~pretty_stream_writer() {delete[] buffer;}
 
         protected:
             void begin_() {current_indent = 0; stream().precision(CPPDATALIB_REAL_DIG);}
@@ -243,13 +244,15 @@ namespace cppdatalib
                 stream() << "</struct>\n", output_padding(current_indent);
                 stream() << "</value>";
             }
+
+            void link_(const core::value &) {throw core::error("XML RPC - 'link' value not allowed in output");}
         };
 
         inline std::string to_xml_rpc(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

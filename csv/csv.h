@@ -156,8 +156,8 @@ namespace cppdatalib
                     if (chr != EOF)
                         stream().unget();
 
-                    while (!buffer.empty() && isspace(buffer.back() & 0xff))
-                        buffer.pop_back();
+                    while (!buffer.empty() && isspace(buffer[buffer.size()-1] & 0xff))
+                        buffer.erase(buffer.size()-1);
 
                     deduce_type(buffer, writer);
                 }
@@ -217,8 +217,8 @@ namespace cppdatalib
                         buffer += core::ucs_to_utf8(chr);
                     }
 
-                    while (!buffer.empty() && isspace(buffer.back() & 0xff))
-                        buffer.pop_back();
+                    while (!buffer.empty() && isspace(buffer[buffer.size()-1] & 0xff))
+                        buffer.erase(buffer.size()-1);
 
                     deduce_type(buffer, writer);
                 }
@@ -228,14 +228,16 @@ namespace cppdatalib
 
             options opts;
             char separator;
-            bool comma_just_parsed = true;
-            bool newline_just_parsed = true;
+            bool comma_just_parsed;
+            bool newline_just_parsed;
 
         public:
             parser(core::istream_handle input, char separator = ',', options opts = convert_fields_by_deduction)
                 : stream_parser(input)
                 , opts(opts)
                 , separator(separator)
+                , comma_just_parsed(true)
+                , newline_just_parsed(true)
             {
                 reset();
             }
@@ -376,6 +378,8 @@ namespace cppdatalib
 
             void begin_array_(const core::value &, core::optional_size, bool) {throw core::error("CSV - 'array' value not allowed in row output");}
             void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("CSV - 'object' value not allowed in output");}
+
+            void link_(const core::value &) {throw core::error("CSV - 'link' value not allowed in output");}
         };
 
         class stream_writer : public impl::stream_writer_base
@@ -415,13 +419,15 @@ namespace cppdatalib
                     throw core::error("CSV - 'array' value not allowed in row output");
             }
             void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("CSV - 'object' value not allowed in output");}
+
+            void link_(const core::value &) {throw core::error("CSV - 'link' value not allowed in output");}
         };
 
         inline core::value from_csv_table(core::istream_handle stream, char separator = ',', parser::options opts = parser::convert_fields_by_deduction)
         {
             parser reader(stream, separator, opts);
             core::value v;
-            reader >> v;
+            core::convert(reader, v);
             return v;
         }
 
@@ -429,7 +435,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             row_writer writer(stream, separator);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -437,7 +443,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             stream_writer writer(stream, separator);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 

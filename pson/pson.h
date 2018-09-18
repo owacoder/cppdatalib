@@ -36,7 +36,7 @@ namespace cppdatalib
         {
             struct container_data
             {
-                container_data(core::subtype_t sub_type, uint64_t remaining_size)
+                container_data(core::subtype_t sub_type = core::normal, uint64_t remaining_size = 0)
                     : sub_type(sub_type)
                     , remaining_size(remaining_size)
                 {}
@@ -45,13 +45,16 @@ namespace cppdatalib
                 uint64_t remaining_size;
             };
 
-            std::unique_ptr<char []> buffer;
-            std::stack<container_data, std::vector<container_data>> containers;
-            std::map<uint32_t, core::string_t> string_dict, original_string_dict;
+            char * const buffer;
+            typedef std::stack< container_data, std::vector<container_data> > containers_t;
+            typedef std::map<uint32_t, core::string_t> dict_t;
+
+            containers_t containers;
+            dict_t string_dict, original_string_dict;
             bool written;
 
         public:
-            parser(core::istream_handle input, const std::map<uint32_t, core::string_t> &string_dictionary = std::map<uint32_t, core::string_t>())
+            parser(core::istream_handle input, const dict_t &string_dictionary = dict_t())
                 : core::stream_parser(input)
                 , buffer(new char [core::buffer_size])
                 , string_dict(string_dictionary)
@@ -59,6 +62,7 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
             unsigned int features() const {return provides_prefix_array_size |
                                                   provides_prefix_object_size |
@@ -67,20 +71,20 @@ namespace cppdatalib
         protected:
             void read_string(core::subtype_t subtype, uint64_t size, bool add_to_dict, const char *failure_message)
             {
-                core::string_t *dict_entry = add_to_dict? std::addressof(string_dict.insert({uint32_t(string_dict.size()), {}}).first->second): nullptr;
+                core::string_t *dict_entry = add_to_dict? stdx::addressof(string_dict.insert(dict_t::value_type(uint32_t(string_dict.size()), core::string_t())).first->second): nullptr;
 
                 core::value string_type = core::value("", 0, subtype, true);
                 get_output()->begin_string(string_type, size);
                 while (size > 0)
                 {
                     uint64_t buffer_size = std::min(uint64_t(core::buffer_size), size);
-                    stream().read(buffer.get(), buffer_size);
+                    stream().read(buffer, buffer_size);
                     if (stream().fail())
                         throw core::error(failure_message);
                     // Set string in string_type to preserve the subtype
-                    string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                    string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                     if (add_to_dict)
-                        dict_entry->append(buffer.get(), static_cast<size_t>(buffer_size));
+                        dict_entry->append(buffer, static_cast<size_t>(buffer_size));
                     get_output()->append_to_string(string_type);
                     size -= buffer_size;
                 }
@@ -120,7 +124,7 @@ namespace cppdatalib
                 if (!read_int(uvalue))
                     return false;
 
-                value = (uvalue >> 1) ^ -(uvalue & 1);
+                value = (uvalue >> 1) ^ (~(uvalue & 1) + 1);
 
                 return true;
             }
@@ -146,14 +150,14 @@ namespace cppdatalib
                     return false;
 
                 uvalue |= uint64_t(chr & 0x7f) << shift;
-                value = (uvalue >> 1) ^ -(uvalue & 1);
+                value = (uvalue >> 1) ^ (~(uvalue & 1) + 1);
 
                 return true;
             }
 
             void reset_()
             {
-                containers = decltype(containers)();
+                containers = containers_t();
                 written = false;
 
                 string_dict = original_string_dict;
@@ -289,9 +293,9 @@ namespace cppdatalib
                         if (!read_int(spec))
                             throw core::error("PSON - expected UTF-8 string dictionary specifier");
 
-                        auto it = string_dict.find(spec);
+                        dict_t::const_iterator it = string_dict.find(spec);
                         if (it == string_dict.end())
-                            throw core::custom_error("PSON - " + std::to_string(spec) + " is not a valid string dictionary specifier");
+                            throw core::custom_error("PSON - " + stdx::to_string(spec) + " is not a valid string dictionary specifier");
 
                         get_output()->write(core::value(it->second.data(), it->second.size(), core::normal, true));
                         break;
@@ -334,14 +338,14 @@ namespace cppdatalib
                 {
                     uint32_t zigzag = size;
 
-                    return write_int(stream, ((zigzag >> 31) * UINT32_MAX) ^ (zigzag << 1));
+                    return write_int(stream, ((zigzag >> 31) * std::numeric_limits<uint32_t>::max()) ^ (zigzag << 1));
                 }
 
                 core::ostream &write_int(core::ostream &stream, int64_t size)
                 {
                     uint64_t zigzag = size;
 
-                    zigzag = ((zigzag >> 63) * UINT64_MAX) ^ (zigzag << 1);
+                    zigzag = ((zigzag >> 63) * std::numeric_limits<uint64_t>::max()) ^ (zigzag << 1);
 
                     while (zigzag > 0x7f)
                     {
@@ -386,12 +390,12 @@ namespace cppdatalib
                 {
                     if (v.get_int_unchecked() >= -120)
                         stream().put((-(v.get_int_unchecked() + 1) << 1) | 1);
-                    else if (v.get_int_unchecked() >= INT32_MIN)
+                    else if (v.get_int_unchecked() >= std::numeric_limits<int32_t>::min())
                     {
                         stream().put(static_cast<unsigned char>(0xf8));
                         write_int(stream(), int32_t(v.get_int_unchecked()));
                     }
-                    else if (v.get_int_unchecked() >= INT64_MIN)
+                    else if (v.get_int_unchecked() >= std::numeric_limits<int64_t>::min())
                     {
                         stream().put(static_cast<unsigned char>(0xf9));
                         write_int(stream(), int64_t(v.get_int_unchecked()));
@@ -403,12 +407,12 @@ namespace cppdatalib
                 {
                     if (v.get_int_unchecked() < 120)
                         stream().put(v.get_int_unchecked() << 1);
-                    else if (v.get_int_unchecked() <= INT32_MAX)
+                    else if (v.get_int_unchecked() <= std::numeric_limits<int32_t>::max())
                     {
                         stream().put(static_cast<unsigned char>(0xf8));
                         write_int(stream(), int32_t(v.get_int_unchecked()));
                     }
-                    else if (v.get_int_unchecked() <= INT64_MAX)
+                    else if (v.get_int_unchecked() <= std::numeric_limits<int64_t>::max())
                     {
                         stream().put(static_cast<unsigned char>(0xf9));
                         write_int(stream(), int64_t(v.get_int_unchecked()));
@@ -422,12 +426,12 @@ namespace cppdatalib
             {
                 if (v.get_uint_unchecked() < 120)
                     stream().put(v.get_uint_unchecked() << 1);
-                else if (v.get_uint_unchecked() <= INT32_MAX)
+                else if (v.get_uint_unchecked() <= std::numeric_limits<int32_t>::max())
                 {
                     stream().put(static_cast<unsigned char>(0xf8));
                     write_int(stream(), int32_t(v.get_uint_unchecked()));
                 }
-                else if (v.get_uint_unchecked() <= INT64_MAX)
+                else if (v.get_uint_unchecked() <= uintmax_t(std::numeric_limits<int64_t>::max()))
                 {
                     stream().put(static_cast<unsigned char>(0xf9));
                     write_int(stream(), int64_t(v.get_uint_unchecked()));
@@ -440,7 +444,9 @@ namespace cppdatalib
             {
                 uint64_t out;
 
-                if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || std::isnan(v.get_real_unchecked()))
+                using namespace std;
+
+                if (core::float_from_ieee_754(core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()))) == v.get_real_unchecked() || isnan(v.get_real_unchecked()))
                 {
                     out = core::float_to_ieee_754(static_cast<float>(v.get_real_unchecked()));
                     stream().put(static_cast<unsigned char>(0xfa));
@@ -477,7 +483,7 @@ namespace cppdatalib
             {
                 if (!size.has_value())
                     throw core::error("PSON - 'array' value does not have size specified");
-                else if (size.value() > UINT32_MAX)
+                else if (size.value() > std::numeric_limits<uint32_t>::max())
                     throw core::error("PSON - 'array' size is too large");
 
                 if (size.value() == 0)
@@ -493,7 +499,7 @@ namespace cppdatalib
             {
                 if (!size.has_value())
                     throw core::error("PSON - 'object' value does not have size specified");
-                else if (size.value() > UINT32_MAX)
+                else if (size.value() > std::numeric_limits<uint32_t>::max())
                     throw core::error("PSON - 'object' size is too large");
 
                 if (size.value() == 0)
@@ -504,13 +510,15 @@ namespace cppdatalib
                     write_int(stream(), uint32_t(size.value()));
                 }
             }
+
+            void link_(const core::value &) {throw core::error("PSON - 'link' value not allowed in output");}
         };
 
         inline std::string to_pson(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer w(stream);
-            w << v;
+            core::convert(w, v);
             return stream.str();
         }
     }

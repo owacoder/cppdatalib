@@ -27,8 +27,22 @@
 
 #include <cstdlib>
 #include <vector>
-#include <array>
 #include <limits>
+#include <iostream>
+#include <cstring>
+
+#ifdef __WATCOMC__
+// Watcom has an incomplete (and not exactly standard-conforming) std::istringstream implementation, so force it to use the custom implementation
+#ifndef CPPDATALIB_ENABLE_FAST_IO
+#define CPPDATALIB_ENABLE_FAST_IO
+#endif
+#define CPPDATALIB_WATCOM
+#define CPPDATALIB_TYPENAME
+
+#define uintmax_t uint64_t
+#define intmax_t int64_t
+#include <strstrea.h>
+#endif
 
 #if defined(__linux) || defined(__linux__)
 #define CPPDATALIB_LINUX
@@ -53,8 +67,22 @@
 #define CPPDATALIB_CPP14
 #endif
 
-#if __cplusplus >= 201103L
+#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900)
 #define CPPDATALIB_CPP11
+#define CPPDATALIB_NOEXCEPT noexcept
+#define CPPDATALIB_CONSTEXPR constexpr
+#define CPPDATALIB_CONSTEXPR_VALUE constexpr
+#define CPPDATALIB_EXPLICIT explicit
+#define CPPDATALIB_TYPENAME typename
+#include <array>
+#else
+#define CPPDATALIB_NOEXCEPT
+#define CPPDATALIB_CONSTEXPR
+#define CPPDATALIB_CONSTEXPR_VALUE const
+#define CPPDATALIB_EXPLICIT
+#ifndef CPPDATALIB_TYPENAME
+#define CPPDATALIB_TYPENAME typename
+#endif
 #endif
 
 namespace cppdatalib
@@ -118,7 +146,17 @@ namespace cppdatalib
         typedef CPPDATALIB_REAL_T real_t;
 #else
         typedef double real_t;
+#ifdef CPPDATALIB_WATCOM
+#define CPPDATALIB_REAL_DIG 17
+#define CPPDATALIB_FP_INFINITY(fp_type) INFINITY
+#define CPPDATALIB_FP_QNAN(fp_type) NAN
+#define CPPDATALIB_FP_SNAN(fp_type) NAN
+#else
 #define CPPDATALIB_REAL_DIG std::numeric_limits<double>::max_digits10
+#define CPPDATALIB_FP_INFINITY(fp_type) std::numeric_limits<fp_type>::infinity()
+#define CPPDATALIB_FP_QNAN(fp_type) std::numeric_limits<fp_type>::quiet_NaN()
+#define CPPDATALIB_FP_SNAN(fp_type) std::numeric_limits<fp_type>::signaling_NaN()
+#endif // CPPDATALIB_WATCOM
 #endif
 
 #ifdef CPPDATALIB_CSTRING_T
@@ -136,7 +174,11 @@ namespace cppdatalib
         template<typename T>
         struct optional
         {
+#ifdef CPPDATALIB_CPP11
             optional() : val_{}, used_(false) {}
+#else
+            optional() : val_(), used_(false) {}
+#endif
             optional(T v) : val_(v), used_(true) {}
 
             optional &operator=(T v) {val_ = v; used_ = true; return *this;}
@@ -158,7 +200,7 @@ namespace cppdatalib
             const T *operator->() const {return &val_;}
             T operator*() const {return val_;}
 
-            explicit operator bool() const {return has_value();}
+            CPPDATALIB_EXPLICIT operator bool() const {return has_value();}
             bool has_value() const {return used_;}
             void reset() {val_ = {}; used_ = false;}
 
@@ -193,28 +235,27 @@ namespace cppdatalib
                 typedef std::size_t size_type;
                 typedef std::ptrdiff_t difference_type;
 
-                static constexpr size_type npos = -1;
+                static CPPDATALIB_CONSTEXPR_VALUE size_type npos = -1;
 
-                string_view_t() noexcept : data_(nullptr), size_(0) {}
-                string_view_t(const string_view_t &other) noexcept = default;
+                string_view_t() CPPDATALIB_NOEXCEPT : data_(NULL), size_(0) {}
                 string_view_t(const_pointer nul_terminated) : data_(nul_terminated), size_(strlen(nul_terminated)) {}
                 string_view_t(const_pointer data, size_type size) : data_(data), size_(size) {}
                 string_view_t(const string_t &str) : data_(str.data()), size_(str.size()) {}
 
-                explicit operator std::basic_string<value_type>() const {return std::basic_string<value_type>(data(), size());}
+                CPPDATALIB_EXPLICIT operator std::basic_string<value_type>() const {return std::basic_string<value_type>(data(), size());}
 
-                constexpr const_iterator begin() const noexcept {return data_;}
-                constexpr const_iterator end() const noexcept {return data_ + size();}
-                constexpr const_iterator cbegin() const noexcept {return data_;}
-                constexpr const_iterator cend() const noexcept {return data_ + size();}
-                constexpr const_reverse_iterator rbegin() const noexcept {return const_reverse_iterator(end());}
-                constexpr const_reverse_iterator rend() const noexcept {return const_reverse_iterator(begin());}
-                constexpr const_reverse_iterator crbegin() const noexcept {return const_reverse_iterator(end());}
-                constexpr const_reverse_iterator crend() const noexcept {return const_reverse_iterator(begin());}
+                CPPDATALIB_CONSTEXPR const_iterator begin() const CPPDATALIB_NOEXCEPT {return data_;}
+                CPPDATALIB_CONSTEXPR const_iterator end() const CPPDATALIB_NOEXCEPT {return data_ + size();}
+                CPPDATALIB_CONSTEXPR const_iterator cbegin() const CPPDATALIB_NOEXCEPT {return data_;}
+                CPPDATALIB_CONSTEXPR const_iterator cend() const CPPDATALIB_NOEXCEPT {return data_ + size();}
+                CPPDATALIB_CONSTEXPR const_reverse_iterator rbegin() const CPPDATALIB_NOEXCEPT {return const_reverse_iterator(end());}
+                CPPDATALIB_CONSTEXPR const_reverse_iterator rend() const CPPDATALIB_NOEXCEPT {return const_reverse_iterator(begin());}
+                CPPDATALIB_CONSTEXPR const_reverse_iterator crbegin() const CPPDATALIB_NOEXCEPT {return const_reverse_iterator(end());}
+                CPPDATALIB_CONSTEXPR const_reverse_iterator crend() const CPPDATALIB_NOEXCEPT {return const_reverse_iterator(begin());}
 
-                constexpr const_pointer data() const noexcept {return data_;}
-                constexpr const_reference operator[](size_type idx) const {return data_[idx];}
-                constexpr const_reference at(size_type idx) const {return idx >= size()? (throw std::out_of_range("impl::string_view_t - element access is out of bounds"), front()): data_[idx];}
+                CPPDATALIB_CONSTEXPR const_pointer data() const CPPDATALIB_NOEXCEPT {return data_;}
+                CPPDATALIB_CONSTEXPR const_reference operator[](size_type idx) const {return data_[idx];}
+                CPPDATALIB_CONSTEXPR const_reference at(size_type idx) const {return idx >= size()? (throw std::out_of_range("impl::string_view_t - element access is out of bounds"), front()): data_[idx];}
 
                 void remove_prefix(size_type n) {data_ += n;}
                 void remove_suffix(size_type n) {size_ -= n;}
@@ -225,15 +266,15 @@ namespace cppdatalib
                     swap(size_, other.size_);
                 }
 
-                constexpr const_reference front() const {return *data_;}
-                constexpr const_reference back() const {return data_[size() - 1];}
+                CPPDATALIB_CONSTEXPR const_reference front() const {return *data_;}
+                CPPDATALIB_CONSTEXPR const_reference back() const {return data_[size() - 1];}
 
-                constexpr size_type size() const {return size_;}
-                constexpr size_type length() const {return size_;}
+                CPPDATALIB_CONSTEXPR size_type size() const {return size_;}
+                CPPDATALIB_CONSTEXPR size_type length() const {return size_;}
 
-                constexpr size_type max_length() const {return npos - 1;}
+                CPPDATALIB_CONSTEXPR size_type max_length() const {return npos - 1;}
 
-                constexpr bool empty() const {return size() == 0;}
+                CPPDATALIB_CONSTEXPR bool empty() const {return size() == 0;}
 
                 size_type copy(value_type *dest,
                                size_type count,
@@ -251,16 +292,16 @@ namespace cppdatalib
                     return count;
                 }
 
-                constexpr string_view_t substr(size_type pos = 0, size_type count = npos) const
+                CPPDATALIB_CONSTEXPR string_view_t substr(size_type pos = 0, size_type count = npos) const
                 {
                     return pos > size()? (throw std::out_of_range("impl::string_view_t - element access is out of bounds"), string_view_t()):
                                          string_view_t(data_ + pos, std::min(count, size() - pos));
                 }
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                int compare(string_view_t v) const noexcept
+                int compare(string_view_t v) const CPPDATALIB_NOEXCEPT
                 {
                     using namespace std;
 
@@ -280,56 +321,56 @@ namespace cppdatalib
                         return 1;
                 }
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
                 int compare(size_type pos1, size_type count1, string_view_t v) const {return substr(pos1, count1).compare(v);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
                 int compare(size_type pos1, size_type count1, string_view_t v, size_type pos2, size_type count2) const {return substr(pos1, count1).compare(v.substr(pos2, count2));}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
                 int compare(const_pointer s) const {return compare(string_view_t(s));}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
                 int compare(size_type pos, size_type count1, const_pointer s) const {return substr(pos, count1).compare(string_view_t(s));}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
                 int compare(size_type pos, size_type count1, const_pointer s, size_type count2) const {return substr(pos, count1).compare(string_view_t(s, count2));}
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                bool starts_with(string_view_t v) const noexcept {return size() >= v.size() && compare(0, v.size(), v) == 0;}
+                bool starts_with(string_view_t v) const CPPDATALIB_NOEXCEPT {return size() >= v.size() && compare(0, v.size(), v) == 0;}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                bool starts_with(value_type v) const noexcept {return size() > 0 && compare(0, 1, string_view_t(&v, 1)) == 0;}
+                bool starts_with(value_type v) const CPPDATALIB_NOEXCEPT {return size() > 0 && compare(0, 1, string_view_t(&v, 1)) == 0;}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
                 bool starts_with(const_pointer s) const {return starts_with(string_view_t(s));}
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                bool ends_with(string_view_t v) const noexcept {return size() >= v.size() && compare(size()-v.size(), v.size(), v) == 0;}
+                bool ends_with(string_view_t v) const CPPDATALIB_NOEXCEPT {return size() >= v.size() && compare(size()-v.size(), v.size(), v) == 0;}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                bool ends_with(value_type v) const noexcept {return size() > 0 && compare(size()-1, 1, string_view_t(&v, 1)) == 0;}
+                bool ends_with(value_type v) const CPPDATALIB_NOEXCEPT {return size() > 0 && compare(size()-1, 1, string_view_t(&v, 1)) == 0;}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
                 bool ends_with(const_pointer s) const {return ends_with(string_view_t(s));}
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find(string_view_t v, size_type pos = 0) const noexcept
+                size_type find(string_view_t v, size_type pos = 0) const CPPDATALIB_NOEXCEPT
                 {
                     if (v.size() > size())
                         return npos;
@@ -341,22 +382,22 @@ namespace cppdatalib
                     return npos;
                 }
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find(value_type v, size_type pos = 0) const noexcept {return find(string_view_t(&v, 1), pos);}
+                size_type find(value_type v, size_type pos = 0) const CPPDATALIB_NOEXCEPT {return find(string_view_t(&v, 1), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find(const_pointer v, size_type pos, size_type count) const noexcept {return find(string_view_t(v, count), pos);}
+                size_type find(const_pointer v, size_type pos, size_type count) const CPPDATALIB_NOEXCEPT {return find(string_view_t(v, count), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find(const_pointer s, size_type pos = 0) const noexcept {return find(string_view_t(s), pos);}
+                size_type find(const_pointer s, size_type pos = 0) const CPPDATALIB_NOEXCEPT {return find(string_view_t(s), pos);}
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type rfind(string_view_t v, size_type pos = npos) const noexcept
+                size_type rfind(string_view_t v, size_type pos = npos) const CPPDATALIB_NOEXCEPT
                 {
                     if (v.size() > size())
                         return npos;
@@ -371,22 +412,22 @@ namespace cppdatalib
                     return npos;
                 }
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type rfind(value_type v, size_type pos = npos) const noexcept {return rfind(string_view_t(&v, 1), pos);}
+                size_type rfind(value_type v, size_type pos = npos) const CPPDATALIB_NOEXCEPT {return rfind(string_view_t(&v, 1), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type rfind(const_pointer v, size_type pos, size_type count) const noexcept {return rfind(string_view_t(v, count), pos);}
+                size_type rfind(const_pointer v, size_type pos, size_type count) const CPPDATALIB_NOEXCEPT {return rfind(string_view_t(v, count), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type rfind(const_pointer s, size_type pos = npos) const noexcept {return rfind(string_view_t(s), pos);}
+                size_type rfind(const_pointer s, size_type pos = npos) const CPPDATALIB_NOEXCEPT {return rfind(string_view_t(s), pos);}
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_first_of(string_view_t v, size_type pos = 0) const noexcept
+                size_type find_first_of(string_view_t v, size_type pos = 0) const CPPDATALIB_NOEXCEPT
                 {
                     for (; pos < size(); ++pos)
                         for (const auto &c: v)
@@ -396,22 +437,22 @@ namespace cppdatalib
                     return npos;
                 }
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_first_of(value_type v, size_type pos = 0) const noexcept {return find_first_of(string_view_t(&v, 1), pos);}
+                size_type find_first_of(value_type v, size_type pos = 0) const CPPDATALIB_NOEXCEPT {return find_first_of(string_view_t(&v, 1), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_first_of(const_pointer v, size_type pos, size_type count) const noexcept {return find_first_of(string_view_t(v, count), pos);}
+                size_type find_first_of(const_pointer v, size_type pos, size_type count) const CPPDATALIB_NOEXCEPT {return find_first_of(string_view_t(v, count), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_first_of(const_pointer s, size_type pos = 0) const noexcept {return find_first_of(string_view_t(s), pos);}
+                size_type find_first_of(const_pointer s, size_type pos = 0) const CPPDATALIB_NOEXCEPT {return find_first_of(string_view_t(s), pos);}
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_first_not_of(string_view_t v, size_type pos = 0) const noexcept
+                size_type find_first_not_of(string_view_t v, size_type pos = 0) const CPPDATALIB_NOEXCEPT
                 {
                     for (; pos < size(); ++pos)
                     {
@@ -431,22 +472,22 @@ namespace cppdatalib
                     return npos;
                 }
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_first_not_of(value_type v, size_type pos = 0) const noexcept {return find_first_not_of(string_view_t(&v, 1), pos);}
+                size_type find_first_not_of(value_type v, size_type pos = 0) const CPPDATALIB_NOEXCEPT {return find_first_not_of(string_view_t(&v, 1), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_first_not_of(const_pointer v, size_type pos, size_type count) const noexcept {return find_first_not_of(string_view_t(v, count), pos);}
+                size_type find_first_not_of(const_pointer v, size_type pos, size_type count) const CPPDATALIB_NOEXCEPT {return find_first_not_of(string_view_t(v, count), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_first_not_of(const_pointer s, size_type pos = 0) const noexcept {return find_first_not_of(string_view_t(s), pos);}
+                size_type find_first_not_of(const_pointer s, size_type pos = 0) const CPPDATALIB_NOEXCEPT {return find_first_not_of(string_view_t(s), pos);}
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_last_of(string_view_t v, size_type pos = npos) const noexcept
+                size_type find_last_of(string_view_t v, size_type pos = npos) const CPPDATALIB_NOEXCEPT
                 {
                     for (pos = std::min(pos, size() - 1) + 1; pos > 0;)
                     {
@@ -459,22 +500,22 @@ namespace cppdatalib
                     return npos;
                 }
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_last_of(value_type v, size_type pos = npos) const noexcept {return find_last_of(string_view_t(&v, 1), pos);}
+                size_type find_last_of(value_type v, size_type pos = npos) const CPPDATALIB_NOEXCEPT {return find_last_of(string_view_t(&v, 1), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_last_of(const_pointer v, size_type pos, size_type count) const noexcept {return find_last_of(string_view_t(v, count), pos);}
+                size_type find_last_of(const_pointer v, size_type pos, size_type count) const CPPDATALIB_NOEXCEPT {return find_last_of(string_view_t(v, count), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_last_of(const_pointer s, size_type pos = npos) const noexcept {return find_last_of(string_view_t(s), pos);}
+                size_type find_last_of(const_pointer s, size_type pos = npos) const CPPDATALIB_NOEXCEPT {return find_last_of(string_view_t(s), pos);}
 
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_last_not_of(string_view_t v, size_type pos = npos) const noexcept
+                size_type find_last_not_of(string_view_t v, size_type pos = npos) const CPPDATALIB_NOEXCEPT
                 {
                     for (pos = std::min(pos, size() - 1) + 1; pos > 0;)
                     {
@@ -495,17 +536,17 @@ namespace cppdatalib
                     return npos;
                 }
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_last_not_of(value_type v, size_type pos = npos) const noexcept {return find_last_not_of(string_view_t(&v, 1), pos);}
+                size_type find_last_not_of(value_type v, size_type pos = npos) const CPPDATALIB_NOEXCEPT {return find_last_not_of(string_view_t(&v, 1), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_last_not_of(const_pointer v, size_type pos, size_type count) const noexcept {return find_last_not_of(string_view_t(v, count), pos);}
+                size_type find_last_not_of(const_pointer v, size_type pos, size_type count) const CPPDATALIB_NOEXCEPT {return find_last_not_of(string_view_t(v, count), pos);}
 #ifdef CPPDATALIB_CPP14
-                constexpr
+                CPPDATALIB_CONSTEXPR
 #endif
-                size_type find_last_not_of(const_pointer s, size_type pos = npos) const noexcept {return find_last_not_of(string_view_t(s), pos);}
+                size_type find_last_not_of(const_pointer s, size_type pos = npos) const CPPDATALIB_NOEXCEPT {return find_last_not_of(string_view_t(s), pos);}
 
                 bool operator==(string_view_t b) const {return compare(b) == 0;}
                 bool operator!=(string_view_t b) const {return compare(b) != 0;}
@@ -522,7 +563,6 @@ namespace cppdatalib
 
         std::string s;
         typedef impl::string_view_t<char> string_view_t;
-
     } // Namespace core
 } // Namespace cppdatalib
 
@@ -536,6 +576,8 @@ namespace cppdatalib
 #endif // CPPDATALIB_STRING_VIEW_T
 #else
         typedef const core::string_t &string_view_t;
+
+        inline std::ostream &operator<<(std::ostream &os, cppdatalib::core::string_view_t rhs) {return os.write(rhs.data(), rhs.size());}
 #endif // CPPDATALIB_DISABLE_TEMP_STRING
     } // Namespace core
 } // Namespace cppdatalib

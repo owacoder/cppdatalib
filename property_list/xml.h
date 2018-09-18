@@ -35,6 +35,8 @@ namespace cppdatalib
     {
         class stream_writer : public core::xml_impl::stream_writer_base
         {
+            base64::encode_accumulator base64;
+
         public:
             stream_writer(core::ostream_handle output) : core::xml_impl::stream_writer_base(output) {}
 
@@ -66,7 +68,10 @@ namespace cppdatalib
                         case core::datetime: stream() << "<date>"; break;
                         default:
                             if (!core::subtype_is_text_string(v.get_subtype()))
-                                 stream() << "<data>";
+                            {
+                                stream() << "<data>";
+                                base64 = base64::encode_accumulator(stream());
+                            }
                             else
                                 stream() << "<string>";
                             break;
@@ -74,9 +79,8 @@ namespace cppdatalib
             }
             void string_data_(const core::value &v, bool)
             {
-                // TODO: dumb Base64 concatenation is dangerous and wrong. Needs to be fixed
                 if (!core::subtype_is_text_string(current_container_subtype()))
-                    base64::write(stream(), v.get_string_unchecked());
+                    base64.accumulate(v.get_string_unchecked());
                 else
                     write_element_content(stream(), v.get_string_unchecked());
             }
@@ -92,7 +96,10 @@ namespace cppdatalib
                         case core::datetime: stream() << "</date>"; break;
                         default:
                             if (!core::subtype_is_text_string(v.get_subtype()))
+                            {
+                                base64.end();
                                 stream() << "</data>";
+                            }
                             else
                                 stream() << "</string>";
                             break;
@@ -104,11 +111,15 @@ namespace cppdatalib
 
             void begin_object_(const core::value &, core::optional_size, bool) {stream() << "<dict>";}
             void end_object_(const core::value &, bool) {stream() << "</dict>";}
+
+            void link_(const core::value &) {throw core::error("XML Property List - 'link' value not allowed in output");}
         };
 
         class pretty_stream_writer : public core::xml_impl::stream_writer_base
         {
-            std::unique_ptr<char []> buffer;
+            base64::encode_accumulator base64;
+
+            char * const buffer;
             size_t indent_width;
             size_t current_indent;
 
@@ -118,9 +129,9 @@ namespace cppdatalib
                 {
                     size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                    memset(buffer.get(), ' ', size);
+                    memset(buffer, ' ', size);
 
-                    stream().write(buffer.get(), size);
+                    stream().write(buffer, size);
                     padding -= size;
                 }
             }
@@ -132,6 +143,7 @@ namespace cppdatalib
                 , indent_width(indent_width)
                 , current_indent(0)
             {}
+            ~pretty_stream_writer() {delete[] buffer;}
 
             size_t indent() {return indent_width;}
 
@@ -184,7 +196,10 @@ namespace cppdatalib
                         case core::datetime: stream() << "<date>"; break;
                         default:
                             if (!core::subtype_is_text_string(v.get_subtype()))
-                                 stream() << "<data>";
+                            {
+                                stream() << "<data>";
+                                base64 = base64::encode_accumulator(stream());
+                            }
                             else
                                 stream() << "<string>";
                             break;
@@ -197,7 +212,7 @@ namespace cppdatalib
 
                 // TODO: dumb Base64 concatenation is dangerous and wrong. Needs to be fixed
                 if (!core::subtype_is_text_string(current_container_subtype()))
-                    base64::write(stream(), v.get_string_unchecked());
+                    base64.accumulate(v.get_string_unchecked());
                 else
                     write_element_content(stream(), v.get_string_unchecked());
             }
@@ -216,7 +231,10 @@ namespace cppdatalib
                         case core::datetime: stream() << "</date>"; break;
                         default:
                             if (!core::subtype_is_text_string(v.get_subtype()))
+                            {
+                                base64.end();
                                 stream() << "</data>";
+                            }
                             else
                                 stream() << "</string>";
                             break;
@@ -252,13 +270,15 @@ namespace cppdatalib
 
                 stream() << "</dict>";
             }
+
+            void link_(const core::value &) {throw core::error("XML Property List - 'link' value not allowed in output");}
         };
 
         inline std::string to_xml_property_list(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -266,7 +286,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             pretty_stream_writer writer(stream, indent_width);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

@@ -33,7 +33,9 @@ namespace cppdatalib
     {
         class value_parser : public core::stream_input
         {
-            std::stack<value::traversal_reference, std::vector<value::traversal_reference>> references;
+            typedef std::stack< value::traversal_reference, std::vector<value::traversal_reference> > references_t;
+
+            references_t references;
             const value *bind;
             const value *p;
 
@@ -54,7 +56,7 @@ namespace cppdatalib
         protected:
             void reset_()
             {
-                references = decltype(references)();
+                references = references_t();
                 p = bind;
             }
 
@@ -70,7 +72,7 @@ namespace cppdatalib
 
                             references.push(value::traversal_reference(p, p->get_array_unchecked().begin()));
                             if (!p->get_array_unchecked().empty())
-                                p = std::addressof(*references.top().array++);
+                                p = stdx::addressof(*references.top().array++);
                             else
                                 p = NULL;
                         }
@@ -80,7 +82,7 @@ namespace cppdatalib
 
                             references.push(value::traversal_reference(p, p->get_object_unchecked().begin(), true));
                             if (!p->get_object_unchecked().empty())
-                                p = std::addressof(references.top().object->first);
+                                p = stdx::addressof(references.top().object->first);
                             else
                                 p = NULL;
                         }
@@ -93,14 +95,14 @@ namespace cppdatalib
                     else
                     {
                         const value *peek = references.top().p;
-                        if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                            p = std::addressof(*references.top().array++);
-                        else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
+                        if (peek->is_array() && references.top().array.differs(peek->get_array_unchecked().end()))
+                            p = stdx::addressof(*references.top().array++);
+                        else if (peek->is_object() && references.top().object.differs(peek->get_object_unchecked().end()))
                         {
                             if (!references.top().traversed_key_already)
-                                p = std::addressof(references.top().object->first);
+                                p = stdx::addressof(references.top().object->first);
                             else
-                                p = std::addressof((references.top().object++)->second);
+                                p = stdx::addressof((references.top().object++).data()->second);
 
                             references.top().traversed_key_already = !references.top().traversed_key_already;
                         }
@@ -118,6 +120,7 @@ namespace cppdatalib
             }
         };
 
+#ifdef CPPDATALIB_CPP11
         // Forward-declare generic_parser
         class generic_parser;
 
@@ -388,6 +391,7 @@ namespace cppdatalib
         {
             master_parser->compose_parser(item);
         }
+#endif
     }
 }
 

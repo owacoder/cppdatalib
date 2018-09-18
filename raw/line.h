@@ -33,7 +33,7 @@ namespace cppdatalib
     {
         class line_parser : public core::stream_parser
         {
-            std::unique_ptr<char[]> buffer;
+            char * const buffer;
             int delimiter;
 
         public:
@@ -44,39 +44,40 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~line_parser() {delete[] buffer;}
 
         protected:
             core::istream &read_string(core::istream &stream, core::stream_handler &writer, bool &had_eof)
             {
                 core::value str_type((const char *) "", core::normal, true);
                 core::istream::int_type c;
-                char *write = buffer.get();
+                char *write = buffer;
 
                 writer.begin_string(str_type, core::stream_handler::unknown_size());
                 while (c = stream.get(), c != delimiter && c != EOF)
                 {
                     *write++ = c;
 
-                    if (write - buffer.get() >= core::buffer_size)
+                    if (write - buffer >= core::buffer_size)
                     {
                         *write = 0;
-                        writer.append_to_string(core::value(buffer.get(), write - buffer.get(), core::normal, true));
-                        write = buffer.get();
+                        writer.append_to_string(core::value(buffer, write - buffer, core::normal, true));
+                        write = buffer;
                     }
                 }
 
                 had_eof = (c == EOF);
 
-                if (write != buffer.get())
+                if (write != buffer)
                 {
                     *write = 0;
-                    writer.append_to_string(core::value(buffer.get(), write - buffer.get(), core::normal, true));
+                    writer.append_to_string(core::value(buffer, write - buffer, core::normal, true));
                 }
                 writer.end_string(str_type);
                 return stream;
             }
 
-            void reset_() {stream() >> std::noskipws;}
+            void reset_() {stream() >> stdx::noskipws;}
 
             void write_one_()
             {
@@ -132,27 +133,31 @@ namespace cppdatalib
                     throw core::error("Raw line - nested 'array' value not allowed in output");
             }
             void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("Raw line - 'object' value not allowed in output");}
+
+            void link_(const core::value &) {throw core::error("Raw line - 'link' value not allowed in output");}
         };
 
         inline core::value from_raw_line(core::istream_handle stream)
         {
             line_parser p(stream);
             core::value v;
-            p >> v;
+            core::convert(p, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _raw_line(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_raw_line(wrap);
         }
+#endif
 
         inline std::string to_raw_line(const core::value &v)
         {
             core::ostringstream stream;
             line_stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

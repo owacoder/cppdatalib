@@ -114,13 +114,15 @@ namespace cppdatalib
                     throw core::error("DIF - 'array' value not allowed in row output");
             }
             void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("DIF - 'object' value not allowed in output");}
+
+            void link_(const core::value &) {throw core::error("DIF - 'link' value not allowed in output");}
         };
 
         inline std::string to_dif_table(const core::value &v, const core::string_t &worksheet_name, core::int_t columns, core::int_t rows)
         {
             core::ostringstream stream;
             stream_writer writer(stream, worksheet_name, columns, rows);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 

@@ -58,11 +58,13 @@ namespace cppdatalib
                 {
                     assert(("cppdatalib::impl::stream_filter_base(const stream_filter_base &) - attempted to copy a stream_filter_base while active" && !f.active()));
                 }
+#ifdef CPPDATALIB_CPP11
                 stream_filter_base(stream_filter_base &&f)
                     : output(f.output)
                 {
                     assert(("cppdatalib::impl::stream_filter_base(stream_filter_base &&) - attempted to move a stream_filter_base while active" && !f.active()));
                 }
+#endif
 
                 unsigned int required_features() const {return output.required_features();}
 
@@ -281,12 +283,14 @@ namespace cppdatalib
                 , flags(f.flags)
                 , nesting_level(f.nesting_level)
             {}
+#ifdef CPPDATALIB_CPP11
             buffer_filter(buffer_filter &&f)
                 : stream_filter_base(f.output)
                 , cache(cache_val)
                 , flags(f.flags)
                 , nesting_level(f.nesting_level)
             {}
+#endif
 
             unsigned int required_features() const
             {
@@ -1083,7 +1087,7 @@ namespace cppdatalib
                     if (direction == ascending_sort)
                         sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end());
                     else
-						sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end(), std::greater<cppdatalib::core::value>());
+                                                sort(sorted.get_array_ref().data().begin(), sorted.get_array_ref().data().end(), std::greater<cppdatalib::core::value>());
 
                     buffer_filter::write_buffered_value_(sorted, is_key);
                 }
@@ -1116,16 +1120,20 @@ namespace cppdatalib
                 {
                     size_t i = 0;
 
-                    for (const auto &element: v.get_array_unchecked())
+                    for (core::array_const_iterator_t element = v.get_array_unchecked().begin();
+                         element.differs(v.get_array_unchecked().end());
+                         ++element)
                     {
-                        if (element.is_object())
+                        if (element->is_object())
                         {
-                            for (const auto &pair: element.get_object_unchecked())
+                            for (core::object_const_iterator_t pair = element->get_object_unchecked().begin();
+                                 pair != v->get_object_unchecked().end();
+                                 ++pair)
                             {
-                                core::value &ref = map_.member(pair.first);
+                                core::value &ref = map_.member(pair->first);
                                 if (fail_on_extra_column && ref.array_size() + 1 < i)
                                     throw core::error("cppdatalib::core::array_of_objects_to_object_of_arrays_filter - extra column found in array entry");
-                                ref[i] = pair.second;
+                                ref[i] = pair->second;
                             }
                         }
                         else
@@ -1195,11 +1203,13 @@ namespace cppdatalib
                     , key_builder(key)
                     , keys(other.keys)
                 {}
+#ifdef CPPDATALIB_CPP11
                 layer(layer &&other)
                     : key(std::move(other.key))
                     , key_builder(key)
                     , keys(std::move(other.keys))
                 {}
+#endif
 
                 void begin() {key_builder.begin();}
                 void end() {key_builder.end();}
@@ -1211,7 +1221,9 @@ namespace cppdatalib
 
             // WARNING: Underlying container type of `layer`s MUST not copy stored layers when adding to it,
             // so the value_builders in the layer don't get corrupted (i.e. DON'T USE A VECTOR)
-            std::list<layer> layers;
+            typedef std::list<layer> layers_t;
+
+            layers_t layers;
 
         public:
             duplicate_key_check_filter(core::stream_handler &output) : stream_filter_base(output) {}
@@ -1239,7 +1251,7 @@ namespace cppdatalib
             void begin_scalar_(const value &v, bool)
             {
                 output.write(v);
-                for (auto i = layers.begin(); i != layers.end(); ++i)
+                for (layers_t::iterator i = layers.begin(); i != layers.end(); ++i)
                     if (i->key_builder.active())
                         i->key_builder.write(v);
             }
@@ -1247,14 +1259,14 @@ namespace cppdatalib
             void begin_array_(const value &v, optional_size size, bool)
             {
                 output.begin_array(v, size);
-                for (auto i = layers.begin(); i != layers.end(); ++i)
+                for (layers_t::iterator i = layers.begin(); i != layers.end(); ++i)
                     if (i->key_builder.active())
                         i->key_builder.begin_array(v, size);
             }
             void end_array_(const value &v, bool)
             {
                 output.end_array(v);
-                for (auto i = layers.begin(); i != layers.end(); ++i)
+                for (layers_t::iterator i = layers.begin(); i != layers.end(); ++i)
                     if (i->key_builder.active())
                         i->key_builder.end_array(v);
             }
@@ -1262,7 +1274,7 @@ namespace cppdatalib
             void begin_object_(const value &v, optional_size size, bool)
             {
                 output.begin_object(v, size);
-                for (auto i = layers.begin(); i != layers.end(); ++i)
+                for (layers_t::iterator i = layers.begin(); i != layers.end(); ++i)
                     if (i->key_builder.active())
                         i->key_builder.begin_object(v, size);
                 layers.push_back(layer());
@@ -1271,7 +1283,7 @@ namespace cppdatalib
             {
                 output.end_object(v);
                 layers.pop_back();
-                for (auto i = layers.begin(); i != layers.end(); ++i)
+                for (layers_t::iterator i = layers.begin(); i != layers.end(); ++i)
                     if (i->key_builder.active())
                         i->key_builder.end_object(v);
             }
@@ -1279,21 +1291,21 @@ namespace cppdatalib
             void begin_string_(const value &v, optional_size size, bool)
             {
                 output.begin_string(v, size);
-                for (auto i = layers.begin(); i != layers.end(); ++i)
+                for (layers_t::iterator i = layers.begin(); i != layers.end(); ++i)
                     if (i->key_builder.active())
                         i->key_builder.begin_string(v, size);
             }
             void string_data_(const value &v, bool)
             {
                 output.append_to_string(v);
-                for (auto i = layers.begin(); i != layers.end(); ++i)
+                for (layers_t::iterator i = layers.begin(); i != layers.end(); ++i)
                     if (i->key_builder.active())
                         i->key_builder.append_to_string(v);
             }
             void end_string_(const value &v, bool)
             {
                 output.end_string(v);
-                for (auto i = layers.begin(); i != layers.end(); ++i)
+                for (layers_t::iterator i = layers.begin(); i != layers.end(); ++i)
                     if (i->key_builder.active())
                         i->key_builder.end_string(v);
             }
@@ -1339,6 +1351,8 @@ namespace cppdatalib
             return select_from_array_filter<Selecter>(output, s);
         }
 
+        // Unfortunately, SQL requires std::function, which isn't available prior to C++11
+#ifdef CPPDATALIB_CPP11
         namespace impl
         {
             struct sql_function
@@ -2650,10 +2664,7 @@ namespace cppdatalib
 
                 return result;
             }
-        }
 
-        namespace impl
-        {
             class sql_parser : public stream_parser
             {
                 core::value select, where;
@@ -3403,6 +3414,7 @@ namespace cppdatalib
                 return true; // The value was handled, so don't keep processing it
             }
         };
+#endif // CPPDATALIB_CPP11
 
 #ifndef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
         template<core::type from, core::type to>

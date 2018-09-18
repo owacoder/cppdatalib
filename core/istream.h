@@ -31,9 +31,13 @@
 #include <limits>
 #include <cstring>
 #include <memory>
+#include <cstdlib>
+#include <cerrno>
+#include <cctype>
 
 #include "error.h"
 #include "global.h"
+#include "cpp11.h"
 
 #ifdef CPPDATALIB_LINUX
 #include <sys/mman.h>
@@ -88,6 +92,8 @@ namespace cppdatalib
 
                 void skip_spaces(istream &stream)
                 {
+                    using namespace std;
+
                     int_type c;
                     do
                     {
@@ -117,7 +123,7 @@ namespace cppdatalib
 
             // Get one character, bumping position forward, and return it (return EOF if no more characters available)
             virtual int_type getc_() = 0;
-            // Unget the last character, bumping position backward. Throw an error if ungetting too far
+            // Unget the last character, bumping position backward. Set an error if ungetting too far
             virtual void ungetc_() = 0;
             // Peek at the next character, preserving position, and return it (return EOF if no more characters available)
             virtual int_type peekc_() = 0;
@@ -139,6 +145,7 @@ namespace cppdatalib
               , last_read_(0)
 #endif
             {}
+            virtual ~istream() {}
 
             iostate rdstate() const {return flags_;}
             operator bool() const {return rdstate() == 0;}
@@ -286,7 +293,7 @@ namespace cppdatalib
 
                 bool eof = false;
                 size_t sz = 0;
-                if (n < 0 || (uintmax_t(n) > SIZE_MAX) || !readc_(ch, (sz = size_t(n)), eof))
+                if (n < 0 || (uintmax_t(n) > std::numeric_limits<size_t>::max()) || !readc_(ch, (sz = size_t(n)), eof))
                 {
                     if (eof)
                         flags_ = fail_bit | eof_bit;
@@ -353,7 +360,11 @@ namespace cppdatalib
 
             friend istream &operator>>(istream &in, std::streambuf *buf);
 
+#ifndef CPPDATALIB_WATCOM
             friend istream &operator>>(istream &in, std::ios_base &(*pf)(std::ios_base &));
+#else
+            friend istream &operator>>(istream &in, stdx::skipws_t (*pf)());
+#endif
 
         private:
             template<typename T>
@@ -522,8 +533,13 @@ namespace cppdatalib
                 return *this;
             }
 
+#ifndef CPPDATALIB_WATCOM
             template<typename T, typename Converter, typename Alt_Converter>
             istream &read_formatted_real(T &f, Converter convert, Alt_Converter instr_convert)
+#else
+            template<typename T, typename Converter>
+            istream &read_formatted_real(T &f, Converter convert)
+#endif
             {
                 std::string str;
 
@@ -546,9 +562,11 @@ namespace cppdatalib
                     flags_ = fail_bit | eof_bit;
                 else
                 {
+#ifndef CPPDATALIB_WATCOM
                     const char *buffer = current_buffer_begin();
                     if (buffer)
                         --buffer; // The sentry stole one of our buffer characters!
+#endif
 
                     while (c != EOF && c < 0x80 && (isdigit(c) || strchr(".eE+-", c)))
                     {
@@ -557,19 +575,25 @@ namespace cppdatalib
 #else
                         ++len;
 #endif
+#ifndef CPPDATALIB_WATCOM
                         if (buffer == nullptr)
+#endif
                             str.push_back(c);
                         c = getc_();
                     }
 
                     errno = 0;
                     char *end;
+
+#ifndef CPPDATALIB_WATCOM
                     if (buffer == nullptr)
+#endif
                     {
                         f = convert(str.c_str(), &end);
                         if (errno == ERANGE || *end != 0)
                             flags_ |= fail_bit;
                     }
+#ifndef CPPDATALIB_WATCOM
                     else
                     {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
@@ -580,6 +604,7 @@ namespace cppdatalib
                         if (errno == ERANGE || end == nullptr)
                             flags_ |= fail_bit;
                     }
+#endif
 
                     if (c == EOF)
                         flags_ = eof_bit;
@@ -605,9 +630,15 @@ namespace cppdatalib
         inline istream &operator>>(istream &in, unsigned long &val) {return in.read_formatted_unsigned_int(val);}
         inline istream &operator>>(istream &in, unsigned long long &val) {return in.read_formatted_unsigned_int(val);}
 
+#ifdef CPPDATALIB_WATCOM
+        inline istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, std::strtod);}
+        inline istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, std::strtod);}
+        inline istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, std::strtod);}
+#else
         inline istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, &core::fp_from_string<float>, &core::fp_from_in_string<float>);}
         inline istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, &core::fp_from_string<double>, &core::fp_from_in_string<double>);}
         inline istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, &core::fp_from_string<long double>, &core::fp_from_in_string<long double>);}
+#endif
 
         inline istream &operator>>(istream &in, std::streambuf *buf)
         {
@@ -644,16 +675,24 @@ namespace cppdatalib
             return in;
         }
 
+#ifndef CPPDATALIB_WATCOM
         inline istream &operator>>(istream &in, std::ios_base &(*pf)(std::ios_base &))
         {
-            if (pf == std::skipws)
+            if (pf == std::skipws || pf == static_cast<std::ios_base &(*)(std::ios_base &)>(stdx::skipws))
                 in.skip_ws = true;
-            else if (pf == std::noskipws)
+            else if (pf == std::noskipws || pf == static_cast<std::ios_base &(*)(std::ios_base &)>(stdx::skipws))
                 in.skip_ws = false;
             else
                 throw core::error("cppdatalib::core::istream - stream manipulator applied to input stream is not supported");
             return in;
         }
+#else
+        inline istream &operator>>(istream &in, stdx::skipws_t (*pf)())
+        {
+            in.skip_ws = pf();
+            return in;
+        }
+#endif
 
         class istring_wrapper_stream : public istream
         {
@@ -666,11 +705,13 @@ namespace cppdatalib
                 : string(string)
                 , pos(0)
             {}
+#ifdef CPPDATALIB_CPP11
             istring_wrapper_stream(std::string &&string)
                 : string(my_string)
                 , my_string(std::move(string))
                 , pos(0)
             {}
+#endif
 
             const char *current_buffer_begin() const {return string.data() + pos;}
             streamsize used_buffer() const {return pos;}
@@ -802,21 +843,27 @@ namespace cppdatalib
                 : string(string)
                 , pos(0)
             {}
+            istringstream(const char *string, size_t len)
+                : string(string, len)
+                , pos(0)
+            {}
             istringstream(const std::string &string)
                 : string(string)
                 , pos(0)
             {}
+#ifdef CPPDATALIB_CPP11
             istringstream(std::string &&string)
                 : string(std::move(string))
                 , pos(0)
             {}
+#endif
 
             const char *current_buffer_begin() const {return string.data() + pos;}
             streamsize used_buffer() const {return pos;}
             streamsize remaining_buffer() const {return string.size() - pos;}
 
             const std::string &str() const {return string;}
-            void str(std::string s) {string = std::move(s); pos = 0; flags_ = 0;}
+            void str(std::string s) {string = stdx::move(s); pos = 0; flags_ = 0;}
 
         protected:
             streamsize pos_() {return pos;}
@@ -863,6 +910,7 @@ namespace cppdatalib
 
         class istd_streambuf_wrapper : public istream
         {
+            int_type last_get_;
             size_t pos;
             std::streambuf *stream_;
 
@@ -877,14 +925,27 @@ namespace cppdatalib
 
         protected:
             streamsize pos_() {return pos;}
+#ifdef CPPDATALIB_WATCOM
+            bool seekc_(streamsize p) {return stream_->seekpos(p, std::ios::in) >= 0;}
+#else
             bool seekc_(streamsize p) {return stream_->pubseekpos(p, std::ios_base::in) >= 0;}
+#endif
             int_type getc_()
             {
                 int_type ch = stream_->sbumpc();
                 pos += ch != EOF;
-                return ch;
+                return last_get_ = ch;
             }
             int_type peekc_() {return stream_->sgetc();}
+#ifdef CPPDATALIB_WATCOM
+            void ungetc_()
+            {
+                if (stream_->sputbackc(last_get_) == EOF)
+                    flags_ |= bad_bit;
+                else
+                    --pos;
+            }
+#else
             void ungetc_()
             {
                 if (stream_->sungetc() == EOF)
@@ -892,6 +953,7 @@ namespace cppdatalib
                 else
                     --pos;
             }
+#endif
             bool readc_(char *buffer, size_t &n, bool &eof)
             {
                 uint64_t got = stream_->sgetn(buffer, n);
@@ -1157,7 +1219,7 @@ namespace cppdatalib
         class istream_handle
         {
             std::istream *std_; // Original standard stream reference
-            std::shared_ptr<istream> d_; // Handle to created custom istream
+            stdx::shared_ptr<istream> d_; // Handle to created custom istream
 
             istream *predef_; // Handle to already-defined custom istream
             istream *p_; // Same as either d_ or predef_, whichever is used
@@ -1167,22 +1229,22 @@ namespace cppdatalib
             istream_handle(core::istream &stream) : std_(NULL), d_(NULL), predef_(&stream), p_(predef_) {}
             istream_handle(std::istream &stream) : std_(&stream), d_(NULL), predef_(NULL)
             {
-                d_ = std::make_shared<istd_streambuf_wrapper>(stream.rdbuf());
+                d_ = stdx::make_shared<istd_streambuf_wrapper>(stream.rdbuf());
                 p_ = d_.get();
             }
             istream_handle(const char *string) : std_(NULL), d_(NULL)
             {
-                d_ = std::make_shared<icstring_wrapper_stream>(string, strlen(string));
+                d_ = stdx::make_shared<icstring_wrapper_stream>(string, strlen(string));
                 p_ = d_.get();
             }
             istream_handle(const char *string, size_t len) : std_(NULL), d_(NULL)
             {
-                d_ = std::make_shared<icstring_wrapper_stream>(string, len);
+                d_ = stdx::make_shared<icstring_wrapper_stream>(string, len);
                 p_ = d_.get();
             }
             istream_handle(core::string_view_t string) : std_(NULL), d_(NULL), predef_(NULL)
             {
-                d_ = std::make_shared<icstring_wrapper_stream>(string.data(), string.size());
+                d_ = stdx::make_shared<icstring_wrapper_stream>(string.data(), string.size());
                 p_ = d_.get();
             }
 
@@ -1198,29 +1260,41 @@ namespace cppdatalib
         const char *current_buffer_begin(const istream &stream) {return stream.current_buffer_begin();}
         istream::streamsize used_buffer(const istream &stream) {return stream.used_buffer();}
         istream::streamsize remaining_buffer(const istream &stream) {return stream.remaining_buffer();}
+
+#define CPPDATALIB_INIT_ISTRINGSTREAM(x, y) (x), (y)
 #else
         typedef std::istream istream;
+#ifdef CPPDATALIB_WATCOM
+        typedef std::istrstream istringstream;
+        typedef std::istrstream istring_wrapper_stream;
+
+#define CPPDATALIB_INIT_ISTRINGSTREAM(x, y) const_cast<char*>(x), (y)
+#else
         typedef std::istringstream istringstream;
         typedef std::istringstream istring_wrapper_stream;
+
+#define CPPDATALIB_INIT_ISTRINGSTREAM(x, y) std::string((x), (y))
+#endif
 
         class istream_handle
         {
             core::istream *std_;
-            std::shared_ptr<istream> d_;
+            stdx::shared_ptr<istream> d_;
 
         public:
+            istream_handle() : std_(NULL), d_(NULL) {}
             istream_handle(core::istream &stream) : std_(&stream), d_(NULL) {}
             istream_handle(const char *string) : std_(NULL), d_(NULL)
             {
-                d_ = std::make_shared<istringstream>(string);
+                d_ = stdx::make_shared<istringstream>(string);
             }
             istream_handle(const char *string, size_t len) : std_(NULL), d_(NULL)
             {
-                d_ = std::make_shared<istringstream>(std::string(string, len));
+                d_ = stdx::make_shared<istringstream>(std::string(string, len));
             }
             istream_handle(core::string_view_t string) : std_(NULL), d_(NULL)
             {
-                d_ = std::make_shared<istringstream>(static_cast<std::string>(string));
+                d_ = stdx::make_shared<istringstream>(static_cast<std::string>(string));
             }
 
             bool valid() const {return std_ || d_;}
@@ -1232,9 +1306,9 @@ namespace cppdatalib
             std::istream *std_stream() {return std_;}
         };
 
-        const char *current_buffer_begin(const istream &) {return nullptr;}
-        std::streamsize used_buffer(istream &stream) {return stream.tellg();}
-        std::streamsize remaining_buffer(const istream &) {return -1;}
+        const char *current_buffer_begin(const istream &) {return NULL;}
+        stdx::streamsize used_buffer(istream &stream) {return stream.tellg();}
+        stdx::streamsize remaining_buffer(const istream &) {return -1;}
 #endif
 
         template<typename T>
@@ -1290,7 +1364,7 @@ namespace cppdatalib
                 if (temp < 0x8000)
                     val = temp;
                 else if (temp == 0x8000)
-                    val = INT16_MIN;
+                    val = std::numeric_limits<int16_t>::min();
                 else
                     val = -T((~unsigned(temp) + 1) & 0xffff);
             }
@@ -1307,7 +1381,7 @@ namespace cppdatalib
                 if (temp < 0x8000)
                     val = temp;
                 else if (temp == 0x8000)
-                    val = INT16_MIN;
+                    val = std::numeric_limits<int16_t>::min();
                 else
                     val = -T((~unsigned(temp) + 1) & 0xffff);
             }
@@ -1352,7 +1426,7 @@ namespace cppdatalib
                 if (temp < 0x80000000)
                     val = temp;
                 else if (temp == 0x80000000)
-                    val = INT32_MIN;
+                    val = std::numeric_limits<int32_t>::min();
                 else
                     val = -T((~(unsigned long) temp + 1) & 0xffffffff);
             }
@@ -1369,7 +1443,7 @@ namespace cppdatalib
                 if (temp < 0x80000000)
                     val = temp;
                 else if (temp == 0x80000000)
-                    val = INT32_MIN;
+                    val = std::numeric_limits<int32_t>::min();
                 else
                     val = -T((~(unsigned long) temp + 1) & 0xffffffff);
             }
@@ -1414,7 +1488,7 @@ namespace cppdatalib
                 if (temp < 0x8000000000000000)
                     val = temp;
                 else if (temp == 0x8000000000000000)
-                    val = INT64_MIN;
+                    val = std::numeric_limits<int64_t>::min();
                 else
                     val = -T((~(unsigned long long) temp + 1) & 0xffffffffffffffff);
             }
@@ -1431,7 +1505,7 @@ namespace cppdatalib
                 if (temp < 0x8000000000000000)
                     val = temp;
                 else if (temp == 0x8000000000000000)
-                    val = INT64_MIN;
+                    val = std::numeric_limits<int64_t>::min();
                 else
                     val = -T((~(unsigned long long) temp + 1) & 0xffffffffffffffff);
             }

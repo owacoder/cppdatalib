@@ -38,7 +38,7 @@ namespace cppdatalib
     {
         class parser : public core::xml_impl::stream_parser
         {
-            std::unique_ptr<char []> buffer;
+            char * const buffer;
             bool require_full_document;
 
             core::string_t content;
@@ -57,6 +57,7 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
             bool busy() const {return get_output() && state == reading_elements;}
 
@@ -77,7 +78,7 @@ namespace cppdatalib
                 if (content.empty())
                     return;
 
-                get_output()->write(core::value(std::move(content)));
+                get_output()->write(core::value(stdx::move(content)));
                 content = core::string_t();
             }
 
@@ -85,7 +86,7 @@ namespace cppdatalib
             {
                 if (!content.empty())
                 {
-                    get_output()->write(core::value(std::move(content)));
+                    get_output()->write(core::value(stdx::move(content)));
                     content = core::string_t();
                 }
 
@@ -234,7 +235,9 @@ namespace cppdatalib
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v)
             {
-                if (!std::isfinite(v.get_real_unchecked()))
+                using namespace std;
+                
+                if (!isfinite(v.get_real_unchecked()))
                     throw core::error("XML - cannot write 'NaN' or 'Infinity' values");
                 stream() << v.get_real_unchecked();
             }
@@ -258,11 +261,13 @@ namespace cppdatalib
                 write_name(stream().write("</", 2), current_keys.back()).put('>');
                 current_keys.pop_back();
             }
+
+            void link_(const core::value &) {throw core::error("XML - 'link' value not allowed in output");}
         };
 
         class pretty_stream_writer : public core::xml_impl::stream_writer_base
         {
-            std::unique_ptr<char []> buffer;
+            char * const buffer;
             size_t indent_width;
             size_t current_indent;
             core::cache_vector_n<core::string_t, core::cache_size> current_keys;
@@ -273,9 +278,9 @@ namespace cppdatalib
                 {
                     size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                    memset(buffer.get(), ' ', size);
+                    memset(buffer, ' ', size);
 
-                    stream().write(buffer.get(), size);
+                    stream().write(buffer, size);
                     padding -= size;
                 }
             }
@@ -287,6 +292,7 @@ namespace cppdatalib
                 , indent_width(indent_width)
                 , current_indent(0)
             {}
+            ~pretty_stream_writer() {delete[] buffer;}
 
             size_t indent() {return indent_width;}
 
@@ -351,7 +357,9 @@ namespace cppdatalib
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v)
             {
-                if (!std::isfinite(v.get_real_unchecked()))
+                using namespace std;
+                
+                if (!isfinite(v.get_real_unchecked()))
                     throw core::error("XML - cannot write 'NaN' or 'Infinity' values");
                 stream() << v.get_real_unchecked();
             }
@@ -380,6 +388,8 @@ namespace cppdatalib
                 write_name(stream().write("</", 2), current_keys.back()).put('>');
                 current_keys.pop_back();
             }
+
+            void link_(const core::value &) {throw core::error("XML - 'link' value not allowed in output");}
         };
 
         class document_writer : public stream_writer
@@ -414,21 +424,23 @@ namespace cppdatalib
         {
             parser reader(stream);
             core::value v;
-            reader >> v;
+            core::convert(reader, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _xml(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_xml(wrap);
         }
+#endif
 
         inline std::string to_xml_elements(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -436,7 +448,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             pretty_stream_writer writer(stream, indent_width);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -444,7 +456,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             document_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -452,7 +464,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             pretty_document_writer writer(stream, indent_width);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

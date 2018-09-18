@@ -33,7 +33,7 @@ namespace cppdatalib
     {
         class parser : public core::stream_parser
         {
-            std::unique_ptr<char []> buffer;
+            char * const buffer;
 
         public:
             parser(core::istream_handle input)
@@ -42,6 +42,7 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
             unsigned int features() const {return provides_prefix_string_size;}
 
@@ -97,11 +98,11 @@ namespace cppdatalib
                             while (size > 0)
                             {
                                 core::int_t buffer_size = std::min(core::int_t(core::buffer_size), size);
-                                stream().read(buffer.get(), buffer_size);
+                                stream().read(buffer, buffer_size);
                                 if (stream().fail())
                                     throw core::error("Bencode - unexpected end of string");
                                 // Set string in string_type to preserve the subtype
-                                string_type = core::value(buffer.get(), static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
+                                string_type = core::value(buffer, static_cast<size_t>(buffer_size), string_type.get_subtype(), true);
                                 get_output()->append_to_string(string_type);
                                 size -= buffer_size;
                             }
@@ -160,27 +161,31 @@ namespace cppdatalib
 
             void begin_object_(const core::value &, core::optional_size, bool) {stream().put('d');}
             void end_object_(const core::value &, bool) {stream().put('e');}
+
+            void link_(const core::value &) {throw core::error("Bencode - 'link' value not allowed in output");}
         };
 
         inline core::value from_bencode(core::istream_handle stream)
         {
             parser p(stream);
             core::value v;
-            p >> v;
+            core::convert(p, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _bencode(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_bencode(wrap);
         }
+#endif
 
         inline std::string to_bencode(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer w(stream);
-            w << v;
+            core::convert(w, v);
             return stream.str();
         }
     }

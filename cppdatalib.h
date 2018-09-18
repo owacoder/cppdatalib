@@ -52,6 +52,9 @@
 #include "xls/xml.h"
 #include "xml/xml.h"
 
+// Accumulators
+#include "accumulators/crc32.h"
+
 #ifdef CPPDATALIB_ENABLE_BOOST_COMPUTE
 #include "adapters/boost_compute.h"
 #endif

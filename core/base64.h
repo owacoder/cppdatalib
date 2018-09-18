@@ -25,85 +25,117 @@
 #ifndef CPPDATALIB_BASE64_H
 #define CPPDATALIB_BASE64_H
 
-#include "ostream.h"
-
-// TODO: ensure formats using base64::write or base64::decode don't perform dumb concatenation
+#include "value_builder.h"
 
 namespace cppdatalib
 {
     namespace base64
     {
-        inline core::ostream &write(core::ostream &stream, core::string_view_t str)
+        class encode_accumulator : public core::accumulator_base
         {
-            const char alpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-            uint32_t temp;
+            uint32_t state;
+            int required_input_before_flush;
 
-            for (size_t i = 0; i < str.size();)
+        public:
+            encode_accumulator() : core::accumulator_base() {}
+            encode_accumulator(core::istream_handle handle, accumulator_base *output_handle = NULL) : core::accumulator_base(handle, output_handle) {}
+            encode_accumulator(core::ostream_handle handle) : core::accumulator_base(handle) {}
+            encode_accumulator(accumulator_base *handle, bool pull_from_handle = false) : core::accumulator_base(handle, pull_from_handle) {}
+            encode_accumulator(core::stream_handler &handle, bool just_append = false) : core::accumulator_base(handle, just_append) {}
+
+        protected:
+            const char *alphabet() {return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";}
+
+            void begin_() {state = 0; required_input_before_flush = 3;}
+            void end_()
             {
-                temp = (uint32_t) (str[i++] & 0xFF) << 16;
-                if (i + 2 <= str.size())
+                if (required_input_before_flush && required_input_before_flush < 3)
                 {
-                    temp |= (uint32_t) (str[i++] & 0xFF) << 8;
-                    temp |= (uint32_t) (str[i++] & 0xFF);
-                    stream.put(alpha[(temp >> 18) & 0x3F]);
-                    stream.put(alpha[(temp >> 12) & 0x3F]);
-                    stream.put(alpha[(temp >>  6) & 0x3F]);
-                    stream.put(alpha[ temp        & 0x3F]);
-                }
-                else if (i + 1 == str.size())
-                {
-                    temp |= (uint32_t) (str[i++] & 0xFF) << 8;
-                    stream.put(alpha[(temp >> 18) & 0x3F]);
-                    stream.put(alpha[(temp >> 12) & 0x3F]);
-                    stream.put(alpha[(temp >>  6) & 0x3F]);
-                    stream.put('=');
-                }
-                else if (i == str.size())
-                {
-                    stream.put(alpha[(temp >> 18) & 0x3F]);
-                    stream.put(alpha[(temp >> 12) & 0x3F]);
-                    stream.write("==", 2);
+                    char buf[4];
+                    int padding = required_input_before_flush;
+
+                    state <<= 8 * padding;
+                    buf[0] = alphabet()[(state >> 18) & 0x3F];
+                    buf[1] = alphabet()[(state >> 12) & 0x3F];
+                    buf[2] = alphabet()[(state >>  6) & 0x3F];
+                    buf[3] = alphabet()[ state        & 0x3F];
+
+                    flush_out(buf, 4 - padding);
+                    flush_out("==", padding);
                 }
             }
 
-            return stream;
-        }
-
-        inline std::string encode(const std::string &str)
-        {
-            core::ostringstream stream;
-            write(stream, str);
-            return stream.str();
-        }
-
-        inline std::string decode(const std::string &str)
-        {
-            const std::string alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-            std::string result;
-            size_t input = 0;
-            uint32_t temp = 0;
-
-            for (size_t i = 0; i < str.size(); ++i)
+            void accumulate_(core::istream::int_type data)
             {
-                size_t pos = alpha.find(str[i]);
-                if (pos == std::string::npos)
-                    continue;
-                temp |= (uint32_t) pos << (18 - 6 * input++);
-                if (input == 4)
+                state = (state << 8) | (data & 0xff);
+
+                if (--required_input_before_flush == 0)
                 {
-                    result.push_back((temp >> 16) & 0xFF);
-                    result.push_back((temp >>  8) & 0xFF);
-                    result.push_back( temp        & 0xFF);
-                    input = 0;
-                    temp = 0;
+                    char buf[4];
+                    buf[0] = alphabet()[(state >> 18) & 0x3F];
+                    buf[1] = alphabet()[(state >> 12) & 0x3F];
+                    buf[2] = alphabet()[(state >>  6) & 0x3F];
+                    buf[3] = alphabet()[ state        & 0x3F];
+                    flush_out(buf, 4);
+
+                    begin_();
+                }
+            }
+        };
+
+        class decode_accumulator : public core::accumulator_base
+        {
+            uint32_t state;
+            int required_input_before_flush;
+
+        public:
+            decode_accumulator() : core::accumulator_base() {}
+            decode_accumulator(core::istream_handle handle, accumulator_base *output_handle = NULL) : core::accumulator_base(handle, output_handle) {}
+            decode_accumulator(core::ostream_handle handle) : core::accumulator_base(handle) {}
+            decode_accumulator(accumulator_base *handle, bool pull_from_handle = false) : core::accumulator_base(handle, pull_from_handle) {}
+            decode_accumulator(core::stream_handler &handle, bool just_append = false) : core::accumulator_base(handle, just_append) {}
+
+        protected:
+            const char *alphabet() {return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";}
+
+            void begin_() {state = 0; required_input_before_flush = 4;}
+            void end_()
+            {
+                if (required_input_before_flush && required_input_before_flush < 4)
+                {
+                    char buf[3];
+                    int padding = required_input_before_flush;
+
+                    state <<= 6 * padding;
+                    buf[0] = (state >> 16) & 0xFF;
+                    buf[1] = (state >>  8) & 0xFF;
+                    buf[2] =  state        & 0xFF;
+
+                    flush_out(buf, 3 - padding);
                 }
             }
 
-            if (input > 1) result.push_back((temp >> 16) & 0xFF);
-            if (input > 2) result.push_back((temp >>  8) & 0xFF);
+            void accumulate_(core::istream::int_type data)
+            {
+                const char *ptr = strchr(alphabet(), data & 0xff);
 
-            return result;
-        }
+                if (ptr == NULL)
+                    return;
+
+                state = (state << 6) | (ptr - alphabet());
+
+                if (--required_input_before_flush == 0)
+                {
+                    char buf[3];
+                    buf[0] = (state >> 16) & 0xFF;
+                    buf[1] = (state >>  8) & 0xFF;
+                    buf[2] =  state        & 0xFF;
+                    flush_out(buf, 3);
+
+                    begin_();
+                }
+            }
+        };
     }
 }
 

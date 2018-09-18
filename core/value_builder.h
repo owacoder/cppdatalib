@@ -46,10 +46,13 @@ namespace cppdatalib
 
             // WARNING: Underlying container type of `keys` MUST be able to maintain element positions
             // so their addresses don't change (i.e. NOT VECTOR)
-            std::stack<core::value, std::list<core::value>> keys;
+            typedef std::stack< core::value, std::list<core::value> > keys_t;
+            typedef core::cache_vector_n<core::value *, core::cache_size> references_t;
+
+            keys_t keys;
             core::value top_key;
             bool top_key_used;
-            core::cache_vector_n<core::value *, core::cache_size> references;
+            references_t references;
 
         public:
             value_builder(core::value &bind) : v(bind) {}
@@ -59,21 +62,29 @@ namespace cppdatalib
             {
                 assert(("cppdatalib::core::value_builder(const value_builder &) - attempted to copy a value_builder while active" && !builder.active()));
             }
+#ifdef CPPDATALIB_CPP11
             value_builder(value_builder &&builder)
                 : v(builder.v)
                 , top_key_used(false)
             {
                 assert(("cppdatalib::core::value_builder(value_builder &&) - attempted to move a value_builder while active" && !builder.active()));
             }
+#endif
 
             const core::value &value() const {return v;}
 
             std::string name() const
             {
+#ifdef CPPDATALIB_CPP11
                 const size_t size = sizeof(ptrdiff_t) * CHAR_BIT;
                 char n[size+1];
 
                 snprintf(n, size, "%p", &v);
+#else
+                const uintmax_t ptr = reinterpret_cast<uintmax_t>(&v);
+
+                std::string n = stdx::to_string(ptr);
+#endif
 
                 return std::string("cppdatalib::core::value_builder(") + n + ")";
             }
@@ -104,8 +115,8 @@ namespace cppdatalib
             // begin_() clears the bound value to null and pushes a reference to it
             void begin_()
             {
-                keys = decltype(keys)();
-                references = decltype(references)();
+                keys = keys_t();
+                references = references_t();
 
                 top_key_used = false;
 
@@ -143,7 +154,7 @@ namespace cppdatalib
                     references.back()->push_back(v);
                 else if (!is_key && current_container() == object)
                 {
-                    references.back()->add_member(std::move(top_key), v);
+                    references.back()->add_member(stdx::move(top_key), v);
                     pop_key();
                 }
                 else
@@ -161,6 +172,7 @@ namespace cppdatalib
                 references.back()->get_owned_string_ref() += v.get_string_unchecked();
             }
 
+#ifdef CPPDATALIB_CPP11
             void string_data_(core::value &&v, bool)
             {
                 if (references.empty())
@@ -174,6 +186,7 @@ namespace cppdatalib
                 else
                     references.back()->get_owned_string_ref() += v.get_string_unchecked();
             }
+#endif
 
             // begin_container() operates similarly to begin_scalar_(), but pushes a reference to the container as well
             void begin_container(const core::value &v, optional_size size, bool is_key)
@@ -191,7 +204,7 @@ namespace cppdatalib
                 }
                 else if (!is_key && current_container() == object)
                 {
-                    references.push_back(&references.back()->add_member(std::move(top_key)));
+                    references.push_back(&references.back()->add_member(stdx::move(top_key)));
                     pop_key();
                 }
 
@@ -201,7 +214,7 @@ namespace cppdatalib
                 if (v.is_array())
                 {
                     references.back()->set_array(core::array_t(), v.get_subtype());
-                    if (size.has_value() && size.value() < SIZE_MAX)
+                    if (size.has_value() && size.value() < std::numeric_limits<size_t>::max())
                         references.back()->get_array_ref().data().reserve(size.value());
                 }
                 else if (v.is_object())
@@ -261,7 +274,10 @@ namespace cppdatalib
                 case array:
                 {
                     if (src.is_nonnull_array())
-                        value_builder(dst) << src;
+                    {
+                        value_builder builder(dst);
+                        builder << src;
+                    }
                     else
                         dst.set_array(core::array_t(), src.get_subtype());
                     break;
@@ -269,7 +285,10 @@ namespace cppdatalib
                 case object:
                 {
                     if (src.is_nonnull_object())
-                        value_builder(dst) << src;
+                    {
+                        value_builder builder(dst);
+                        builder << src;
+                    }
                     else
                         dst.set_object(core::object_t(), src.get_subtype());
                     break;
@@ -288,6 +307,7 @@ namespace cppdatalib
             return dst;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline value &value::assign(value &dst, value &&src)
         {
             using namespace std;
@@ -324,6 +344,7 @@ namespace cppdatalib
 #endif
             return dst;
         }
+#endif // CPPDATALIB_CPP11
 
         // Convert directly from value to serializer
         inline stream_handler &operator<<(stream_handler &output, const value &input)
@@ -340,7 +361,9 @@ namespace cppdatalib
 
             return output;
         }
+        inline stream_handler &convert(stream_handler &output, const value &input) {return output << input;}
 
+#ifdef CPPDATALIB_CPP11
         // Convert directly from value to rvalue serializer
         inline void operator<<(stream_handler &&output, const value &input)
         {
@@ -354,6 +377,8 @@ namespace cppdatalib
             if (!stream_ready)
                 output.end();
         }
+        inline void convert(stream_handler &&output, const value &input) {return std::move(output) << input;}
+#endif
 
         // Convert directly from value to serializer
         inline const value &operator>>(const value &input, stream_handler &output)
@@ -361,13 +386,17 @@ namespace cppdatalib
             output << input;
             return input;
         }
+        inline const value &convert(const value &input, stream_handler &output) {return input >> output;}
 
+#ifdef CPPDATALIB_CPP11
         // Convert directly from value to rvalue serializer
         inline const value &operator>>(const value &input, stream_handler &&output)
         {
             output << input;
             return input;
         }
+        inline const value &convert(const value &input, stream_handler &&output) {return input >> std::move(output);}
+#endif
 
         // Convert directly from parser to value
         inline stream_input &operator>>(stream_input &input, value &output)
@@ -376,13 +405,17 @@ namespace cppdatalib
             input.convert(builder);
             return input;
         }
+        inline stream_input &convert(stream_input &input, value &output) {return input >> output;}
 
+#ifdef CPPDATALIB_CPP11
         // Convert directly from parser to value
         inline void operator>>(stream_input &&input, value &output)
         {
             value_builder builder(output);
             input.convert(builder);
         }
+        inline void convert(stream_input &&input, value &output) {return std::move(input) >> output;}
+#endif
 
         // Convert directly from parser to value
         inline value &operator<<(value &output, stream_input &input)
@@ -390,13 +423,17 @@ namespace cppdatalib
             input >> output;
             return output;
         }
+        inline value &convert(value &output, stream_input &input) {return output << input;}
 
+#ifdef CPPDATALIB_CPP11
         // Convert directly from parser to value
         inline value &operator<<(value &output, stream_input &&input)
         {
             input >> output;
             return output;
         }
+        inline value &convert(value &output, stream_input &&input) {return output << std::move(input);}
+#endif
 
         inline bool operator<(const value &lhs, const value &rhs)
         {

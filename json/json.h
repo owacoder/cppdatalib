@@ -26,14 +26,86 @@
 #define CPPDATALIB_JSON_H
 
 #include "../core/core.h"
+#include "json_pointer.h"
 
 namespace cppdatalib
 {
     namespace json
     {
+        // TODO: the item_offset class is a WIP. It may never go anywhere
+#if 0
+        namespace impl
+        {
+            class item_offset
+            {
+                core::value json_pointer;
+                core::istream_handle handle;
+
+            public:
+                item_offset(core::value json_pointer, core::istream_handle handle)
+                    : json_pointer(json_pointer)
+                    , handle(handle)
+                {}
+
+                bool is_valid() const {return json::pointer::is_valid_path(json_pointer.as_string());}
+
+                uint64_t operator()(bool *success = nullptr)
+                {
+                    std::string path = json_pointer.as_string();
+
+                    bool valid = is_valid();
+                    if (success)
+                        *success = valid;
+                    if (!valid)
+                        return 0;
+
+                    core::value path_array = json::pointer::path_to_array(path);
+                    if (!path_array.is_array())
+                        return 0;
+
+                    size_t path_idx = 0;
+                    uint64_t offset;
+
+                    handle.stream().seekg(0);
+                    parser p(handle);
+                    core::stream_handler handler;
+
+                    p.begin(handler);
+                    do
+                    {
+                        core::value path_item = path_array[path_idx];
+
+                        if (path_item.is_null()) // Cannot handle a non-existent array index
+                        {
+                            if (success)
+                                *success = false;
+                            return 0;
+                        }
+                        else if (path_item.is_string())
+                        {
+                            // TODO: detect object key
+                        }
+                        else
+                        {
+                            // TODO: detect array index
+                            if (handler.current_container() == core::array && handler.current_container_size() == path_item.as_uint())
+                                offset = handle.stream().tellg();
+                        }
+
+                        do
+                            p.write_one();
+                        while (handler.current_container() == core::string);
+                    }
+                    while (p.busy());
+                    p.end();
+                }
+            };
+        }
+#endif
+
         class parser : public core::stream_parser
         {
-            std::unique_ptr<char []> buffer;
+            char * const buffer;
             bool delimiter_required;
 
         private:
@@ -44,7 +116,7 @@ namespace cppdatalib
 
                 core::value str_type((const char *) "", core::normal, true);
                 core::istream::int_type c;
-                char *write = buffer.get();
+                char *write = buffer;
 
                 writer.begin_string(str_type, core::stream_handler::unknown_size());
                 while (c = stream.get(), c != '"' && c != EOF)
@@ -110,21 +182,21 @@ namespace cppdatalib
                     else
                         *write++ = c;
 
-                    if (write - buffer.get() >= core::buffer_size)
+                    if (write - buffer >= core::buffer_size)
                     {
                         *write = 0;
-                        writer.append_to_string(core::value(buffer.get(), write - buffer.get(), core::normal, true));
-                        write = buffer.get();
+                        writer.append_to_string(core::value(buffer, write - buffer, core::normal, true));
+                        write = buffer;
                     }
                 }
 
                 if (c == EOF)
                     throw core::error("JSON - unexpected end of string");
 
-                if (write != buffer.get())
+                if (write != buffer)
                 {
                     *write = 0;
-                    writer.append_to_string(core::value(buffer.get(), write - buffer.get(), core::normal, true));
+                    writer.append_to_string(core::value(buffer, write - buffer, core::normal, true));
                 }
                 writer.end_string(str_type);
                 return stream;
@@ -137,12 +209,13 @@ namespace cppdatalib
             {
                 reset();
             }
+            ~parser() {delete[] buffer;}
 
         protected:
             void reset_()
             {
                 delimiter_required = false;
-                stream() >> std::skipws;
+                stream() >> stdx::skipws;
             }
 
             void write_one_()
@@ -269,7 +342,7 @@ namespace cppdatalib
                                 }
 
                                 // Revert to bignum
-                                get_output()->write(core::value(std::move(buffer), core::bignum));
+                                get_output()->write(core::value(stdx::move(buffer), core::bignum));
                             }
                             else
                                 throw core::error("JSON - expected value");
@@ -315,8 +388,12 @@ namespace cppdatalib
                                             case '\r': stream.write("\\r", 2); break;
                                             case '\t': stream.write("\\t", 2); break;
                                             default:
-                                                hex::write(stream.write("\\u00", 4), c);
+                                            {
+                                                hex::encode_accumulator accumulator(stream.write("\\u00", 4));
+                                                accumulator.accumulate(c);
+                                                accumulator.end();
                                                 break;
+                                            }
                                         }
                                     }
                                     else
@@ -335,7 +412,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_MSVC
                                         sprintf_s(buf+2, 5, "%04x", (unsigned) c);
 #else
-										std::sprintf(buf+2, "%04x", (unsigned) c);
+                                                                                std::sprintf(buf+2, "%04x", (unsigned) c);
 #endif
                                     else
                                     {
@@ -344,8 +421,8 @@ namespace cppdatalib
                                         c += 0xd800dc00; // Add UTF-16 surrogate values
 
 #ifdef CPPDATALIB_MSVC
-										sprintf_s(buf+2, 5, "%04x", (unsigned) (c >> 16));
-										sprintf_s(buf+8, 5, "%04x", (unsigned) (c & 0xffff));
+                                                                                sprintf_s(buf+2, 5, "%04x", (unsigned) (c >> 16));
+                                                                                sprintf_s(buf+8, 5, "%04x", (unsigned) (c & 0xffff));
 #else
                                         std::sprintf(buf+2, "%04x", (unsigned) (c >> 16));
                                         std::sprintf(buf+8, "%04x", (unsigned) (c & 0xffff));
@@ -390,7 +467,13 @@ namespace cppdatalib
                                         case '\n': stream.write("\\n", 2); break;
                                         case '\r': stream.write("\\r", 2); break;
                                         case '\t': stream.write("\\t", 2); break;
-                                        default: hex::write(stream.write("\\u00", 4), c); break;
+                                        default:
+                                        {
+                                            hex::encode_accumulator accumulator(stream.write("\\u00", 4));
+                                            accumulator.accumulate(c);
+                                            accumulator.end();
+                                            break;
+                                        }
                                     }
                                 }
                                 else
@@ -436,7 +519,9 @@ namespace cppdatalib
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v)
             {
-                if (!std::isfinite(v.get_real_unchecked()))
+                using namespace std;
+                
+                if (!isfinite(v.get_real_unchecked()))
                     throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
                 stream() << v.get_real_unchecked();
             }
@@ -455,11 +540,13 @@ namespace cppdatalib
 
             void begin_object_(const core::value &, core::optional_size, bool) {stream().put('{');}
             void end_object_(const core::value &, bool) {stream().put('}');}
+
+            void link_(const core::value &) {throw core::error("JSON - 'link' value not allowed in output");}
         };
 
         class pretty_stream_writer : public impl::stream_writer_base
         {
-            std::unique_ptr<char []> buffer;
+            char * const buffer;
             size_t indent_width;
             size_t current_indent;
 
@@ -469,9 +556,9 @@ namespace cppdatalib
                 {
                     size_t size = std::min(size_t(core::buffer_size-1), padding);
 
-                    memset(buffer.get(), ' ', size);
+                    memset(buffer, ' ', size);
 
-                    stream().write(buffer.get(), size);
+                    stream().write(buffer, size);
                     padding -= size;
                 }
             }
@@ -483,6 +570,7 @@ namespace cppdatalib
                 , indent_width(indent_width)
                 , current_indent(0)
             {}
+            ~pretty_stream_writer() {delete[] buffer;}
 
             size_t indent() {return indent_width;}
 
@@ -518,7 +606,9 @@ namespace cppdatalib
             void uinteger_(const core::value &v) {stream() << v.get_uint_unchecked();}
             void real_(const core::value &v)
             {
-                if (!std::isfinite(v.get_real_unchecked()))
+                using namespace std;
+                
+                if (!isfinite(v.get_real_unchecked()))
                     throw core::error("JSON - cannot write 'NaN' or 'Infinity' values");
                 stream() << v.get_real_unchecked();
             }
@@ -555,27 +645,31 @@ namespace cppdatalib
 
                 stream().put('}');
             }
+
+            void link_(const core::value &) {throw core::error("JSON - 'link' value not allowed in output");}
         };
 
         inline core::value from_json(core::istream_handle stream)
         {
             parser reader(stream);
             core::value v;
-            reader >> v;
+            core::convert(reader, v);
             return v;
         }
 
+#ifdef CPPDATALIB_CPP11
         inline core::value operator "" _json(const char *stream, size_t size)
         {
             core::istringstream wrap(std::string(stream, size));
             return from_json(wrap);
         }
+#endif
 
         inline std::string to_json(const core::value &v)
         {
             core::ostringstream stream;
             stream_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -583,7 +677,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             pretty_stream_writer writer(stream, indent_width);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
     }

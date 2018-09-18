@@ -101,6 +101,8 @@ namespace cppdatalib
                     throw core::error("XML XLS - 'array' value not allowed in row output");
             }
             void begin_object_(const core::value &, core::optional_size, bool) {throw core::error("XML XLS - 'object' value not allowed in output");}
+
+            void link_(const core::value &) {throw core::error("XML XLS - 'link' value not allowed in output");}
         };
 
         class worksheet_writer : public table_writer
@@ -176,7 +178,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             table_writer writer(stream);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -184,7 +186,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             worksheet_writer writer(stream, worksheet_name);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -192,7 +194,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             workbook_writer writer(stream, worksheet_name);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 
@@ -200,7 +202,7 @@ namespace cppdatalib
         {
             core::ostringstream stream;
             document_writer writer(stream, worksheet_name);
-            writer << v;
+            core::convert(writer, v);
             return stream.str();
         }
 

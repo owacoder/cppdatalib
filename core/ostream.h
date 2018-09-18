@@ -30,6 +30,8 @@
 #include <sstream>
 #include <limits>
 #include <cstring>
+#include <string.h>
+#include <ctype.h>
 #include <memory>
 
 #include "error.h"
@@ -58,9 +60,12 @@ namespace cppdatalib
 
         public:
             ostream() : fmtflags_(0), precision_(0) {}
+            virtual ~ostream() {}
 
             ostream &put(char c) {putc_(c); return *this;}
             ostream &write(const char *c, streamsize n) {if (n > 0) write_(c, size_t(n)); return *this;}
+
+            ostream &flush() {flush_(); return *this;}
 
             friend ostream &operator<<(ostream &out, char ch);
             friend ostream &operator<<(ostream &out, signed char ch);
@@ -86,9 +91,11 @@ namespace cppdatalib
 
             friend ostream &operator<<(ostream &out, std::streambuf *buf);
 
+#ifndef CPPDATALIB_WATCOM
             friend ostream &operator<<(ostream &out, std::ostream &(*pf)(std::ostream &));
             friend ostream &operator<<(ostream &out, std::ios &(*pf)(std::ios &));
             friend ostream &operator<<(ostream &out, std::ios_base &(*pf)(std::ios_base &));
+#endif
 
             streamsize precision() const {return precision_;}
             streamsize precision(streamsize prec)
@@ -210,6 +217,7 @@ namespace cppdatalib
             return out;
         }
 
+#ifndef CPPDATALIB_WATCOM
         inline ostream &operator<<(ostream &out, std::ios &(*pf)(std::ios &))
         {
             (void) pf;
@@ -245,11 +253,12 @@ namespace cppdatalib
 
             return out;
         }
+#endif
 
         class ostring_wrapper_stream : public ostream
         {
             std::string &string;
-            std::unique_ptr<char []> buffer;
+            char *buffer;
             size_t bufpos;
 
         public:
@@ -258,6 +267,11 @@ namespace cppdatalib
                 , buffer(new char[buffer_size])
                 , bufpos(0)
             {}
+            ~ostring_wrapper_stream()
+            {
+                flush_();
+                delete[] buffer;
+            }
 
             const std::string &str() {flush_(); return string;}
 
@@ -266,7 +280,7 @@ namespace cppdatalib
             {
                 if (n - bufpos >= buffer_size)
                 {
-                    string.append(buffer.get(), bufpos);
+                    string.append(buffer, bufpos);
                     bufpos = 0;
                 }
 
@@ -274,7 +288,7 @@ namespace cppdatalib
                     string.append(c, n);
                 else
                 {
-                    memcpy(buffer.get() + bufpos, c, n);
+                    memcpy(buffer + bufpos, c, n);
                     bufpos += n;
                 }
             }
@@ -283,7 +297,7 @@ namespace cppdatalib
             {
                 if (bufpos == buffer_size)
                 {
-                    string.append(buffer.get(), bufpos);
+                    string.append(buffer, bufpos);
                     bufpos = 0;
                 }
                 string.push_back(c);
@@ -292,7 +306,7 @@ namespace cppdatalib
             {
                 if (bufpos)
                 {
-                    string.append(buffer.get(), bufpos);
+                    string.append(buffer, bufpos);
                     bufpos = 0;
                 }
             }
@@ -301,11 +315,12 @@ namespace cppdatalib
         class ostringstream : public ostream
         {
             std::string string;
-            std::unique_ptr<char []> buffer;
+            char *buffer;
             size_t bufpos;
 
         public:
             ostringstream() : buffer(new char[buffer_size]), bufpos(0) {}
+            ~ostringstream() {delete[] buffer;}
 
             const std::string &str() {flush_(); return string;}
 
@@ -314,7 +329,7 @@ namespace cppdatalib
             {
                 if (n - bufpos >= buffer_size)
                 {
-                    string.append(buffer.get(), bufpos);
+                    string.append(buffer, bufpos);
                     bufpos = 0;
                 }
 
@@ -322,7 +337,7 @@ namespace cppdatalib
                     string.append(c, n);
                 else
                 {
-                    memcpy(buffer.get() + bufpos, c, n);
+                    memcpy(buffer + bufpos, c, n);
                     bufpos += n;
                 }
             }
@@ -331,7 +346,7 @@ namespace cppdatalib
             {
                 if (bufpos == buffer_size)
                 {
-                    string.append(buffer.get(), bufpos);
+                    string.append(buffer, bufpos);
                     bufpos = 0;
                 }
                 buffer[bufpos++] = c;
@@ -340,7 +355,7 @@ namespace cppdatalib
             {
                 if (bufpos)
                 {
-                    string.append(buffer.get(), bufpos);
+                    string.append(buffer, bufpos);
                     bufpos = 0;
                 }
             }
@@ -358,7 +373,12 @@ namespace cppdatalib
         protected:
             void write_(const char *c, size_t n) {stream_->sputn(c, n);}
             void putc_(char c) {stream_->sputc(c);}
-            void flush_() {stream_->pubsync();}
+            void flush_()
+            {
+#ifndef CPPDATALIB_WATCOM
+                stream_->pubsync();
+#endif
+            }
         };
 
         class obufferstream : public ostream
@@ -394,16 +414,19 @@ namespace cppdatalib
         class ostream_handle
         {
             std::ostream *std_;
-            std::shared_ptr<ostd_streambuf_wrapper> d_;
+            stdx::shared_ptr<ostd_streambuf_wrapper> d_;
 
             ostream *predef_;
 
         public:
+            ostream_handle() : std_(NULL), d_(NULL), predef_(NULL) {}
             ostream_handle(core::ostream &stream) : std_(NULL), d_(NULL), predef_(&stream) {}
             ostream_handle(std::ostream &stream) : std_(&stream), d_(NULL), predef_(NULL)
             {
-                d_ = std::make_shared<ostd_streambuf_wrapper>(stream.rdbuf());
+                d_ = stdx::make_shared<ostd_streambuf_wrapper>(stream.rdbuf());
             }
+
+            bool valid() const {return std_ || predef_;}
 
             operator core::ostream &() {return predef_? *predef_: *d_;}
             core::ostream &stream() {return predef_? *predef_: *d_;}
@@ -413,14 +436,21 @@ namespace cppdatalib
         };
 #else
         typedef std::ostream ostream;
+#ifdef CPPDATALIB_WATCOM
+        typedef std::ostrstream ostringstream;
+#else
         typedef std::ostringstream ostringstream;
+#endif
 
         class ostream_handle
         {
             ostream *d_;
 
         public:
+            ostream_handle() : d_(NULL) {}
             ostream_handle(core::ostream &stream) : d_(&stream) {}
+
+            bool valid() const {return d_;}
 
             operator core::ostream &() {return *d_;}
             core::ostream &stream() {return *d_;}
