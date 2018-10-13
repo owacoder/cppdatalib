@@ -54,6 +54,11 @@
 
 // Accumulators
 #include "accumulators/crc32.h"
+#include "accumulators/crypto_rand.h"
+#include "accumulators/md5.h"
+#include "accumulators/rand.h"
+#include "accumulators/sha1.h"
+#include "accumulators/zlibacc.h"
 
 #ifdef CPPDATALIB_ENABLE_BOOST_COMPUTE
 #include "adapters/boost_compute.h"

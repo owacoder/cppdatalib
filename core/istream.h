@@ -32,6 +32,7 @@
 #include <cstring>
 #include <memory>
 #include <cstdlib>
+#include <cstdio>
 #include <cerrno>
 #include <cctype>
 
@@ -964,6 +965,69 @@ namespace cppdatalib
                 {
                     n = got;
                     eof = true;
+                    return false;
+                }
+
+                return true;
+            }
+        };
+
+        class icstream_wrapper_stream : public istream
+        {
+            int_type last_get_;
+            size_t pos;
+            std::FILE *stream_;
+
+        public:
+            icstream_wrapper_stream(std::FILE *stream)
+                : pos(0)
+                , stream_(stream)
+            {}
+
+            streamsize used_buffer() const {return pos;}
+            streamsize remaining_buffer() const {return -1;}
+
+        protected:
+            streamsize pos_() {return pos;}
+            bool seekc_(streamsize p)
+            {
+                using namespace std;
+                return fseek(stream_, long(p), SEEK_SET) == 0;
+            }
+            int_type getc_()
+            {
+                using namespace std;
+                int_type ch = fgetc(stream_);
+                pos += ch != EOF;
+                return last_get_ = ch;
+            }
+            int_type peekc_()
+            {
+                using namespace std;
+                int_type ch = fgetc(stream_);
+                if (ch == EOF)
+                    return ch;
+                return ungetc(ch, stream_) == EOF? EOF: ch;
+            }
+            void ungetc_()
+            {
+                using namespace std;
+                if (ungetc(last_get_, stream_) == EOF)
+                    flags_ |= bad_bit;
+                else
+                    --pos;
+            }
+            bool readc_(char *buffer, size_t &n, bool &eof)
+            {
+                using namespace std;
+                size_t got = fread(buffer, 1, n, stream_);
+
+                pos += got;
+
+                if (got != n)
+                {
+                    n = got;
+                    eof = feof(stream_);
                     return false;
                 }
 

@@ -381,6 +381,32 @@ namespace cppdatalib
             }
         };
 
+        class ocstream_wrapper_stream : public ostream
+        {
+            std::FILE *stream_;
+
+        public:
+            ocstream_wrapper_stream(std::FILE *stream)
+                : stream_(stream)
+            {}
+
+        protected:
+            void write_(const char *c, size_t n)
+            {
+                using namespace std;
+                fwrite(c, 1, n, stream_);
+            }
+            void putc_(char c)
+            {
+                using namespace std;
+                fputc(c, stream_);
+            }
+            void flush_()
+            {
+                std::fflush(stream_);
+            }
+        };
+
         class obufferstream : public ostream
         {
             char *mem_;

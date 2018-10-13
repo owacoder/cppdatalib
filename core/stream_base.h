@@ -1313,9 +1313,8 @@ namespace cppdatalib
         protected:
             void accumulate_(core::istream::int_type data)
             {
-                std::string utf8 = core::ucs_to_utf8(data);
-
-                flush_out(utf8.c_str(), utf8.size());
+                char c = data & 0xff;
+                flush_out(&c, 1);
             }
         };
 

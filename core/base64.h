@@ -122,7 +122,7 @@ namespace cppdatalib
                 if (ptr == NULL)
                     return;
 
-                state = (state << 6) | (ptr - alphabet());
+                state = (state << 6) | uint32_t(ptr - alphabet());
 
                 if (--required_input_before_flush == 0)
                 {

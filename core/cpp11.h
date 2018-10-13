@@ -27,6 +27,8 @@
 
 #include "global.h"
 
+#include <climits>
+
 #ifndef CPPDATALIB_CPP11
 #include <iostream>
 
@@ -418,5 +420,23 @@ namespace stdx
     auto noskipws(Args&&... args) -> decltype(std::noskipws(std::forward<Args>(args)...)) {return std::noskipws(std::forward<Args>(args)...);}
 }
 #endif
+
+template<typename T>
+T rotate_left(T value, unsigned int amount)
+{
+#ifdef CPPDATALIB_CPP11
+    static_assert(stdx::is_unsigned<T>::value, "cannot rotate with signed value");
+#endif
+    return (value << amount) | (value >> (-amount & (sizeof(T) * CHAR_BIT - 1)));
+}
+
+template<typename T>
+T rotate_right(T value, unsigned int amount)
+{
+#ifdef CPPDATALIB_CPP11
+    static_assert(stdx::is_unsigned<T>::value, "cannot rotate with signed value");
+#endif
+    return (value << amount) | (value >> (-amount & (sizeof(T) * CHAR_BIT - 1)));
+}
 
 #endif // CPP11_H

@@ -76,7 +76,7 @@ namespace cppdatalib
                 else if (!isxdigit(xdigit))
                     return -1;
                 else
-                    return 10 + strchr(alpha, tolower(xdigit)) - alpha;
+                    return 10 + int(strchr(alpha, tolower(xdigit)) - alpha);
             }
 
             void begin_() {state = 0; required_input_before_flush = 2;}
