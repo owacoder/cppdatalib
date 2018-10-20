@@ -523,7 +523,7 @@ namespace cppdatalib
                                         {
                                             size.top() += 2 + arg->string_size(); // If regexp, add actual payload size plus two nul-terminators
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-                                            size.top() += arg->attribute(core::value((const char *) "options", core::domain_comparable, true)).as_string().size();
+                                            size.top() += arg->attribute(core::value((const char *) "options", (cppdatalib::core::subtype_t) core::domain_comparable, true)).as_string().size();
 #endif
                                         }
                                         else if (arg->get_subtype() == core::binary_object_id)
@@ -774,7 +774,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                     // Reuse key_name to contain regexp options if available
                     if (v.get_subtype() == core::regexp)
-                        key_name = v.attribute(core::value((const char *) "options", core::domain_comparable, true)).as_string();
+                        key_name = v.attribute(core::value((const char *) "options", (cppdatalib::core::subtype_t) core::domain_comparable, true)).as_string();
                     else
 #else
                     // No options available for regexp

@@ -30,7 +30,7 @@
 #include <limits>
 #include <iostream>
 #include <cstring>
-#include <cstdint>
+#include <stdint.h>
 
 #ifdef __WATCOMC__
 // Watcom has an incomplete (and not exactly standard-conforming) std::istringstream implementation, so force it to use the custom implementation
@@ -60,15 +60,15 @@
 #define CPPDATALIB_LITTLE_ENDIAN
 #endif
 
-#if __cplusplus >= 201703L
+#if !defined(CPPDATALIB_NO_CPP17) && __cplusplus >= 201703L
 #define CPPDATALIB_CPP17
 #endif
 
-#if __cplusplus >= 201402L
+#if !defined(CPPDATALIB_NO_CPP14) && __cplusplus >= 201402L
 #define CPPDATALIB_CPP14
 #endif
 
-#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900)
+#if !defined(CPPDATALIB_NO_CPP11) && (__cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900))
 #define CPPDATALIB_CPP11
 #define CPPDATALIB_NOEXCEPT noexcept
 #define CPPDATALIB_CONSTEXPR constexpr
@@ -77,7 +77,11 @@
 #define CPPDATALIB_TYPENAME typename
 #include <array>
 #else
-#define CPPDATALIB_NOEXCEPT
+#ifdef CPPDATALIB_WATCOM
+# define CPPDATALIB_NOEXCEPT
+#else
+# define CPPDATALIB_NOEXCEPT noexcept
+#endif
 #define CPPDATALIB_CONSTEXPR
 #define CPPDATALIB_CONSTEXPR_VALUE const
 #define CPPDATALIB_EXPLICIT
@@ -152,8 +156,13 @@ namespace cppdatalib
 #define CPPDATALIB_FP_INFINITY(fp_type) INFINITY
 #define CPPDATALIB_FP_QNAN(fp_type) NAN
 #define CPPDATALIB_FP_SNAN(fp_type) NAN
-#else
+#elif defined(CPPDATALIB_CPP11)
 #define CPPDATALIB_REAL_DIG std::numeric_limits<double>::max_digits10
+#define CPPDATALIB_FP_INFINITY(fp_type) std::numeric_limits<fp_type>::infinity()
+#define CPPDATALIB_FP_QNAN(fp_type) std::numeric_limits<fp_type>::quiet_NaN()
+#define CPPDATALIB_FP_SNAN(fp_type) std::numeric_limits<fp_type>::signaling_NaN()
+#else
+#define CPPDATALIB_REAL_DIG 17
 #define CPPDATALIB_FP_INFINITY(fp_type) std::numeric_limits<fp_type>::infinity()
 #define CPPDATALIB_FP_QNAN(fp_type) std::numeric_limits<fp_type>::quiet_NaN()
 #define CPPDATALIB_FP_SNAN(fp_type) std::numeric_limits<fp_type>::signaling_NaN()
@@ -203,7 +212,11 @@ namespace cppdatalib
 
             CPPDATALIB_EXPLICIT operator bool() const {return has_value();}
             bool has_value() const {return used_;}
+#ifdef CPPDATALIB_CPP11
             void reset() {val_ = {}; used_ = false;}
+#else
+            void reset() {val_ = T(); used_ = false;}
+#endif
 
         private:
             T val_;
@@ -238,7 +251,7 @@ namespace cppdatalib
 
                 static CPPDATALIB_CONSTEXPR_VALUE size_type npos = -1;
 
-                string_view_t() CPPDATALIB_NOEXCEPT : data_(NULL), size_(0) {}
+                string_view_t() : data_(NULL), size_(0) {}
                 string_view_t(const_pointer nul_terminated) : data_(nul_terminated), size_(strlen(nul_terminated)) {}
                 string_view_t(const_pointer data, size_type size) : data_(data), size_(size) {}
                 string_view_t(const string_t &str) : data_(str.data()), size_(str.size()) {}

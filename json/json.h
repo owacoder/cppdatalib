@@ -114,7 +114,7 @@ namespace cppdatalib
             {
                 static const std::string hex = "0123456789ABCDEF";
 
-                core::value str_type((const char *) "", core::normal, true);
+                core::value str_type((const char *) "", (cppdatalib::core::subtype_t) core::normal, true);
                 core::istream::int_type c;
                 char *write = buffer;
 

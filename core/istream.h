@@ -361,7 +361,7 @@ namespace cppdatalib
 
             friend istream &operator>>(istream &in, std::streambuf *buf);
 
-#ifndef CPPDATALIB_WATCOM
+#ifdef CPPDATALIB_CPP11
             friend istream &operator>>(istream &in, std::ios_base &(*pf)(std::ios_base &));
 #else
             friend istream &operator>>(istream &in, stdx::skipws_t (*pf)());
@@ -534,7 +534,7 @@ namespace cppdatalib
                 return *this;
             }
 
-#ifndef CPPDATALIB_WATCOM
+#ifdef CPPDATALIB_CPP11
             template<typename T, typename Converter, typename Alt_Converter>
             istream &read_formatted_real(T &f, Converter convert, Alt_Converter instr_convert)
 #else
@@ -563,7 +563,7 @@ namespace cppdatalib
                     flags_ = fail_bit | eof_bit;
                 else
                 {
-#ifndef CPPDATALIB_WATCOM
+#ifdef CPPDATALIB_CPP11
                     const char *buffer = current_buffer_begin();
                     if (buffer)
                         --buffer; // The sentry stole one of our buffer characters!
@@ -576,7 +576,7 @@ namespace cppdatalib
 #else
                         ++len;
 #endif
-#ifndef CPPDATALIB_WATCOM
+#ifdef CPPDATALIB_CPP11
                         if (buffer == nullptr)
 #endif
                             str.push_back(c);
@@ -586,7 +586,7 @@ namespace cppdatalib
                     errno = 0;
                     char *end;
 
-#ifndef CPPDATALIB_WATCOM
+#ifdef CPPDATALIB_CPP11
                     if (buffer == nullptr)
 #endif
                     {
@@ -594,7 +594,7 @@ namespace cppdatalib
                         if (errno == ERANGE || *end != 0)
                             flags_ |= fail_bit;
                     }
-#ifndef CPPDATALIB_WATCOM
+#ifdef CPPDATALIB_CPP11
                     else
                     {
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
@@ -631,7 +631,7 @@ namespace cppdatalib
         inline istream &operator>>(istream &in, unsigned long &val) {return in.read_formatted_unsigned_int(val);}
         inline istream &operator>>(istream &in, unsigned long long &val) {return in.read_formatted_unsigned_int(val);}
 
-#ifdef CPPDATALIB_WATCOM
+#ifndef CPPDATALIB_CPP11
         inline istream &operator>>(istream &in, float &val) {return in.read_formatted_real(val, std::strtod);}
         inline istream &operator>>(istream &in, double &val) {return in.read_formatted_real(val, std::strtod);}
         inline istream &operator>>(istream &in, long double &val) {return in.read_formatted_real(val, std::strtod);}
@@ -676,7 +676,7 @@ namespace cppdatalib
             return in;
         }
 
-#ifndef CPPDATALIB_WATCOM
+#ifdef CPPDATALIB_CPP11
         inline istream &operator>>(istream &in, std::ios_base &(*pf)(std::ios_base &))
         {
             if (pf == std::skipws || pf == static_cast<std::ios_base &(*)(std::ios_base &)>(stdx::skipws))

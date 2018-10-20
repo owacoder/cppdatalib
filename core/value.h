@@ -225,6 +225,7 @@ namespace cppdatalib
 #endif
 
         struct null_t {};
+        struct userdata_tag {};
 
         inline bool subtype_is_reserved(subtype_t subtype, subtype_t *which)
         {
@@ -608,7 +609,7 @@ namespace cppdatalib
 #endif
             value(const object_t &v, const object_t &attributes, subtype_t subtype = core::normal);
 
-#ifdef CPPDATALIB_CPP11
+#ifndef CPPDATALIB_WATCOM
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
@@ -679,7 +680,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const T &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(normal)
+            value(const T &v, UserData userdata, userdata_tag, subtype_t subtype) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
@@ -720,7 +721,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const T &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(normal)
+            value(const T &v, UserData userdata, userdata_tag, subtype_t subtype) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
@@ -741,7 +742,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(std::initializer_list<Ts...> v, UserData userdata, subtype_t subtype = core::normal);
+            value(std::initializer_list<Ts...> v, UserData userdata, userdata_tag, subtype_t subtype = core::normal);
 #endif
 
 #ifndef CPPDATALIB_DISABLE_WEAK_POINTER_CONVERSIONS
@@ -764,7 +765,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const T *v, UserData userdata, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
+            value(const T *v, UserData userdata, userdata_tag, subtype_t subtype = core::normal) : type_(null), subtype_(subtype)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
@@ -785,7 +786,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const T (&v)[N], UserData userdata, subtype_t subtype);
+            value(const T (&v)[N], UserData userdata, userdata_tag, subtype_t subtype);
 
 #ifdef CPPDATALIB_CPP11
             // Template constructor for template type
@@ -820,7 +821,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const Template<Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(normal)
+            value(const Template<Ts...> &v, UserData userdata, userdata_tag, subtype_t subtype) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
@@ -861,7 +862,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const Template<T, N, Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(normal)
+            value(const Template<T, N, Ts...> &v, UserData userdata, userdata_tag, subtype_t subtype) : type_(null), subtype_(normal)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
@@ -902,7 +903,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_DISABLE_IMPLICIT_TYPE_CONVERSIONS
             explicit
 #endif
-            value(const Template<N, Ts...> &v, UserData userdata, subtype_t subtype) : type_(null), subtype_(subtype)
+            value(const Template<N, Ts...> &v, UserData userdata, userdata_tag, subtype_t subtype) : type_(null), subtype_(subtype)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
                 , attr_(nullptr)
 #endif
@@ -2486,7 +2487,7 @@ namespace cppdatalib
         }
 
         template<typename UserData, typename... Ts>
-        value::value(std::initializer_list<Ts...> v, UserData userdata, subtype_t subtype)
+        value::value(std::initializer_list<Ts...> v, UserData userdata, userdata_tag, subtype_t subtype)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             : attr_(nullptr)
 #endif
@@ -2519,7 +2520,7 @@ namespace cppdatalib
         }
 
         template<typename T, size_t N, typename UserData>
-        value::value(const T (&v)[N], UserData userdata, subtype_t subtype)
+        value::value(const T (&v)[N], UserData userdata, userdata_tag, subtype_t subtype)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             : attr_(nullptr)
 #endif
@@ -2739,7 +2740,7 @@ namespace cppdatalib
                     {
                         references.push(traversal_reference(p, p->get_array_unchecked().begin()));
                         if (!p->get_array_unchecked().empty())
-                            p = std::addressof(*references.top().array++);
+                            p = stdx::addressof(*references.top().array++);
                         else
                             p = NULL;
                     }
@@ -2747,7 +2748,7 @@ namespace cppdatalib
                     {
                         references.push(traversal_reference(p, p->get_object_unchecked().begin(), true));
                         if (!p->get_object_unchecked().empty())
-                            p = std::addressof((references.top().object++)->second);
+                            p = stdx::addressof((references.top().object++)->second);
                         else
                             p = NULL;
                     }
@@ -2761,9 +2762,9 @@ namespace cppdatalib
                 {
                     const value *peek = references.top().p;
                     if (peek->is_array() && references.top().array != peek->get_array_unchecked().end())
-                        p = std::addressof(*references.top().array++);
+                        p = stdx::addressof(*references.top().array++);
                     else if (peek->is_object() && references.top().object != peek->get_object_unchecked().end())
-                        p = std::addressof((references.top().object++)->second);
+                        p = stdx::addressof((references.top().object++)->second);
                     else
                     {
                         references.pop();

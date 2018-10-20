@@ -31,6 +31,9 @@
 
 #ifndef CPPDATALIB_CPP11
 #include <iostream>
+#include <sstream>
+#include <cerrno>
+#include <typeinfo>
 
 namespace stdx
 {
@@ -313,8 +316,6 @@ namespace stdx
             is_same<T, unsigned long>::value ||
             is_same<T, signed long long>::value ||
             is_same<T, unsigned long long>::value ||
-            is_same<T, char16_t>::value ||
-            is_same<T, char32_t>::value ||
             is_same<T, wchar_t>::value> {};
     template<typename T> struct is_arithmetic : public integral_constant<bool, is_integral<T>::value || is_floating_point<T>::value> {};
 
@@ -323,8 +324,23 @@ namespace stdx
 
     template<typename T> struct is_class : public integral_constant<bool, !is_arithmetic<T>::value> {};
 
-    template<typename T> struct is_unsigned : public integral_constant<bool, T(0) < T(-1)> {};
-    template<typename T> struct is_signed : public integral_constant<bool, T(-1) < T(0)> {};
+    template<typename T> struct is_unsigned : public integral_constant<bool,
+            is_same<T, bool>::value ||
+            (is_same<T, char>::value && CHAR_MAX == UCHAR_MAX) ||
+            is_same<T, unsigned char>::value ||
+            is_same<T, unsigned int>::value ||
+            is_same<T, unsigned long>::value ||
+            is_same<T, unsigned long long>::value> {};
+    template<typename T> struct is_signed : public integral_constant<bool,
+            is_same<T, signed char>::value ||
+            (is_same<T, char>::value && CHAR_MAX == SCHAR_MAX) ||
+            is_same<T, signed int>::value ||
+            is_same<T, signed long>::value ||
+            is_same<T, signed long long>::value ||
+            is_same<T, wchar_t>::value ||
+            is_same<T, float>::value ||
+            is_same<T, double>::value ||
+            is_same<T, long double>::value> {};
 
     template<typename T> struct remove_reference {typedef T type;};
     template<typename T> struct remove_reference<T &> {typedef T type;};

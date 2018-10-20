@@ -49,7 +49,7 @@ namespace cppdatalib
         protected:
             core::istream &read_string(core::istream &stream, core::stream_handler &writer, bool &had_eof)
             {
-                core::value str_type((const char *) "", core::normal, true);
+                core::value str_type((const char *) "", (cppdatalib::core::subtype_t) core::normal, true);
                 core::istream::int_type c;
                 char *write = buffer;
 
