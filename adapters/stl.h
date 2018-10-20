@@ -1800,7 +1800,7 @@ public:
                 dest = cppdatalib::core::value(std::chrono::duration_cast<std::chrono::nanoseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp_ns);
         }
         else // Second or super-second precision
-            dest = cppdatalib::core::value(std::chrono::duration_cast<std::chrono::milliseconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp);
+            dest = cppdatalib::core::value(std::chrono::duration_cast<std::chrono::seconds>(bind.time_since_epoch()), cppdatalib::core::unix_timestamp);
     }
 };
 
@@ -1826,7 +1826,7 @@ public:
             else if (Period::den <= 1000000000)
                 dest = cppdatalib::core::value(bind.count() * (1000000000 / Period::den), cppdatalib::core::duration_ns);
             else // Period::den > 1000000000
-                dest = cppdatalib::core::value(bind.count() / (Period::den / 1000000000ull), cppdatalib::core::duration_ns);
+                dest = cppdatalib::core::value(bind.count() / std::max(1ull, Period::den / 1000000000ull), cppdatalib::core::duration_ns);
         }
         else // Second or super-second precision
             dest = cppdatalib::core::value(bind.count() * Period::num / Period::den, cppdatalib::core::duration);

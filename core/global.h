@@ -30,6 +30,7 @@
 #include <limits>
 #include <iostream>
 #include <cstring>
+#include <cstdint>
 
 #ifdef __WATCOMC__
 // Watcom has an incomplete (and not exactly standard-conforming) std::istringstream implementation, so force it to use the custom implementation
