@@ -746,7 +746,7 @@ namespace cppdatalib
 
             const core::value &get_max() const {return max_;}
             const core::value &get_min() const {return min_;}
-            core::value get_midpoint() const {return (core::real_t(max_) + core::real_t(min_)) / 2.0;}
+            core::value get_midpoint() const {return cppdatalib::core::value((core::real_t(max_) + core::real_t(min_)) / 2.0);}
 
             std::string name() const
             {
@@ -1352,7 +1352,7 @@ namespace cppdatalib
         }
 
         // Unfortunately, SQL requires std::function, which isn't available prior to C++11
-#ifdef CPPDATALIB_CPP11
+#if defined(CPPDATALIB_CPP11) && !defined(CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS)
         namespace impl
         {
             struct sql_function
@@ -3349,7 +3349,7 @@ namespace cppdatalib
             bool selection_order_is_important;
 
         public:
-            sql_select_filter(core::stream_handler &output, core::string_view_t sql_query = core::string_view_t(), bool selection_order_is_important = false)
+            sql_select_filter(core::stream_handler &output, core::string_view_t sql_query = "", bool selection_order_is_important = false)
                 : buffer_filter(output, static_cast<buffer_filter_flags>(buffer_strings | buffer_arrays | buffer_objects | buffer_ignore_reported_sizes), 1)
                 , functions(impl::make_sql_function_list())
                 , selection_order_is_important(selection_order_is_important)

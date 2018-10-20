@@ -393,7 +393,7 @@ namespace cppdatalib
                         core::uint_t aIndex;
                         core::istring_wrapper_stream wrapper(path_node);
                         wrapper >> aIndex;
-                        result.push_back(aIndex);
+                        result.push_back(core::value(aIndex));
                     }
                     else if (path_node == "-")
                         result.push_back(core::value());

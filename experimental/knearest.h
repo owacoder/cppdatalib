@@ -154,7 +154,7 @@ namespace cppdatalib
                              k);
 
             // Accumulate probabilities for each class
-            core::value result = core::object_t();
+            core::value result = cppdatalib::core::value(core::object_t());
             for (size_t idx = 0; idx < k; ++idx)
                 result.member(results[distances[idx]["index"].as_uint()]).get_real_ref() += 1.0 / k;
 

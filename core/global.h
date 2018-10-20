@@ -80,7 +80,7 @@
 #ifdef CPPDATALIB_WATCOM
 # define CPPDATALIB_NOEXCEPT
 #else
-# define CPPDATALIB_NOEXCEPT noexcept
+# define CPPDATALIB_NOEXCEPT throw()
 #endif
 #define CPPDATALIB_CONSTEXPR
 #define CPPDATALIB_CONSTEXPR_VALUE const
