@@ -55,6 +55,7 @@
 // Accumulators
 #include "accumulators/crc32.h"
 #include "accumulators/crypto_rand.h"
+#include "accumulators/line_count.h"
 #include "accumulators/md5.h"
 #include "accumulators/rand.h"
 #include "accumulators/sha1.h"

@@ -98,7 +98,7 @@ namespace cppdatalib
         class blocking_accumulator : public core::accumulator_base
         {
             HMODULE library;
-            BOOLEAN (*RtlGenRandom)(PVOID buffer, ULONG bufferLength);
+            BOOLEAN WINAPI (*RtlGenRandom)(PVOID buffer, ULONG bufferLength);
 
         public:
             blocking_accumulator() : core::accumulator_base() {init();}
@@ -117,7 +117,7 @@ namespace cppdatalib
                 if (!library)
                     return;
 
-                RtlGenRandom = ::GetProcAddress(library, "SystemFunction036");
+                RtlGenRandom = reinterpret_cast<decltype(RtlGenRandom)>(::GetProcAddress(library, "SystemFunction036"));
             }
 
             void accumulate_(core::istream::int_type data)

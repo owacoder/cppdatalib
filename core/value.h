@@ -1193,6 +1193,9 @@ namespace cppdatalib
             value const_member(cstring_t key) const;
             value const_member(string_view_t key) const;
             value const_member(const value &key) const;
+            value const_members(cstring_t key) const;
+            value const_members(string_view_t key) const;
+            value const_members(const value &key) const;
             value member(cstring_t key) const;
             value member(string_view_t key) const;
             value member(const value &key) const;
@@ -3179,6 +3182,19 @@ namespace cppdatalib
                     return it->second;
             }
             return value();
+        }
+        inline value value::const_members(cstring_t key) const {return const_members(value(key, domain_comparable));}
+        inline value value::const_members(string_view_t key) const {return const_members(value(key, domain_comparable));}
+        inline value value::const_members(const value &key) const
+        {
+            value result;
+            if (is_nonnull_object())
+            {
+                object_iterator_t it = mutable_obj_ref_().data().find(key);
+                for (; it != mutable_obj_ref_().end() && it->first == key; ++it)
+                    result.push_back(it->second);
+            }
+            return result;
         }
         inline value value::member(cstring_t key) const {return const_member(key);}
         inline value value::member(string_view_t key) const {return const_member(key);}

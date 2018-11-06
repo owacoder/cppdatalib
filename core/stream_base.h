@@ -1254,7 +1254,10 @@ namespace cppdatalib
 
                 return true;
             }
-            bool seekc_(streamsize) {return false;}
+            bool seekc_(streamsize pos)
+            {
+                return ihandle.valid() && ihandle.stream().seekg(pos);
+            }
             streamsize pos_() {return -1;}
 
             // ostream implementation

@@ -324,7 +324,7 @@ namespace cppdatalib
                 if (!s)
                     flags_ |= fail_bit;
 
-                flags_ &= ~eof_bit;
+                flags_ &= ~(eof_bit | fail_bit);
                 if (!seekc_(p))
                     flags_ |= fail_bit;
 
@@ -336,7 +336,7 @@ namespace cppdatalib
 #ifndef CPPDATALIB_FAST_IO_DISABLE_GCOUNT
                 last_read_ = 0;
 #endif
-                flags_ &= ~eof_bit;
+                flags_ &= ~(eof_bit | fail_bit);
 
                 sentry s(*this);
                 if (s)
@@ -382,7 +382,7 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int_type c = s.get_last_char();
+                int_type c = skip_ws? s.get_last_char(): getc_();
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
                 else
@@ -411,7 +411,7 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int_type c = s.get_last_char();
+                int_type c = skip_ws? s.get_last_char(): getc_();
                 if (c == '-')
                 {
                     negative = true;
@@ -487,7 +487,7 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int_type c = s.get_last_char();
+                int_type c = skip_ws? s.get_last_char(): getc_();
 
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
@@ -557,7 +557,7 @@ namespace cppdatalib
                     return *this;
                 }
 
-                int_type c = s.get_last_char();
+                int_type c = skip_ws? s.get_last_char(): getc_();
 
                 if (c == EOF)
                     flags_ = fail_bit | eof_bit;
@@ -681,7 +681,7 @@ namespace cppdatalib
         {
             if (pf == std::skipws || pf == static_cast<std::ios_base &(*)(std::ios_base &)>(stdx::skipws))
                 in.skip_ws = true;
-            else if (pf == std::noskipws || pf == static_cast<std::ios_base &(*)(std::ios_base &)>(stdx::skipws))
+            else if (pf == std::noskipws || pf == static_cast<std::ios_base &(*)(std::ios_base &)>(stdx::noskipws))
                 in.skip_ws = false;
             else
                 throw core::error("cppdatalib::core::istream - stream manipulator applied to input stream is not supported");

@@ -273,6 +273,14 @@ namespace cppdatalib
                 delete[] buffer;
             }
 
+            ostring_wrapper_stream &operator=(const ostring_wrapper_stream &other)
+            {
+                string = other.string;
+                memcpy(buffer, other.buffer, buffer_size);
+                bufpos = other.bufpos;
+                return *this;
+            }
+
             const std::string &str() {flush_(); return string;}
 
         protected:
@@ -321,6 +329,14 @@ namespace cppdatalib
         public:
             ostringstream() : buffer(new char[buffer_size]), bufpos(0) {}
             ~ostringstream() {delete[] buffer;}
+
+            ostringstream &operator=(const ostringstream &other)
+            {
+                string = other.string;
+                memcpy(buffer, other.buffer, buffer_size);
+                bufpos = other.bufpos;
+                return *this;
+            }
 
             const std::string &str() {flush_(); return string;}
 

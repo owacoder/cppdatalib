@@ -855,7 +855,7 @@ namespace cppdatalib
             std::string verb;
             int maximum_redirects;
             core::object_t proxy_settings;
-            core::network_library interface;
+            core::network_library interface_;
             core::stream_input *interface_stream;
             void *context, *s_context;
 
@@ -863,7 +863,7 @@ namespace cppdatalib
 
         public:
             parser(const core::value &url /* URL may include headers as attributes if CPPDATALIB_ENABLE_ATTRIBUTES is defined */,
-                   core::network_library interface = core::default_network_library,
+                   core::network_library interface_ = core::default_network_library,
                    const std::string &verb = "GET",
                    core::istream_handle input = core::istream_handle(),
                    const core::object_t &headers = core::object_t(), /* headers must NOT contain a Range field or Transfer-Encoding field */
@@ -888,13 +888,13 @@ namespace cppdatalib
                 , verb(verb)
                 , maximum_redirects(max_redirects)
                 , proxy_settings(proxy_settings)
-                , interface(core::unknown_network_library)
+                , interface_(core::unknown_network_library)
                 , interface_stream(nullptr)
                 , context(context)
                 , s_context(s_context)
                 , input_handle(input)
             {
-                set_interface(interface);
+                set_interface(interface_);
                 reset();
             }
             ~parser()
@@ -902,23 +902,23 @@ namespace cppdatalib
                 delete interface_stream;
             }
 
-            void set_interface(core::network_library interface)
+            void set_interface(core::network_library interface_)
             {
                 (void) context;
                 (void) s_context;
 
-                if (this->interface != interface)
+                if (this->interface_ != interface_)
                 {
-                    this->interface = interface;
+                    this->interface_ = interface_;
                     delete interface_stream;
 
-                    if (interface >= core::network_library_count)
+                    if (interface_ >= core::network_library_count)
                     {
                         interface_stream = nullptr;
                         return;
                     }
 
-                    switch (interface)
+                    switch (interface_)
                     {
                         case core::unknown_network_library:
                         default:
@@ -955,7 +955,7 @@ namespace cppdatalib
                     reset();
                 }
             }
-            core::network_library get_interface() const {return interface;}
+            core::network_library get_interface() const {return interface_;}
 
             int max_redirects() const {return maximum_redirects;}
             void set_max_redirects(int max) {maximum_redirects = max;}
