@@ -3299,8 +3299,8 @@ namespace cppdatalib
 #endif // CPPDATALIB_CPP11
 
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
-        inline value value::const_attribute(cstring_t key) const {return const_attribute(core::value(key));}
-        inline value value::const_attribute(string_view_t key) const {return const_attribute(core::value(static_cast<string_t>(key)));}
+        inline value value::const_attribute(cstring_t key) const {return const_attribute(core::value(key, domain_comparable));}
+        inline value value::const_attribute(string_view_t key) const {return const_attribute(core::value(key, domain_comparable));}
         inline value value::const_attribute(const value &key) const
         {
             object_iterator_t it = mutable_attr_ref_().data().find(key);
@@ -3308,11 +3308,11 @@ namespace cppdatalib
                 return it->second;
             return value();
         }
-        inline value value::attribute(cstring_t key) const {return const_attribute(value(key));}
-        inline value value::attribute(string_view_t key) const {return const_attribute(value(static_cast<string_t>(key)));}
+        inline value value::attribute(cstring_t key) const {return const_attribute(value(key, domain_comparable));}
+        inline value value::attribute(string_view_t key) const {return const_attribute(value(key, domain_comparable));}
         inline value value::attribute(const value &key) const {return const_attribute(key);}
-        inline value &value::attribute(cstring_t key) {return attribute(value(key));}
-        inline value &value::attribute(string_view_t key) {return attribute(value(static_cast<string_t>(key)));}
+        inline value &value::attribute(cstring_t key) {return attribute(value(key, domain_comparable));}
+        inline value &value::attribute(string_view_t key) {return attribute(value(key, domain_comparable));}
         inline value &value::attribute(const value &key)
         {
             object_iterator_t it = mutable_attr_ref_().data().lower_bound(key);
@@ -3328,14 +3328,14 @@ namespace cppdatalib
                 return stdx::addressof(it->second);
             return NULL;
         }
-        inline bool_t value::is_attribute(cstring_t key) const {return mutable_attr_ref_().data().find(value(key)) != mutable_attr_ref_().data().end();}
-        inline bool_t value::is_attribute(string_view_t key) const {return mutable_attr_ref_().data().find(value(static_cast<string_t>(key))) != mutable_attr_ref_().data().end();}
+        inline bool_t value::is_attribute(cstring_t key) const {return mutable_attr_ref_().data().find(value(key, domain_comparable)) != mutable_attr_ref_().data().end();}
+        inline bool_t value::is_attribute(string_view_t key) const {return mutable_attr_ref_().data().find(value(key, domain_comparable)) != mutable_attr_ref_().data().end();}
         inline bool_t value::is_attribute(const value &key) const {return mutable_attr_ref_().data().find(key) != mutable_attr_ref_().data().end();}
-        inline size_t value::attribute_count(cstring_t key) const {return mutable_attr_ref_().data().count(value(key));}
-        inline size_t value::attribute_count(string_view_t key) const {return mutable_attr_ref_().data().count(value(static_cast<string_t>(key)));}
+        inline size_t value::attribute_count(cstring_t key) const {return mutable_attr_ref_().data().count(value(key, domain_comparable));}
+        inline size_t value::attribute_count(string_view_t key) const {return mutable_attr_ref_().data().count(value(key, domain_comparable));}
         inline size_t value::attribute_count(const value &key) const {return mutable_attr_ref_().data().count(key);}
-        inline void value::erase_attribute(cstring_t key) {attr_ref_().data().erase(value(key));}
-        inline void value::erase_attribute(string_view_t key) {attr_ref_().data().erase(value(static_cast<string_t>(key)));}
+        inline void value::erase_attribute(cstring_t key) {attr_ref_().data().erase(value(key, domain_comparable));}
+        inline void value::erase_attribute(string_view_t key) {attr_ref_().data().erase(value(key, domain_comparable));}
         inline void value::erase_attribute(const value &key) {attr_ref_().data().erase(key);}
         inline void value::erase_attributes() {attr_ref_().data().clear();}
 
