@@ -59,6 +59,7 @@
 #include "accumulators/md5.h"
 #include "accumulators/rand.h"
 #include "accumulators/sha1.h"
+#include "accumulators/sha256.h"
 #include "accumulators/zlibacc.h"
 
 #ifdef CPPDATALIB_ENABLE_BOOST_COMPUTE
@@ -91,6 +92,10 @@
 
 #ifdef CPPDATALIB_ENABLE_FILESYSTEM
 #include "raw/filesystem.h"
+#endif
+
+#ifdef CPPDATALIB_ENABLE_DUKTAPE
+#include "adapters/duktape.h"
 #endif
 
 namespace cppdatalib

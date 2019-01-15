@@ -372,6 +372,7 @@ Enable/Disable flags are listed below:
    - `CPPDATALIB_DISABLE_HTTPS_IF_POSSIBLE` - To reduce dependencies, define this flag if HTTPS support is not needed for your application.
    - `CPPDATALIB_ENABLE_QT_NETWORK` - Enables the [Qt](https://www.qt.io/) network adapter, for use with the `cppdatalib::http::parser` class. This defines the value `qt_network_library` to be used with `CPPDATALIB_DEFAULT_NETWORK_LIBRARY`. The Qt source tree must be in the include path
    - `CPPDATALIB_ENABLE_POCO_NETWORK` - Enables the [POCO](https://pocoproject.org/) network adapter, for use with the `cppdatalib::http::parser` class. This defines the value `poco_network_library` to be used with `CPPDATALIB_DEFAULT_NETWORK_LIBRARY`. The "Poco" source tree must be in the include path
+   - `CPPDATALIB_ENABLE_DUKTAPE` - Enables the [Duktape](https://www.duktape.org/) adapter, to smoothly integrate with the Duktape JavaScript environment.
 
 For best space savings, do the following before including `cppdatalib.h`:
 

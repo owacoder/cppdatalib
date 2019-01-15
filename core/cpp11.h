@@ -443,7 +443,7 @@ T rotate_left(T value, unsigned int amount)
 #ifdef CPPDATALIB_CPP11
     static_assert(stdx::is_unsigned<T>::value, "cannot rotate with signed value");
 #endif
-    return (value << amount) | (value >> (-amount & (sizeof(T) * CHAR_BIT - 1)));
+    return (value << amount) | (value >> ((~amount + 1) & (sizeof(T) * CHAR_BIT - 1)));
 }
 
 template<typename T>
@@ -452,7 +452,7 @@ T rotate_right(T value, unsigned int amount)
 #ifdef CPPDATALIB_CPP11
     static_assert(stdx::is_unsigned<T>::value, "cannot rotate with signed value");
 #endif
-    return (value << amount) | (value >> (-amount & (sizeof(T) * CHAR_BIT - 1)));
+    return (value >> amount) | (value << ((~amount + 1) & (sizeof(T) * CHAR_BIT - 1)));
 }
 
 #endif // CPP11_H

@@ -108,7 +108,7 @@ namespace cppdatalib
                 uint32_t mstate[5] = {state[0], state[1], state[2], state[3], state[4]};
 
                 for (size_t i = 0; i < 64; ++i)
-                    wbuffer[i / 4] |= uint32_t(buffer[i]) << (((3 - i) % 4) * 8);
+                    wbuffer[i / 4] |= uint32_t(buffer[i]) << ((3 - i % 4) * 8);
 
                 for (size_t i = 16; i < 80; ++i)
                     wbuffer[i] = rotate_left(wbuffer[i-3] ^ wbuffer[i-8] ^ wbuffer[i-14] ^ wbuffer[i-16], 1);

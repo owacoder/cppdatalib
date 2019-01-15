@@ -353,7 +353,7 @@ namespace cppdatalib
                         zigzag >>= 7;
                     }
 
-                    stream.put(zigzag);
+                    stream.put(char(zigzag));
                     return stream;
                 }
 

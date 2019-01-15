@@ -98,7 +98,7 @@ namespace cppdatalib
         class blocking_accumulator : public core::accumulator_base
         {
             HMODULE library;
-            BOOLEAN WINAPI (*RtlGenRandom)(PVOID buffer, ULONG bufferLength);
+            BOOLEAN (WINAPI *RtlGenRandom)(PVOID buffer, ULONG bufferLength); // MSVC coughs if WINAPI is outside `()`??
 
         public:
             blocking_accumulator() : core::accumulator_base() {init();}

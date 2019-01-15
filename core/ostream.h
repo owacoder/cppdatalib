@@ -287,10 +287,7 @@ namespace cppdatalib
             void write_(const char *c, size_t n)
             {
                 if (n - bufpos >= buffer_size)
-                {
-                    string.append(buffer, bufpos);
-                    bufpos = 0;
-                }
+                    flush_();
 
                 if (n > buffer_size)
                     string.append(c, n);
@@ -304,11 +301,8 @@ namespace cppdatalib
             void putc_(char c)
             {
                 if (bufpos == buffer_size)
-                {
-                    string.append(buffer, bufpos);
-                    bufpos = 0;
-                }
-                string.push_back(c);
+                    flush_();
+                buffer[bufpos++] = c;
             }
             void flush_()
             {
@@ -344,10 +338,7 @@ namespace cppdatalib
             void write_(const char *c, size_t n)
             {
                 if (n - bufpos >= buffer_size)
-                {
-                    string.append(buffer, bufpos);
-                    bufpos = 0;
-                }
+                    flush_();
 
                 if (n > buffer_size)
                     string.append(c, n);
@@ -361,10 +352,7 @@ namespace cppdatalib
             void putc_(char c)
             {
                 if (bufpos == buffer_size)
-                {
-                    string.append(buffer, bufpos);
-                    bufpos = 0;
-                }
+                    flush_();
                 buffer[bufpos++] = c;
             }
             void flush_()
@@ -510,55 +498,115 @@ namespace cppdatalib
         template<typename T>
         core::ostream &write_uint16_be(core::ostream &strm, T val)
         {
+#ifdef CPPDATALIB_BIG_ENDIAN
+            union
+            {
+                char buf[2];
+                uint16_t i;
+            } data;
+            data.i = (uint16_t) val;
+            return strm.write(data.buf, 2);
+#else
             char buf[2];
             buf[0] = uint8_t(val >> 8);
             buf[1] = uint8_t(val);
             return strm.write(buf, 2);
+#endif
         }
 
         template<typename T>
         core::ostream &write_uint16_le(core::ostream &strm, T val)
         {
+#ifdef CPPDATALIB_LITTLE_ENDIAN
+            union
+            {
+                char buf[2];
+                uint16_t i;
+            } data;
+            data.i = (uint16_t) val;
+            return strm.write(data.buf, 2);
+#else
             char buf[2];
             buf[0] = uint8_t(val);
             buf[1] = uint8_t(val >> 8);
             return strm.write(buf, 2);
+#endif
         }
 
         template<typename T>
         core::ostream &write_uint32_be(core::ostream &strm, T val)
         {
+#ifdef CPPDATALIB_BIG_ENDIAN
+            union
+            {
+                char buf[4];
+                uint32_t i;
+            } data;
+            data.i = (uint32_t) val;
+            return strm.write(data.buf, 4);
+#else
             char buf[4];
             for (int i = 3; i >= 0; --i, val >>= 8)
                 buf[i] = uint8_t(val);
             return strm.write(buf, 4);
+#endif
         }
 
         template<typename T>
         core::ostream &write_uint32_le(core::ostream &strm, T val)
         {
+#ifdef CPPDATALIB_LITTLE_ENDIAN
+            union
+            {
+                char buf[4];
+                uint32_t i;
+            } data;
+            data.i = (uint32_t) val;
+            return strm.write(data.buf, 4);
+#else
             char buf[4];
             for (int i = 0; i < 4; ++i, val >>= 8)
                 buf[i] = uint8_t(val);
             return strm.write(buf, 4);
+#endif
         }
 
         template<typename T>
         core::ostream &write_uint64_be(core::ostream &strm, T val)
         {
+#ifdef CPPDATALIB_BIG_ENDIAN
+            union
+            {
+                char buf[8];
+                uint64_t i;
+            } data;
+            data.i = (uint64_t) val;
+            return strm.write(data.buf, 8);
+#else
             char buf[8];
             for (int i = 7; i >= 0; --i, val >>= 8)
                 buf[i] = uint8_t(val);
             return strm.write(buf, 8);
+#endif
         }
 
         template<typename T>
         core::ostream &write_uint64_le(core::ostream &strm, T val)
         {
+#ifdef CPPDATALIB_LITTLE_ENDIAN
+            union
+            {
+                char buf[8];
+                uint64_t i;
+            } data;
+            data.i = (uint64_t) val;
+            return strm.write(data.buf, 8);
+#else
             char buf[8];
             for (int i = 0; i < 8; ++i, val >>= 8)
                 buf[i] = uint8_t(val);
             return strm.write(buf, 8);
+#endif
         }
     }
 }

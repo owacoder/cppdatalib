@@ -66,12 +66,14 @@ namespace cppdatalib {
 // No template template conversions if not C++11 :(
 
 template<typename T> class cast_to_cppdatalib;
+template<typename T> class cast_existing_pointer_to_cppdatalib;
 #ifdef CPPDATALIB_CPP11
 template<template<size_t, typename...> class Template, size_t N, typename... Ts> struct cast_sized_template_to_cppdatalib;
 template<template<typename...> class Template, typename... Ts> struct cast_template_to_cppdatalib;
 template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts> struct cast_array_template_to_cppdatalib;
 #endif
 template<typename T> class cast_from_cppdatalib;
+template<typename T> class cast_existing_pointer_from_cppdatalib;
 #ifdef CPPDATALIB_CPP11
 template<template<size_t, typename...> class Template, size_t N, typename... Ts> struct cast_sized_template_from_cppdatalib;
 template<template<typename...> class Template, typename... Ts> struct cast_template_from_cppdatalib;
@@ -145,8 +147,9 @@ namespace cppdatalib
             // The `comparable` types should not be used in actual data values, but are intented to be used to find a specific value in a dataset
             domain_comparable = -2, // Domain comparables are not compared by type or subtype, but are compared by value in a specific domain (i.e. compare by numbers or compare by strings)
             generic_subtype_comparable = -3, // Generic subtype comparables are only compared by type and value, not by subtype.
+            missing_value = -4, // Missing value means there was some sort of error on input and no value is available
 
-            // Integers
+            // Integers, signed and unsigned
             unix_timestamp = -39, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds
             unix_timestamp_ms, // Number of milliseconds since the epoch, Jan 1, 1970, without leap seconds
             unix_timestamp_ns, // Number of nanoseconds since the epoch, Jan 1, 1970, without leap seconds
@@ -157,6 +160,10 @@ namespace cppdatalib
             duration_ms, // A specified number of milliseconds as a duration
             duration_ns, // A specified number of nanoseconds as a duration
             mongodb_timestamp, // MongoDB timestamp
+
+            // UIntegers
+            pointer = -49, // A generic pointer
+            function_pointer, // A function pointer, indeterminate parameters, return value, and convention (so you shouldn't call it unless you put it there...)
 
             // Text strings
             clob = -129, // A chunk of text (unknown encoding, can include random bytes > 0x7f)
@@ -259,14 +266,15 @@ namespace cppdatalib
             return (subtype > -200 && subtype <= -130);
         }
 
-        const char *subtype_to_string(subtype_t subtype)
+        inline const char *subtype_to_string(subtype_t subtype)
         {
             switch (subtype)
             {
                 case normal: return "normal";
 
-                case domain_comparable: return "<domain-comparable>";
+                case domain_comparable: return "<domain comparable>";
                 case generic_subtype_comparable: return "<no subtype>";
+                case missing_value: return "<missing>";
 
                 case unix_timestamp: return "UNIX timestamp (seconds)";
                 case unix_timestamp_ms: return "UNIX timestamp (milliseconds)";
@@ -278,6 +286,9 @@ namespace cppdatalib
                 case duration_ms: return "duration (milliseconds)";
                 case duration_ns: return "duration (nanoseconds)";
                 case mongodb_timestamp: return "MongoDB timestamp";
+
+                case pointer: return "object pointer";
+                case function_pointer: return "function pointer";
 
                 case clob: return "text (unknown encoding)";
                 case symbol: return "symbol";
@@ -482,6 +493,9 @@ namespace cppdatalib
                 : attr_(nullptr)
 #endif
             {
+                if (v == nullptr)
+                    v = "";
+
                 (void) make_temporary;
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
                 if (make_temporary)
@@ -508,6 +522,9 @@ namespace cppdatalib
                 : attr_(nullptr)
 #endif
             {
+                if (v == nullptr)
+                    v = "";
+
                 (void) make_temporary;
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
                 if (make_temporary)
@@ -912,6 +929,31 @@ namespace cppdatalib
             }
 #endif // CPPDATALIB_CPP11
 
+            // Template constructor for pointer
+            template<typename T>
+            static value from_existing_pointer(T *v, subtype_t subtype = core::normal)
+            {
+                value result;
+                result.set_subtype(subtype);
+                cast_existing_pointer_to_cppdatalib<T *>(v).convert(result);
+                return result;
+            }
+
+            // Template constructor for pointer with supplied user data
+            template<typename T, typename UserData>
+            static value from_existing_pointer(T *v, UserData userdata, userdata_tag, subtype_t subtype = core::normal)
+            {
+                value result;
+                result.set_subtype(subtype);
+                cast_existing_pointer_to_cppdatalib<T *>(v, userdata).convert(result);
+                return result;
+            }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            static value value_with_attributes(value v, const object_t &attributes);
+            static value value_with_attributes(value v, object_t &&attributes);
+#endif
+
             ~value();
 
 #ifdef CPPDATALIB_CPP11
@@ -973,6 +1015,8 @@ namespace cppdatalib
 #else
             size_t string_size() const {return is_nonnull_owned_string()? str_ref_().size(): 0;}
 #endif
+
+            bool_t is_missing() const {return subtype_ == missing_value;}
 
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
@@ -1157,7 +1201,7 @@ namespace cppdatalib
             void set_temp_string(string_view_t v) {clear(temporary_string); tstr_ = v;}
             void set_temp_string(const string_t &v) {clear(temporary_string); tstr_ = string_view_t(v.data(), v.size());}
 #endif
-            void set_string(cstring_t v) {clear(string); str_ref_() = v;}
+            void set_string(cstring_t v) {clear(string); if (v) str_ref_() = v;}
             void set_string(const string_t &v) {clear(string); str_ref_() = v;}
             void set_array(const array_t &v);
             void set_object(const object_t &v);
@@ -1181,7 +1225,7 @@ namespace cppdatalib
             void set_temp_string(string_view_t v, subtype_t subtype) {clear(temporary_string); tstr_ = v; subtype_ = subtype;}
             void set_temp_string(const string_t &v, subtype_t subtype) {clear(temporary_string); tstr_ = string_view_t(v.data(), v.size()); subtype_ = subtype;}
 #endif
-            void set_string(cstring_t v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
+            void set_string(cstring_t v, subtype_t subtype) {clear(string); if (v) str_ref_() = v; subtype_ = subtype;}
             void set_string(const string_t &v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
             void set_array(const array_t &v, subtype_t subtype);
             void set_object(const object_t &v, subtype_t subtype);
@@ -1582,6 +1626,15 @@ namespace cppdatalib
             array_t &convert_to_array();
             object_t &convert_to_object();
 #endif
+
+            // Avoids different behavior for pointers than simple cast(), which reassigns the destination with a newly allocated pointer
+            // This function just passes the existing pointer on, unmodified
+            template<typename T>
+            const value &cast_to_existing_pointer(T *dest) const
+            {
+                cast_existing_pointer_from_cppdatalib<CPPDATALIB_TYPENAME stdx::remove_cv<CPPDATALIB_TYPENAME stdx::remove_reference<T>::type>::type *>(*this).convert(dest);
+                return *this;
+            }
 
             template<typename T>
             const value &cast(T &dest) const
@@ -2482,8 +2535,8 @@ namespace cppdatalib
             if (v.begin() != v.end())
             {
                 array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(value(element));
+                for (auto &&element: v)
+                    push_back(value(std::move(element)));
             }
             else
                 init(array, subtype);
@@ -2498,8 +2551,8 @@ namespace cppdatalib
             if (v.begin() != v.end())
             {
                 array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(value(element, userdata, core::normal));
+                for (auto &&element: v)
+                    push_back(value(std::move(element), userdata, core::normal));
             }
             else
                 init(array, subtype);
@@ -3003,6 +3056,20 @@ namespace cppdatalib
             else
                 init(object, subtype);
         }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+        inline value value::value_with_attributes(value v, const object_t &attributes)
+        {
+            v.set_attributes(attributes);
+            return v;
+        }
+
+        inline value value::value_with_attributes(value v, object_t &&attributes)
+        {
+            v.set_attributes(stdx::move(attributes));
+            return v;
+        }
+#endif
 
         inline value::value(value &&other) : type_(other.type_), subtype_(other.subtype_)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
@@ -3763,6 +3830,17 @@ public:
     void convert(cppdatalib::core::value &) const {throw cppdatalib::core::error("cast_to_cppdatalib - invalid conversion, no operator found");}
 };
 
+template<typename T>
+class cast_existing_pointer_to_cppdatalib {
+#ifndef CPPDATALIB_WATCOM
+    typedef CPPDATALIB_TYPENAME T::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
+#endif
+public:
+    cast_existing_pointer_to_cppdatalib(T *) {}
+    operator cppdatalib::core::value() const {cppdatalib::core::value result; convert(result); return result;}
+    void convert(cppdatalib::core::value &) const {throw cppdatalib::core::error("cast_existing_pointer_to_cppdatalib - invalid conversion, no operator found");}
+};
+
 #ifdef CPPDATALIB_CPP11
 template<template<typename...> class Template, typename... Ts>
 struct cast_template_to_cppdatalib
@@ -3794,6 +3872,16 @@ public:
     void convert(cppdatalib::core::value &) const {throw cppdatalib::core::error("cast_sized_template_to_cppdatalib - invalid conversion, no operator found");}
 };
 #endif // CPPDATALIB_CPP11
+
+template<typename T>
+class cast_existing_pointer_from_cppdatalib {
+#ifndef CPPDATALIB_WATCOM
+    typedef CPPDATALIB_TYPENAME T::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
+#endif
+public:
+    cast_existing_pointer_from_cppdatalib(const cppdatalib::core::value &) {}
+    void convert(T *) const {throw cppdatalib::core::error("cast_existing_pointer_from_cppdatalib - invalid conversion, no operator found");}
+};
 
 template<typename T>
 class cast_from_cppdatalib {

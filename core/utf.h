@@ -33,7 +33,7 @@ namespace cppdatalib
     namespace core
     {
         // Removes leading space characters from beginning of string
-        void ascii_ltrim(std::string &str)
+        inline void ascii_ltrim(std::string &str)
         {
             for (size_t i = 0; i < str.size(); ++i)
             {
@@ -48,14 +48,14 @@ namespace cppdatalib
         }
 
         // Returns string with space characters trimmed off the beginning
-        std::string ascii_ltrim_copy(std::string str)
+        inline std::string ascii_ltrim_copy(std::string str)
         {
             ascii_ltrim(str);
             return str;
         }
 
         // Removes trailing space characters from end of string
-        void ascii_rtrim(std::string &str)
+        inline void ascii_rtrim(std::string &str)
         {
             for (size_t i = str.size(); i > 0; --i)
             {
@@ -70,28 +70,28 @@ namespace cppdatalib
         }
 
         // Returns string with space characters trimmed off the end
-        std::string ascii_rtrim_copy(std::string str)
+        inline std::string ascii_rtrim_copy(std::string str)
         {
             ascii_rtrim(str);
             return str;
         }
 
         // Removes leading and trailing space characters from string
-        void ascii_trim(std::string &str)
+        inline void ascii_trim(std::string &str)
         {
             ascii_rtrim(str);
             ascii_ltrim(str);
         }
 
         // Returns string with space characters trimmed off both ends
-        std::string ascii_trim_copy(std::string str)
+        inline std::string ascii_trim_copy(std::string str)
         {
             ascii_trim(str);
             return str;
         }
 
         // Converts ASCII characters in string to lowercase
-        void ascii_lowercase(std::string &str)
+        inline void ascii_lowercase(std::string &str)
         {
             for (size_t i = 0; i < str.size(); ++i)
             {
@@ -113,14 +113,14 @@ namespace cppdatalib
         }
 
         // Returns string with ASCII characters converted to lowercase
-        std::string ascii_lowercase_copy(std::string str)
+        inline std::string ascii_lowercase_copy(std::string str)
         {
             ascii_lowercase(str);
             return str;
         }
 
         // Converts ASCII characters in string to uppercase
-        void ascii_uppercase(std::string &str)
+        inline void ascii_uppercase(std::string &str)
         {
             for (size_t i = 0; i < str.size(); ++i)
             {
@@ -142,13 +142,13 @@ namespace cppdatalib
         }
 
         // Returns string with ASCII characters converted to uppercase
-        std::string ascii_uppercase_copy(std::string str)
+        inline std::string ascii_uppercase_copy(std::string str)
         {
             ascii_uppercase(str);
             return str;
         }
 
-        encoding encoding_from_name(const char *encoding_name)
+        inline encoding encoding_from_name(const char *encoding_name)
         {
             if (!strcmp(encoding_name, "UTF-8"))
                 return utf8;
@@ -330,7 +330,7 @@ namespace cppdatalib
 
         // Returns -1 on conversion failure, invalid codepoint, overlong encoding, or truncated input
         // Returns codepoint on success, with updated `idx` stored in `new_pos`
-        uint32_t utf8_to_ucs(string_view_t s, size_t idx, size_t &new_pos)
+        inline uint32_t utf8_to_ucs(string_view_t s, size_t idx, size_t &new_pos)
         {
             uint32_t result = 0;
             int c = s[idx] & 0xff;
@@ -451,7 +451,7 @@ namespace cppdatalib
 
         // Returns -1 on conversion failure, invalid codepoint, overlong encoding, truncated input, or proper EOF (`eof` is set to true iff proper EOF is met, false otherwise)
         // Returns codepoint on success
-        uint32_t utf8_to_ucs(core::istream &stream, bool *eof)
+        inline uint32_t utf8_to_ucs(core::istream &stream, bool *eof)
         {
             uint32_t result = 0;
             int32_t c = stream.get();
@@ -534,7 +534,7 @@ namespace cppdatalib
                 return -1;
         }
 
-        std::vector<uint32_t> utf8_to_ucs(string_view_t s)
+        inline std::vector<uint32_t> utf8_to_ucs(string_view_t s)
         {
             std::vector<uint32_t> result;
 
@@ -552,31 +552,31 @@ namespace cppdatalib
                 result.push_back(utf8_to_ucs(s, i, i));
         }
 
-        std::string ucs_to_utf8(uint32_t codepoint)
+        inline std::string ucs_to_utf8(uint32_t codepoint)
         {
             return ucs_to_utf8(&codepoint, 1);
         }
 
         // Returns empty string if invalid codepoint is encountered
         // Returns UTF-xx string on valid input
-        std::string ucs_to_utf(const uint32_t *s, size_t size, const char *encoding_name)
+        inline std::string ucs_to_utf(const uint32_t *s, size_t size, const char *encoding_name)
         {
             return ucs_to_utf(s, size, encoding_from_name(encoding_name));
         }
 
-        std::string ucs_to_utf(uint32_t codepoint, encoding mode)
+        inline std::string ucs_to_utf(uint32_t codepoint, encoding mode)
         {
             return ucs_to_utf(&codepoint, 1, mode);
         }
 
-        std::string ucs_to_utf(uint32_t codepoint, const char *encoding_name)
+        inline std::string ucs_to_utf(uint32_t codepoint, const char *encoding_name)
         {
             return ucs_to_utf(&codepoint, 1, encoding_from_name(encoding_name));
         }
 
         // Returns -1 on conversion failure, invalid codepoint, overlong encoding, or truncated input
         // Returns codepoint on success, with updated `idx` stored in `new_pos`
-        uint32_t utf_to_ucs(string_view_t s, encoding mode, size_t idx, size_t &new_pos)
+        inline uint32_t utf_to_ucs(string_view_t s, encoding mode, size_t idx, size_t &new_pos)
         {
             uint32_t result = 0;
 
@@ -713,7 +713,7 @@ namespace cppdatalib
 
         // Returns -1 on conversion failure, invalid codepoint, overlong encoding, or truncated input
         // Returns codepoint on success, with updated `idx` stored in `new_pos`
-        uint32_t utf_to_ucs(core::istream &stream, encoding mode, bool *eof)
+        inline uint32_t utf_to_ucs(core::istream &stream, encoding mode, bool *eof)
         {
             if (mode == utf8)
                 return utf8_to_ucs(stream, eof);
@@ -857,7 +857,7 @@ namespace cppdatalib
             return result > 0x10ffff? uint32_t(-1): result;
         }
 
-        std::vector<uint32_t> utf_to_ucs(string_view_t s, encoding mode)
+        inline std::vector<uint32_t> utf_to_ucs(string_view_t s, encoding mode)
         {
             std::vector<uint32_t> result;
 
@@ -875,7 +875,7 @@ namespace cppdatalib
                 result.push_back(utf_to_ucs(s, mode, i, i));
         }
 
-        std::vector<uint32_t> utf_to_ucs(string_view_t s, const char *encoding_name)
+        inline std::vector<uint32_t> utf_to_ucs(string_view_t s, const char *encoding_name)
         {
             return utf_to_ucs(s, encoding_from_name(encoding_name));
         }

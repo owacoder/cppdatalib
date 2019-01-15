@@ -322,7 +322,7 @@ namespace cppdatalib
 
             void reset_()
             {
-                while (stack.size() > 1) stack.pop_back();
+                stack.erase(stack.begin() + 1, stack.end());
                 stack.back().parser().reset();
             }
 

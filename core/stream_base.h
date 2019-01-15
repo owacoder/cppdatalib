@@ -1069,7 +1069,7 @@ namespace cppdatalib
 
             // For buffering unget()
             std::deque<char> read_buffer;
-            int_type last_read_;
+            istream::int_type last_read_;
             size_t pos;
 
         public:
