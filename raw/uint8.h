@@ -91,7 +91,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_CPP11
         inline core::value operator "" _raw_uint8(const char *stream, size_t size)
         {
-            core::istringstream wrap(std::string(stream, size));
+            core::icstring_wrapper_stream wrap(stream, size);
             return from_raw_uint8(wrap);
         }
 #endif

@@ -875,7 +875,7 @@ namespace cppdatalib
 #ifdef CPPDATALIB_CPP11
         inline core::value operator "" _binn(const char *stream, size_t size)
         {
-            core::istringstream wrap(std::string(stream, size));
+            core::icstring_wrapper_stream wrap(stream, size);
             return from_binn(wrap);
         }
 #endif
