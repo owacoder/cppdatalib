@@ -109,7 +109,7 @@ namespace cppdatalib
             ostream &write_formatted_bool(bool b)
             {
                 if (fmtflags_ & boolalpha)
-                    return write_formatted_string(b? "true": "false");
+                    return b? write("true", 4): write("false", 5);
                 else
                     return write_formatted_unsigned_int((unsigned int) b);
             }

@@ -34,8 +34,8 @@ namespace cppdatalib
     {
         class accumulator : public core::accumulator_base
         {
+            alignas(16) uint8_t buffer[64];
             uint32_t state[5];
-            uint8_t buffer[64];
             size_t buffer_size;
             uint64_t message_len;
 

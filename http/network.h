@@ -162,7 +162,12 @@ namespace cppdatalib
                         core::istream::int_type c;
 
                         while ((c = input_handle.stream().get(), c != EOF))
-                            data += QByteArray::fromStdString(core::ucs_to_utf8(c));
+                        {
+                            if (c > 0xff)
+                                throw core::error("HTTP - invalid encoding used for input to request");
+
+                            data.push_back(c);
+                        }
 
                         input_buffer.close();
                         input_buffer.setData(data);
@@ -398,7 +403,12 @@ namespace cppdatalib
                             core::istream::int_type c;
 
                             while ((c = input_stream.stream().get(), c != EOF))
-                                out << core::ucs_to_utf8(c);
+                            {
+                                if (c > 0xff)
+                                    throw core::error("HTTP - invalid encoding used for input to request");
+
+                                out.put(c);
+                            }
                         }
 
                         in = &https->receiveResponse(response);
@@ -901,6 +911,9 @@ namespace cppdatalib
             {
                 delete interface_stream;
             }
+
+            core::istream_handle input_stream() {return input_handle;}
+            void set_input_stream(core::istream_handle handle) {input_handle = handle;}
 
             void set_interface(core::network_library interface_)
             {

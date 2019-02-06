@@ -33,16 +33,17 @@ namespace cppdatalib
     {
         class accumulator : public core::accumulator_base
         {
-            uint64_t count;
+            uint64_t count, col; // line count and column count, respectively (0-based)
 
         public:
-            accumulator() : core::accumulator_base(), count(0) {}
-            accumulator(core::istream_handle handle, accumulator_base *output_handle = NULL) : core::accumulator_base(handle, output_handle), count(0) {}
-            accumulator(core::ostream_handle handle) : core::accumulator_base(handle), count(0) {}
-            accumulator(accumulator_base *handle, bool pull_from_handle = false) : core::accumulator_base(handle, pull_from_handle), count(0) {}
-            accumulator(core::stream_handler &handle, bool just_append = false) : core::accumulator_base(handle, just_append), count(0) {}
+            accumulator() : core::accumulator_base(), count(0), col(0) {}
+            accumulator(core::istream_handle handle, accumulator_base *output_handle = NULL) : core::accumulator_base(handle, output_handle), count(0), col(0) {}
+            accumulator(core::ostream_handle handle) : core::accumulator_base(handle), count(0), col(0) {}
+            accumulator(accumulator_base *handle, bool pull_from_handle = false) : core::accumulator_base(handle, pull_from_handle), count(0), col(0) {}
+            accumulator(core::stream_handler &handle, bool just_append = false) : core::accumulator_base(handle, just_append), count(0), col(0) {}
 
             uint64_t current_line_count() const {return count;}
+            uint64_t current_column() const {return col;}
 
         protected:
             bool seekc_(streamsize pos)
@@ -51,7 +52,7 @@ namespace cppdatalib
                 {
                     bool b = core::accumulator_base::seekc_(pos);
                     if (b)
-                        count = 0;
+                        count = 0, col = 0;
                     return b;
                 }
 
@@ -61,7 +62,12 @@ namespace cppdatalib
             void accumulate_(core::istream::int_type data)
             {
                 char c = data & 0xff;
-                count += c == '\n';
+                if (c == '\n') {
+                    ++count;
+                    col = 0;
+                }
+                else
+                    ++col;
                 flush_out(&c, 1);
             }
         };

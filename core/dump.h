@@ -44,6 +44,8 @@ namespace cppdatalib
                 protected:
                     core::ostream &write_string(core::ostream &stream, core::string_view_t str)
                     {
+                        size_t run_start = 0;
+
                         for (size_t i = 0; i < str.size(); ++i)
                         {
                             int c = str[i] & 0xff;
@@ -52,12 +54,16 @@ namespace cppdatalib
                             {
                                 case '"':
                                 case '\\':
+                                    stream.write(str.data() + run_start, i - run_start);
                                     stream.put('\\');
                                     stream.put(c);
+
+                                    run_start = i+1;
                                     break;
                                 default:
                                     if (iscntrl(c))
                                     {
+                                        stream.write(str.data() + run_start, i - run_start);
                                         switch (c)
                                         {
                                             case '\b': stream.write("\\b", 2); break;
@@ -73,12 +79,14 @@ namespace cppdatalib
                                                 break;
                                             }
                                         }
+
+                                        run_start = i+1;
                                     }
-                                    else
-                                        stream.put(c);
                                     break;
                             }
                         }
+
+                        stream.write(str.data() + run_start, str.size() - run_start);
 
                         return stream;
                     }
