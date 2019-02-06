@@ -334,8 +334,7 @@ namespace cppdatalib
                 case array:
                 case object:
                 case link:
-                    dst.ptr_ = src.ptr_;
-                    src.ptr_ = nullptr;
+                    std::swap(dst.ptr_, src.ptr_);
                     break;
             }
             dst.subtype_ = src.get_subtype();

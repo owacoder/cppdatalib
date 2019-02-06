@@ -46,6 +46,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #elif defined(CPPDATALIB_WINDOWS)
+#ifndef NOMINMAX
+# define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 
@@ -1321,9 +1324,9 @@ namespace cppdatalib
             std::istream *std_stream() {return std_;}
         };
 
-        const char *current_buffer_begin(const istream &stream) {return stream.current_buffer_begin();}
-        istream::streamsize used_buffer(const istream &stream) {return stream.used_buffer();}
-        istream::streamsize remaining_buffer(const istream &stream) {return stream.remaining_buffer();}
+        inline const char *current_buffer_begin(const istream &stream) {return stream.current_buffer_begin();}
+        inline istream::streamsize used_buffer(const istream &stream) {return stream.used_buffer();}
+        inline istream::streamsize remaining_buffer(const istream &stream) {return stream.remaining_buffer();}
 
 #define CPPDATALIB_INIT_ISTRINGSTREAM(x, y) (x), (y)
 #else
@@ -1402,21 +1405,48 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_uint16_be(core::istream &strm, T &val)
         {
+#ifdef CPPDATALIB_BIG_ENDIAN
+            union
+            {
+                char buf[2];
+                uint16_t i;
+            } data;
+            strm.read(data.buf, 2);
+
+            if (strm)
+                val = data.i;
+            return strm;
+#else
             char buf[2];
             strm.read(buf, 2);
+
             if (strm)
                 val = (uint16_t(uint8_t(buf[0])) << 8) | uint8_t(buf[1]);
             return strm;
+#endif
         }
 
         template<typename T>
         core::istream &read_uint16_le(core::istream &strm, T &val)
         {
+#ifdef CPPDATALIB_LITTLE_ENDIAN
+            union
+            {
+                char buf[2];
+                uint16_t i;
+            } data;
+            strm.read(data.buf, 2);
+
+            if (strm)
+                val = data.i;
+            return strm;
+#else
             char buf[2];
             strm.read(buf, 2);
             if (strm)
                 val = (uint16_t(uint8_t(buf[1])) << 8) | uint8_t(buf[0]);
             return strm;
+#endif
         }
 
         template<typename T>
@@ -1456,6 +1486,18 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_uint32_be(core::istream &strm, T &val)
         {
+#ifdef CPPDATALIB_BIG_ENDIAN
+            union
+            {
+                char buf[4];
+                uint32_t i;
+            } data;
+            strm.read(data.buf, 4);
+
+            if (strm)
+                val = data.i;
+            return strm;
+#else
             char buf[4];
             strm.read(buf, 4);
             if (strm)
@@ -1465,11 +1507,24 @@ namespace cppdatalib
                     val = (val << 8) | uint8_t(buf[i]);
             }
             return strm;
+#endif
         }
 
         template<typename T>
         core::istream &read_uint32_le(core::istream &strm, T &val)
         {
+#ifdef CPPDATALIB_LITTLE_ENDIAN
+            union
+            {
+                char buf[4];
+                uint32_t i;
+            } data;
+            strm.read(data.buf, 4);
+
+            if (strm)
+                val = data.i;
+            return strm;
+#else
             char buf[4];
             strm.read(buf, 4);
             if (strm)
@@ -1479,6 +1534,7 @@ namespace cppdatalib
                     val |= uint32_t(uint8_t(buf[i])) << 8*i;
             }
             return strm;
+#endif
         }
 
         template<typename T>
@@ -1518,6 +1574,18 @@ namespace cppdatalib
         template<typename T>
         core::istream &read_uint64_be(core::istream &strm, T &val)
         {
+#ifdef CPPDATALIB_BIG_ENDIAN
+            union
+            {
+                char buf[8];
+                uint64_t i;
+            } data;
+            strm.read(data.buf, 8);
+
+            if (strm)
+                val = data.i;
+            return strm;
+#else
             char buf[8];
             strm.read(buf, 8);
             if (strm)
@@ -1527,11 +1595,24 @@ namespace cppdatalib
                     val = (val << 8) | uint8_t(buf[i]);
             }
             return strm;
+#endif
         }
 
         template<typename T>
         core::istream &read_uint64_le(core::istream &strm, T &val)
         {
+#ifdef CPPDATALIB_LITTLE_ENDIAN
+            union
+            {
+                char buf[8];
+                uint64_t i;
+            } data;
+            strm.read(data.buf, 8);
+
+            if (strm)
+                val = data.i;
+            return strm;
+#else
             char buf[8];
             strm.read(buf, 8);
             if (strm)
@@ -1541,6 +1622,7 @@ namespace cppdatalib
                     val |= uint64_t(uint8_t(buf[i])) << 8*i;
             }
             return strm;
+#endif
         }
 
         template<typename T>

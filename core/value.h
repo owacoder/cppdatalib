@@ -66,12 +66,14 @@ namespace cppdatalib {
 // No template template conversions if not C++11 :(
 
 template<typename T> class cast_to_cppdatalib;
+template<typename T> class cast_existing_pointer_to_cppdatalib;
 #ifdef CPPDATALIB_CPP11
 template<template<size_t, typename...> class Template, size_t N, typename... Ts> struct cast_sized_template_to_cppdatalib;
 template<template<typename...> class Template, typename... Ts> struct cast_template_to_cppdatalib;
 template<template<typename, size_t, typename...> class Template, typename T, size_t N, typename... Ts> struct cast_array_template_to_cppdatalib;
 #endif
 template<typename T> class cast_from_cppdatalib;
+template<typename T> class cast_existing_pointer_from_cppdatalib;
 #ifdef CPPDATALIB_CPP11
 template<template<size_t, typename...> class Template, size_t N, typename... Ts> struct cast_sized_template_from_cppdatalib;
 template<template<typename...> class Template, typename... Ts> struct cast_template_from_cppdatalib;
@@ -145,8 +147,9 @@ namespace cppdatalib
             // The `comparable` types should not be used in actual data values, but are intented to be used to find a specific value in a dataset
             domain_comparable = -2, // Domain comparables are not compared by type or subtype, but are compared by value in a specific domain (i.e. compare by numbers or compare by strings)
             generic_subtype_comparable = -3, // Generic subtype comparables are only compared by type and value, not by subtype.
+            missing_value = -4, // Missing value means there was some sort of error on input and no value is available
 
-            // Integers
+            // Integers, signed and unsigned
             unix_timestamp = -39, // Number of seconds since the epoch, Jan 1, 1970, without leap seconds
             unix_timestamp_ms, // Number of milliseconds since the epoch, Jan 1, 1970, without leap seconds
             unix_timestamp_ns, // Number of nanoseconds since the epoch, Jan 1, 1970, without leap seconds
@@ -157,6 +160,10 @@ namespace cppdatalib
             duration_ms, // A specified number of milliseconds as a duration
             duration_ns, // A specified number of nanoseconds as a duration
             mongodb_timestamp, // MongoDB timestamp
+
+            // UIntegers
+            pointer = -49, // A generic pointer
+            function_pointer, // A function pointer, indeterminate parameters, return value, and convention (so you shouldn't call it unless you put it there...)
 
             // Text strings
             clob = -129, // A chunk of text (unknown encoding, can include random bytes > 0x7f)
@@ -259,14 +266,15 @@ namespace cppdatalib
             return (subtype > -200 && subtype <= -130);
         }
 
-        const char *subtype_to_string(subtype_t subtype)
+        inline const char *subtype_to_string(subtype_t subtype)
         {
             switch (subtype)
             {
                 case normal: return "normal";
 
-                case domain_comparable: return "<domain-comparable>";
+                case domain_comparable: return "<domain comparable>";
                 case generic_subtype_comparable: return "<no subtype>";
+                case missing_value: return "<missing>";
 
                 case unix_timestamp: return "UNIX timestamp (seconds)";
                 case unix_timestamp_ms: return "UNIX timestamp (milliseconds)";
@@ -278,6 +286,9 @@ namespace cppdatalib
                 case duration_ms: return "duration (milliseconds)";
                 case duration_ns: return "duration (nanoseconds)";
                 case mongodb_timestamp: return "MongoDB timestamp";
+
+                case pointer: return "object pointer";
+                case function_pointer: return "function pointer";
 
                 case clob: return "text (unknown encoding)";
                 case symbol: return "symbol";
@@ -482,6 +493,9 @@ namespace cppdatalib
                 : attr_(nullptr)
 #endif
             {
+                if (v == nullptr)
+                    v = "";
+
                 (void) make_temporary;
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
                 if (make_temporary)
@@ -508,6 +522,9 @@ namespace cppdatalib
                 : attr_(nullptr)
 #endif
             {
+                if (v == nullptr)
+                    v = "";
+
                 (void) make_temporary;
 #ifndef CPPDATALIB_DISABLE_TEMP_STRING
                 if (make_temporary)
@@ -912,6 +929,31 @@ namespace cppdatalib
             }
 #endif // CPPDATALIB_CPP11
 
+            // Template constructor for pointer
+            template<typename T>
+            static value from_existing_pointer(T *v, subtype_t subtype = core::normal)
+            {
+                value result;
+                result.set_subtype(subtype);
+                cast_existing_pointer_to_cppdatalib<T *>(v).convert(result);
+                return result;
+            }
+
+            // Template constructor for pointer with supplied user data
+            template<typename T, typename UserData>
+            static value from_existing_pointer(T *v, UserData userdata, userdata_tag, subtype_t subtype = core::normal)
+            {
+                value result;
+                result.set_subtype(subtype);
+                cast_existing_pointer_to_cppdatalib<T *>(v, userdata).convert(result);
+                return result;
+            }
+
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+            static value value_with_attributes(value v, const object_t &attributes);
+            static value value_with_attributes(value v, object_t &&attributes);
+#endif
+
             ~value();
 
 #ifdef CPPDATALIB_CPP11
@@ -973,6 +1015,8 @@ namespace cppdatalib
 #else
             size_t string_size() const {return is_nonnull_owned_string()? str_ref_().size(): 0;}
 #endif
+
+            bool_t is_missing() const {return subtype_ == missing_value;}
 
             bool_t is_null() const {return type_ == null;}
             bool_t is_bool() const {return type_ == boolean;}
@@ -1157,7 +1201,7 @@ namespace cppdatalib
             void set_temp_string(string_view_t v) {clear(temporary_string); tstr_ = v;}
             void set_temp_string(const string_t &v) {clear(temporary_string); tstr_ = string_view_t(v.data(), v.size());}
 #endif
-            void set_string(cstring_t v) {clear(string); str_ref_() = v;}
+            void set_string(cstring_t v) {clear(string); if (v) str_ref_() = v;}
             void set_string(const string_t &v) {clear(string); str_ref_() = v;}
             void set_array(const array_t &v);
             void set_object(const object_t &v);
@@ -1181,7 +1225,7 @@ namespace cppdatalib
             void set_temp_string(string_view_t v, subtype_t subtype) {clear(temporary_string); tstr_ = v; subtype_ = subtype;}
             void set_temp_string(const string_t &v, subtype_t subtype) {clear(temporary_string); tstr_ = string_view_t(v.data(), v.size()); subtype_ = subtype;}
 #endif
-            void set_string(cstring_t v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
+            void set_string(cstring_t v, subtype_t subtype) {clear(string); if (v) str_ref_() = v; subtype_ = subtype;}
             void set_string(const string_t &v, subtype_t subtype) {clear(string); str_ref_() = v; subtype_ = subtype;}
             void set_array(const array_t &v, subtype_t subtype);
             void set_object(const object_t &v, subtype_t subtype);
@@ -1561,27 +1605,36 @@ namespace cppdatalib
             array_t as_array() const;
             object_t as_object() const;
 #else
-            bool_t as_bool(bool_t default_ = false) const {return value(*this).convert_to(boolean, core::value(default_)).bool_;}
-            value *as_link(value *default_ = nullptr) const {return reinterpret_cast<value *>(value(*this).convert_to(link, core::value(default_)).ptr_);}
-            int_t as_int(int_t default_ = 0) const {return value(*this).convert_to(integer, core::value(default_)).int_;}
-            uint_t as_uint(uint_t default_ = 0) const {return value(*this).convert_to(uinteger, core::value(default_)).uint_;}
-            real_t as_real(real_t default_ = 0.0) const {return value(*this).convert_to(real, core::value(default_)).real_;}
-            string_t as_string(const string_t &default_ = string_t()) const {return value(*this).convert_to(string, core::value(default_)).str_ref_();}
+            bool_t as_bool(bool_t default_ = false) const {return converted_to(boolean, core::value(default_)).bool_;}
+            value *as_link(value *default_ = nullptr) const {return reinterpret_cast<value *>(converted_to(link, core::value(default_)).ptr_);}
+            int_t as_int(int_t default_ = 0) const {return converted_to(integer, core::value(default_)).int_;}
+            uint_t as_uint(uint_t default_ = 0) const {return converted_to(uinteger, core::value(default_)).uint_;}
+            real_t as_real(real_t default_ = 0.0) const {return converted_to(real, core::value(default_)).real_;}
+            string_t as_string(const string_t &default_ = string_t()) const {return converted_to(string, core::value(default_)).str_ref_();}
             array_t as_array(const array_t &default_) const;
             object_t as_object(const object_t &default_) const;
             array_t as_array() const;
             object_t as_object() const;
 
-            bool_t &convert_to_bool(bool_t default_ = false) {return convert_to(boolean, core::value(default_)).bool_;}
-            int_t &convert_to_int(int_t default_ = 0) {return convert_to(integer, core::value(default_)).int_;}
-            uint_t &convert_to_uint(uint_t default_ = 0) {return convert_to(uinteger, core::value(default_)).uint_;}
-            real_t &convert_to_real(real_t default_ = 0.0) {return convert_to(real, core::value(default_)).real_;}
-            string_t &convert_to_string(const string_t &default_ = string_t()) {return convert_to(string, core::value(default_)).str_ref_();}
-            array_t &convert_to_array(const array_t &default_) {return convert_to(array, core::value(default_)).arr_ref_();}
-            object_t &convert_to_object(const object_t &default_) {return convert_to(object, core::value(default_)).obj_ref_();}
+            bool_t &convert_to_bool(bool_t default_ = false) {return (*this = converted_to(boolean, core::value(default_))).bool_;}
+            int_t &convert_to_int(int_t default_ = 0) {return (*this = converted_to(integer, core::value(default_))).int_;}
+            uint_t &convert_to_uint(uint_t default_ = 0) {return (*this = converted_to(uinteger, core::value(default_))).uint_;}
+            real_t &convert_to_real(real_t default_ = 0.0) {return (*this = converted_to(real, core::value(default_))).real_;}
+            string_t &convert_to_string(const string_t &default_ = string_t()) {return (*this = converted_to(string, core::value(default_))).str_ref_();}
+            array_t &convert_to_array(const array_t &default_) {return (*this = converted_to(array, core::value(default_))).arr_ref_();}
+            object_t &convert_to_object(const object_t &default_) {return (*this = converted_to(object, core::value(default_))).obj_ref_();}
             array_t &convert_to_array();
             object_t &convert_to_object();
 #endif
+
+            // Avoids different behavior for pointers than simple cast(), which reassigns the destination with a newly allocated pointer
+            // This function just passes the existing pointer on, unmodified
+            template<typename T>
+            const value &cast_to_existing_pointer(T *dest) const
+            {
+                cast_existing_pointer_from_cppdatalib<CPPDATALIB_TYPENAME stdx::remove_cv<CPPDATALIB_TYPENAME stdx::remove_reference<T>::type>::type *>(*this).convert(dest);
+                return *this;
+            }
 
             template<typename T>
             const value &cast(T &dest) const
@@ -1872,7 +1925,7 @@ namespace cppdatalib
 
 #ifndef CPPDATALIB_DISABLE_IMPLICIT_DATA_CONVERSIONS
             // TODO: ensure that all conversions are generic enough (for example, string -> bool doesn't just need to be "true")
-            value &convert_to(type new_type, const value &default_value)
+            value converted_to(type new_type, value default_value) const
             {
                 using namespace stdx;
 
@@ -1885,17 +1938,16 @@ namespace cppdatalib
                     case array:
                     case object:
                     case link:
-                        *this = default_value;
-                        break;
+                        return default_value;
                     case boolean:
                     {
                         switch (new_type)
                         {
-                            case integer: set_int((bool) bool_); break;
-                            case uinteger: set_uint((bool) bool_); break;
-                            case real: set_real((bool) bool_); break;
-                            case string: set_string((bool) bool_? "true": "false"); break;
-                            default: *this = default_value; break;
+                            case integer: return value((int_t) (bool) bool_);
+                            case uinteger: return value((uint_t) (bool) bool_);
+                            case real: return value((real_t) (bool) bool_);
+                            case string: return value(bool_? "true": "false");
+                            default: return default_value;
                         }
                         break;
                     }
@@ -1904,31 +1956,31 @@ namespace cppdatalib
                         switch (new_type)
                         {
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
-                            case boolean: set_bool(int_ != 0); break;
-                            case uinteger: set_uint(int_ > 0? int_: 0); break;
-                            case real: set_real(static_cast<real_t>(int_)); break;
+                            case boolean: return value(int_ != 0);
+                            case uinteger: return value(uint_t(int_ > 0? int_: 0));
+                            case real: return value(static_cast<real_t>(int_));
 #else
                             case boolean:
                                 if (int_ == 0 || int_ == 1)
-                                    set_bool(int_ != 0);
+                                    return value(int_ != 0);
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert integer to boolean results in data loss");
                                 break;
                             case uinteger:
                                 if (int_ >= 0)
-                                    set_uint(int_);
+                                    return value(uint_t(int_));
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert integer to uinteger results in data loss");
                                 break;
                             case real:
                                 if (static_cast<int_>(static_cast<real_t>(int_)) == int_)
-                                    set_real(static_cast<real_t>(int_));
+                                    return value(static_cast<real_t>(int_));
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert integer to real results in data loss");
                                 break;
 #endif
-                            case string: set_string(to_string(int_)); break;
-                            default: *this = default_value; break;
+                            case string: return value(to_string(int_));
+                            default: return default_value;
                         }
                         break;
                     }
@@ -1937,30 +1989,30 @@ namespace cppdatalib
                         switch (new_type)
                         {
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
-                            case boolean: set_bool(uint_ != 0); break;
-                            case integer: set_int(uint_ <= uint_t(std::numeric_limits<int64_t>::max())? uint_: 0); break;
-                            case real: set_real(static_cast<real_t>(uint_)); break;
+                            case boolean: return value(uint_ != 0);
+                            case integer: return value(int_t(uint_ <= uint_t(std::numeric_limits<int_t>::max())? uint_: 0));
+                            case real: return value(static_cast<real_t>(uint_));
 #else
                             case boolean:
                                 if (uint_ == 0 || uint_ == 1)
-                                    set_bool(uint_ != 0);
+                                    return value(uint_ != 0);
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert uinteger to boolean results in data loss");
                                 break;
                             case integer:
-                                if (uint_ <= std::numeric_limits<int64_t>::max())
-                                    set_int(uint_);
+                                if (uint_ <= std::numeric_limits<int_t>::max())
+                                    return value(int_t(uint_));
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert uinteger to integer results in data loss");
                             case real:
                                 if (static_cast<uint_>(static_cast<real_t>(uint_)) == uint_)
-                                    set_real(static_cast<real_t>(uint_));
+                                    return value(static_cast<real_t>(uint_));
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert uinteger to real results in data loss");
                                 break;
 #endif
-                            case string: set_string(to_string(uint_)); break;
-                            default: *this = default_value; break;
+                            case string: return value(to_string(uint_));
+                            default: return default_value;
                         }
                         break;
                     }
@@ -1969,24 +2021,24 @@ namespace cppdatalib
                         switch (new_type)
                         {
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
-                            case boolean: set_bool(real_ != 0.0); break;
-                            case integer: set_int((real_ >= std::numeric_limits<int64_t>::min() && real_ <= std::numeric_limits<int64_t>::max())? static_cast<int_t>(trunc(real_)): 0); break;
-                            case uinteger: set_uint((real_ >= 0 && real_ <= std::numeric_limits<int64_t>::max())? static_cast<uint_t>(trunc(real_)): 0); break;
+                            case boolean: return value(real_ != 0.0);
+                            case integer: return value((real_ >= std::numeric_limits<int_t>::min() && real_ <= std::numeric_limits<int_t>::max())? static_cast<int_t>(trunc(real_)): 0);
+                            case uinteger: return value((real_ >= 0 && real_ <= std::numeric_limits<uint_t>::max())? static_cast<uint_t>(trunc(real_)): 0);
 #else
                             case boolean:
                                 if (real_ == 0 || real_ == 1)
-                                    set_bool(real_ != 0);
+                                    return value(real_ != 0);
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert real to boolean results in data loss");
                                 break;
                             case integer:
-                                if (real_ >= std::numeric_limits<int64_t>::min() && real_ <= std::numeric_limits<int64_t>::max() && trunc(real_) == real_)
-                                    set_int(real_);
+                                if (real_ >= std::numeric_limits<int_t>::min() && real_ <= std::numeric_limits<int_t>::max() && trunc(real_) == real_)
+                                    return value(int_t(real_));
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert real to integer results in data loss");
                             case uinteger:
-                                if (real_ >= 0 && real_ <= std::numeric_limits<uint64_t>::max() && trunc(real_) == real_)
-                                    set_real(real_);
+                                if (real_ >= 0 && real_ <= std::numeric_limits<uint_t>::max() && trunc(real_) == real_)
+                                    return value(uint_t(real_));
                                 else
                                     throw core::error("cppdatalib::core::value - attempt to convert real to uinteger results in data loss");
                                 break;
@@ -1996,10 +2048,9 @@ namespace cppdatalib
                                 core::ostringstream str;
                                 str.precision(CPPDATALIB_REAL_DIG);
                                 str << real_;
-                                set_string(str.str());
-                                break;
+                                return value(str.str());
                             }
-                            default: *this = default_value; break;
+                            default: return default_value;
                         }
                         break;
                     }
@@ -2007,53 +2058,56 @@ namespace cppdatalib
                     {
                         switch (new_type)
                         {
-                            case boolean: set_bool(str_ref_() == "true"); break;
+                            case boolean: return value(str_ref_() == "true");
                             case integer:
                             {
+                                value result;
                                 core::istringstream str(CPPDATALIB_INIT_ISTRINGSTREAM(str_ref_().data(),
                                                                                       str_ref_().size()));
-                                clear(integer);
-                                str >> int_;
+                                result.clear(integer);
+                                str >> result.int_;
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
-                                    int_ = 0;
+                                    result.int_ = 0;
 #else
                                 if (!str)
                                     throw core::error("cppdatalib::core::value - attempt to convert string to integer results in data loss");
 #endif
-                                break;
+                                return result;
                             }
                             case uinteger:
                             {
+                                value result;
                                 core::istringstream str(CPPDATALIB_INIT_ISTRINGSTREAM(str_ref_().data(),
                                                                                       str_ref_().size()));
-                                clear(uinteger);
-                                str >> uint_;
+                                result.clear(uinteger);
+                                str >> result.uint_;
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
-                                    uint_ = 0;
+                                    result.uint_ = 0;
 #else
                                 if (!str)
                                     throw core::error("cppdatalib::core::value - attempt to convert string to uinteger results in data loss");
 #endif
-                                break;
+                                return result;
                             }
                             case real:
                             {
+                                value result;
                                 core::istringstream str(CPPDATALIB_INIT_ISTRINGSTREAM(str_ref_().data(),
                                                                                       str_ref_().size()));
-                                clear(real);
-                                str >> real_;
+                                result.clear(real);
+                                str >> result.real_;
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
-                                    real_ = 0.0;
+                                    result.real_ = 0.0;
 #else
                                 if (!str)
                                     throw core::error("cppdatalib::core::value - attempt to convert string to real results in data loss");
 #endif
-                                break;
+                                return result;
                             }
-                            default: *this = default_value; break;
+                            default: return default_value;
                         }
                         break;
                     }
@@ -2062,61 +2116,65 @@ namespace cppdatalib
                     {
                         switch (new_type)
                         {
-                            case boolean: set_bool(tstr_ == "true"); break;
+                            case boolean: return value(tstr_ == "true");
                             case integer:
                             {
+                                value result;
                                 core::istringstream str(CPPDATALIB_INIT_ISTRINGSTREAM(tstr_.data(),
                                                                                       tstr_.size()));
-                                clear(integer);
-                                str >> int_;
+                                result.clear(integer);
+                                str >> result.int_;
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
-                                    int_ = 0;
+                                    result.int_ = 0;
 #else
                                 if (!str)
                                     throw core::error("cppdatalib::core::value - attempt to convert string to integer results in data loss");
 #endif
-                                break;
+                                return result;
                             }
                             case uinteger:
                             {
+                                value result;
                                 core::istringstream str(CPPDATALIB_INIT_ISTRINGSTREAM(tstr_.data(),
                                                                                       tstr_.size()));
-                                clear(uinteger);
-                                str >> uint_;
+                                result.clear(uinteger);
+                                str >> result.uint_;
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
-                                    uint_ = 0;
+                                    result.uint_ = 0;
 #else
                                 if (!str)
                                     throw core::error("cppdatalib::core::value - attempt to convert string to uinteger results in data loss");
 #endif
-                                break;
+                                return result;
                             }
                             case real:
                             {
+                                value result;
                                 core::istringstream str(CPPDATALIB_INIT_ISTRINGSTREAM(tstr_.data(),
                                                                                       tstr_.size()));
-                                clear(real);
-                                str >> real_;
+                                result.clear(real);
+                                str >> result.real_;
 #ifndef CPPDATALIB_DISABLE_CONVERSION_LOSS
                                 if (!str)
-                                    real_ = 0.0;
+                                    result.real_ = 0.0;
 #else
                                 if (!str)
                                     throw core::error("cppdatalib::core::value - attempt to convert string to real results in data loss");
 #endif
-                                break;
+                                return result;
                             }
                             case string:
                             {
+                                value result;
                                 core::string_t str(tstr_.data(), tstr_.size());
-                                clear(string);
+                                result.clear(string);
                                 if (str.size())
-                                    str_ref_() = std::move(str);
+                                    result.str_ref_() = std::move(str);
                                 break;
                             }
-                            default: *this = default_value; break;
+                            default: return default_value;
                         }
                         break;
                     }
@@ -2482,8 +2540,8 @@ namespace cppdatalib
             if (v.begin() != v.end())
             {
                 array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(value(element));
+                for (auto &&element: v)
+                    push_back(value(std::move(element)));
             }
             else
                 init(array, subtype);
@@ -2498,8 +2556,8 @@ namespace cppdatalib
             if (v.begin() != v.end())
             {
                 array_init(subtype, core::array_t());
-                for (auto const &element: v)
-                    push_back(value(element, userdata, core::normal));
+                for (auto &&element: v)
+                    push_back(value(std::move(element), userdata, core::normal));
             }
             else
                 init(array, subtype);
@@ -3004,6 +3062,20 @@ namespace cppdatalib
                 init(object, subtype);
         }
 
+#ifdef CPPDATALIB_ENABLE_ATTRIBUTES
+        inline value value::value_with_attributes(value v, const object_t &attributes)
+        {
+            v.set_attributes(attributes);
+            return v;
+        }
+
+        inline value value::value_with_attributes(value v, object_t &&attributes)
+        {
+            v.set_attributes(stdx::move(attributes));
+            return v;
+        }
+#endif
+
         inline value::value(value &&other) : type_(other.type_), subtype_(other.subtype_)
 #ifdef CPPDATALIB_ENABLE_ATTRIBUTES
             , attr_(nullptr)
@@ -3458,13 +3530,13 @@ namespace cppdatalib
         inline array_t value::as_array() const {return get_array();}
         inline object_t value::as_object() const {return get_object();}
 #else
-        inline array_t value::as_array(const array_t &default_) const {return value(*this).convert_to(array, core::value(default_)).arr_ref_();}
-        inline object_t value::as_object(const object_t &default_) const {return value(*this).convert_to(object, core::value(default_)).obj_ref_();}
-        inline array_t value::as_array() const {return value(*this).convert_to(array, core::value(array_t())).arr_ref_();}
-        inline object_t value::as_object() const {return value(*this).convert_to(object, core::value(object_t())).obj_ref_();}
+        inline array_t value::as_array(const array_t &default_) const {return converted_to(array, core::value(default_)).arr_ref_();}
+        inline object_t value::as_object(const object_t &default_) const {return converted_to(object, core::value(default_)).obj_ref_();}
+        inline array_t value::as_array() const {return converted_to(array, core::value(array_t())).arr_ref_();}
+        inline object_t value::as_object() const {return converted_to(object, core::value(object_t())).obj_ref_();}
 
-        inline array_t &value::convert_to_array() {return convert_to(array, core::value(array_t())).arr_ref_();}
-        inline object_t &value::convert_to_object() {return convert_to(object, core::value(object_t())).obj_ref_();}
+        inline array_t &value::convert_to_array() {return (*this = converted_to(array, core::value(array_t()))).arr_ref_();}
+        inline object_t &value::convert_to_object() {return (*this = converted_to(object, core::value(object_t()))).obj_ref_();}
 #endif
 
         inline void value::mutable_clear() const
@@ -3763,6 +3835,17 @@ public:
     void convert(cppdatalib::core::value &) const {throw cppdatalib::core::error("cast_to_cppdatalib - invalid conversion, no operator found");}
 };
 
+template<typename T>
+class cast_existing_pointer_to_cppdatalib {
+#ifndef CPPDATALIB_WATCOM
+    typedef CPPDATALIB_TYPENAME T::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
+#endif
+public:
+    cast_existing_pointer_to_cppdatalib(T *) {}
+    operator cppdatalib::core::value() const {cppdatalib::core::value result; convert(result); return result;}
+    void convert(cppdatalib::core::value &) const {throw cppdatalib::core::error("cast_existing_pointer_to_cppdatalib - invalid conversion, no operator found");}
+};
+
 #ifdef CPPDATALIB_CPP11
 template<template<typename...> class Template, typename... Ts>
 struct cast_template_to_cppdatalib
@@ -3794,6 +3877,16 @@ public:
     void convert(cppdatalib::core::value &) const {throw cppdatalib::core::error("cast_sized_template_to_cppdatalib - invalid conversion, no operator found");}
 };
 #endif // CPPDATALIB_CPP11
+
+template<typename T>
+class cast_existing_pointer_from_cppdatalib {
+#ifndef CPPDATALIB_WATCOM
+    typedef CPPDATALIB_TYPENAME T::You_must_reimplement_cppdatalib_conversions_for_custom_types type;
+#endif
+public:
+    cast_existing_pointer_from_cppdatalib(const cppdatalib::core::value &) {}
+    void convert(T *) const {throw cppdatalib::core::error("cast_existing_pointer_from_cppdatalib - invalid conversion, no operator found");}
+};
 
 template<typename T>
 class cast_from_cppdatalib {

@@ -77,7 +77,7 @@ namespace cppdatalib
                 stream.avail_in = 0;
                 stream.next_in = Z_NULL;
 
-                int windowBitsParam = windowBits;
+                int windowBitsParam = windowBits & 0xf;
 
                 switch (format)
                 {

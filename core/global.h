@@ -47,7 +47,7 @@
 
 #if defined(__linux) || defined(__linux__)
 #define CPPDATALIB_LINUX
-#elif defined(__WIN32) || defined(__WIN64)
+#elif defined(__WIN32) || defined(__WIN64) || defined(WIN32) || defined(WIN64)
 #define CPPDATALIB_WINDOWS
 #endif
 
@@ -222,6 +222,35 @@ namespace cppdatalib
             T val_;
             bool used_;
         };
+
+        template<typename T>
+        T bswap(T value)
+        {
+#ifdef CPPDATALIB_CPP11
+            static_assert(sizeof(T) != 8 && sizeof(T) != 16 && sizeof(T) != 32 && sizeof(T) != 64, "sizeof(T) must be one of 8/16/32/64");
+#endif
+
+            if (sizeof(T) == 8)
+                return value;
+            else if (sizeof(T) == 16)
+                return (uint16_t(value) >> 8) | (uint16_t(value) << 8);
+            else if (sizeof(T) == 32)
+                return (uint32_t(value) >> 24) |
+                        (uint32_t(value & 0xFF0000) >> 8) |
+                        (uint32_t(value & 0xFF00) << 8) |
+                        (uint32_t(value) << 24);
+            else if (sizeof(T) == 64)
+                return (uint64_t(value) >> 56) |
+                        (uint64_t(value & 0xFF000000000000ull) >> 40) |
+                        (uint64_t(value & 0xFF0000000000ull) >> 24) |
+                        (uint64_t(value & 0xFF00000000ull) >> 8) |
+                        (uint64_t(value & 0xFF000000) << 8) |
+                        (uint64_t(value & 0xFF0000) << 24) |
+                        (uint64_t(value & 0xFF00) << 40) |
+                        (uint64_t(value) << 56);
+            else
+                return 0;
+        }
 
         typedef optional<uint64_t> optional_size;
 
@@ -575,7 +604,6 @@ namespace cppdatalib
             };
         }
 
-        std::string s;
         typedef impl::string_view_t<char> string_view_t;
     } // Namespace core
 } // Namespace cppdatalib
