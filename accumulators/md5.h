@@ -32,6 +32,12 @@ namespace cppdatalib
 {
     namespace md5
     {
+        /* class md5::accumulator
+         *
+         * Computes the MD5 hash of the input; the hash is not flushed until end() is called
+         *
+         * Only binary (0x00-0xff) data is accepted
+         */
         class accumulator : public core::accumulator_base
         {
 #ifndef CPPDATALIB_WATCOM

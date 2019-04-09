@@ -48,6 +48,12 @@ namespace cppdatalib
 #endif
         }
 
+        /* class sha256::accumulator
+         *
+         * Computes the SHA2-256 hash of the input; the hash is not flushed until end() is called
+         *
+         * Only binary (0x00-0xff) data is accepted
+         */
         class accumulator : public core::accumulator_base
         {
             alignas(16) uint8_t buffer[64];

@@ -32,6 +32,13 @@ namespace cppdatalib
 {
     namespace rand
     {
+        /* class rand::accumulator
+         *
+         * Obtains NON-cryptographically-secure random 8-bit characters and flushes them to the output,
+         *  using a PRNG to calculate them
+         *
+         * This accumulator ignores input
+         */
         class accumulator : public core::accumulator_base
         {
         public:

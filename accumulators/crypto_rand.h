@@ -37,6 +37,14 @@ namespace cppdatalib
 {
     namespace crypto_rand
     {
+        /* class crypto_rand::blocking_accumulator
+         * class crypto_rand::nonblocking_accumulator
+         *
+         * Obtains cryptographically-secure random 8-bit characters and flushes them to the output,
+         *  either blocking until more entropy is available or using a CSPRNG to calculate them
+         *
+         * This accumulator ignores input
+         */
 #ifdef CPPDATALIB_LINUX
         class blocking_accumulator : public core::accumulator_base
         {

@@ -31,6 +31,12 @@ namespace cppdatalib
 {
     namespace crc32
     {
+        /* class crc32::accumulator
+         *
+         * Computes CRC32 of input over the polynomial 0xEDB88320, and outputs the result as a 32-bit big-endian integer
+         *
+         * Only binary (0x00-0xff) data is accepted
+         */
         class accumulator : public core::accumulator_base
         {
             static const uint32_t poly = 0xEDB88320;

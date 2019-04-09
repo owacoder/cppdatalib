@@ -31,6 +31,14 @@ namespace cppdatalib
 {
     namespace line_count
     {
+        /* class line_count::accumulator
+         *
+         * Computes number of lines ('\n' characters) read from the input, as well as where in the column the current read stream is
+         *
+         * Use current_line_count() and current_line_column() to return the current information
+         *
+         * Data is passed through the accumulator unmodified, but only binary (0x00-0xff) data is accepted
+         */
         class accumulator : public core::accumulator_base
         {
             uint64_t count, col; // line count and column count, respectively (0-based)

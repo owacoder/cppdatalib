@@ -40,6 +40,12 @@ namespace cppdatalib
 {
     namespace zlib
     {
+        /* class zlib::decode_accumulator
+         *
+         * Decodes a zlib- or gzip-encoded stream and flushes it to output.
+         *
+         * Only binary (0x00-0xff) data is accepted
+         */
         class decode_accumulator : public core::accumulator_base
         {
             z_stream stream;
